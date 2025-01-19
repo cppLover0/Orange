@@ -5,8 +5,9 @@ Orange is my multiboot2 x86_64 OS
 
 ## TODO
 
-- [ ] Build
-- [ ] Jump to long mode
+- [x] Build
+- [x] Early paging
+- [x] Jump to long mode
 - [ ] PMM 
 - [ ] Paging
 - [ ] Some heap
