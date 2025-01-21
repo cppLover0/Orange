@@ -8,6 +8,9 @@ Orange is my multiboot2 x86_64 OS
 - [x] Build
 - [x] Early paging
 - [x] Jump to long mode
+- [x] IO
+- [x] Locking
+- [x] Serial
 - [ ] PMM 
 - [ ] Paging
 - [ ] Some heap
