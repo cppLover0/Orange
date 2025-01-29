@@ -1,16 +1,15 @@
 
 # Orange
 
-Orange is my multiboot2 x86_64 OS
+Orange is my limine x86_64 OS
 
 ## TODO
 
 - [x] Build
-- [x] Early paging
-- [x] Jump to long mode
 - [x] IO
 - [x] Locking
 - [x] Serial
+- [x] PCI
 - [ ] PMM 
 - [ ] Paging
 - [ ] Some heap

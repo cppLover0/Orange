@@ -5,3 +5,10 @@ obj
 trash
 .code
 serial_output.txt
+kernel-deps
+limine
+kernel/bin
+kernel/cc-runtime
+kernel/cc-runtime-x86_64
+kernel/freestnd-c-hdrs
+kernel/freestnd-cxx-hdrs
