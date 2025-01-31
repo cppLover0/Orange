@@ -1,1 +1,2 @@
 #define PAGE_SIZE 4096
+#define SIZE_KHEAP_IN_PAGES 256
