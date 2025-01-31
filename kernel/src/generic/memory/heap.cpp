@@ -3,6 +3,7 @@
 #include <generic/locks/spinlock.hpp>
 #include <generic/memory/pmm.hpp>
 #include <generic/memory/heap.hpp>
+#include <generic/memory/paging.hpp>
 #include <config.hpp>
 
 char heap_lock = 0;
@@ -14,6 +15,7 @@ void KHeap::Init() {
     head->isfree = 1;
     head->next = nullptr;
     kmalloc_base = (uint64_t)head;
+    Paging::alwaysMappedAdd((uint64_t)head,PAGE_SIZE * SIZE_KHEAP_IN_PAGES);
 }
 
 void* KHeap::Malloc(uint64_t size) {

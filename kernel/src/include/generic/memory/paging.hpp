@@ -18,6 +18,13 @@
 
 #define PTE_INDEX(address,bit) ((address & (uint64_t)0x1FF << bit) >> bit)
 
+typedef struct alwaysMapped {
+    uint64_t base;
+    uint64_t size;
+    char is_phys;
+    struct alwaysMapped* next;
+} alwaysMapped_t;
+
 class Paging {
 public:
     static void Init();
@@ -33,6 +40,10 @@ public:
     static void MemoryEntry(uint64_t* cr3,uint32_t type,uint64_t flags);
 
     static void Pat(uint8_t index, uint8_t type);
+
+    static void alwaysMappedMap(uint64_t* cr3);
+
+    static void alwaysMappedAdd(uint64_t base,uint64_t size);
 
     static void EnablePaging(uint64_t* virt_cr3);
 

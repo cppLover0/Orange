@@ -7,6 +7,7 @@
 #include <generic/limineA/limineinfo.hpp>
 #include <lib/limineA/limine.h>
 #include <drivers/serial/serial.hpp>
+#include <generic/locks/spinlock.hpp>
 
 uint64_t* __paging_next_level(uint64_t* table,uint64_t index) {
     if(!(table[index] & PTE_PRESENT))
@@ -71,6 +72,40 @@ void Paging::EnablePaging(uint64_t* virt_cr3) {
 
 void Paging::EnableKernel() {
     EnablePaging(kernel_cr3);
+}
+
+alwaysMapped_t head_map;
+alwaysMapped_t* last_map;
+char maplock;
+
+void Paging::alwaysMappedAdd(uint64_t base,uint64_t size) {
+    if(head_map.base == 0) { //kheap
+        head_map.base = base;
+        head_map.size = size;
+        head_map.is_phys = 0;
+        last_map = &head_map;
+    } else {
+        // it will not be atomic so i need a lock
+        spinlock_lock(&maplock);
+        alwaysMapped_t* map = new alwaysMapped_t;
+        LimineInfo info;
+        map->base = base;
+        map->size = size;
+        last_map->next = map;
+        last_map = map;
+        head_map.is_phys = base < info.hhdm_offset ? 1 : 0; 
+        spinlock_unlock(&maplock);
+    }
+}
+
+void Paging::alwaysMappedMap(uint64_t* cr3) {
+    alwaysMapped_t* current_map = &head_map;
+    while(current_map != 0) {
+        for(uint64_t i = current_map->base;i < current_map->base + current_map->size;i += PAGE_SIZE) {
+            HHDMMap(cr3,current_map->is_phys ? i : HHDM::toPhys(i),PTE_PRESENT | PTE_RW);
+        }
+        current_map = current_map->next;
+    }
 }
 
 void Paging::Init() {

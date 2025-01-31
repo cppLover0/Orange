@@ -10,6 +10,7 @@
 #include <generic/memory/paging.hpp>
 #include <generic/memory/heap.hpp>
 #include <arch/x86_64/cpu/data.hpp>
+#include <arch/x86_64/cpu/gdt.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -65,6 +66,8 @@ extern "C" void kmain() {
     cpudata_t* data = CpuData::Access();
     Serial::printf("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
 
+    GDT::Init();
+    Serial::printf("[+] GDT Initializied\n");
 
     uint8_t t = 0;
     char m = 0;

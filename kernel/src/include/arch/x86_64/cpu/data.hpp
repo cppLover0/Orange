@@ -5,7 +5,7 @@
 #include <arch/x86_64/cpu/gdt.hpp>
 
 typedef struct {
-    GDT* gdt;
+    GDT gdt;
     struct LIMINE_MP(info)* smp_info;
 } __attribute__((packed)) cpudata_t;
 
