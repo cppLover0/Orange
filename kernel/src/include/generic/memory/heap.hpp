@@ -1,6 +1,8 @@
 
 #include <stdint.h>
 
+#pragma once
+
 typedef struct kernel_heap_block {
     uint64_t size;
     uint8_t isfree;

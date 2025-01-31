@@ -53,10 +53,12 @@ typedef struct __attribute__((packed)) {
 class GDT {
 public:
 
-    gdt_t* gdt;
-    tss_t* tss;
-    gdt_pointer_t* gdtr;
+    gdt_t gdt;
+    tss_t tss;
+    gdt_pointer_t gdtr;
 
     static void Init();
 
 };
+
+#pragma once

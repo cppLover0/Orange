@@ -1,6 +1,8 @@
 
 // i'll use hhdm 
 
+#pragma once
+
 #include <stdint.h>
 #include <config.hpp>
 

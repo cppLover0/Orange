@@ -1,6 +1,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <generic/memory/heap.hpp>
 
 extern "C" {
 
@@ -71,4 +72,24 @@ extern "C" {
     int __cxa_atexit(void (*)(void *), void *, void *) { return 0; }
     void __cxa_pure_virtual() { hcf(); }
     void *__dso_handle;
+}
+
+void *operator new(size_t size)
+{
+    return KHeap::Malloc(size);
+}
+
+void *operator new[](size_t size)
+{
+    return KHeap::Malloc(size);
+}
+
+void operator delete(void *p)
+{
+    KHeap::Free(p);
+}
+
+void operator delete[](void *p)
+{
+    KHeap::Free(p);
 }

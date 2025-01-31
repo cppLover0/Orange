@@ -9,6 +9,7 @@
 #include <generic/memory/pmm.hpp>
 #include <generic/memory/paging.hpp>
 #include <generic/memory/heap.hpp>
+#include <arch/x86_64/cpu/data.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -60,6 +61,10 @@ extern "C" void kmain() {
     Serial::printf("[+] KHeap Initializied\n");
 
     Serial::printf("KHeap test: 1:0x%p 2:0x%p 3:0x%p\n",KHeap::Malloc(10),KHeap::Malloc(4096),KHeap::Malloc(16));
+
+    cpudata_t* data = CpuData::Access();
+    Serial::printf("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
+
 
     uint8_t t = 0;
     char m = 0;

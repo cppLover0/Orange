@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <lib/limineA/limine.h>
 
+#pragma once
+
 class LimineInfo {
 public:
 

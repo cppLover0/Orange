@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <lib/limineA/limine.h>
 
+#pragma once
+
 typedef struct bitmap {
     uint64_t bits;
     uint64_t size;
