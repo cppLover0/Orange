@@ -35,11 +35,11 @@ extern "C" void kmain() {
 
     HHDM::applyHHDM(info.hhdm_offset);
 
-    Serial::printf("Initializing PMM\n");
     PMM::Init(info.memmap);
+    Serial::printf("[+] PMM Initializied\n"); //it will be initializied anyway
 
-    Serial::printf("Initializing Paging\n");
     Paging::Init();
+    Serial::printf("[+] Paging Initializied\n"); //it will be initializied anyway
 
     Serial::printf("Starting PMM Test\n");
 
