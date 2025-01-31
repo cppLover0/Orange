@@ -4,8 +4,8 @@
 #include <generic/memory/paging.hpp>
 #include <other/assembly.hpp>
 #include <other/hhdm.hpp>
-#include <generic/limine/limineinfo.hpp>
-#include <lib/limine/limine.h>
+#include <generic/limineA/limineinfo.hpp>
+#include <lib/limineA/limine.h>
 #include <drivers/serial/serial.hpp>
 
 uint64_t* __paging_next_level(uint64_t* table,uint64_t index) {

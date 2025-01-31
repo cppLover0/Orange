@@ -81,5 +81,5 @@ clone_repo_commit \
 
 download_by_hash \
     https://github.com/limine-bootloader/limine/raw/7cddb61183685d9bddd2eb13d42223d929c2abe6/limine.h \
-    src/limine.h \
+    src/include/lib/limine/limine.h \
     c00e7d4cd6e2674eca481f978b64a7fb8c8479cc32c466ec35aad2207761bf01

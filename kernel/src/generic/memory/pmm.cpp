@@ -1,7 +1,7 @@
 
 #include <generic/locks/spinlock.hpp>
 #include <generic/memory/pmm.hpp>
-#include <lib/limine/limine.h>
+#include <lib/limineA/limine.h>
 #include <other/hhdm.hpp>
 #include <drivers/serial/serial.hpp>
 #include <other/string.hpp>

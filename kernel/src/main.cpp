@@ -1,9 +1,9 @@
 #include <cstdint>
 #include <cstddef>
-#include <lib/limine/limine.h>
+#include <lib/limineA/limine.h>
 #include <drivers/serial/serial.hpp>
 #include <generic/status/status.hpp>
-#include <generic/limine/limineinfo.hpp>
+#include <generic/limineA/limineinfo.hpp>
 #include <other/hhdm.hpp>
 #include <other/string.hpp>
 #include <generic/memory/pmm.hpp>
