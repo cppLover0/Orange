@@ -31,8 +31,10 @@ void GDT::Init() {
     tss_t* tss = &data->gdt.tss;
     uint64_t stack_1 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES);
     uint64_t stack_2 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES);
-    tss->rsp[0] = stack_1 + TSS_STACK_IN_PAGES * PAGE_SIZE;
-    tss->ist[0] = stack_2 + TSS_STACK_IN_PAGES * PAGE_SIZE;
+    uint64_t stack_3 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES);
+    tss->rsp[0] = stack_1 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    tss->ist[0] = stack_2 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    tss->ist[1] = stack_3 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     tss->iopb_offsset = sizeof(tss);
     gdt->tss.baselow16 = (uint64_t)tss & 0xFFFF;
     gdt->tss.basemid8 = ((uint64_t)tss >> 16) & 0xFF;

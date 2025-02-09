@@ -11,6 +11,7 @@
 #include <generic/memory/heap.hpp>
 #include <arch/x86_64/cpu/data.hpp>
 #include <arch/x86_64/cpu/gdt.hpp>
+#include <arch/x86_64/interrupts/idt.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -25,7 +26,7 @@ extern "C" void kmain() {
 
     ret = Serial::Init();
 
-    Serial::printf("[%s] Serial initializied\n",ret >> 4 == 1 ? "+" : "-");
+    Serial::printf("Serial initializied\n");
 
     LimineInfo info;
 
@@ -39,36 +40,20 @@ extern "C" void kmain() {
     HHDM::applyHHDM(info.hhdm_offset);
 
     PMM::Init(info.memmap);
-    Serial::printf("[+] PMM Initializied\n"); //it will be initializied anyway
+    Serial::printf("PMM Initializied\n"); //it will be initializied anyway
 
     Paging::Init();
-    Serial::printf("[+] Paging Initializied\n"); //it will be initializied anyway
-
-    Serial::printf("Starting PMM Test\n");
-
-    void* f1 = PMM::VirtualAlloc();
-    void* f2 = PMM::VirtualAlloc();
-    void* f3 = PMM::VirtualBigAlloc(256);
-    void* f4 = PMM::VirtualAlloc();
-    PMM::VirtualFree(f1);
-    void* f5 = PMM::VirtualAlloc();
-    PMM::VirtualBigFree(f3,256);
-    void* f6 = PMM::VirtualBigAlloc(255);
-    void* f7 = PMM::VirtualAlloc();
-
-    Serial::printf("PMM Test\nf1: 0x%p f2: 0x%p f3: 0x%p f4: 0x%p f5: 0x%p f6: 0x%p f7: 0x%p\n",f1,f2,f3,f4,f5,f6,f7);
-
+    Serial::printf("Paging Initializied\n"); //it will be initializied anyway
     KHeap::Init();
-    Serial::printf("[+] KHeap Initializied\n");
-
-    Serial::printf("KHeap test: 1:0x%p 2:0x%p 3:0x%p\n",KHeap::Malloc(10),KHeap::Malloc(4096),KHeap::Malloc(16));
-
+    Serial::printf("KHeap Initializied\n");
     cpudata_t* data = CpuData::Access();
     Serial::printf("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
 
     GDT::Init();
-    Serial::printf("[+] GDT Initializied\n");
+    Serial::printf("GDT Initializied\n");
 
+    IDT::Init();
+    Serial::printf("IDT Initializied\n");
     uint8_t t = 0;
     char m = 0;
     while(1) {

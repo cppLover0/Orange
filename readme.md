@@ -10,17 +10,19 @@ Orange is my limine x86_64 OS
 - [x] Locking
 - [x] Serial
 - [x] PCI
-- [ ] PMM 
-- [ ] Paging
-- [ ] Some heap
-- [ ] GDT
-- [ ] IDT
-- [ ] TSS
+- [x] PMM 
+- [x] Paging
+- [x] Some heap
+- [x] GDT
+- [x] IDT
+- [x] TSS
 - [ ] ACPI
 - [ ] HPET
 - [ ] LAPIC 
 - [ ] SMP
-- [ ] Scheduling
 - [ ] IOAPIC
 - [ ] VFS
-- [ ] User space
+- [ ] Some fs and procfs
+- [ ] Scheduling
+- [ ] Unixlike syscalls
+- [ ] UserSpace 
