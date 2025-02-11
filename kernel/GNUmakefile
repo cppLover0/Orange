@@ -10,16 +10,16 @@ override OUTPUT := kernel
 PREFIX := /usr/local
 
 # User controllable C compiler command.
-CC := cc
+CC := clang
 
 # User controllable C++ compiler command.
-CXX := c++
+CXX := clang++
 
 # User controllable archiver command.
 AR := ar
 
 # User controllable C flags.
-CFLAGS := -g -O2 -pipe -I ./src/include
+CFLAGS := -g -O2 -pipe -I ./src/include -I ./src/lib/uACPI/include
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS) 

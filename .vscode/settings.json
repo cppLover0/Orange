@@ -10,6 +10,9 @@
         "slist": "cpp",
         "format": "cpp",
         "stacktrace": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "serial.hpp": "c",
+        "*.tcc": "cpp",
+        "thread": "cpp"
     }
 }

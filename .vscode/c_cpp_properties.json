@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/kernel/src/include"
+                "${workspaceFolder}/kernel/src/include",
+                "${workspaceFolder}/kernel/src/lib/uACPI/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

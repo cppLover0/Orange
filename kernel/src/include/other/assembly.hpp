@@ -28,9 +28,3 @@ inline void __sti() {
 inline void __hlt() {
     __asm__ volatile ("hlt");
 }
-
-inline uint64_t __rdtsc() {
-    uint32_t lo, hi;
-    __asm__ volatile ("rdtsc" : "=a" (lo), "=d" (hi));
-    return ((uint64_t)hi << 32) | lo;
-}

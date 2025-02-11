@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+typedef struct {
+    uint64_t base;
+    uint64_t len;
+} __attribute__((packed)) uacpi_io_struct_t;
+
 class IO {
 public:
 

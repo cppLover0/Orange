@@ -8,6 +8,7 @@ Orange is my limine x86_64 OS
 - [x] Build
 - [x] IO
 - [x] Locking
+- [x] GFX (flanterm)
 - [x] Serial
 - [x] PCI
 - [x] PMM 
@@ -16,8 +17,8 @@ Orange is my limine x86_64 OS
 - [x] GDT
 - [x] IDT
 - [x] TSS
-- [ ] ACPI
-- [ ] HPET
+- [x] ACPI
+- [x] HPET
 - [ ] LAPIC 
 - [ ] SMP
 - [ ] IOAPIC

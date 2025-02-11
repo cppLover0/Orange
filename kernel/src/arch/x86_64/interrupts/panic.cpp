@@ -5,7 +5,7 @@
 #include <other/assembly.hpp>
 
 extern "C" void CPUKernelPanic(int_frame_t* frame) {
-    Serial::printf("Kernel panic !\nVector: 0x%p, err_code: 0x%p\n",frame->vec,frame->err_code);
+    Serial::printf("Kernel panic !\nVector: 0x%p, err_code: 0x%p at RIP: 0x%p\n",frame->vec,frame->err_code,frame->rip);
     __cli();
     __hlt();
 }

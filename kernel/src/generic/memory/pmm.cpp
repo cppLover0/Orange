@@ -6,6 +6,7 @@
 #include <drivers/serial/serial.hpp>
 #include <other/string.hpp>
 #include <config.hpp>
+#include <other/log.hpp>
 
 char pmm_spinlock = 0;
 memory_entry_t biggest_entry;
@@ -30,7 +31,7 @@ void PMM::Init(limine_memmap_response* mem_map) {
     uint64_t top;
     for(uint64_t i = 0; i < mem_map->entry_count;i++) {
         current_entry = mem_map->entries[i];
-        Serial::printf("Entry #%d. Base: 0x%p, size: 0x%p, type: %s (%d)\n",i,current_entry->base,current_entry->length,current_entry->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non usable",current_entry->type);
+        Log("Entry #%d. Base: 0x%p, size: 0x%p, type: %s (%d)\n",i,current_entry->base,current_entry->length,current_entry->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non usable",current_entry->type);
         if(current_entry->type == LIMINE_MEMMAP_USABLE) {
             if(current_entry->length > top) {
                 top = current_entry->length;

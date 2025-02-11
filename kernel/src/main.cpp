@@ -11,7 +11,14 @@
 #include <generic/memory/heap.hpp>
 #include <arch/x86_64/cpu/data.hpp>
 #include <arch/x86_64/cpu/gdt.hpp>
+#include <other/assembly.hpp>
+#include <uacpi/sleep.h>
 #include <arch/x86_64/interrupts/idt.hpp>
+#include <generic/acpi/acpi.hpp>
+#include <drivers/hpet/hpet.hpp>
+#include <other/log.hpp>
+#include <lib/flanterm/flanterm.h>
+#include <lib/flanterm/backends/fb.h>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -30,45 +37,66 @@ extern "C" void kmain() {
 
     LimineInfo info;
 
-    Serial::printf("Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
-    Serial::printf("RSDP: 0x%p\n",info.rsdp_address);
-    Serial::printf("HHDM: 0x%p\n",info.hhdm_offset);
-    Serial::printf("Kernel: Phys: 0x%p, Virt: 0x%p\n",info.ker_addr->physical_base,info.ker_addr->virtual_base);
-    Serial::printf("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
-    Serial::printf("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
+    struct flanterm_context *ft_ctx = flanterm_fb_init(
+        NULL,
+        NULL,
+        (uint32_t*)info.fb_info->address, info.fb_info->width, info.fb_info->height, info.fb_info->pitch,
+        info.fb_info->red_mask_size, info.fb_info->red_mask_shift,
+        info.fb_info->green_mask_size, info.fb_info->green_mask_shift,
+        info.fb_info->blue_mask_size, info.fb_info->blue_mask_shift,
+        NULL,
+        NULL, NULL,
+        NULL, NULL,
+        NULL, NULL,
+        NULL, 0, 0, 1,
+        0, 0,
+        0
+    );
+
+    LogInit(ft_ctx);
+
+    Log("Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
+    Log("RSDP: 0x%p\n",info.rsdp_address);
+    Log("HHDM: 0x%p\n",info.hhdm_offset);
+    Log("Kernel: Phys: 0x%p, Virt: 0x%p\n",info.ker_addr->physical_base,info.ker_addr->virtual_base);
+    Log("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
+    Log("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
     HHDM::applyHHDM(info.hhdm_offset);
 
     PMM::Init(info.memmap);
-    Serial::printf("PMM Initializied\n"); //it will be initializied anyway
+    Log("PMM Initializied\n"); //it will be initializied anyway
 
     Paging::Init();
-    Serial::printf("Paging Initializied\n"); //it will be initializied anyway
+    Log("Paging Initializied\n"); //it will be initializied anyway
     KHeap::Init();
-    Serial::printf("KHeap Initializied\n");
+    Log("KHeap Initializied\n");
     cpudata_t* data = CpuData::Access();
-    Serial::printf("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
+    Log("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
 
     GDT::Init();
-    Serial::printf("GDT Initializied\n");
+    Log("GDT Initializied\n");
 
     IDT::Init();
-    Serial::printf("IDT Initializied\n");
-    uint8_t t = 0;
-    char m = 0;
-    while(1) {
-        String::memset(info.fb_info->address,t,info.fb_info->height * info.fb_info->pitch);
-        if(t == 0xFF) {
-            m = 1;
-        } else if(t == 0) {
-            m = 0;
-        }
-        if(m)
-            t--;
-        else
-            t++;
-        
-    }
+    Log("IDT Initializied\n");
+
+    ACPI::InitTables();
+    Log("Early tables of ACPI initializied\n");
+
+    HPET::Init();
+    Log("HPET Initializied\n");
+    
+    ACPI::fullInit();
+    Log("ACPI Initializied\n");
+
+    Log("Waiting 5 seconds and shutdown\n");
+    HPET::Sleep(5*1000*1000);
+
+    uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
+    __cli();
+    uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
+
+    Log("Fuck up your computer :rage:");
 
     asm volatile("hlt");
     
