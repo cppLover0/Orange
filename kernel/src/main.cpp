@@ -19,9 +19,20 @@
 #include <other/log.hpp>
 #include <lib/flanterm/flanterm.h>
 #include <lib/flanterm/backends/fb.h>
+#include <arch/x86_64/cpu/lapic.hpp>
+#include <drivers/cmos/cmos.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
+
+void timer_test() {
+    Log("Got timer interrupt cpu %d %d:%d:%d!\n",Lapic::ID(),CMOS::Hour(),CMOS::Minute(),CMOS::Second());
+    Lapic::EOI();
+    __sti();
+    while(1) {
+        __hlt();
+    }
+}
 
 extern "C" void kmain() {
 
@@ -89,14 +100,13 @@ extern "C" void kmain() {
     ACPI::fullInit();
     Log("ACPI Initializied\n");
 
-    Log("Waiting 5 seconds and shutdown\n");
-    HPET::Sleep(5*1000*1000);
+    Lapic::Init();
+    Log("LAPIC Initializied\n");
 
-    uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
-    __cli();
-    uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
+    idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
+    timer_entry->ist = 3;
 
-    Log("Fuck up your computer :rage:");
+    __sti();
 
     asm volatile("hlt");
     

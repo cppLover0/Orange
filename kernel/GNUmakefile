@@ -19,7 +19,7 @@ CXX := clang++
 AR := ar
 
 # User controllable C flags.
-CFLAGS := -g -O2 -pipe -I ./src/include -I ./src/lib/uACPI/include
+CFLAGS := -g -O2 -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS) 

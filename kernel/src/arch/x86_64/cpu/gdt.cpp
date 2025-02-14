@@ -29,12 +29,14 @@ void GDT::Init() {
     String::memcpy(&data->gdt.gdt,&original_gdt,sizeof(gdt_t));
     gdt_t* gdt = &data->gdt.gdt;
     tss_t* tss = &data->gdt.tss;
-    uint64_t stack_1 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES);
-    uint64_t stack_2 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES);
-    uint64_t stack_3 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES);
+    uint64_t stack_1 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for rsp[0]
+    uint64_t stack_2 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for ist 1 (exceptions)
+    uint64_t stack_3 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for ist 2 (some irqs)
+    uint64_t stack_4 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for ist 3 (timer)
     tss->rsp[0] = stack_1 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     tss->ist[0] = stack_2 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     tss->ist[1] = stack_3 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    tss->ist[2] = stack_4 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     tss->iopb_offsset = sizeof(tss);
     gdt->tss.baselow16 = (uint64_t)tss & 0xFFFF;
     gdt->tss.basemid8 = ((uint64_t)tss >> 16) & 0xFF;

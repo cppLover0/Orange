@@ -19,7 +19,8 @@ Orange is my limine x86_64 OS
 - [x] TSS
 - [x] ACPI
 - [x] HPET
-- [ ] LAPIC 
+- [x] CMOS
+- [x] LAPIC 
 - [ ] SMP
 - [ ] IOAPIC
 - [ ] VFS
