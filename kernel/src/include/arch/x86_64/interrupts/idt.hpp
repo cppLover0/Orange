@@ -52,4 +52,5 @@ public:
     static idt_entry_t* SetEntry(uint8_t vec,void* base,uint8_t flags);
     static uint8_t AllocEntry();
     static void FreeEntry(uint8_t vec);
+    static void Load();
 };

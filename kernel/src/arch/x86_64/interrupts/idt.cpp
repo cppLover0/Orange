@@ -35,6 +35,10 @@ void IDT::FreeEntry(uint8_t vec) {
 extern void* isrTable[];
 extern void* ignoreStub;
 
+void IDT::Load() {
+    __asm__ volatile ("lidt %0" : : "m"(idtr));
+}
+
 void IDT::Init() {
     idtr.base = (uint64_t)&idt[0];
     idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;

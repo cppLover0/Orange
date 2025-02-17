@@ -21,12 +21,14 @@
 #include <lib/flanterm/backends/fb.h>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <drivers/cmos/cmos.hpp>
+#include <generic/mp/mp.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
 void timer_test() {
-    Log("Got timer interrupt cpu %d %d:%d:%d!\n",Lapic::ID(),CMOS::Hour(),CMOS::Minute(),CMOS::Second());
+    Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
+    HPET::Sleep(50000);
     Lapic::EOI();
     __sti();
     while(1) {
@@ -45,7 +47,6 @@ extern "C" void kmain() {
     ret = Serial::Init();
 
     Serial::printf("Serial initializied\n");
-
     LimineInfo info;
 
     struct flanterm_context *ft_ctx = flanterm_fb_init(
@@ -105,6 +106,11 @@ extern "C" void kmain() {
 
     idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
     timer_entry->ist = 3;
+
+    MP::Init();
+    Log("MP Initializied\n");
+
+    MP::Sync();
 
     __sti();
 

@@ -7,6 +7,7 @@
 #include <generic/memory/pmm.hpp>
 #include <other/string.hpp>
 #include <config.hpp>
+#include <other/log.hpp>
 
 gdt_t original_gdt = {
     {0,0,0,0,0,0}, // 0x0 null
@@ -26,6 +27,7 @@ extern void loadGDT(void* gdtr);
 
 void GDT::Init() {
     cpudata_t* data = CpuData::Access();
+    String::memset(data,0,sizeof(cpudata_t));
     String::memcpy(&data->gdt.gdt,&original_gdt,sizeof(gdt_t));
     gdt_t* gdt = &data->gdt.gdt;
     tss_t* tss = &data->gdt.tss;
@@ -44,9 +46,12 @@ void GDT::Init() {
     gdt->tss.baseup32 = (uint64_t)tss >> 32;
     Paging::alwaysMappedAdd(stack_1,TSS_STACK_IN_PAGES * PAGE_SIZE);
     Paging::alwaysMappedAdd(stack_2,TSS_STACK_IN_PAGES * PAGE_SIZE);
+    Paging::alwaysMappedAdd(stack_3,TSS_STACK_IN_PAGES * PAGE_SIZE);
+    Paging::alwaysMappedAdd(stack_4,TSS_STACK_IN_PAGES * PAGE_SIZE);
     gdt_pointer_t* gdtr = &data->gdt.gdtr;
     gdtr->size = sizeof(gdt_t) -1;
     gdtr->base = (uint64_t)gdt;
+    Log("rsp[0]: 0x%p ist[0]: 0x%p ist[1]: 0x%p ist[2]: 0x%p\n",tss->rsp[0],tss->ist[0],tss->ist[1],tss->ist[2]);
     loadGDT(gdtr);
     loadTSS();
 }
