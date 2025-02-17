@@ -74,6 +74,8 @@ extern "C" void kmain() {
     Log("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
     Log("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
+    __wrmsr(0xC0000101,0); // write to zero cuz idk what can be in this msr
+
     HHDM::applyHHDM(info.hhdm_offset);
 
     PMM::Init(info.memmap);
@@ -110,9 +112,9 @@ extern "C" void kmain() {
     MP::Init();
     Log("MP Initializied\n");
 
-    MP::Sync();
+   // MP::Sync();
 
-    __sti();
+    //__sti();
 
     asm volatile("hlt");
     

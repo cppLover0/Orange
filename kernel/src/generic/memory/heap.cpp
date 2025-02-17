@@ -18,9 +18,13 @@ void KHeap::Init() {
     Paging::alwaysMappedAdd((uint64_t)head,PAGE_SIZE * SIZE_KHEAP_IN_PAGES);
 }
 
+kernel_heap_block_t* current = 0;
+
 void* KHeap::Malloc(uint64_t size) {
     spinlock_lock(&heap_lock);
-    kernel_heap_block_t* current = (kernel_heap_block_t*)kmalloc_base;
+    if(!current) {
+        current = (kernel_heap_block_t*)kmalloc_base;
+    }
     uint64_t totalsize = size + sizeof(kernel_heap_block_t);
     while(current) {
         if(current->isfree && current->size >= totalsize) {
@@ -37,6 +41,9 @@ void* KHeap::Malloc(uint64_t size) {
             return (void*)((uint8_t*)current + sizeof(kernel_heap_block_t));
         }
         current=current->next;
+        if(!current) {
+            current = (kernel_heap_block_t*)kmalloc_base;
+        }
     }
     spinlock_unlock(&heap_lock);
     return (void*)0;

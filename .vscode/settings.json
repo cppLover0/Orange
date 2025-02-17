@@ -13,6 +13,7 @@
         "regex": "cpp",
         "serial.hpp": "c",
         "*.tcc": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "valarray": "cpp"
     }
 }

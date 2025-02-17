@@ -19,6 +19,8 @@ uint64_t temp_how_much_cpus = 0;
 void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     
     __cli();
+    __wrmsr(0xC0000101,0); // write to zero cuz idk what can be in this msr
+
     Paging::EnableKernel();
 
     GDT::Init();
