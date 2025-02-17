@@ -21,7 +21,7 @@ Orange is my limine x86_64 OS
 - [x] HPET
 - [x] CMOS
 - [x] LAPIC 
-- [ ] MP
+- [x] MP
 - [ ] IOAPIC
 - [ ] VFS
 - [ ] Some fs and procfs
