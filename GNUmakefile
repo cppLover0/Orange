@@ -75,6 +75,7 @@ kernel-deps:
 
 .PHONY: kernel
 kernel: kernel-deps
+	rm -rf kernel/src/lib/uACPI/tests
 	$(MAKE) -C kernel
 
 $(IMAGE_NAME).iso: limine/limine kernel
