@@ -2,8 +2,8 @@
 %macro isr_err_stub 1
 isr_stub_%+%1:
     cli
-    mov rax,%+%1
-    push rax
+    mov rbp,%+%1
+    push rbp
     jmp asmException
     cli
     hlt 
@@ -13,8 +13,8 @@ isr_stub_%+%1:
 isr_stub_%+%1:
     cli
     push qword 0
-    mov rax,%+%1
-    push rax
+    mov rbp,%+%1 ; no one care about rbp lol
+    push rbp
     jmp asmException
     cli
     hlt

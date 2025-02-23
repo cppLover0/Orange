@@ -9,6 +9,7 @@
 #include <other/assembly.hpp>
 #include <other/hhdm.hpp>
 #include <uacpi/acpi.h>
+#include <other/assert.hpp>
 
 char hpet_is_32_bit;
 uint64_t hpet_base;
@@ -18,11 +19,7 @@ uint32_t hpet_clock_period_nano;
 void HPET::Init() {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature("HPET",&hpet);
-    if(ret != UACPI_STATUS_OK) {
-        Serial::printf("Orange can't work without hpet.\n");
-        __cli();
-        __hlt();
-    }
+    pAssert(ret == UACPI_STATUS_OK,"HPET is disabled");
     struct acpi_hpet* hpet_table = ((struct acpi_hpet*)hpet.virt_addr);
     hpet_base = HHDM::toVirt(hpet_table->address.address);
     Paging::KernelMap(hpet_table->address.address);

@@ -32,6 +32,7 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     Log("Waiting for other CPUs...\n");
     MP::Sync();
+    MP::Sync();
     __sti();
     while(1) {
         __hlt();

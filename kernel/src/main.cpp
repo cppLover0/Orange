@@ -22,6 +22,7 @@
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <drivers/cmos/cmos.hpp>
 #include <generic/mp/mp.hpp>
+#include <other/assert.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -112,7 +113,11 @@ extern "C" void kmain() {
     MP::Init();
     Log("MP Initializied\n");
 
-   // MP::Sync();
+    MP::Sync();
+
+    pAssert(1 == 0,"Test");
+    
+    MP::Sync();
 
     //__sti();
 

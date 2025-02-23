@@ -6,6 +6,8 @@
 #include <other/log.hpp>
 #include <generic/memory/paging.hpp>
 
+char __lapic_init = 0;
+
 void Lapic::Init() {
     __cli(); // if interrupts is enabled disable it
     __wrmsr(0x1B,__rdmsr(0x1B));
@@ -19,6 +21,7 @@ void Lapic::Init() {
     Write(0x320,32 | (1 << 17));
     Write(0x3E0,0x3);
     Write(0x380,calibration_ticks);
+    __lapic_init = 1;
 }
 
 uint32_t Lapic::Read(uint32_t reg) {
@@ -34,6 +37,8 @@ void Lapic::EOI() {
 }
     
 uint32_t Lapic::ID() {
+    if(!__lapic_init)
+        return 0;
     return Read(0x20) >> 24;
 }
 
