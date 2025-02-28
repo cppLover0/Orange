@@ -75,13 +75,14 @@ void IOAPIC::SetEntry(uint8_t vector,uint8_t irq,uint32_t flags,uint64_t lapic) 
     uint64_t ioapic_info =  (lapic << 56) | flags | (vector & 0xFF); 
     struct acpi_madt_ioapic* current_ioapic;
     char is_success = 0;
+
     for(char i = 0;i < ioapic_entries;i++) {
         current_ioapic = &io_apics[i];
         uint32_t apic_ver = Read(current_ioapic->address,1);
         uint32_t max_redirection_entries = apic_ver >> 16;
         if(current_ioapic->gsi_base <= irq && current_ioapic->gsi_base + max_redirection_entries > irq) {
             is_success = 1;
-            break; // yay we got irq !!!
+            break; 
         }
     }
 

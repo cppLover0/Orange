@@ -145,7 +145,13 @@ extern "C" void kmain() {
     PowerButton::Hook(handle_power_button);
     Log("PowerButton initializied\n");
 
+    Log("Waiting for interrupts...\n");
+
     __sti();
+
+    while(1) {
+        __nop();
+    }
 
     //MP::Sync();
 
