@@ -10,6 +10,7 @@
 #include <other/string.hpp>
 #include <other/hhdm.hpp>
 #include <generic/memory/paging.hpp>
+#include <drivers/io/io.hpp>
 
 struct acpi_madt_ioapic io_apics[24]; 
 char ioapic_entries = 0;
@@ -29,7 +30,21 @@ uint32_t IOAPIC::Read(uint64_t phys_base,uint32_t reg) {
     return *(volatile uint32_t*)(virt + 0x10);
 }
 
+void __pic_disable() {
+    IO::OUT(0x20,0x11,1);
+    IO::OUT(0xA0,0x11,1);
+    IO::OUT(0x21,0x20,1);
+    IO::OUT(0xA1,0x28,1);
+    IO::OUT(0x21,0x2,1);
+    IO::OUT(0xA1,0x4,1);
+    IO::OUT(0x21,1,1);
+    IO::OUT(0xA1,1,1);
+    IO::OUT(0x21,0xFF,1);
+    IO::OUT(0xA1,0xFF,1);
+}
+
 void IOAPIC::Init() {
+    __pic_disable();
     struct uacpi_table apic_table;
     uacpi_status ret = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE,&apic_table);
     pAssert(ret == UACPI_STATUS_OK,"Can't find APIC Table");
