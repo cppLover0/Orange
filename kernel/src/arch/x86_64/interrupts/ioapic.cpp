@@ -14,6 +14,9 @@
 struct acpi_madt_ioapic io_apics[24]; 
 char ioapic_entries = 0;
 
+struct acpi_madt_interrupt_source_override iso[24];
+char iso_entries = 0;
+
 void IOAPIC::Write(uint64_t phys_base,uint32_t reg,uint32_t value) {
     uint64_t virt = HHDM::toVirt(phys_base);
     *(volatile uint32_t*)virt = reg;
@@ -56,6 +59,14 @@ void IOAPIC::Init() {
                 break;
             }
 
+            case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE: {
+                struct acpi_madt_interrupt_source_override* current_iso = (struct acpi_madt_interrupt_source_override*)current;
+                Log("ISO %d: Source: %d, GSI: %d, Bus: %d, Flags: 0x%p\n",iso_entries,current_iso->source,current_iso->gsi,current_iso->bus,current_iso->flags);
+                String::memcpy(&iso[iso_entries],current_iso,sizeof(acpi_madt_interrupt_source_override));
+                iso_entries++;
+                break;
+            }
+
             default:
                 break;
 
@@ -69,12 +80,47 @@ void IOAPIC::Init() {
 
 }
 
-void IOAPIC::SetEntry(uint8_t vector,uint8_t irq,uint32_t flags,uint64_t lapic) {
+char ISOtoBIT(char i) {
+    i = i & 0b11;
+    if(i == 0b10)
+        return -1;
+    else if(i == 0b11)
+        return 0b1;
+    else if(i == 0b01)
+        return 0b0;
+    return 0;
 
-    uint64_t ioapic_info =  (lapic << 56) | flags | (vector & 0xFF); 
+}
+
+void IOAPIC::SetEntry(uint8_t vector,uint8_t irq,uint64_t flags,uint64_t lapic) {
+
     struct acpi_madt_ioapic* current_ioapic;
+    struct acpi_madt_interrupt_source_override* current_iso;
     char is_success = 0;
 
+    for(char i = 0;i < iso_entries;i++) {
+        current_iso = &iso[i];
+
+        if(current_iso->source == irq) {
+            is_success = 1;
+            break;
+        }
+
+    }
+
+    uint64_t ioapic_info =  (lapic << 56) | flags | (vector & 0xFF); 
+
+    if(!is_success) 
+        current_iso = 0;
+    
+    is_success = 0;
+
+    if(current_iso) {
+        char polarity = (current_iso->flags & 0b11) == 0b11 ? 1 : 0;
+        char mode = (current_iso->flags >> 2) & 0b11 == 0b11 ? 1 : 0;
+        ioapic_info = ((uint64_t)lapic << 56) | (mode << 15) | (polarity << 13) | (vector & 0xFF);
+    }
+        
     for(char i = 0;i < ioapic_entries;i++) {
         current_ioapic = &io_apics[i];
         uint32_t apic_ver = Read(current_ioapic->address,1);

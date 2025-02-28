@@ -18,7 +18,7 @@ void Lapic::Init() {
     Write(0x380,0xFFFFFFFF);
     HPET::Sleep(10000);
     uint64_t calibration_ticks = 0xFFFFFFFF - Read(0x390);
-    //Write(0x320,32 | (1 << 17));
+    Write(0x320,32 | (1 << 17));
     Write(0x3E0,0x3);
     Write(0x380,calibration_ticks);
     __lapic_init = 1;

@@ -23,6 +23,7 @@
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <drivers/cmos/cmos.hpp>
 #include <generic/mp/mp.hpp>
+#include <uacpi/utilities.h>
 #include <arch/x86_64/interrupts/ioapic.hpp>
 #include <other/assert.hpp>
 #include <drivers/power_button/power_button.hpp>
@@ -115,24 +116,12 @@ extern "C" void kmain() {
 
     IDT::Init();
     Log("IDT Initializied\n");
-
-    IO::OUT(0x21,0xFF,1);
-    IO::OUT(0xA1,0xFF,1);
-
-    ACPI::InitTables();
-    Log("Early tables of ACPI initializied\n");
-
-    HPET::Init();
-    Log("HPET Initializied\n");
+    
+    ACPI::fullInit();
+    Log("ACPI Initializied\n");
     
     Lapic::Init();
     Log("LAPIC Initializied\n");
-
-    IOAPIC::Init();
-    Log("IOAPIC Initializied\n");
-
-    ACPI::fullInit();
-    Log("ACPI Initializied\n");
 
     idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
     timer_entry->ist = 3;
