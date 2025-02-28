@@ -14,7 +14,6 @@
 struct acpi_madt_ioapic io_apics[24]; 
 char ioapic_entries = 0;
 
-// i got some unexcepted UB so i'll use volatile
 void IOAPIC::Write(uint64_t phys_base,uint32_t reg,uint32_t value) {
     uint64_t virt = HHDM::toVirt(phys_base);
     *(volatile uint32_t*)virt = reg;
