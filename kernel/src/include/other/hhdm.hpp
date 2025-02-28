@@ -1,6 +1,8 @@
 
 #include <stdint.h>
 
+#pragma once
+
 class HHDM {
 public:
     

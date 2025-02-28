@@ -1,6 +1,8 @@
 
 #include <stdint.h>
 
+#pragma once
+
 inline uint64_t __rdmsr(uint32_t msr) {
     uint32_t lo, hi;
     __asm__ volatile ("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));

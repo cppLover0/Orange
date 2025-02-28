@@ -25,11 +25,11 @@ void Lapic::Init() {
 }
 
 uint32_t Lapic::Read(uint32_t reg) {
-    return *(uint32_t*)(Base() + reg);
+    return *(volatile uint32_t*)(Base() + reg);
 }
 
 void Lapic::Write(uint32_t reg,uint32_t val) {
-    *(uint32_t*)(Base() + reg) = val;
+    *(volatile uint32_t*)(Base() + reg) = val;
 }
 
 void Lapic::EOI() {

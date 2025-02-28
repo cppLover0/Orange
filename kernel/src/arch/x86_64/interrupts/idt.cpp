@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <generic/memory/pmm.hpp>
+#include <other/string.hpp>
 
 idt_entry_t idt[256];
 uint8_t vectors_idt[256];
@@ -22,7 +23,7 @@ idt_entry_t* IDT::SetEntry(uint8_t vec,void* base,uint8_t flags) {
 
 uint8_t IDT::AllocEntry() {
     for(uint8_t vec = 32;vec < 256;vec++) {
-        if(!vec)
+        if(!vectors_idt[vec])
             return vec;
     }
     return 0;
@@ -40,13 +41,17 @@ void IDT::Load() {
 }
 
 void IDT::Init() {
+    
+    String::memset(vectors_idt,0,sizeof(char) * 256);
+
     idtr.base = (uint64_t)&idt[0];
     idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;
+    
     for(uint8_t vec = 0;vec <32;vec++){
         idt_entry_t* entry = SetEntry(vec,isrTable[vec],0x8E);
         entry->ist = 1;
     }
-    for(uint8_t vec = 32;vec < 255;vec++) {
+    for(uint8_t vec = 32;vec < 40;vec++) {
         idt_entry_t* entry = SetEntry(vec,ignoreStub,0x8E);
         entry->ist = 2;
     }

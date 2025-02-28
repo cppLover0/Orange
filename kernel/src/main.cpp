@@ -13,6 +13,7 @@
 #include <arch/x86_64/cpu/gdt.hpp>
 #include <other/assembly.hpp>
 #include <uacpi/sleep.h>
+#include <uacpi/event.h>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <generic/acpi/acpi.hpp>
 #include <drivers/hpet/hpet.hpp>
@@ -22,19 +23,39 @@
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <drivers/cmos/cmos.hpp>
 #include <generic/mp/mp.hpp>
+#include <arch/x86_64/interrupts/ioapic.hpp>
 #include <other/assert.hpp>
+#include <drivers/power_button/power_button.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
 void timer_test() {
-    Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
+    //Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
     HPET::Sleep(50000);
     Lapic::EOI();
     __sti();
     while(1) {
         __hlt();
     }
+}
+
+static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
+    Log("Shutdowning system in 5 seconds");
+
+    __cli();
+
+    for(char i =0; i < 5;i++) {
+        Log(".");
+        HPET::Sleep(1*1000*1000);
+    }
+
+    Log("\nBye.\n");
+
+    uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
+    ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
+
+    return UACPI_INTERRUPT_HANDLED;
 }
 
 extern "C" void kmain() {
@@ -95,17 +116,23 @@ extern "C" void kmain() {
     IDT::Init();
     Log("IDT Initializied\n");
 
+    IO::OUT(0x21,0xFF,1);
+    IO::OUT(0xA1,0xFF,1);
+
     ACPI::InitTables();
     Log("Early tables of ACPI initializied\n");
 
     HPET::Init();
     Log("HPET Initializied\n");
     
-    ACPI::fullInit();
-    Log("ACPI Initializied\n");
-
     Lapic::Init();
     Log("LAPIC Initializied\n");
+
+    IOAPIC::Init();
+    Log("IOAPIC Initializied\n");
+
+    ACPI::fullInit();
+    Log("ACPI Initializied\n");
 
     idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
     timer_entry->ist = 3;
@@ -115,9 +142,12 @@ extern "C" void kmain() {
 
     MP::Sync();
 
-    pAssert(1 == 0,"Test");
-    
-    MP::Sync();
+    PowerButton::Hook(handle_power_button);
+    Log("PowerButton initializied\n");
+
+    __sti();
+
+    //MP::Sync();
 
     //__sti();
 

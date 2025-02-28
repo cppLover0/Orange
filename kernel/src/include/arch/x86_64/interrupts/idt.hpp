@@ -45,7 +45,7 @@ typedef struct {
     uint64_t rsp;
     uint64_t ss;
 } __attribute__((packed)) int_frame_t;
-
+ 
 class IDT {
 public:
     static void Init();

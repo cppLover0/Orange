@@ -14,6 +14,9 @@
 #include <other/assembly.hpp>
 #include <uacpi/kernel_api.h>
 #include <other/log.hpp>
+#include <arch/x86_64/interrupts/ioapic.hpp>
+#include <arch/x86_64/interrupts/idt.hpp>
+#include <arch/x86_64/cpu/lapic.hpp>
 
 #ifdef __cplusplus
 extern "C" {
@@ -357,10 +360,15 @@ uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request*) {
  * refer to this handler from other API.
  */
 uacpi_status uacpi_kernel_install_interrupt_handler(
-    uacpi_u32 irq, uacpi_interrupt_handler, uacpi_handle ctx,
+    uacpi_u32 irq, uacpi_interrupt_handler base, uacpi_handle ctx,
     uacpi_handle *out_irq_handle
 ) {
-    return UACPI_STATUS_OK; // i dont implemented this
+    uint8_t vector = IDT::AllocEntry();
+    *out_irq_handle = (uacpi_handle)vector;
+    idt_entry_t* entry = IDT::SetEntry(vector,(void*)base,0x8E);
+    IOAPIC::SetEntry(vector,irq,0,Lapic::ID());
+    entry->ist = 2;
+    return UACPI_STATUS_OK;
 }
 
 /*
@@ -370,7 +378,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
 uacpi_status uacpi_kernel_uninstall_interrupt_handler(
     uacpi_interrupt_handler, uacpi_handle irq_handle
 ) {
-    return UACPI_STATUS_UNIMPLEMENTED; // i dont implemented this
+    return UACPI_STATUS_OK; // i dont implemented this
 }
 
 

@@ -22,8 +22,7 @@ Orange is my limine x86_64 OS
 - [x] CMOS
 - [x] LAPIC 
 - [x] MP
-- [ ] SMEP/SMAP (security stuff)
-- [ ] IOAPIC
+- [x] IOAPIC
 - [ ] VFS
 - [ ] Some fs and procfs
 - [ ] Scheduling

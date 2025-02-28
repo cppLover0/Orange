@@ -23,15 +23,15 @@ void HPET::Init() {
     struct acpi_hpet* hpet_table = ((struct acpi_hpet*)hpet.virt_addr);
     hpet_base = HHDM::toVirt(hpet_table->address.address);
     Paging::KernelMap(hpet_table->address.address);
-    *(uint64_t*)(hpet_base + 0x10) |= 1;
-    hpet_is_32_bit = (*(uint64_t*)hpet_base & (1 << 13)) ? 0 : 1;
-    hpet_clock_period = *(uint32_t*)(hpet_base + 4);
+    *(volatile uint64_t*)(hpet_base + 0x10) |= 1;
+    hpet_is_32_bit = (*(volatile uint64_t*)hpet_base & (1 << 13)) ? 0 : 1;
+    hpet_clock_period = *(volatile uint32_t*)(hpet_base + 4);
     hpet_clock_period_nano = hpet_clock_period / 1000000;
     Serial::printf("%s HPET: 0x%p\n",hpet_is_32_bit ? "32 Bit" : "64 Bit",hpet_base);
 }
 
 uint64_t hpet_counter() {
-    return hpet_is_32_bit ? *(uint32_t*)(hpet_base + 0xf0) : *(uint64_t*)(hpet_base + 0xf0);
+    return hpet_is_32_bit ? *(volatile uint32_t*)(hpet_base + 0xf0) : *(volatile uint64_t*)(hpet_base + 0xf0);
 }
 
 uint64_t HPET::NanoCurrent() {
