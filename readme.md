@@ -25,6 +25,7 @@ Orange is my limine x86_64 OS
 - [x] IOAPIC
 - [ ] VFS
 - [ ] Some fs and procfs
+- [ ] Keyboard 
 - [ ] Scheduling
 - [ ] Unixlike syscalls
 - [ ] UserSpace 

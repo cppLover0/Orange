@@ -27,6 +27,7 @@
 #include <arch/x86_64/interrupts/ioapic.hpp>
 #include <other/assert.hpp>
 #include <drivers/power_button/power_button.hpp>
+#include <generic/VFS/vfs.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -44,7 +45,7 @@ void timer_test() {
 static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     Log("Shutdowning system in 5 seconds");
 
-    __cli();
+    __cli(); //yes i know lapic waiting for my eoi but why not ? 
 
     for(char i =0; i < 5;i++) {
         Log(".");
@@ -133,6 +134,9 @@ extern "C" void kmain() {
 
     PowerButton::Hook(handle_power_button);
     Log("PowerButton initializied\n");
+
+    VFS::Init();
+    Log("VFS Initializied\n");
 
     Log("Waiting for interrupts...\n");
 

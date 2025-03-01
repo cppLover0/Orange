@@ -59,118 +59,103 @@ void* String::memcpy(void* dstptr, const void* srcptr, uint64_t size) {
 	return dstptr;
 }
 
-// From GNU Libc implementation
-void* __rawmemchr(const char* s, int c_in)
-{
-  const unsigned char *char_ptr;
-  const unsigned long int *longword_ptr;
-  unsigned long int longword, magic_bits, charmask;
-  unsigned char c;
+uint64_t String::strncmp(const char* str1, const char* str2, uint64_t n) {
+  uint64_t i = 0;
 
-  c = (unsigned char) c_in;
-  for (char_ptr = (const unsigned char *) s;
-       ((unsigned long int) char_ptr & (sizeof (longword) - 1)) != 0;
-       ++char_ptr)
-    if (*char_ptr == c)
-      return (void*) char_ptr;
-
-  longword_ptr = (unsigned long int *) char_ptr;
-
-  if (sizeof (longword) != 4 && sizeof (longword) != 8)
-    std::abort();
-
-  magic_bits = 0x7efefeff;
-
-  charmask = c | (c << 8);
-  charmask |= charmask << 16;
-
-  while (1)
-    {
-
-      longword = *longword_ptr++ ^ charmask;
-
-      if ((((longword + magic_bits)
-
-	    ^ ~longword)
-
-	   & ~magic_bits) != 0)
-	{
-
-	  const unsigned char *cp = (const unsigned char *) (longword_ptr - 1);
-
-	  if (cp[0] == c)
-	    return (void*) cp;
-	  if (cp[1] == c)
-	    return (void*) &cp[1];
-	  if (cp[2] == c)
-	    return (void*) &cp[2];
-	  if (cp[3] == c)
-	    return (void*) &cp[3];
-	}
+  while (i < n && str1[i] != '\0' && str2[i] != '\0') {
+    if (str1[i] != str2[i]) {
+      return (unsigned char)str1[i] - (unsigned char)str2[i];
     }
+    i++;
+  }
+
+  if (i == n)
+    return 0;
+
+  return (unsigned char)str1[i] - (unsigned char)str2[i];
 }
 
-// From GNU Libc implementation
-uint64_t strspn(const char *s, const char *accept)
-{
-  const char *p;
-  const char *a;
-  uint64_t count = 0;
 
-  for (p = s; *p != '\0'; ++p)
-    {
-      for (a = accept; *a != '\0'; ++a)
-	if (*p == *a)
-	  break;
-      if (*a == '\0')
-	return count;
-      else
-	++count;
-    }
+char * String::strchr(const char *str, int ch) {
+  while (*str) {
+      if (*str == (char)ch) {
+          return (char *)str;
+      }
+      str++;
+  }
 
-  return count;
+  if (ch == '\0') {
+      return (char *)str;
+  }
+
+  return NULL;
 }
 
-// From GNU Libc implementation
-char* strpbrk(const char *s, const char *accept)
-{
-  while (*s != '\0')
-    {
-      const char *a = accept;
-      while (*a != '\0')
-	if (*a++ == *s)
-	  return (char *) s;
-      ++s;
-    }
+char* String::strtok(char *str, const char *delim, char** saveptr) {
+  char *start;
+  char *delim_pos;
 
-  return 0;
+  if (str == NULL) {
+      str = *saveptr;
+  }
+
+  while (*str && strchr(delim, *str)) {
+      str++;
+  }
+
+  if (*str == '\0') {
+      *saveptr = str;
+      return NULL;
+  }
+
+  start = str;
+
+  while (*str && (delim_pos = strchr(delim, *str)) == NULL) {
+      str++;
+  }
+
+  if (*str) {
+      *str = '\0';
+      *saveptr = str + 1;
+  } else {
+      *saveptr = str;
+  }
+
+  return start;
 }
 
-// From GNU Libc implementation
-char* String::strtok(char *s, const char *delim) {
-  char *token;
-  static char* olds;
+int String::strcmp(const char *str1, const char *str2) {
+  while (*str1 && (*str1 == *str2)) {
+      str1++;
+      str2++;
+  }
+  return *(unsigned char *)str1 - *(unsigned char *)str2;
+}
 
-  if (s == 0)
-    s = olds;
 
-  s += strspn (s, delim);
-  if (*s == '\0')
-    {
-      olds = s;
-      return 0;
-    }
+char* String::strncpy(char* dest, const char* src, uint64_t n) {
+  uint64_t i;
+  for (i = 0; i < n && src[i] != '\0'; i++) {
+      dest[i] = src[i];
+  }
+  for (; i < n; i++) {
+      dest[i] = '\0';
+  }
+  return dest;
+}
 
-  token = s;
-  s = strpbrk (token, delim);
-  if (s == 0)
-    olds = (char*)__rawmemchr(token, '\0');
-  else
-    {
-      *s = '\0';
-      olds = s + 1;
-    }
-  return token;
+char* String::strncat(char* dest, const char* src, uint64_t n) {
+  uint64_t dest_len = 0;
+  while (dest[dest_len] != '\0') {
+      dest_len++;
+  }
+  uint64_t i;
+  for (i = 0; i < n && src[i] != '\0'; i++) {
+      dest[dest_len + i] = src[i];
+  }
+  dest[dest_len + i] = '\0';
+
+  return dest;
 }
 
 // Yes, i'm lazy 

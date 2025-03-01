@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 1024M -d int -no-reboot -serial stdio -M q35 -smp 4 -enable-kvm
+QEMUFLAGS := -m 1024M -d int -no-reboot -serial stdio -M q35 -smp 4 
 
 override IMAGE_NAME := orange
 
