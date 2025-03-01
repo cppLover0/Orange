@@ -132,8 +132,8 @@ void IOAPIC::SetEntry(uint8_t vector,uint8_t irq,uint64_t flags,uint64_t lapic) 
 
     if(current_iso) {
         char polarity = (current_iso->flags & 0b11) == 0b11 ? 1 : 0;
-        char mode = (current_iso->flags >> 2) & 0b11 == 0b11 ? 1 : 0;
-        ioapic_info = ((uint64_t)lapic << 56) | (mode << 15) | (polarity << 13) | (vector & 0xFF);
+        char mode = ((current_iso->flags >> 2) & 0b11) == 0b11 ? 1 : 0;
+        ioapic_info = ((uint64_t)lapic << 56) | (mode << 15) | (polarity << 13) | (vector & 0xFF) | flags;
     }
         
     for(char i = 0;i < ioapic_entries;i++) {
@@ -150,6 +150,6 @@ void IOAPIC::SetEntry(uint8_t vector,uint8_t irq,uint64_t flags,uint64_t lapic) 
 
     uint32_t irq_register = ((irq - current_ioapic->gsi_base) * 2) + 0x10;
     Write(current_ioapic->address,irq_register,(uint32_t)ioapic_info);
-    Write(current_ioapic->address,irq_register + 1,(uint32_t)ioapic_info >> 32);
+    Write(current_ioapic->address,irq_register + 1,(uint32_t)((uint64_t)ioapic_info >> 32));
 
 }
