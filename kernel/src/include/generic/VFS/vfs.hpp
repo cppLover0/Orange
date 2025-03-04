@@ -33,4 +33,10 @@ typedef struct {
 class VFS {
 public:
     static void Init();
+    static int Read(char* buffer,char* filename);
+    static int Write(char* buffer,char* filename,uint64_t size);
+    static int Touch(char* filename);
+    static int Create(char* filename,int type);
+    static int Remove(char* filename);
+    static char Exists(char* filename);
 };

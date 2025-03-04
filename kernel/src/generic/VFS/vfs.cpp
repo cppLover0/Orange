@@ -15,8 +15,6 @@ char vfs_spinlock = 0;
 mount_location_t* vfs_find_the_nearest_mount(char* loc) {
     if (!loc) return NULL;
 
-    spinlock_lock(&vfs_spinlock);
-
     mount_location_t* nearest = NULL;
     int max_match = 0;
 
@@ -41,9 +39,92 @@ mount_location_t* vfs_find_the_nearest_mount(char* loc) {
         }
     }
 
-    spinlock_unlock(&vfs_spinlock);
-
     return nearest;
+}
+
+int VFS::Read(char* buffer,char* filename) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); // /somemount/file to /file 
+    int status = fs->fs->readfile(buffer,filename_as_fs);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
+}
+
+int VFS::Write(char* buffer,char* filename,uint64_t size) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
+    int status = fs->fs->writefile(buffer,filename_as_fs,size);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
+}
+
+int VFS::Touch(char* filename) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
+    int status = fs->fs->touch(filename_as_fs);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
+}
+    
+int VFS::Create(char* filename,int type) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
+    int status = fs->fs->create(filename_as_fs,type);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
+}
+
+int VFS::Remove(char* filename) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
+    int status = fs->fs->rm(filename_as_fs);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
+}
+
+char VFS::Exists(char* filename) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+    
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+    int status = fs->fs->exists(filename_as_fs);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
 }
 
 void VFS::Init() {
@@ -51,5 +132,6 @@ void VFS::Init() {
     mount_points[0].loc = "/";
     mount_points[0].fs = tmpfs;
     TMPFS::Init(tmpfs);
+    Log("%s\n",vfs_find_the_nearest_mount("/test")->loc);
     Log("TmpFS initializied\n");
 }

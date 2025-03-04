@@ -138,6 +138,21 @@ extern "C" void kmain() {
     VFS::Init();
     Log("VFS Initializied\n");
 
+    Log("VFS Test\n");
+
+    char buf[40];
+
+    VFS::Create("/test",0);
+    VFS::Write("Hello, World !\0","/test",sizeof("Hello, World !\0"));
+
+    VFS::Read(buf,"/test");
+
+    Log("Reading \"/test\": \"%s\"\n",buf);
+
+    Log("Removing \"/test\"\n");
+
+    VFS::Remove("/test");
+
     Log("Waiting for interrupts...\n");
 
     __sti();

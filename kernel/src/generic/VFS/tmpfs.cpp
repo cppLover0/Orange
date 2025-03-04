@@ -181,7 +181,7 @@ void TMPFS::Init(filesystem_t* fs) {
     fs->exists = tmpfs_exists;
     fs->readfile = tmpfs_readfile;
     fs->writefile = tmpfs_writefile;
-    fs->exists = tmpfs_exists;
+    fs->rm = tmpfs_rm;
     fs->touch = tmpfs_touch;
     
 }
