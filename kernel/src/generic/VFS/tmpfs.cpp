@@ -151,7 +151,14 @@ int tmpfs_touch(char* filename) {
 
     data_file_t* data = tmpfs_scan_for_file(filename);
 
-    if(!data) return 1;
+    if(!data) {
+        if(tmpfs_create(filename,TMPFS_TYPE_FILE) == 0) {
+            data = tmpfs_scan_for_file(filename);
+        } else {
+            return 1;
+        }
+    }
+
     if(data->protection) return 2;
 
     data->file_change_date = convertToUnixTime();
