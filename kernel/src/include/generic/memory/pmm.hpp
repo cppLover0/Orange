@@ -4,6 +4,8 @@
 
 #pragma once
 
+#define SIZE_TO_PAGES(size) (((size) + 4095) / 4096)
+
 typedef struct bitmap {
     uint64_t bits;
     uint64_t size;

@@ -1,4 +1,5 @@
 #define PAGE_SIZE 4096
-#define SIZE_KHEAP_IN_PAGES 4096 // 16 MB kernel heap
+#define SIZE_KHEAP_IN_PAGES 16384 // 64 MB kernel heap :^)
 #define TSS_STACK_IN_PAGES 128
 #define MAX_MOUNT_POINTS 512
+#define TMPFS_MAX_SIZE 1073741824 // 1G

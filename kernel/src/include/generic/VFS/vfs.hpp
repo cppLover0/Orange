@@ -15,8 +15,10 @@ typedef struct {
     int (*readfile)(char* buffer,char* filename);
     int (*writefile)(char* buffer,char* filename,uint64_t size);
     int (*touch)(char* filename);
-    int (*ls)(char* dirlist);
+    int (*create)(char* filename,int type);
     int (*rm)(char* filename);
+    
+    char (*exists)(char* filename);
 
     char is_in_ram;
     disk_t* disk;

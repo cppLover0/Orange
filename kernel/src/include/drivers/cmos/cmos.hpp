@@ -1,6 +1,8 @@
 
 #include <stdint.h>
 
+#pragma once
+
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 #define CMOS_SECONDS 0x00

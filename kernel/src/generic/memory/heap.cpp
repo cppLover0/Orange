@@ -4,6 +4,7 @@
 #include <generic/memory/pmm.hpp>
 #include <generic/memory/heap.hpp>
 #include <generic/memory/paging.hpp>
+#include <other/string.hpp>
 #include <config.hpp>
 
 char heap_lock = 0;

@@ -4,16 +4,18 @@
 #include <other/assert.hpp>
 #include <other/string.hpp>
 #include <config.hpp>
+#include <generic/locks/spinlock.hpp>
+#include <generic/VFS/tmpfs.hpp>
 
 mount_location_t mount_points[MAX_MOUNT_POINTS];
 uint16_t mount_points_ptr = 0;
 
-int vfs_cmp(char* a,char* b) {
-
-}
+char vfs_spinlock = 0;
 
 mount_location_t* vfs_find_the_nearest_mount(char* loc) {
     if (!loc) return NULL;
+
+    spinlock_lock(&vfs_spinlock);
 
     mount_location_t* nearest = NULL;
     int max_match = 0;
@@ -39,24 +41,15 @@ mount_location_t* vfs_find_the_nearest_mount(char* loc) {
         }
     }
 
+    spinlock_unlock(&vfs_spinlock);
+
     return nearest;
 }
 
-
 void VFS::Init() {
+    filesystem_t* tmpfs = new filesystem_t;
     mount_points[0].loc = "/";
-    mount_points[1].loc = "/mount";
-    mount_points[2].loc = "/home/cpplover0";
-    mount_points[3].loc = "/home";
-    mount_points[4].loc = "/home/infernox";
-    const char* test1 = "/home/cpplover0/zxc/mon/pon";
-    Log("\"%s\": %s \n",test1,vfs_find_the_nearest_mount((char*)test1)->loc);
-    test1 = "/home/infenox/564564/";
-    Log("\"%s\": %s \n",test1,vfs_find_the_nearest_mount((char*)test1)->loc);
-    test1 = "/mount/mcz";
-    Log("\"%s\": %s \n",test1,vfs_find_the_nearest_mount((char*)test1)->loc);
-    test1 = "/";
-    Log("\"%s\": %s \n",test1,vfs_find_the_nearest_mount((char*)test1)->loc);
-    test1 = "/mount";
-    Log("\"%s\": %s \n",test1,vfs_find_the_nearest_mount((char*)test1)->loc);
+    mount_points[0].fs = tmpfs;
+    TMPFS::Init(tmpfs);
+    Log("TmpFS initializied\n");
 }
