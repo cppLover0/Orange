@@ -82,7 +82,7 @@ int tmpfs_rm(char* filename) {
 
     tmpfs_free_file_content(data); // TODO: clear all directory's files
 
-    delete data;
+    delete (void*)data;
 
     return 0;
 
@@ -183,5 +183,5 @@ void TMPFS::Init(filesystem_t* fs) {
     fs->writefile = tmpfs_writefile;
     fs->exists = tmpfs_exists;
     fs->touch = tmpfs_touch;
-
+    
 }
