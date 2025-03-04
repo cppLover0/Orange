@@ -23,8 +23,11 @@ Orange is my limine x86_64 OS
 - [x] LAPIC 
 - [x] MP
 - [x] IOAPIC
-- [ ] VFS
-- [ ] Some fs and procfs
+- [x] VFS
+- [x] TMPFS
+- [ ] USTAR
+- [ ] Initrd support
+- [ ] ELF parsing
 - [ ] Keyboard 
 - [ ] Scheduling
 - [ ] Unixlike syscalls
