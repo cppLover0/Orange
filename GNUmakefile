@@ -4,7 +4,6 @@ MAKEFLAGS += -rR
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
 QEMUFLAGS := -m 1024M -d int -no-reboot -serial stdio -M q35 -smp 4 
-
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
@@ -16,6 +15,11 @@ HOST_LIBS :=
 
 .PHONY: run-build
 run-build:all run
+
+.PHONY: initrd
+initrd:
+	rm -rf iso_etc/boot/initrd.tar
+	tar -cf iso_etc/boot/initrd.tar -C initrd .
 
 .PHONY: all
 all: $(IMAGE_NAME).iso
@@ -84,6 +88,7 @@ $(IMAGE_NAME).iso: limine/limine kernel
 	cp -v kernel/bin/kernel iso_root/boot/
 	mkdir -p iso_root/boot/limine
 	cp -v build_etc/limine.conf limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
+	cp -rf iso_etc/* iso_root/
 	mkdir -p iso_root/EFI/BOOT
 	cp -v limine/BOOTX64.EFI iso_root/EFI/BOOT/
 	cp -v limine/BOOTIA32.EFI iso_root/EFI/BOOT/

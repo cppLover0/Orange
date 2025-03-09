@@ -132,6 +132,5 @@ void VFS::Init() {
     mount_points[0].loc = "/";
     mount_points[0].fs = tmpfs;
     TMPFS::Init(tmpfs);
-    Log("%s\n",vfs_find_the_nearest_mount("/test")->loc);
     Log("TmpFS initializied\n");
 }

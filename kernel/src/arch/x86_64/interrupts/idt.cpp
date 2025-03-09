@@ -51,8 +51,9 @@ void IDT::Init() {
         idt_entry_t* entry = SetEntry(vec,isrTable[vec],0x8E);
         entry->ist = 1;
     }
-    for(uint8_t vec = 32;vec < 40;vec++) {
+    for(uint8_t vec = 32;vec < 255;vec++) {
         idt_entry_t* entry = SetEntry(vec,ignoreStub,0x8E);
+        vectors_idt[vec] = 0;
         entry->ist = 2;
     }
     __asm__ volatile ("lidt %0" : : "m"(idtr));

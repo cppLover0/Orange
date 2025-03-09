@@ -21,6 +21,8 @@ typedef struct data_file {
     struct data_file* parent;
 } __attribute__((packed)) data_file_t;
 
+void tmpfs_dump();
+
 class TMPFS {
 public:
     static void Init(filesystem_t* fs);

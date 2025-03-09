@@ -25,8 +25,8 @@ Orange is my limine x86_64 OS
 - [x] IOAPIC
 - [x] VFS
 - [x] TMPFS
-- [ ] USTAR
-- [ ] Initrd support
+- [x] USTAR
+- [x] Initrd support
 - [ ] ELF parsing
 - [ ] Keyboard 
 - [ ] Scheduling

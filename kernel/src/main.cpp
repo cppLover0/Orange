@@ -28,17 +28,19 @@
 #include <other/assert.hpp>
 #include <drivers/power_button/power_button.hpp>
 #include <generic/VFS/vfs.hpp>
+#include <generic/VFS/ustar.hpp>
+#include <generic/VFS/tmpfs.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
 void timer_test() {
     //Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
-    HPET::Sleep(50000);
+    HPET::Sleep(500000);
     Lapic::EOI();
     __sti();
     while(1) {
-        __hlt();
+        __nop();
     }
 }
 
@@ -89,6 +91,8 @@ extern "C" void kmain() {
         0
     );
 
+    ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
+
     LogInit(ft_ctx);
 
     Log("Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
@@ -118,19 +122,17 @@ extern "C" void kmain() {
     IDT::Init();
     Log("IDT Initializied\n");
     
+    idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
+    timer_entry->ist = 2;
+
     ACPI::fullInit();
     Log("ACPI Initializied\n");
-    
+
     Lapic::Init();
     Log("LAPIC Initializied\n");
-
-    idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
-    timer_entry->ist = 3;
-
+    
     MP::Init();
     Log("MP Initializied\n");
-
-    MP::Sync();
 
     PowerButton::Hook(handle_power_button);
     Log("PowerButton initializied\n");
@@ -142,29 +144,21 @@ extern "C" void kmain() {
 
     char buf[40];
 
-    VFS::Create("/test",0);
-    VFS::Write("Hello, World !\0","/test",sizeof("Hello, World !\0"));
+    VFS::Create("/head",0);
 
-    VFS::Read(buf,"/test");
+    USTAR::ParseAndCopy();
+    Log("Loaded initrd\n");
 
-    Log("Reading \"/test\": \"%s\"\n",buf);
+    MP::Sync();
 
-    Log("Removing \"/test\"\n");
-
-    VFS::Remove("/test");
+    //tmpfs_dump();
 
     Log("Waiting for interrupts...\n");
 
     __sti();
 
     while(1) {
-        __nop();
+        __hlt();
     }
-
-    //MP::Sync();
-
-    //__sti();
-
-    asm volatile("hlt");
     
 }

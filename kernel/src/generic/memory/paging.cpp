@@ -113,12 +113,13 @@ void Paging::Init() {
     kernel_cr3 = (uint64_t*)PMM::VirtualAlloc();
     Serial::printf("Mapping usable memory\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_USABLE,PTE_PRESENT | PTE_RW);
-    Serial::printf("Mapping kernel\n");
-    Kernel(kernel_cr3);
     Serial::printf("Mapping framebuffer\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
     Serial::printf("Mapping bootloader reclaimable\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE,PTE_PRESENT | PTE_RW);
     Serial::printf("Activating paging\n");
+    MemoryEntry(kernel_cr3,LIMINE_MEMMAP_EXECUTABLE_AND_MODULES,PTE_PRESENT | PTE_RW);
+    Serial::printf("Mapping kernel\n");
+    Kernel(kernel_cr3);
     EnableKernel();
 }

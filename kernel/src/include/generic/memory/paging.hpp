@@ -14,6 +14,11 @@
 #define ROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
 #define ALIGNPAGEUP(VALUE) (ROUNDUP(VALUE,PAGE_SIZE) * PAGE_SIZE)
 #define ALIGNPAGEDOWN(VALUE) ((VALUE / PAGE_SIZE) * PAGE_SIZE)
+
+#define CROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
+#define CALIGNPAGEUP(VALUE,c) (ROUNDUP(VALUE,c) * c)
+#define CALIGNPAGEDOWN(VALUE,c) ((VALUE / c) * c)
+
 #define PTE_MASK_VALUE 0x000ffffffffff000
 
 #define PTE_INDEX(address,bit) ((address & (uint64_t)0x1FF << bit) >> bit)

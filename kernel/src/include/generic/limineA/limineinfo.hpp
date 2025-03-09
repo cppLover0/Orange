@@ -10,6 +10,7 @@ public:
     struct limine_memmap_response* memmap;
     struct limine_executable_address_response* ker_addr;
     struct limine_framebuffer* fb_info;
+    struct limine_module_response* initrd;
     struct LIMINE_MP(response)* smp;
     uint64_t rsdp_address;
     uint64_t hhdm_offset;

@@ -51,7 +51,6 @@ void GDT::Init() {
     gdt_pointer_t* gdtr = &data->gdt.gdtr;
     gdtr->size = sizeof(gdt_t) -1;
     gdtr->base = (uint64_t)gdt;
-    Log("rsp[0]: 0x%p ist[0]: 0x%p ist[1]: 0x%p ist[2]: 0x%p\n",tss->rsp[0],tss->ist[0],tss->ist[1],tss->ist[2]);
     loadGDT(gdtr);
     loadTSS();
 }

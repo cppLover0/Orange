@@ -66,6 +66,12 @@ volatile limine_hhdm_request hhdm_request = {
     .response = nullptr
 };
 
+__attribute__((used, section(".limine_requests")))
+volatile limine_module_request initrd_request = {
+    .id = LIMINE_MODULE_REQUEST,
+    .revision = 0,
+    .response = nullptr
+};
 
 }
 
@@ -91,4 +97,5 @@ LimineInfo::LimineInfo() {
     hhdm_offset = hhdm_request.response->offset;
     rsdp_address = (uint64_t)rsdp_request.response->address;
     smp = smp_request.response;
+    initrd = initrd_request.response;
 }

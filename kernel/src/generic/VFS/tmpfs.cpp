@@ -30,6 +30,20 @@ data_file_t* tmpfs_scan_for_file(char* name) {
 
 }
 
+void tmpfs_dump() {
+    data_file_t* current = root;
+    
+    Log("tmpfs dump: ");
+
+    while(current) {
+        Log("\"%s\", ",current->name);
+        current = current->next;
+    }
+
+    Log("\n");
+
+}
+
 void tmpfs_free_file_content(data_file_t* file) {
 
     if(!file->content) return;
@@ -61,6 +75,11 @@ int tmpfs_create(char* name,int type) {
     new_data->file_change_date = convertToUnixTime();
     new_data->file_create_date = convertToUnixTime();
 
+    if(name == "/head") {
+        Log("Adding protection to head\n");
+        new_data->protection = 1;
+    }
+
     return 0;
 
 }
@@ -76,13 +95,11 @@ int tmpfs_rm(char* filename) {
 
     data_file_t* data = tmpfs_scan_for_file(filename);
     if(data->protection) return 8;
-    data_file_t* parent = data->parent;
-    data_file_t* next = data->next;
-    parent->next = next;
+    data->protection = 1; // just put protection
 
     tmpfs_free_file_content(data); // TODO: clear all directory's files
 
-    delete (void*)data;
+    data->content = 0;
 
     return 0;
 

@@ -32,7 +32,6 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     Log("Waiting for other CPUs...\n");
     MP::Sync();
-    MP::Sync();
     __sti();
     while(1) {
         __hlt();
@@ -55,6 +54,6 @@ void MP::Init() {
 void MP::Sync() {
     temp_how_much_cpus++;
     while(how_much_cpus != temp_how_much_cpus) {__nop();}
-    HPET::Sleep(1000); // perform 1 ms sleep to sync
+    HPET::Sleep(50000); // perform 50 ms sleep to sync
     temp_how_much_cpus = 0;
 }
