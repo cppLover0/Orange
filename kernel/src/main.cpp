@@ -30,12 +30,13 @@
 #include <generic/VFS/vfs.hpp>
 #include <generic/VFS/ustar.hpp>
 #include <generic/VFS/tmpfs.hpp>
+#include <generic/elf/elf.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
 void timer_test() {
-    //Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
+    Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
     HPET::Sleep(500000);
     Lapic::EOI();
     __sti();
@@ -60,6 +61,12 @@ static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
 
     return UACPI_INTERRUPT_HANDLED;
+}
+
+void test() {
+    __cli();
+    Log("Hello, world from elf !");
+    __hlt();
 }
 
 extern "C" void kmain() {
@@ -92,6 +99,7 @@ extern "C" void kmain() {
     );
 
     ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
+    ft_ctx->cursor_enabled = 0;
 
     LogInit(ft_ctx);
 
@@ -149,9 +157,25 @@ extern "C" void kmain() {
     USTAR::ParseAndCopy();
     Log("Loaded initrd\n");
 
-    MP::Sync();
+    tmpfs_dump();
 
-    //tmpfs_dump();
+    filestat_t stat;
+
+    VFS::Stat("/bin/initrd",(char*)&stat);
+
+    char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096));
+
+    VFS::Read(elf,"/bin/initrd");
+
+    ELF::Load((uint8_t*)elf);
+
+    Log("Kernel is initializied !\n");
+
+    HPET::Sleep(1000 * 1000 * 2);
+
+    ft_ctx->clear(ft_ctx,1);
+
+    MP::Sync();
 
     Log("Waiting for interrupts...\n");
 

@@ -17,9 +17,14 @@ HOST_LIBS :=
 run-build:all run
 
 .PHONY: initrd
-initrd:
+initrd: initrd_build
 	rm -rf iso_etc/boot/initrd.tar
 	tar -cf iso_etc/boot/initrd.tar -C initrd .
+
+.PHONY: initrd_build
+initrd_build:
+	rm -rf initrd/bin/initrd
+	cc -nostdlib -ffreestanding -o initrd/bin/initrd initrd_etc/src/main.c
 
 .PHONY: all
 all: $(IMAGE_NAME).iso

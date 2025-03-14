@@ -30,20 +30,6 @@ data_file_t* tmpfs_scan_for_file(char* name) {
 
 }
 
-void tmpfs_dump() {
-    data_file_t* current = root;
-    
-    Log("tmpfs dump: ");
-
-    while(current) {
-        Log("\"%s\", ",current->name);
-        current = current->next;
-    }
-
-    Log("\n");
-
-}
-
 void tmpfs_free_file_content(data_file_t* file) {
 
     if(!file->content) return;
@@ -158,6 +144,25 @@ int tmpfs_readfile(char* buffer,char* filename) {
     return 0;
 }
 
+int tmpfs_stat(char* filename,char* buffer) {
+    if(!buffer) return 1;
+    if(!filename) return 2;
+    if(filename[0] != '/') return 3; 
+
+    if(!String::strcmp(filename,"/")) return 4;
+
+    if(!tmpfs_scan_for_file(filename)) return 5;
+
+    data_file_t* file = tmpfs_scan_for_file(filename);
+
+    filestat_t stat;
+    stat.size = file->size_of_content;
+
+    String::memcpy(buffer,&stat,sizeof(filestat_t));
+
+    return 0;
+}
+
 char tmpfs_exists(char* filename) {
     if(!filename) return 0;
     return tmpfs_scan_for_file(filename) ? 1 : 0;
@@ -184,6 +189,22 @@ int tmpfs_touch(char* filename) {
 
 }
 
+void tmpfs_dump() {
+    data_file_t* current = root;
+    
+    Log("tmpfs dump: ");
+
+    while(current) {
+        filestat_t stat;
+        int size = tmpfs_stat(current->name,(char*)&stat);
+        Log("\"%s\": Size: %d (%d KB, %d MB, %d GB), ",current->name,stat.size,stat.size / 1024,(stat.size / 1024) / 1024,((stat.size / 1024) / 1024) / 1024);
+        current = current->next;
+    }
+
+    Log("\n");
+
+}
+
 void TMPFS::Init(filesystem_t* fs) {
     data_file_t* root_d = new data_file_t;
     String::memset(root_d,0,sizeof(data_file_t));
@@ -200,5 +221,6 @@ void TMPFS::Init(filesystem_t* fs) {
     fs->writefile = tmpfs_writefile;
     fs->rm = tmpfs_rm;
     fs->touch = tmpfs_touch;
+    fs->stat = tmpfs_stat;
     
 }

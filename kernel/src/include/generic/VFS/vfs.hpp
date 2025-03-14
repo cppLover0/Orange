@@ -19,6 +19,7 @@ typedef struct {
     int (*rm)(char* filename);
     
     char (*exists)(char* filename);
+    int (*stat)(char* filename,char* buffer);
 
     char is_in_ram;
     disk_t* disk;
@@ -30,6 +31,10 @@ typedef struct {
     filesystem_t* fs;
 } mount_location_t;
 
+typedef struct {
+    uint32_t size;
+} __attribute__((packed)) filestat_t;
+
 class VFS {
 public:
     static void Init();
@@ -39,4 +44,5 @@ public:
     static int Create(char* filename,int type);
     static int Remove(char* filename);
     static char Exists(char* filename);
+    static int Stat(char* filename,char* buffer);
 };
