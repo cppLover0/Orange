@@ -159,6 +159,7 @@ extern "C" void kmain() {
 
     tmpfs_dump();
 
+
     filestat_t stat;
 
     VFS::Stat("/bin/initrd",(char*)&stat);
@@ -166,9 +167,8 @@ extern "C" void kmain() {
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096));
 
     VFS::Read(elf,"/bin/initrd");
-
     ELF::Load((uint8_t*)elf);
-
+    
     Log("Kernel is initializied !\n");
 
     HPET::Sleep(1000 * 1000 * 2);

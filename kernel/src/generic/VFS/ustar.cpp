@@ -8,13 +8,14 @@
 #include <other/log.hpp>
 #include <generic/memory/paging.hpp> // it have align macros
 
-int oct2bin(unsigned char *str, int size) {
-    int n = 0;
-    unsigned char *c = str;
-    while (size-- > 0) {
+inline int oct2bin(unsigned char *str, int size) {
+    uint64_t n = 0;
+    volatile unsigned char *c = str;
+    for(int i = 0;i < size;i++) {
         n *= 8;
         n += *c - '0';
         c++;
+        
     }
     return n;
 }
@@ -27,11 +28,13 @@ void USTAR::ParseAndCopy() {
 	limine_file* initrd = info.initrd->modules[0];
 
     pAssert(!String::strncmp(current->ustar,"ustar",5),"Invalid initrd");
+    Log("Valid initrd !\n");
 
 	uint64_t actual_tar_ptr_end = ((uint64_t)initrd->address + initrd->size) - 1024; //substract first header and his content
 
 	while((uint64_t)current < actual_tar_ptr_end) {
-		char type = oct2bin((uint8_t*)&current->type,1);
+		uint64_t type = oct2bin((uint8_t*)&current->type,1);
+        uint64_t aligned_size;
 		if(type == 0) {
             char* filename = (char*)((uint64_t)current->file_name + 1);
 
@@ -39,11 +42,13 @@ void USTAR::ParseAndCopy() {
 
             int size = oct2bin((uint8_t*)current->file_size,String::strlen(current->file_size));
 
+            aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
+
             VFS::Write((char*)((uint64_t)current + 512),filename,size);
 
-		}
-		uint64_t aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
-
+		} else {
+            aligned_size = 512;
+        }
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);
 
     }

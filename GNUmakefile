@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 1024M -d int -no-reboot -serial stdio -M q35 -smp 4 
+QEMUFLAGS := -m 1024M -d int -no-reboot -serial stdio -M q35 -smp 4 -no-shutdown
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
@@ -13,18 +13,32 @@ HOST_CPPFLAGS :=
 HOST_LDFLAGS :=
 HOST_LIBS :=
 
+HOST_LD := ld
+HOST_TAR := tar
+
+ifeq ($(shell uname), Darwin)
+    HOST_LD = ld.lld
+	HOST_TAR = gtar
+endif
+
+
+
+
 .PHONY: run-build
 run-build:all run
 
 .PHONY: initrd
 initrd: initrd_build
 	rm -rf iso_etc/boot/initrd.tar
-	tar -cf iso_etc/boot/initrd.tar -C initrd .
+	$(HOST_TAR) -cf iso_etc/boot/initrd.tar -C initrd .
 
 .PHONY: initrd_build
 initrd_build:
 	rm -rf initrd/bin/initrd
-	cc -nostdlib -ffreestanding -o initrd/bin/initrd initrd_etc/src/main.c
+	clang -c -nostdlib -ffreestanding -target x86_64-elf -o main.o initrd_etc/src/main.c
+	$(HOST_LD) -o initrd/bin/initrd -T initrd_etc/link.ld main.o
+
+
 
 .PHONY: all
 all: $(IMAGE_NAME).iso

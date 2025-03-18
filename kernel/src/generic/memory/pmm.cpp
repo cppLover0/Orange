@@ -105,8 +105,6 @@ uint64_t PMM::BigAlloc(uint64_t size_pages) {
             _continue = 0; 
         }
     }
-    if(startDone)
-        String::memset((void*)HHDM::toVirt(biggest_entry.base + (startDone * PAGE_SIZE)),0,PAGE_SIZE * size_pages);
     spinlock_unlock(&pmm_spinlock);
     return startDone ? biggest_entry.base + (startDone * PAGE_SIZE) : 0;
 }

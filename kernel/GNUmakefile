@@ -21,8 +21,14 @@ AR := ar
 # User controllable C flags.
 CFLAGS := -g -O2 -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings
 
+LD := ld
+
+ifeq ($(shell uname), Darwin)
+    LD = ld.lld
+endif
+
 # User controllable C++ flags. We default to same as C flags.
-CXXFLAGS := $(CFLAGS) 
+CXXFLAGS := $(CFLAGS)
 
 # User controllable C/C++ preprocessor flags. We set none by default.
 CPPFLAGS :=
@@ -116,12 +122,12 @@ override NASMFLAGS += \
 
 # Internal linker flags that should not be changed by the user.
 override LDFLAGS += \
-    -Wl,-m,elf_x86_64 \
-    -Wl,--build-id=none \
+    -m elf_x86_64 \
+    --build-id=none \
     -nostdlib \
     -static \
     -z max-page-size=0x1000 \
-    -Wl,--gc-sections \
+    --gc-sections \
     -T linker.ld
 
 # Use "find" to glob all *.c, *.cpp, *.S, and *.asm files in the tree and obtain the
@@ -154,7 +160,7 @@ cc-runtime-x86_64/cc-runtime.a: GNUmakefile cc-runtime/*
 # Link rules for the final executable.
 bin/$(OUTPUT): GNUmakefile linker.ld $(OBJ) cc-runtime-x86_64/cc-runtime.a
 	mkdir -p "$$(dirname $@)"
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
+	$(LD) $(LDFLAGS) $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
 
 # Compilation rules for *.c files.
 obj/%.c.o: src/%.c GNUmakefile
