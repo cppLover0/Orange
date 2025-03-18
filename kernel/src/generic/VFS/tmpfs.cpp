@@ -35,7 +35,7 @@ void tmpfs_free_file_content(data_file_t* file) {
     if(!file->content) return;
     if(!(file->type == TMPFS_TYPE_FILE)) return;
 
-    uint64_t aligned_size = ALIGNPAGEUP(file->size_of_content);
+    uint64_t aligned_size = ALIGNPAGEUP(file->size_of_content) / PAGE_SIZE;
     PMM::VirtualBigFree(file->content,aligned_size); // the min file size is 4k cuz i have 4k pages
 
 }

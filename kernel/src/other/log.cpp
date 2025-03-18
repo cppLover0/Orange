@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <other/log.hpp>
 #include <lib/flanterm/flanterm.h>
+#include <drivers/cmos/cmos.hpp>
 #include <lib/flanterm/backends/fb.h>
 
 char log_lock = 0;
@@ -21,6 +22,36 @@ void Log(char* format, ...) {
     va_list args;
     va_start(args, format);
     int i = 0;
+
+    char sec_b[4];
+    char min_b[4];
+    char hour_b[4];
+
+    String::itoa(CMOS::Second(), sec_b,10);
+    String::itoa(CMOS::Minute(), min_b,10);
+    String::itoa(CMOS::Hour(), hour_b,10);
+
+    Serial::WriteString("[");
+    flanterm_write(ft_ctx,"[",1);
+
+    Serial::WriteString(sec_b);
+    flanterm_write(ft_ctx,sec_b,String::strlen(sec_b));
+
+    Serial::WriteString(".");
+    flanterm_write(ft_ctx,".",1);
+
+    Serial::WriteString(min_b);
+    flanterm_write(ft_ctx,min_b,String::strlen(min_b));
+
+    Serial::WriteString(".");
+    flanterm_write(ft_ctx,".",1);
+
+    Serial::WriteString(hour_b);
+    flanterm_write(ft_ctx,hour_b,String::strlen(hour_b));
+
+    Serial::WriteString("] ");
+    flanterm_write(ft_ctx,"] ",2);
+
     while (i < String::strlen(format)) {
         if (format[i] == '%') {
             i++;

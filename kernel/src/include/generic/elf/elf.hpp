@@ -7,7 +7,7 @@
 #define MAX2(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct {
-    unsigned char e_ident[4];
+    unsigned char e_ident[16];
     uint16_t e_type;
     uint16_t e_machine;
     uint32_t e_version;
@@ -34,7 +34,11 @@ typedef struct {
     uint64_t p_align;
 } __attribute__((packed)) elfprogramheader_t;
 
+typedef struct {
+    void (*entry)(int argc,char** argv);
+} __attribute__((packed)) ELFLoadResult;
+
 class ELF {
 public:
-    static void Load(uint8_t* base);
+    static ELFLoadResult Load(uint8_t* base, uint64_t* cr3, uint64_t flags);
 };

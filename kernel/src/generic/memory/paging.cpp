@@ -17,6 +17,10 @@ uint64_t* __paging_next_level(uint64_t* table,uint64_t index) {
 
 uint64_t* kernel_cr3;
 
+uint64_t* Paging::KernelGet() {
+    return kernel_cr3;
+}
+
 void* Paging::Map(uint64_t* cr3,uint64_t phys,uint64_t virt,uint64_t flags) {
     uint64_t aligned_phys = ALIGNPAGEDOWN(phys);
     uint64_t aligned_virt = ALIGNPAGEDOWN(virt); // yes hhdm always page aligned, but why not ?

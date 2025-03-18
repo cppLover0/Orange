@@ -54,4 +54,6 @@ public:
 
     static void EnableKernel();
 
+    static uint64_t* KernelGet();
+
 };

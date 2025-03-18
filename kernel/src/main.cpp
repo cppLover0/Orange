@@ -133,6 +133,8 @@ extern "C" void kmain() {
     idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
     timer_entry->ist = 2;
 
+    idt_entry_t* elf_test1 = IDT::SetEntry(0x80,(void*)test,0x8E);
+
     ACPI::fullInit();
     Log("ACPI Initializied\n");
 
@@ -157,8 +159,7 @@ extern "C" void kmain() {
     USTAR::ParseAndCopy();
     Log("Loaded initrd\n");
 
-    tmpfs_dump();
-
+    //tmpfs_dump();
 
     filestat_t stat;
 
@@ -167,8 +168,10 @@ extern "C" void kmain() {
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096));
 
     VFS::Read(elf,"/bin/initrd");
-    ELF::Load((uint8_t*)elf);
+    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT);
     
+    res.entry(0,0);
+
     Log("Kernel is initializied !\n");
 
     HPET::Sleep(1000 * 1000 * 2);
