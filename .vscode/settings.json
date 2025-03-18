@@ -14,6 +14,8 @@
         "serial.hpp": "c",
         "*.tcc": "cpp",
         "thread": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "compare": "c",
+        "cstdint": "c"
     }
 }
