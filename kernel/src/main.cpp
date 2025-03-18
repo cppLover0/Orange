@@ -66,7 +66,9 @@ static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
 void test() {
     __cli();
     Log("Hello, world from elf !");
-    __hlt();
+    while(1) {
+        __nop();
+    }
 }
 
 extern "C" void kmain() {
@@ -161,17 +163,6 @@ extern "C" void kmain() {
 
     //tmpfs_dump();
 
-    filestat_t stat;
-
-    VFS::Stat("/bin/initrd",(char*)&stat);
-
-    char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096));
-
-    VFS::Read(elf,"/bin/initrd");
-    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT);
-    
-    res.entry(0,0);
-
     Log("Kernel is initializied !\n");
 
     HPET::Sleep(1000 * 1000 * 2);
@@ -181,6 +172,35 @@ extern "C" void kmain() {
     MP::Sync();
 
     Log("Waiting for interrupts...\n");
+
+    int breakpoint = 0;
+
+    filestat_t stat;
+
+    Log("Breakpoint #%d\n",breakpoint);
+    breakpoint++;
+
+    VFS::Stat("/bin/initrd",(char*)&stat);
+
+    Log("Breakpoint #%d\n",breakpoint);
+    breakpoint++;
+
+    char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
+
+    Log("Breakpoint #%d\n",breakpoint);
+    breakpoint++;
+
+    VFS::Read(elf,"/bin/initrd");
+
+    Log("Breakpoint #%d\n",breakpoint);
+    breakpoint++;
+
+    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT);
+    
+    Log("Breakpoint #%d\n",breakpoint);
+    breakpoint++;
+
+    res.entry(0,0);
 
     __sti();
 
