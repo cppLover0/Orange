@@ -9,13 +9,14 @@
 #include <config.hpp>
 #include <other/hhdm.hpp>
 
-ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags) {
+ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack) {
     elfheader_t* head = (elfheader_t*)base;
 
     elfprogramheader_t* current_head;
 
     uint64_t elf_base = UINT64_MAX;
     uint64_t size = 0;
+    uint64_t phdr = 0;
     ELFLoadResult res;
     res.entry = 0;
 
@@ -31,6 +32,10 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags) {
     for(int i = 0;i < head->e_phnum; i++) {
         uint64_t end = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
+
+        if(current_head->p_type == PT_PHDR) {
+            phdr = current_head->p_vaddr;
+        }
 
         end = current_head->p_vaddr - elf_base + current_head->p_memsz;
         size = MAX2(size,end);
@@ -57,8 +62,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags) {
 
     }
 
-    Log("ELF Size: 0x%p\n",size);
-    Log("ELF Base: 0x%p\n",elf_base);
+    uint64_t auxv_stack[] = {9,head->e_entry,3,phdr,};
+
     res.entry = (void (*)(int argc,char** argv))head->e_entry;
 
     return res;

@@ -157,6 +157,13 @@ int tmpfs_stat(char* filename,char* buffer) {
 
     filestat_t stat;
     stat.size = file->size_of_content;
+    stat.file_create_date = file->file_create_date;
+    stat.file_change_date = file->file_change_date;
+    stat.name = file->name;
+    stat.type = file->type;
+    stat.fs_prefix1 = 'T';
+    stat.fs_prefix2 = 'M';
+    stat.fs_prefix3 = 'P';
 
     String::memcpy(buffer,&stat,sizeof(filestat_t));
 

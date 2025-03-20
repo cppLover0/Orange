@@ -32,7 +32,19 @@ typedef struct {
 } mount_location_t;
 
 typedef struct {
+    
+    char type;
+    char* name;
+
     uint32_t size;
+
+    uint64_t file_create_date;
+    uint64_t file_change_date;
+
+    char fs_prefix1;
+    char fs_prefix2;
+    char fs_prefix3;
+
 } __attribute__((packed)) filestat_t;
 
 class VFS {

@@ -31,6 +31,7 @@
 #include <generic/VFS/ustar.hpp>
 #include <generic/VFS/tmpfs.hpp>
 #include <generic/elf/elf.hpp>
+#include <drivers/ps2keyboard/ps2keyboard.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -39,6 +40,14 @@ void timer_test() {
     Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
     HPET::Sleep(500000);
     Lapic::EOI();
+    __sti();
+    while(1) {
+        __nop();
+    }
+}
+
+void key_handler() {
+    Log("Got keyboard Interrupt !\n");
     __sti();
     while(1) {
         __nop();
@@ -64,7 +73,7 @@ static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
 }
 
 void test() {
-    __cli();
+    __sti();
     Log("Hello, world from elf !");
     while(1) {
         __nop();
@@ -163,6 +172,8 @@ extern "C" void kmain() {
 
     //tmpfs_dump();
 
+    PS2Keyboard::Init(key_handler);
+
     Log("Kernel is initializied !\n");
 
     HPET::Sleep(1000 * 1000 * 2);
@@ -177,28 +188,13 @@ extern "C" void kmain() {
 
     filestat_t stat;
 
-    Log("Breakpoint #%d\n",breakpoint);
-    breakpoint++;
-
     VFS::Stat("/bin/initrd",(char*)&stat);
-
-    Log("Breakpoint #%d\n",breakpoint);
-    breakpoint++;
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
 
-    Log("Breakpoint #%d\n",breakpoint);
-    breakpoint++;
-
     VFS::Read(elf,"/bin/initrd");
 
-    Log("Breakpoint #%d\n",breakpoint);
-    breakpoint++;
-
-    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT);
-    
-    Log("Breakpoint #%d\n",breakpoint);
-    breakpoint++;
+    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)((uint64_t)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE)));
 
     res.entry(0,0);
 
