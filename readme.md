@@ -64,17 +64,6 @@ Orange is my limine x86_64 OS
 - [ ] EXT4
 - [ ] End of filesystem pain
 
-
-
-
-
-
-
-
-
-
-
-
-
+## Final TODO
 
 - [ ] The end ?
