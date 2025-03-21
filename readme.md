@@ -6,11 +6,8 @@ Orange is my limine x86_64 OS
 ## Base x86 TODO
 
 - [x] Build
-- [x] IO
 - [x] Locking
 - [x] GFX (flanterm)
-- [x] Serial
-- [x] PCI
 - [x] PMM 
 - [x] Paging
 - [x] Some heap
@@ -19,16 +16,11 @@ Orange is my limine x86_64 OS
 - [x] TSS
 - [x] ACPI
 - [x] HPET
-- [x] CMOS
 - [x] LAPIC 
 - [x] MP
 - [x] IOAPIC
-- [x] VFS
-- [x] TMPFS
-- [x] USTAR
 - [x] Initrd support
 - [x] ELF parsing
-- [x] PS2 Keyboard 
 - [ ] Scheduling
 - [ ] End of x86 pain
 
@@ -48,6 +40,11 @@ Orange is my limine x86_64 OS
 
 ## Driver TODO
 
+- [x] IO
+- [x] Serial
+- [x] PCI
+- [x] CMOS
+- [x] PS2 Keyboard 
 - [ ] Speaker
 - [ ] AHCI
 - [ ] NVME
@@ -57,9 +54,27 @@ Orange is my limine x86_64 OS
 
 ## Filesystem TODO
 
+- [x] VFS
+- [x] TMPFS
+- [x] USTAR
 - [ ] DevFS
 - [ ] ProcFS
 - [ ] ISO9660
 - [ ] FAT32
 - [ ] EXT4
 - [ ] End of filesystem pain
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- [ ] The end ?
