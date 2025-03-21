@@ -28,7 +28,7 @@ Orange is my limine x86_64 OS
 - [x] USTAR
 - [x] Initrd support
 - [x] ELF parsing
-- [ ] PS2 Keyboard 
+- [x] PS2 Keyboard 
 - [ ] Scheduling
 - [ ] Unixlike syscalls
 - [ ] UserSpace

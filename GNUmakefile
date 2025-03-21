@@ -35,6 +35,7 @@ initrd: initrd_build
 .PHONY: initrd_build
 initrd_build:
 	rm -rf initrd/bin/initrd
+	mkdir -p initrd/bin
 	clang -c -nostdlib -ffreestanding -target x86_64-elf -o main.o initrd_etc/src/main.c
 	$(HOST_LD) -o initrd/bin/initrd -T initrd_etc/link.ld main.o
 

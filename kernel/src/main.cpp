@@ -37,8 +37,8 @@ extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
 void timer_test() {
-    Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
-    HPET::Sleep(500000);
+    __cli();
+    //Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
     Lapic::EOI();
     __sti();
     while(1) {
@@ -47,8 +47,10 @@ void timer_test() {
 }
 
 void key_handler() {
-    Log("Got keyboard Interrupt !\n");
+    char key = PS2Keyboard::Get();
+    NLog("%c",key);
     __sti();
+    PS2Keyboard::EOI();
     while(1) {
         __nop();
     }
@@ -73,8 +75,8 @@ static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
 }
 
 void test() {
-    __sti();
     Log("Hello, world from elf !");
+    __sti();
     while(1) {
         __nop();
     }
@@ -176,7 +178,9 @@ extern "C" void kmain() {
 
     Log("Kernel is initializied !\n");
 
-    HPET::Sleep(1000 * 1000 * 2);
+    Log("%c",'a');
+
+    HPET::Sleep(1000 * 500);
 
     ft_ctx->clear(ft_ctx,1);
 
@@ -195,6 +199,8 @@ extern "C" void kmain() {
     VFS::Read(elf,"/bin/initrd");
 
     ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)((uint64_t)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE)));
+
+    ft_ctx->cursor_enabled = 1;
 
     res.entry(0,0);
 

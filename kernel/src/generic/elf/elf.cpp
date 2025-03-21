@@ -57,7 +57,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         uint64_t dest = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
         dest = (uint64_t)allocated_elf + current_head->p_vaddr;
-        String::memset((void*)dest,0,current_head->p_memsz);
+        String::memset((void*)dest,0,current_head->p_filesz);
         String::memcpy((void*)dest,(void*)((uint64_t)base + current_head->p_offset), current_head->p_filesz);
 
     }
