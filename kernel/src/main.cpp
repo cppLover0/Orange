@@ -198,7 +198,7 @@ extern "C" void kmain() {
 
     VFS::Read(elf,"/bin/initrd");
 
-    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)((uint64_t)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE)));
+    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)(CALIGNPAGEDOWN((uint64_t)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE),0x10)));
 
     ft_ctx->cursor_enabled = 1;
 

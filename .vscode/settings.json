@@ -16,6 +16,17 @@
         "thread": "cpp",
         "valarray": "cpp",
         "compare": "c",
-        "cstdint": "c"
+        "cstdint": "c",
+        "expected": "cpp",
+        "optional": "cpp",
+        "ratio": "cpp",
+        "type_traits": "cpp",
+        "charconv": "cpp",
+        "chrono": "cpp",
+        "system_error": "cpp",
+        "functional": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp",
+        "string": "cpp"
     }
 }

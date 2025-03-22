@@ -82,5 +82,5 @@ typedef enum {
 
 class ELF {
 public:
-    static ELFLoadResult Load(uint8_t* base, uint64_t* cr3, uint64_t flags,uint64_t* stack);
+    static ELFLoadResult Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,uint64_t** argv,uint64_t** envp);
 };
