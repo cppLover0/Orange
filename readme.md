@@ -35,6 +35,7 @@ Orange is my limine x86_64 OS
 - [ ] nasm
 - [ ] gcc
 - [ ] lua
+- [ ] luau
 - [ ] python
 - [ ] etc. apps
 
