@@ -178,9 +178,7 @@ extern "C" void kmain() {
 
     Log("Kernel is initializied !\n");
 
-    Log("%c",'a');
-
-    HPET::Sleep(1000 * 500);
+    HPET::Sleep(1000 * 100);
 
     ft_ctx->clear(ft_ctx,1);
 
@@ -198,11 +196,18 @@ extern "C" void kmain() {
 
     VFS::Read(elf,"/bin/initrd");
 
-    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)(CALIGNPAGEDOWN((uint64_t)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE),0x10)));
+    const char* hell = "hell";
+    const char* no = "no";
+    const char* gta = "gta";
+
+    char* argv[] = {(char*)hell,(char*)no,0};
+    char* envp[] = {(char*)gta,0};
+
+    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE),(char**)argv,(char**)envp);
 
     ft_ctx->cursor_enabled = 1;
 
-    res.entry(0,0);
+    res.entry();
 
     __sti();
 

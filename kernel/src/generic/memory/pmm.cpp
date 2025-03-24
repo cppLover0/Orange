@@ -41,7 +41,7 @@ void PMM::Init(limine_memmap_response* mem_map) {
         }
     }
 
-    Serial::printf("Biggest entry: Base: 0x%p, Size: 0x%p (%d MB)\n",biggest_entry.base,biggest_entry.length,(biggest_entry.length / 1024) / 1024);
+    Log("Biggest entry: Base: 0x%p, Size: 0x%p (%d MB)\n",biggest_entry.base,biggest_entry.length,(biggest_entry.length / 1024) / 1024);
 
     uint64_t pageCount = biggest_entry.length / PAGE_SIZE;
     uint64_t bitmapSize = (pageCount + 7) / 8;

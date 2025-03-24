@@ -8,6 +8,7 @@
 #include <drivers/serial/serial.hpp>
 #include <other/assembly.hpp>
 #include <other/hhdm.hpp>
+#include <other/log.hpp>
 #include <uacpi/acpi.h>
 #include <other/assert.hpp>
 
@@ -27,7 +28,7 @@ void HPET::Init() {
     hpet_is_32_bit = (*(volatile uint64_t*)hpet_base & (1 << 13)) ? 0 : 1;
     hpet_clock_period = *(volatile uint32_t*)(hpet_base + 4);
     hpet_clock_period_nano = hpet_clock_period / 1000000;
-    Serial::printf("%s HPET: 0x%p\n",hpet_is_32_bit ? "32 Bit" : "64 Bit",hpet_base);
+    Log("%s HPET: 0x%p\n",hpet_is_32_bit ? "32 Bit" : "64 Bit",hpet_base);
 }
 
 uint64_t hpet_counter() {

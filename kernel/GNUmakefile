@@ -10,10 +10,10 @@ override OUTPUT := kernel
 PREFIX := /usr/local
 
 # User controllable C compiler command.
-CC := clang
+CC := gcc
 
 # User controllable C++ compiler command.
-CXX := clang++
+CXX := g++
 
 # User controllable archiver command.
 AR := ar

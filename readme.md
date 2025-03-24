@@ -35,6 +35,7 @@ Orange is my limine x86_64 OS
 - [ ] nasm
 - [ ] gcc
 - [ ] lua
+- [ ] luau
 - [ ] python
 - [ ] etc. apps
 
@@ -47,8 +48,9 @@ Orange is my limine x86_64 OS
 - [x] PS2 Keyboard 
 - [ ] Speaker
 - [ ] AHCI
-- [ ] NVME
 - [ ] XHCI/HID/USB
+- [ ] NVME
+- [ ] Networking
 - [ ] Intel HDA
 - [ ] End of driver pain
 

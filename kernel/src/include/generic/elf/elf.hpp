@@ -35,7 +35,9 @@ typedef struct {
 } __attribute__((packed)) elfprogramheader_t;
 
 typedef struct {
-    void (*entry)(int argc,char** argv);
+    void (*entry)();
+    uint64_t* ready_stack;
+    uint64_t* phys_cr3;
 } __attribute__((packed)) ELFLoadResult;
 
 enum ELF_Type {
@@ -82,5 +84,5 @@ typedef enum {
 
 class ELF {
 public:
-    static ELFLoadResult Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,uint64_t** argv,uint64_t** envp);
+    static ELFLoadResult Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp);
 };

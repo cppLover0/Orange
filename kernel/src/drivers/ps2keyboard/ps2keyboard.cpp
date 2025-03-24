@@ -100,7 +100,7 @@ void PS2Keyboard::EOI() {
 
 
 
-char PS2Keyboard::Get() {
+short PS2Keyboard::Get() {
     char status = IO::IN(0x64,1);
 
     if(status & 0x01) {

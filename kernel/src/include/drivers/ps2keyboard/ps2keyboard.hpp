@@ -11,5 +11,5 @@ class PS2Keyboard {
 public:
     static void Init(void (*key)());
     static void EOI();
-    static char Get();
+    static short Get();
 };

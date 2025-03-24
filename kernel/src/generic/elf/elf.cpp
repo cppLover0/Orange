@@ -9,13 +9,37 @@
 #include <config.hpp>
 #include <other/hhdm.hpp>
 #include <generic/VFS/vfs.hpp>
+#include <generic/memory/heap.hpp>
 #include <other/string.hpp>
 
 #define PUT_STACK(dest,value) *--dest = value;
 #define PUT_STACK_STRING(dest,string) String::memcpy(dest,string,String::strlen(string)); \
-    dest -= String::strlen(string);
+    dest -= CALIGNPAGEUP(String::strlen(string),8);
 
-ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,uint64_t** argv,uint64_t** envp) {
+uint64_t __elf_get_length(char** arr) {
+    uint64_t counter = 0;
+
+    while(arr[counter]) 
+        counter++;
+
+    return counter;
+}
+
+uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t len) {
+
+    uint64_t* temp_stack = stack;
+
+    for(uint64_t i = 0;i < len; i++) {
+        PUT_STACK_STRING(temp_stack,arr[i])
+        out[i] = arr[i];
+    }
+
+    return temp_stack;
+    
+
+}
+
+ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp) {
     elfheader_t* head = (elfheader_t*)base;
 
     elfprogramheader_t* current_head;
@@ -29,7 +53,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     if(String::strncmp((char*)head->e_ident,elf_first,4))
         return res;
 
-    res.entry = (void (*)(int argc,char** argv))head->e_entry;
+    res.entry = (void (*)())head->e_entry;
 
     for (int i = 0; i < head->e_phnum; i++) {
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
@@ -79,6 +103,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     for(uint64_t i = 0;i < size; i += PAGE_SIZE)
         Paging::Map(cr3,phys_elf + i,elf_base + i,flags);
 
+    res.phys_cr3 = (uint64_t*)HHDM::toPhys((uint64_t)cr3);
+
     for(int i = 0;i < head->e_phnum; i++) {
         uint64_t dest = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
@@ -88,11 +114,27 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     }
 
-    // if stack is available so we can put information
     if(stack && argv && envp) {
 
-        uint64_t auxv_stack[] = {AT_ENTRY,(uint64_t)head->e_entry,AT_PHDR,phdr,AT_PHENT,head->e_phentsize,AT_PHNUM,head->e_phnum};
+        uint64_t* _stack = stack;
 
+        uint64_t auxv_stack[] = {AT_ENTRY,(uint64_t)head->e_entry,AT_PHDR,phdr,AT_PHENT,head->e_phentsize,AT_PHNUM,head->e_phnum,AT_PAGESZ,PAGE_SIZE};
+        uint64_t argv_length = __elf_get_length(argv);
+        uint64_t envp_length = __elf_get_length(envp);
+
+        char** stack_argv = (char**)KHeap::Malloc(8 * argv_length);
+        char** stack_envp = (char**)KHeap::Malloc(8 * envp_length);
+
+        _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
+        _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
+
+        _stack = (uint64_t*)CALIGNPAGEDOWN((uint64_t)_stack,16);
+
+        res.ready_stack = _stack;
+
+
+    } else {
+        res.ready_stack = stack;
     }
 
     return res;

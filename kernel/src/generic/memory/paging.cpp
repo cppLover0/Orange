@@ -8,6 +8,7 @@
 #include <lib/limineA/limine.h>
 #include <drivers/serial/serial.hpp>
 #include <generic/locks/spinlock.hpp>
+#include <other/log.hpp>
 
 uint64_t* __paging_next_level(uint64_t* table,uint64_t index) {
     if(!(table[index] & PTE_PRESENT))
@@ -115,15 +116,15 @@ void Paging::alwaysMappedMap(uint64_t* cr3) {
 void Paging::Init() {
     Pat(1,1);
     kernel_cr3 = (uint64_t*)PMM::VirtualAlloc();
-    Serial::printf("Mapping usable memory\n");
+    Log("Mapping usable memory\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_USABLE,PTE_PRESENT | PTE_RW);
-    Serial::printf("Mapping framebuffer\n");
+    Log("Mapping framebuffer\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
-    Serial::printf("Mapping bootloader reclaimable\n");
+    Log("Mapping bootloader reclaimable\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE,PTE_PRESENT | PTE_RW);
-    Serial::printf("Activating paging\n");
+    Log("Activating paging\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_EXECUTABLE_AND_MODULES,PTE_PRESENT | PTE_RW);
-    Serial::printf("Mapping kernel\n");
+    Log("Mapping kernel\n");
     Kernel(kernel_cr3);
     EnableKernel();
 }
