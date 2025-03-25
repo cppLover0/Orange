@@ -11,6 +11,7 @@
 extern "C" void CPanic(const char* msg,int_frame_t* frame) {
     __cli();
     Paging::EnableKernel();
+    LogUnlock();
 
     uint64_t cr2;
     asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");

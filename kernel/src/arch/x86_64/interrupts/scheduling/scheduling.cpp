@@ -21,6 +21,8 @@ process_t* head_proc = 0;
 process_t* last_proc = 0;
 
 char proc_spinlock;
+char proc_spinlock2;
+char proc_spinlock3;
 
 extern "C" void schedulingSchedule(int_frame_t* frame) {
 
@@ -29,10 +31,12 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     cpudata_t* data = CpuData::Access();
     int_frame_t* frame1 = &data->temp_frame;
     process_t* proc = data->current;
+    
+    data->current->status = PROCESS_STATUS_RUN;
 
     spinlock_lock(&proc_spinlock);
-
-    data->current->status = PROCESS_STATUS_RUN;
+    spinlock_lock(&proc_spinlock2);
+    spinlock_lock(&proc_spinlock3);
 
     if(frame) 
         String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
@@ -46,8 +50,10 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     proc->status = PROCESS_STATUS_IN_USE;
                     data->current = proc;
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
-                    spinlock_unlock(&proc_spinlock);
                     Lapic::EOI();
+                    spinlock_unlock(&proc_spinlock);
+                    spinlock_unlock(&proc_spinlock2);
+                    spinlock_unlock(&proc_spinlock3);
                     schedulingEnd(frame1);
                 }
             }

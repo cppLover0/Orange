@@ -47,14 +47,18 @@ void test() {
 
 void _1() {
     while(1) {
+        __cli();
         NLog("1");
+        __sti();
         __hlt();
     }
 }
 
 void _2() {
     while(1) {
+        __cli();
         NLog("2");
+        __sti();
         __hlt();
     }
 }
@@ -158,8 +162,6 @@ extern "C" void kmain() {
 
     ft_ctx->clear(ft_ctx,1);
 
-    MP::Sync();
-
     Log("Waiting for interrupts...\n");
 
     int breakpoint = 0;
@@ -190,6 +192,8 @@ extern "C" void kmain() {
     ft_ctx->cursor_enabled = 1;
 
     //res.entry();
+
+    MP::Sync();
 
     __sti();
 
