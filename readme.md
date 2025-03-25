@@ -21,8 +21,8 @@ Orange is my limine x86_64 OS
 - [x] IOAPIC
 - [x] Initrd support
 - [x] ELF parsing
-- [ ] Scheduling
-- [ ] End of x86 pain
+- [x] Scheduling
+- [x] End of x86 pain
 
 ## Unix-like TODO
 

@@ -28,6 +28,7 @@
         "tuple": "cpp",
         "utility": "cpp",
         "string": "cpp",
-        "cstddef": "cpp"
+        "cstddef": "cpp",
+        "source_location": "cpp"
     }
 }

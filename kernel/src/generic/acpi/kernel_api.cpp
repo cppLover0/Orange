@@ -368,6 +368,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     idt_entry_t* entry = IDT::SetEntry(vector,(void*)base,0x8E);
     IOAPIC::SetEntry(vector,irq,0,Lapic::ID());
     entry->ist = 2;
+    Log("Setupping UACPI vector at vec: %d irq: %d\n",vector,irq);
     return UACPI_STATUS_OK;
 }
 

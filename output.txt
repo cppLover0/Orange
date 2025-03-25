@@ -1,0 +1,85 @@
+Serial initializied
+[29.5.13] Bootloader: Limine 8.7.0
+[29.5.13] RSDP: 0xF59E0
+[29.5.13] HHDM: 0xFFFF800000000000
+[29.5.13] Kernel: Phys: 0x37CD9000, Virt: 0xFFFFFFFF80000000
+[29.5.13] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
+[29.5.13] Memmap: Start: 0xFFFF800037C9E000, Entry_count: 16
+[29.5.13] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
+[29.5.13] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
+[29.5.13] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
+[29.5.13] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
+[29.5.13] Entry #4. Base: 0x100000, size: 0x37B9E000, type: Usable (0)
+[29.5.13] Entry #5. Base: 0x37C9E000, size: 0x29000, type: Non usable (5)
+[29.5.13] Entry #6. Base: 0x37CC7000, size: 0x3000, type: Non usable (6)
+[29.5.13] Entry #7. Base: 0x37CCA000, size: 0xF000, type: Non usable (5)
+[29.5.13] Entry #8. Base: 0x37CD9000, size: 0x810A000, type: Non usable (6)
+[29.5.13] Entry #9. Base: 0x3FDE3000, size: 0x1FC000, type: Non usable (5)
+[29.5.13] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
+[29.5.13] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
+[29.5.13] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
+[29.5.13] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
+[29.5.13] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
+[29.5.13] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
+[30.5.13] Biggest entry: Base: 0x100000, Size: 0x37B9E000 (891 MB)
+[30.5.13] PMM Initializied
+[30.5.13] Mapping usable memory
+[30.5.13] Mapping framebuffer
+[30.5.13] Mapping bootloader reclaimable
+[30.5.13] Activating paging
+[30.5.13] Mapping kernel
+[30.5.13] Paging Initializied
+[30.5.13] KHeap Initializied
+[30.5.13] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
+[30.5.13] GDT Initializied
+[30.5.13] IDT Initializied
+[30.5.13] [UACPI:3] RSDP 0x00000000000F59E0 00000000 v00 (BOCHS )
+[30.5.13] [UACPI:3] RSDT 0x000000003FFE22CF 00000038 v01 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] DSDT 0x000000003FFE0040 00002087 v01 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] FACP 0x000000003FFE20C7 000000F4 v03 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] APIC 0x000000003FFE21BB 00000078 v01 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] HPET 0x000000003FFE2233 00000038 v01 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] MCFG 0x000000003FFE226B 0000003C v01 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] WAET 0x000000003FFE22A7 00000028 v01 (BOCHS  BXPC    )
+[30.5.13] [UACPI:3] FACS 0x000000003FFE0000 00000040
+[30.5.13] 64 Bit HPET: 0xFFFF8000FED00000
+[30.5.13] HPET Initializied
+[30.5.13] IOAPIC: Start: 0xFFFF80003FFE21E7, End: 0xFFFF80003FFE225F
+[30.5.13] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE21E7
+[30.5.13] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE21EF
+[30.5.13] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
+[30.5.13] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE21FB
+[30.5.13] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
+[30.5.13] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2205
+[30.5.13] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
+[30.5.13] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE220F
+[30.5.13] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
+[30.5.13] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2219
+[30.5.13] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
+[30.5.13] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2223
+[30.5.13] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
+[30.5.13] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE222D
+[30.5.13] IOAPIC Initializied
+[30.5.13] [UACPI:3] successfully loaded 1 AML blob, 1704 ops in 13ms (avg 128215/s)
+[30.5.13] Setupping UACPI vector at vec: 33 irq: 9
+[30.5.13] [UACPI:3] namespace initialization done in 5ms: 35 devices, 0 thermal zones
+[30.5.13] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
+[30.5.13] ACPI Initializied
+[30.5.13] LAPIC Initializied
+[30.5.13] CPUs count: 1
+[30.5.13] MP Initializied
+[30.5.13] PowerButton initializied
+[30.5.13] TmpFS initializied
+[30.5.13] VFS Initializied
+[30.5.13] Adding protection to head
+[30.5.13] Valid initrd !
+[30.5.13] Loaded initrd
+[30.5.13] PS/2 Keyboard is initializied !
+[30.5.13] Found PS/2 Keyboard IRQ 1 !
+[30.5.13] Registered PS/2 Keyboard IRQ at 34
+[30.5.13] Scheduling initializied
+[30.5.13] Kernel is initializied !
+[30.5.13] Waiting for interrupts...
+121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121
+[36.5.13] Shutdowning system in 5 seconds.....[41.5.13] 
+Bye.

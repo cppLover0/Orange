@@ -17,6 +17,10 @@ void LogInit(flanterm_context* ctx) {
     ft_ctx = ctx;
 }
 
+void LogUnlock() {
+    log_lock = 0;
+}
+
 void NLog(char* format, ...) {
     spinlock_lock(&log_lock);
     va_list args;

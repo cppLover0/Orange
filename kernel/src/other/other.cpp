@@ -93,3 +93,41 @@ void operator delete[](void *p)
 {
     KHeap::Free(p);
 }
+
+#include <uacpi/sleep.h>
+#include <uacpi/event.h>
+#include <other/log.hpp>
+#include <generic/memory/paging.hpp>
+#include <other/assembly.hpp>
+#include <drivers/hpet/hpet.hpp>
+#include <drivers/ps2keyboard/ps2keyboard.hpp>
+
+extern "C" void keyHandler() {
+    __cli();
+    LogUnlock();
+    Paging::EnableKernel();
+    char key = PS2Keyboard::Get();
+    NLog("%c",key);
+    PS2Keyboard::EOI();
+}
+
+extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
+    LogUnlock();
+    Paging::EnableKernel();
+    NLog("\n");
+    Log("Shutdowning system in 5 seconds");
+
+    __cli(); //yes i know lapic waiting for my eoi but why not ? 
+
+    for(char i =0; i < 5;i++) {
+        NLog(".");
+        HPET::Sleep(1*1000*1000);
+    }
+
+    Log("\nBye.\n");
+
+    uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
+    ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
+
+    __hlt();
+}

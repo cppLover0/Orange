@@ -35,7 +35,18 @@ uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t le
     }
 
     return temp_stack;
-    
+
+}
+
+uint64_t* __elf_copy_to_stack_without_out(uint64_t* arr,uint64_t* stack,uint64_t len) {
+
+    uint64_t* _stack = stack;
+
+    for(uint64_t i = 0;i < len;i++) {
+        PUT_STACK(_stack,arr[i]);
+    }   
+
+    return _stack;
 
 }
 
@@ -128,13 +139,28 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
         _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
 
-        _stack = (uint64_t*)CALIGNPAGEDOWN((uint64_t)_stack,16);
+        PUT_STACK(_stack,AT_NULL);
+
+        _stack = __elf_copy_to_stack_without_out(auxv_stack,_stack,sizeof(auxv_stack) / 8);
+        PUT_STACK(_stack,0);
+
+        _stack = __elf_copy_to_stack_without_out((uint64_t*)stack_envp,_stack,envp_length);
+        PUT_STACK(_stack,0);
+
+        _stack = __elf_copy_to_stack_without_out((uint64_t*)stack_argv,_stack,argv_length);
+        PUT_STACK(_stack,argv_length);
 
         res.ready_stack = _stack;
+        res.argv = stack_argv;
+        res.envp = stack_envp;
+        res.argc = argv_length;
 
 
     } else {
         res.ready_stack = stack;
+        res.argv = 0;
+        res.envp = 0;
+        res.argc = 0;
     }
 
     return res;

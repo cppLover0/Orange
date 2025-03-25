@@ -32,47 +32,10 @@
 #include <generic/VFS/tmpfs.hpp>
 #include <generic/elf/elf.hpp>
 #include <drivers/ps2keyboard/ps2keyboard.hpp>
+#include <arch/x86_64/scheduling/scheduling.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
-
-void timer_test() {
-    __cli();
-    //Log("Got timer interrupt cpu %d %d:%d:%d!\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->lapic_id : 0,CMOS::Hour(),CMOS::Minute(),CMOS::Second());
-    Lapic::EOI();
-    __sti();
-    while(1) {
-        __nop();
-    }
-}
-
-void key_handler() {
-    char key = PS2Keyboard::Get();
-    NLog("%c",key);
-    __sti();
-    PS2Keyboard::EOI();
-    while(1) {
-        __nop();
-    }
-}
-
-static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
-    Log("Shutdowning system in 5 seconds");
-
-    __cli(); //yes i know lapic waiting for my eoi but why not ? 
-
-    for(char i =0; i < 5;i++) {
-        Log(".");
-        HPET::Sleep(1*1000*1000);
-    }
-
-    Log("\nBye.\n");
-
-    uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
-    ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
-
-    return UACPI_INTERRUPT_HANDLED;
-}
 
 void test() {
     Log("Hello, world from elf !");
@@ -81,6 +44,23 @@ void test() {
         __nop();
     }
 }
+
+void _1() {
+    while(1) {
+        NLog("1");
+        __hlt();
+    }
+}
+
+void _2() {
+    while(1) {
+        NLog("2");
+        __hlt();
+    }
+}
+
+extern "C" void keyStub();
+extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx);
 
 extern "C" void kmain() {
 
@@ -142,9 +122,6 @@ extern "C" void kmain() {
 
     IDT::Init();
     Log("IDT Initializied\n");
-    
-    idt_entry_t* timer_entry = IDT::SetEntry(32,(void*)timer_test,0x8E);
-    timer_entry->ist = 2;
 
     idt_entry_t* elf_test1 = IDT::SetEntry(0x80,(void*)test,0x8E);
 
@@ -163,10 +140,6 @@ extern "C" void kmain() {
     VFS::Init();
     Log("VFS Initializied\n");
 
-    Log("VFS Test\n");
-
-    char buf[40];
-
     VFS::Create("/head",0);
 
     USTAR::ParseAndCopy();
@@ -174,7 +147,10 @@ extern "C" void kmain() {
 
     //tmpfs_dump();
 
-    PS2Keyboard::Init(key_handler);
+    PS2Keyboard::Init(keyStub);
+    
+    Process::Init();
+    Log("Scheduling initializied\n");
 
     Log("Kernel is initializied !\n");
 
@@ -205,9 +181,15 @@ extern "C" void kmain() {
 
     ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE),(char**)argv,(char**)envp);
 
+    int _1i = Process::createProcess((uint64_t)_1,0,0,0);
+    int _2i = Process::createProcess((uint64_t)_2,0,0,0);
+
+    Process::WakeUp(_1i);
+    Process::WakeUp(_2i);
+
     ft_ctx->cursor_enabled = 1;
 
-    res.entry();
+    //res.entry();
 
     __sti();
 

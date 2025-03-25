@@ -56,6 +56,8 @@ void IDT::Init() {
         vectors_idt[vec] = 0;
         entry->ist = 2;
     }
+
+    vectors_idt[32] = 1;
     __asm__ volatile ("lidt %0" : : "m"(idtr));
 
 }

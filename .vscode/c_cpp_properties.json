@@ -6,8 +6,8 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/kernel/src/include",
                 "${workspaceFolder}/kernel/src/lib/uACPI/include",
-                "${workspaceFolder}/kernel/freestnd-c-hdrs",
-                "${workspaceFolder}/kernel/freestnd-cxx-hdrs"
+                "${workspaceFolder}/kernel/freestnd-c-hdrs/x86_64/include",
+                "${workspaceFolder}/kernel/freestnd-cxx-hdrs/x86_64/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

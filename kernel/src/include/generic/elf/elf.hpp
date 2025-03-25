@@ -37,6 +37,9 @@ typedef struct {
 typedef struct {
     void (*entry)();
     uint64_t* ready_stack;
+    uint64_t argc;
+    char** argv;
+    char** envp;
     uint64_t* phys_cr3;
 } __attribute__((packed)) ELFLoadResult;
 
