@@ -28,7 +28,7 @@ typedef struct process_struct {
     int_frame_t ctx;
 } __attribute__((packed)) process_t;
 
-extern "C" void schedulingEnd(int_frame_t* ctx);
+extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);
 extern "C" void schedulingStub();
 
 class Process {
@@ -44,6 +44,6 @@ public:
 
     static uint64_t createThread(uint64_t rip,uint64_t parent);
 
-    static void loadELFProcess(process_t* proc,uint8_t* base,char** argv,char** envp);
+    static void loadELFProcess(uint64_t procid,uint8_t* elf,char** argv,char** envp);
 
 };

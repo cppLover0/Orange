@@ -7,5 +7,7 @@ void _start() {
     m += 10;
 
     m -= 10;
-    asm volatile("int $0x80");
+    while(1) {
+        asm volatile("nop");
+    }
 }

@@ -111,8 +111,10 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     if(!allocated_elf) 
         return res;
 
+
     for(uint64_t i = 0;i < size; i += PAGE_SIZE)
         Paging::Map(cr3,phys_elf + i,elf_base + i,flags);
+
 
     res.phys_cr3 = (uint64_t*)HHDM::toPhys((uint64_t)cr3);
 
@@ -162,6 +164,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         res.envp = 0;
         res.argc = 0;
     }
+
+    Log("0x%p 0x%p\n",elf_base,size);
 
     return res;
 

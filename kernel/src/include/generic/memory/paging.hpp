@@ -6,10 +6,10 @@
 #include <stdint.h>
 #include <config.hpp>
 
-#define PTE_PRESENT (1 << 0)
-#define PTE_RW (1 << 1)
-#define PTE_USER (1 << 2)
-#define PTE_WC (1 << 3)
+#define PTE_PRESENT (1ull << 0)
+#define PTE_RW (1ull << 1)
+#define PTE_USER (1ull << 2)
+#define PTE_WC (1ull << 3)
 
 #define ROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
 #define ALIGNPAGEUP(VALUE) (ROUNDUP(VALUE,PAGE_SIZE) * PAGE_SIZE)

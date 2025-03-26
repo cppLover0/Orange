@@ -32,21 +32,25 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     int_frame_t* frame1 = &data->temp_frame;
     process_t* proc = data->current;
     
-    data->current->status = PROCESS_STATUS_RUN;
+    if(data->current) {
+        data->current->status = PROCESS_STATUS_RUN;
+        data->current = 0;
 
-    spinlock_lock(&proc_spinlock);
+        if(frame) 
+            String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
+
+        proc = proc->next;
+    } else
+        proc = head_proc;
+
+    spinlock_lock(&proc_spinlock); // three level spinlock !!!!
     spinlock_lock(&proc_spinlock2);
     spinlock_lock(&proc_spinlock3);
-
-    if(frame) 
-        String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
-
-    proc = proc->next;
 
     while(1) {
         while(proc) {
             if(proc != head_proc) {
-                if(proc->ctx.rip && proc->ctx.rsp && proc->ctx.ss && proc->ctx.cs && proc->ctx.rflags && proc->status == PROCESS_STATUS_RUN) {
+                if(proc->status == PROCESS_STATUS_RUN) {
                     proc->status = PROCESS_STATUS_IN_USE;
                     data->current = proc;
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
@@ -54,7 +58,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     spinlock_unlock(&proc_spinlock);
                     spinlock_unlock(&proc_spinlock2);
                     spinlock_unlock(&proc_spinlock3);
-                    schedulingEnd(frame1);
+                    schedulingEnd(frame1,(uint64_t*)frame1->cr3);
                 }
             }
             proc = proc->next;
@@ -84,23 +88,16 @@ void Process::Init() {
     entry->ist = 2;
 }
 
-void Process::loadELFProcess(process_t* proc,uint8_t* base,char** argv,char** envp) {
-
-    if(proc->type == PROCESS_TYPE_THREAD)
-        return; 
-
-    spinlock_lock(&proc_spinlock);
-
-    while(proc->status == PROCESS_STATUS_RUN) // wait
-        __nop();
+void Process::loadELFProcess(uint64_t procid,uint8_t* elf,char** argv,char** envp) {    
     
-    ELFLoadResult result = ELF::Load(base,(uint64_t*)HHDM::toVirt(proc->ctx.cr3),proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,proc->stack,argv,envp);
-    proc->ctx.rsp = (uint64_t)result.ready_stack;
-    proc->ctx.rip = (uint64_t)result.entry;
-    proc->ctx.rdi = result.argc;
-    proc->ctx.rsi = (uint64_t)result.argv;
-    proc->ctx.rdx = (uint64_t)result.envp;
-    spinlock_unlock(&proc_spinlock);
+    process_t* proc = ByID(procid);
+    uint64_t* vcr3 = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
+
+    Log("0x%p",proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT);
+    ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,proc->stack,argv,envp);
+
+    proc->ctx.rsp = (uint64_t)l.ready_stack;
+    proc->ctx.rip = (uint64_t)l.entry;
 }
 
 process_t* Process::ByID(uint64_t id) {
@@ -137,8 +134,8 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->ctx.rip = rip;
     proc->user = is_user;
     proc->type = is_thread;
-    proc->ctx.cs = is_user ? 0x18 : 0x08;
-    proc->ctx.ss = is_user ? 0x20 : 0x10;
+    proc->ctx.cs = is_user ? 0x18 | 3 : 0x08;
+    proc->ctx.ss = is_user ? 0x20 | 3 : 0x10;
     proc->ctx.rflags = (1 << 9); // setup IF
     proc->status = PROCESS_STATUS_KILLED;
 
@@ -149,28 +146,18 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->stack = stack_end;
     proc->ctx.rsp = (uint64_t)stack_end;
 
-    uint64_t* cr3;
+    uint64_t* cr3 = (uint64_t*)PMM::VirtualAlloc();
 
-    if(!is_thread) {
-    
-        cr3 = (uint64_t*)PMM::VirtualAlloc();
+    pAssert(cr3 && stack_start,"No memory :(");
 
-        pAssert(cr3 && stack_start,"No memory :(");
-
-        Paging::MemoryEntry(cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
-        Paging::MemoryEntry(cr3,LIMINE_MEMMAP_EXECUTABLE_AND_MODULES,PTE_PRESENT | PTE_RW);
-        Paging::alwaysMappedMap(cr3);
-        Paging::Kernel(cr3);
-
-    } else {
-        cr3 = (uint64_t*)HHDM::toVirt((uint64_t)cr3_parent);
-    }
+    Paging::Kernel(cr3);
+    Paging::MemoryEntry(cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
+    Paging::alwaysMappedMap(cr3);
 
     uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
     for(uint64_t i = 0;i < PROCESS_STACK_SIZE;i++) {
         Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
     }
-
 
     proc->ctx.cr3 = HHDM::toPhys((uint64_t)cr3);
     proc->next = 0;

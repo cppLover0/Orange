@@ -4,8 +4,9 @@ schedulingEnd:
     cli
     mov rsp,rdi
 
+    mov cr3,rsi
+
     pop rax
-    mov cr3,rax
 
     pop rax
     pop rbx
@@ -23,4 +24,9 @@ schedulingEnd:
     pop r14
     pop r15
     add rsp,16
+
+    cmp byte [rsp + 8],0x08
+    jz .end
+    swapgs
+.end:
     iretq

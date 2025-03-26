@@ -10,16 +10,16 @@ override OUTPUT := kernel
 PREFIX := /usr/local
 
 # User controllable C compiler command.
-CC := gcc
+CC := clang
 
 # User controllable C++ compiler command.
-CXX := g++
+CXX := clang++
 
 # User controllable archiver command.
 AR := ar
 
 # User controllable C flags.
-CFLAGS := -g -O2 -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings
+CFLAGS := -g -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings
 
 LD := ld
 

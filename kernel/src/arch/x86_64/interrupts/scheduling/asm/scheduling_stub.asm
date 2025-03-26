@@ -3,6 +3,12 @@ extern schedulingSchedule
 
 global schedulingStub
 schedulingStub:
+
+    cmp byte [rsp + 8],0x08
+    jz .continue
+    swapgs
+.continue:
+
     push qword 0
     push qword 0
     push r15

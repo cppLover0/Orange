@@ -47,9 +47,6 @@ void test() {
 
 void _1() {
     while(1) {
-        __cli();
-        NLog("1");
-        __sti();
         __hlt();
     }
 }
@@ -127,7 +124,7 @@ extern "C" void kmain() {
     IDT::Init();
     Log("IDT Initializied\n");
 
-    idt_entry_t* elf_test1 = IDT::SetEntry(0x80,(void*)test,0x8E);
+    idt_entry_t* elf_test1 = IDT::SetEntry(0x80,(void*)test,0xEE);
 
     ACPI::fullInit();
     Log("ACPI Initializied\n");
@@ -181,19 +178,19 @@ extern "C" void kmain() {
     char* argv[] = {(char*)hell,(char*)no,0};
     char* envp[] = {(char*)gta,0};
 
-    ELFLoadResult res = ELF::Load((uint8_t*)elf,Paging::KernelGet(), PTE_RW | PTE_PRESENT,(uint64_t*)PMM::VirtualBigAlloc(256) + (256 * PAGE_SIZE),(char**)argv,(char**)envp);
-
-    int _1i = Process::createProcess((uint64_t)_1,0,0,0);
-    int _2i = Process::createProcess((uint64_t)_2,0,0,0);
-
-    Process::WakeUp(_1i);
-    Process::WakeUp(_2i);
-
     ft_ctx->cursor_enabled = 1;
 
     //res.entry();
 
     MP::Sync();
+
+    int initrd = Process::createProcess(0,0,1,0);
+    int _1i = Process::createProcess((uint64_t)_1,0,0,0);
+
+    Process::loadELFProcess(initrd,(uint8_t*)elf,0,0);
+
+    Process::WakeUp(initrd);
+    Process::WakeUp(_1i);
 
     __sti();
 
