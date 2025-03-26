@@ -93,10 +93,9 @@ void Process::loadELFProcess(uint64_t procid,uint8_t* elf,char** argv,char** env
     process_t* proc = ByID(procid);
     uint64_t* vcr3 = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
 
-    Log("0x%p",proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT);
     ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,proc->stack,argv,envp);
 
-    proc->ctx.rsp = (uint64_t)l.ready_stack;
+    //proc->ctx.rsp = (uint64_t)l.ready_stack;
     proc->ctx.rip = (uint64_t)l.entry;
 }
 
@@ -155,6 +154,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     Paging::alwaysMappedMap(cr3);
 
     uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
+    Log("0x%p 0x%p %d 0x%p\n",stack_start,rip,is_user,cr3);
     for(uint64_t i = 0;i < PROCESS_STACK_SIZE;i++) {
         Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
     }

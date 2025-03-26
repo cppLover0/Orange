@@ -10,9 +10,9 @@
 #include <generic/locks/spinlock.hpp>
 #include <other/log.hpp>
 
-uint64_t* __paging_next_level(uint64_t* table,uint64_t index) {
+uint64_t* __paging_next_level(uint64_t* table,uint64_t index,uint64_t flags) {
     if(!(table[index] & PTE_PRESENT))
-        table[index] = (uint64_t)PMM::Alloc() | PTE_PRESENT | PTE_RW | PTE_USER;
+        table[index] = (uint64_t)PMM::Alloc() | PTE_USER | flags;
     return (uint64_t*)HHDM::toVirt(table[index] & PTE_MASK_VALUE);
 }
 
@@ -25,9 +25,9 @@ uint64_t* Paging::KernelGet() {
 void* Paging::Map(uint64_t* cr3,uint64_t phys,uint64_t virt,uint64_t flags) {
     uint64_t aligned_phys = ALIGNPAGEDOWN(phys);
     uint64_t aligned_virt = ALIGNPAGEDOWN(virt); 
-    uint64_t* pml3 = __paging_next_level(cr3,PTE_INDEX(aligned_virt,39));
-    uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(aligned_virt,30));
-    uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(aligned_virt,21));
+    uint64_t* pml3 = __paging_next_level(cr3,PTE_INDEX(aligned_virt,39),flags);
+    uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(aligned_virt,30),flags);
+    uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(aligned_virt,21),flags);
     pml[PTE_INDEX(aligned_virt,12)] = phys | flags;
     return (void*)virt;
 }

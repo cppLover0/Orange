@@ -171,13 +171,6 @@ extern "C" void kmain() {
 
     VFS::Read(elf,"/bin/initrd");
 
-    const char* hell = "hell";
-    const char* no = "no";
-    const char* gta = "gta";
-
-    char* argv[] = {(char*)hell,(char*)no,0};
-    char* envp[] = {(char*)gta,0};
-
     ft_ctx->cursor_enabled = 1;
 
     //res.entry();
