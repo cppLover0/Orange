@@ -175,8 +175,6 @@ extern "C" void kmain() {
 
     //res.entry();
 
-    MP::Sync();
-
     int initrd = Process::createProcess(0,0,1,0);
     int _1i = Process::createProcess((uint64_t)_1,0,0,0);
 
@@ -184,6 +182,8 @@ extern "C" void kmain() {
 
     Process::WakeUp(initrd);
     Process::WakeUp(_1i);
+
+    MP::Sync();
 
     __sti();
 

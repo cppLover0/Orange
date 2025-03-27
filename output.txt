@@ -1,99 +1,95 @@
 Serial initializied
-[40.39.6] Bootloader: Limine 8.7.0
-[40.39.6] RSDP: 0xF59E0
-[40.39.6] HHDM: 0xFFFF800000000000
-[40.39.6] Kernel: Phys: 0x37D26000, Virt: 0xFFFFFFFF80000000
-[40.39.6] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
-[40.39.6] Memmap: Start: 0xFFFF800037CEC000, Entry_count: 16
-[40.39.6] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
-[40.39.6] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
-[40.39.6] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
-[40.39.6] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
-[40.39.6] Entry #4. Base: 0x100000, size: 0x37BEC000, type: Usable (0)
-[40.39.6] Entry #5. Base: 0x37CEC000, size: 0x28000, type: Non usable (5)
-[40.39.6] Entry #6. Base: 0x37D14000, size: 0x3000, type: Non usable (6)
-[40.39.6] Entry #7. Base: 0x37D17000, size: 0xF000, type: Non usable (5)
-[40.39.6] Entry #8. Base: 0x37D26000, size: 0x8120000, type: Non usable (6)
-[40.39.6] Entry #9. Base: 0x3FE46000, size: 0x199000, type: Non usable (5)
-[40.39.6] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
-[40.39.6] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
-[40.39.6] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
-[40.39.6] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
-[40.39.6] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
-[40.39.6] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
-[40.39.6] Biggest entry: Base: 0x100000, Size: 0x37BEC000 (891 MB)
-[40.39.6] PMM Initializied
-[40.39.6] Mapping usable memory
-[40.39.6] Mapping framebuffer
-[40.39.6] Mapping bootloader reclaimable
-[40.39.6] Activating paging
-[40.39.6] Mapping kernel
-[40.39.6] Paging Initializied
-[40.39.6] KHeap Initializied
-[40.39.6] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
-[40.39.6] GDT Initializied
-[40.39.6] IDT Initializied
-[41.39.6] [UACPI:3] RSDP 0x00000000000F59E0 00000000 v00 (BOCHS )
-[41.39.6] [UACPI:3] RSDT 0x000000003FFE22CF 00000038 v01 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] DSDT 0x000000003FFE0040 00002087 v01 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] FACP 0x000000003FFE20C7 000000F4 v03 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] APIC 0x000000003FFE21BB 00000078 v01 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] HPET 0x000000003FFE2233 00000038 v01 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] MCFG 0x000000003FFE226B 0000003C v01 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] WAET 0x000000003FFE22A7 00000028 v01 (BOCHS  BXPC    )
-[41.39.6] [UACPI:3] FACS 0x000000003FFE0000 00000040
-[41.39.6] 64 Bit HPET: 0xFFFF8000FED00000
-[41.39.6] HPET Initializied
-[41.39.6] IOAPIC: Start: 0xFFFF80003FFE21E7, End: 0xFFFF80003FFE225F
-[41.39.6] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE21E7
-[41.39.6] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE21EF
-[41.39.6] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
-[41.39.6] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE21FB
-[41.39.6] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
-[41.39.6] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2205
-[41.39.6] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
-[41.39.6] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE220F
-[41.39.6] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
-[41.39.6] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2219
-[41.39.6] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
-[41.39.6] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2223
-[41.39.6] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
-[41.39.6] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE222D
-[41.39.6] IOAPIC Initializied
-[41.39.6] [UACPI:3] successfully loaded 1 AML blob, 1704 ops in 35ms (avg 48378/s)
-[41.39.6] Setupping UACPI vector at vec: 33 irq: 9
-[41.39.6] [UACPI:3] namespace initialization done in 9ms: 35 devices, 0 thermal zones
-[41.39.6] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
-[41.39.6] ACPI Initializied
-[41.39.6] LAPIC Initializied
-[41.39.6] CPUs count: 1
-[41.39.6] MP Initializied
-[41.39.6] PowerButton initializied
-[41.39.6] TmpFS initializied
-[41.39.6] VFS Initializied
-[41.39.6] Adding protection to head
-[41.39.6] Valid initrd !
-[41.39.6] Loaded initrd
-[41.39.6] PS/2 Keyboard is initializied !
-[41.39.6] Found PS/2 Keyboard IRQ 1 !
-[41.39.6] Registered PS/2 Keyboard IRQ at 34
-[41.39.6] 0xFFFF800001555000 0x0 0 0xFFFF800001655000
-[41.39.6] Scheduling initializied
-[41.39.6] Kernel is initializied !
-[41.39.6] Waiting for interrupts...
-[42.39.6] 0xFFFF8000016AC000 0x0 1 0xFFFF8000017AC000
-[42.39.6] 0xFFFF800001801000 0xFFFFFFFF80037470 0 0xFFFF800001901000
-[42.39.6] 0x0 0x10004D
-
-
-
-Kernel panic
-
-Reason: CPU Exception
-CPU: 0
-Vector: 14/0xE (error code: 7/0x7)
-Registers dump
-RIP: 0x100030, SS: 0x23, CS: 0x1B, RFLAGS: 0x206, RSP: 0xFFFF8000017ABFF8
-RAX: 0xFFFFFFFF80000000, RBX: 0x0, RCX: 0x0, RDX: 0x0, RSI: 0x0
-RDI: 0x0, RBP: 0xE, R8: 0x0, R9: 0x0, R10: 0x0, CR2: 0xFFFFFFFF80000000
-R11: 0x0, R12: 0x0, R13: 0x0, R14: 0x0, R15: 0x0 CR3: 0x17AC000
+[30.24.15] Bootloader: Limine 8.7.0
+[30.24.15] RSDP: 0xF59E0
+[30.24.15] HHDM: 0xFFFF800000000000
+[30.24.15] Kernel: Phys: 0x37D26000, Virt: 0xFFFFFFFF80000000
+[30.24.15] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
+[30.24.15] Memmap: Start: 0xFFFF800037CBA000, Entry_count: 16
+[30.24.15] Entry #0. Base: 0x1000, size: 0x53000, type: Non usable (5)
+[30.24.15] Entry #1. Base: 0x54000, size: 0x4B000, type: Usable (0)
+[30.24.15] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
+[30.24.15] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
+[30.24.15] Entry #4. Base: 0x100000, size: 0x37BBA000, type: Usable (0)
+[30.24.15] Entry #5. Base: 0x37CBA000, size: 0x5A000, type: Non usable (5)
+[30.24.15] Entry #6. Base: 0x37D14000, size: 0x3000, type: Non usable (6)
+[30.24.15] Entry #7. Base: 0x37D17000, size: 0xF000, type: Non usable (5)
+[30.24.15] Entry #8. Base: 0x37D26000, size: 0x8120000, type: Non usable (6)
+[30.24.15] Entry #9. Base: 0x3FE46000, size: 0x199000, type: Non usable (5)
+[30.24.15] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
+[30.24.15] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
+[30.24.15] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
+[30.24.15] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
+[30.24.15] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
+[30.24.15] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
+[30.24.15] Biggest entry: Base: 0x100000, Size: 0x37BBA000 (891 MB)
+[30.24.15] PMM Initializied
+[30.24.15] Mapping usable memory
+[30.24.15] Mapping framebuffer
+[30.24.15] Mapping bootloader reclaimable
+[30.24.15] Activating paging
+[30.24.15] Mapping kernel
+[30.24.15] Paging Initializied
+[31.24.15] KHeap Initializied
+[31.24.15] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
+[31.24.15] GDT Initializied
+[31.24.15] IDT Initializied
+[31.24.15] [UACPI:3] RSDP 0x00000000000F59E0 00000000 v00 (BOCHS )
+[31.24.15] [UACPI:3] RSDT 0x000000003FFE23E6 00000038 v01 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] DSDT 0x000000003FFE0040 00002186 v01 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] FACP 0x000000003FFE21C6 000000F4 v03 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] APIC 0x000000003FFE22BA 00000090 v01 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] HPET 0x000000003FFE234A 00000038 v01 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] MCFG 0x000000003FFE2382 0000003C v01 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] WAET 0x000000003FFE23BE 00000028 v01 (BOCHS  BXPC    )
+[31.24.15] [UACPI:3] FACS 0x000000003FFE0000 00000040
+[31.24.15] 64 Bit HPET: 0xFFFF8000FED00000
+[31.24.15] HPET Initializied
+[31.24.15] IOAPIC: Start: 0xFFFF80003FFE22E6, End: 0xFFFF80003FFE2376
+[31.24.15] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE22E6
+[31.24.15] MADT Entry 1: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE22EE
+[31.24.15] MADT Entry 2: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE22F6
+[31.24.15] MADT Entry 3: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE22FE
+[31.24.15] MADT Entry 4: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE2306
+[31.24.15] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
+[31.24.15] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2312
+[31.24.15] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
+[31.24.15] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE231C
+[31.24.15] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
+[31.24.15] MADT Entry 7: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2326
+[31.24.15] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
+[31.24.15] MADT Entry 8: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2330
+[31.24.15] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
+[31.24.15] MADT Entry 9: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE233A
+[31.24.15] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
+[31.24.15] MADT Entry 10: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE2344
+[31.24.15] IOAPIC Initializied
+[31.24.15] [UACPI:3] successfully loaded 1 AML blob, 1725 ops in 330ms (avg 5224/s)
+[31.24.15] Setupping UACPI vector at vec: 33 irq: 9
+[31.24.15] [UACPI:3] namespace initialization done in 63ms: 38 devices, 0 thermal zones
+[31.24.15] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
+[32.24.15] ACPI Initializied
+[32.24.15] LAPIC Initializied
+[32.24.15] CPUs count: 4
+[32.24.15] MP Initializied
+[32.24.15] PowerButton initializied
+[32.24.15] TmpFS initializied
+[32.24.15] CPU 2 is online !
+[32.24.15] CPU 1 is online !
+[32.24.15] Waiting for other CPUs...
+[32.24.15] Waiting for other CPUs...
+[32.24.15] CPU 3 is online !
+[32.24.15] VFS Initializied
+[32.24.15] Waiting for other CPUs...
+[32.24.15] Adding protection to head
+[32.24.15] Valid initrd !
+[32.24.15] Loaded initrd
+[32.24.15] PS/2 Keyboard is initializied !
+[32.24.15] Found PS/2 Keyboard IRQ 1 !
+[32.24.15] Registered PS/2 Keyboard IRQ at 34
+[32.24.15] 0xFFFF800001B55000 0x0 0 0xFFFF800001C55000
+[32.24.15] Scheduling initializied
+[32.24.15] Kernel is initializied !
+[32.24.15] Waiting for interrupts...
+[32.24.15] 0xFFFF800001CAF000 0x0 1 0xFFFF800001DAF000
+[32.24.15] 0xFFFF800001E07000 0xFFFFFFFF80037470 0 0xFFFF800001F07000
+[32.24.15] 0x0 0x100043
