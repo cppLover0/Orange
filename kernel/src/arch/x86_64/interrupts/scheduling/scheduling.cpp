@@ -149,9 +149,13 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
 
     pAssert(cr3 && stack_start,"No memory :(");
 
-    Paging::Kernel(cr3);
-    Paging::MemoryEntry(cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
-    Paging::alwaysMappedMap(cr3);
+    if(is_thread) {
+        cr3 = cr3_parent;
+    } else {
+        Paging::Kernel(cr3);
+        Paging::MemoryEntry(cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
+        Paging::alwaysMappedMap(cr3);
+    }
 
     uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
     Log("0x%p 0x%p %d 0x%p\n",stack_start,rip,is_user,cr3);
