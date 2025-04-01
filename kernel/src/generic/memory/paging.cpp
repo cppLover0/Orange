@@ -105,7 +105,8 @@ void Paging::alwaysMappedAdd(uint64_t base,uint64_t size) {
 
 void Paging::alwaysMappedMap(uint64_t* cr3) {
     alwaysMapped_t* current_map = &head_map;
-    while(current_map != 0) {
+    while(current_map) {
+        //Log("Always mapped: 0x%p 0x%p\n",current_map->base,current_map->next);
         for(uint64_t i = current_map->base;i < current_map->base + current_map->size;i += PAGE_SIZE) {
             HHDMMap(cr3,current_map->is_phys ? i : HHDM::toPhys(i),PTE_PRESENT | PTE_RW);
         }

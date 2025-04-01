@@ -101,13 +101,18 @@ void operator delete[](void *p)
 #include <other/assembly.hpp>
 #include <drivers/hpet/hpet.hpp>
 #include <drivers/ps2keyboard/ps2keyboard.hpp>
+#include <arch/x86_64/interrupts/idt.hpp>
+#include <arch/x86_64/cpu/data.hpp>
 
-extern "C" void keyHandler() {
+extern "C" void keyHandler(int_frame_t* ctx) {
     __cli();
     LogUnlock();
     Paging::EnableKernel();
     char key = PS2Keyboard::Get();
     NLog("%c",key);
+    
+    
+
     PS2Keyboard::EOI();
 }
 

@@ -25,11 +25,18 @@ typedef struct process_struct {
 
     uint64_t parent_process; // for threads
 
+    uint8_t cs;
+    uint8_t ss;
+    
+    char is_eoi;
+
     int_frame_t ctx;
 } __attribute__((packed)) process_t;
 
 extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);
 extern "C" void schedulingStub();
+
+extern "C" void schedulingSchedule(int_frame_t* frame);
 
 class Process {
 public:

@@ -29,6 +29,15 @@ extern keyHandler
 global keyStub
 keyStub:
     cli
+
+    cmp byte [rsp + 8],0x08
+    jz .cont
+    swapgs
+
+.cont:
+
+    push qword 0
+    push qword 0 
     push r15
     push r14
     push r13
@@ -46,6 +55,7 @@ keyStub:
     push rax
     mov rax,cr3
     push rax
+    mov rdi,rsp
     call keyHandler
     pop rax
     mov cr3,rax
@@ -64,6 +74,14 @@ keyStub:
     pop r13
     pop r14
     pop r15
+    add rsp,16
+
+    cmp byte [rsp + 8],0x08
+    jz .cont2
+    swapgs
+
+
+.cont2:
     iretq
 
 extern CPUKernelPanic

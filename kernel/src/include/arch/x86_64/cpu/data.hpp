@@ -5,8 +5,11 @@
 #include <arch/x86_64/cpu/gdt.hpp>
 #include <arch/x86_64/scheduling/scheduling.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
+#include <stdint.h>
 
 typedef struct {
+    uint64_t user_stack;
+    uint64_t kernel_stack;
     GDT gdt;
     struct LIMINE_MP(info)* smp_info;
     process_t* current;

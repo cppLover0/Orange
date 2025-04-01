@@ -78,8 +78,8 @@ void Log(char* format, ...) {
     Serial::WriteString("[");
     flanterm_write(ft_ctx,"[",1);
 
-    Serial::WriteString(sec_b);
-    flanterm_write(ft_ctx,sec_b,String::strlen(sec_b));
+    Serial::WriteString(hour_b);
+    flanterm_write(ft_ctx,hour_b,String::strlen(hour_b));
 
     Serial::WriteString(".");
     flanterm_write(ft_ctx,".",1);
@@ -90,8 +90,8 @@ void Log(char* format, ...) {
     Serial::WriteString(".");
     flanterm_write(ft_ctx,".",1);
 
-    Serial::WriteString(hour_b);
-    flanterm_write(ft_ctx,hour_b,String::strlen(hour_b));
+    Serial::WriteString(sec_b);
+    flanterm_write(ft_ctx,sec_b,String::strlen(sec_b));
 
     Serial::WriteString("] ");
     flanterm_write(ft_ctx,"] ",2);

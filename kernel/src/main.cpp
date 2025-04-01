@@ -33,6 +33,7 @@
 #include <generic/elf/elf.hpp>
 #include <drivers/ps2keyboard/ps2keyboard.hpp>
 #include <arch/x86_64/scheduling/scheduling.hpp>
+#include <arch/x86_64/interrupts/syscalls/syscall.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -47,7 +48,9 @@ void test() {
 
 void _1() {
     while(1) {
+        //Serial::printf(" _1 ");
         __hlt();
+
     }
 }
 
@@ -121,6 +124,9 @@ extern "C" void kmain() {
     GDT::Init();
     Log("GDT Initializied\n");
 
+    uint64_t stack_5 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
+    Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
+
     IDT::Init();
     Log("IDT Initializied\n");
 
@@ -153,15 +159,19 @@ extern "C" void kmain() {
     Process::Init();
     Log("Scheduling initializied\n");
 
+    Syscall::Init();
+    Log("Syscall initializied");
+
+    cpudata_t* cpu_data = CpuData::Access();
+
+    cpu_data->kernel_stack = stack_5 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    cpu_data->user_stack = 0;
+
     Log("Kernel is initializied !\n");
 
     HPET::Sleep(1000 * 100);
 
     ft_ctx->clear(ft_ctx,1);
-
-    Log("Waiting for interrupts...\n");
-
-    int breakpoint = 0;
 
     filestat_t stat;
 
@@ -182,6 +192,8 @@ extern "C" void kmain() {
 
     Process::WakeUp(initrd);
     Process::WakeUp(_1i);
+
+    Log("Waiting for interrupts...\n");
 
     MP::Sync();
 

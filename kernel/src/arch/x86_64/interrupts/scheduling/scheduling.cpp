@@ -33,11 +33,12 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     process_t* proc = data->current;
     
     if(data->current) {
-        data->current->status = PROCESS_STATUS_RUN;
-        data->current = 0;
 
         if(frame) 
             String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
+
+        data->current->status = PROCESS_STATUS_RUN;
+        data->current = 0;
 
         proc = proc->next;
     } else
@@ -54,7 +55,15 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     proc->status = PROCESS_STATUS_IN_USE;
                     data->current = proc;
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
-                    Lapic::EOI();
+                    
+                    if(proc->is_eoi)
+                        Lapic::EOI();
+                
+                    frame1->cs = proc->cs;
+                    frame1->ss = proc->ss;
+
+                    // Log("0x%p 0x%p 0x%p\n",frame1->cs,frame->ss,frame->rip);
+
                     spinlock_unlock(&proc_spinlock);
                     spinlock_unlock(&proc_spinlock2);
                     spinlock_unlock(&proc_spinlock3);
@@ -133,8 +142,16 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->ctx.rip = rip;
     proc->user = is_user;
     proc->type = is_thread;
-    proc->ctx.cs = is_user ? 0x18 | 3 : 0x08;
-    proc->ctx.ss = is_user ? 0x20 | 3 : 0x10;
+    if(is_user) {
+        proc->ctx.cs = 0x20 | 3;
+        proc->ctx.ss = 0x18 | 3;
+    } else {
+        proc->ctx.cs = 0x08;
+        proc->ctx.ss = 0;
+    }
+    proc->cs = proc->ctx.cs;
+    proc->ss = proc->ctx.ss;
+    proc->is_eoi = 1;
     proc->ctx.rflags = (1 << 9); // setup IF
     proc->status = PROCESS_STATUS_KILLED;
 
@@ -158,7 +175,6 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     }
 
     uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
-    Log("0x%p 0x%p %d 0x%p\n",stack_start,rip,is_user,cr3);
     for(uint64_t i = 0;i < PROCESS_STACK_SIZE;i++) {
         Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
     }

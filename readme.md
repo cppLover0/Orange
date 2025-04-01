@@ -26,7 +26,7 @@ Orange is my limine x86_64 OS
 
 ## Unix-like TODO
 
-- [ ] Syscalls
+- [x] Syscalls
 - [ ] Start libc porting
 
 ## Porting TODO

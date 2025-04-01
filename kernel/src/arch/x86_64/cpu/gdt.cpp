@@ -13,8 +13,8 @@ gdt_t original_gdt = {
     {0,0,0,0,0,0}, // 0x0 null
     {0,0,0,0x9a,0xa2,0}, // 0x08 64 bit code
     {0,0,0,0x92,0xa0,0}, // 0x10 64 bit data
-    {0,0,0,0xFA,0x20,0}, // 0x18 user code
-    {0,0,0,0xF2,0,0}, // 0x20 user data
+    {0,0,0,0xF2,0,0}, // 0x18 user data
+    {0,0,0,0xFA,0x20,0}, // 0x20 user code
     {0x68,0,0,0x89,0x20,0,0,0} // 0x28 tss
 };
 
@@ -51,6 +51,7 @@ void GDT::Init() {
     gdt_pointer_t* gdtr = &data->gdt.gdtr;
     gdtr->size = sizeof(gdt_t) -1;
     gdtr->base = (uint64_t)gdt;
+
     loadGDT(gdtr);
     loadTSS();
 }
