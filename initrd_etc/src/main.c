@@ -12,9 +12,6 @@ void _start() {
     while(1) {
         asm volatile("nop");
         asm volatile("syscall");
-        if(i == 50) {
-            *(long*)0xffffffff8002e0f5 = 0;
-        }
         i++;
     }
 }

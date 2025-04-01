@@ -12,6 +12,8 @@
 #include <other/assembly.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <drivers/hpet/hpet.hpp>
+#include <generic/memory/pmm.hpp>
+#include <arch/x86_64/interrupts/syscalls/syscall.hpp>
 
 uint64_t how_much_cpus = 0;
 uint64_t temp_how_much_cpus = 0;
@@ -26,6 +28,15 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     GDT::Init();
     CpuData::Access()->smp_info = smp_info;
     IDT::Load();
+
+    Syscall::Init();
+
+    uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
+
+    CpuData::Access()->kernel_stack = stack + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    CpuData::Access()->user_stack = 0;
+
+    Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
 
     Lapic::Init();
     Log("CPU %d is online !\n",smp_info->lapic_id);
