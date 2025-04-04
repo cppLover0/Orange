@@ -7,12 +7,13 @@
 #include <drivers/hpet/hpet.hpp>
 #include <generic/memory/paging.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
+#include <arch/x86_64/cpu/data.hpp>
 
 extern "C" void syscall_handler();
 
 extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
-    Log("Got syscall !\n");
+    Log("Got syscall from cpu %d !\n",CpuData::Access()->smp_info ? CpuData::Access()->smp_info->processor_id : 0);
 }
 
 void Syscall::Init() {

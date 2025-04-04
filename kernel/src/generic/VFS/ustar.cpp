@@ -33,9 +33,10 @@ void USTAR::ParseAndCopy() {
 	uint64_t actual_tar_ptr_end = ((uint64_t)initrd->address + initrd->size) - 1024; //substract first header and his content
 
 	while((uint64_t)current < actual_tar_ptr_end) {
-		uint64_t type = oct2bin((uint8_t*)&current->type,1);
+		uint8_t type = oct2bin((uint8_t*)&current->type,1);
         uint64_t aligned_size;
 		if(type == 0) {
+
             char* filename = (char*)((uint64_t)current->file_name + 1);
 
             int _2 = VFS::Create(filename,0);
@@ -46,7 +47,19 @@ void USTAR::ParseAndCopy() {
 
             VFS::Write((char*)((uint64_t)current + 512),filename,size);
 
-		} else {
+		} else if(type == 5) {
+
+            char* filename = (char*)((uint64_t)current->file_name + 1);
+
+            int _2 = VFS::Create(filename,1);
+
+            Log("dir: %s %d\n",filename,_2);
+
+            int size = oct2bin((uint8_t*)current->file_size,String::strlen(current->file_size));
+
+            aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
+
+        } else {
             aligned_size = 512;
         }
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);

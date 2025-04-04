@@ -152,7 +152,7 @@ extern "C" void kmain() {
     USTAR::ParseAndCopy();
     Log("Loaded initrd\n");
 
-    //tmpfs_dump();
+    tmpfs_dump();
 
     PS2Keyboard::Init(keyStub);
     

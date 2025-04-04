@@ -21,8 +21,10 @@ data_file_t* tmpfs_scan_for_file(char* name) {
     data_file_t* current = root;
     
     while(current) {
-        if(!String::strcmp(name,current->name))
+        
+        if(!String::strcmp(name,current->name)) {
             return current;
+        }
         current = current->next;
     }
 
@@ -30,10 +32,41 @@ data_file_t* tmpfs_scan_for_file(char* name) {
 
 }
 
+data_file_t* tmpfs_find_nearest_directory(char* name) {
+
+    data_file_t* current = root;
+    data_file_t* nearest;
+
+    int max_match = 0;
+
+    while(current) {
+        if(current->name && current->type == TMPFS_TYPE_DIRECTORY) {
+            int temp_match = 0;
+            int dir_length = String::strlen(current->name);
+            int loc_length = String::strlen(name);
+            if(dir_length <= loc_length) {
+                for(int b = 0;b < loc_length;b++) {
+                    if(current->name[b]) {
+                        if(current->name[b] == name[b]) 
+                            temp_match++; 
+                    } else
+                        break;
+                }
+                if(temp_match > max_match) {
+                    max_match = temp_match;
+                    nearest = current;
+                }
+            } 
+        }
+    }
+
+    return nearest;
+
+}
+
 void tmpfs_free_file_content(data_file_t* file) {
 
     if(!file->content) return;
-    if(!(file->type == TMPFS_TYPE_FILE)) return;
 
     uint64_t aligned_size = ALIGNPAGEUP(file->size_of_content) / PAGE_SIZE;
     PMM::VirtualBigFree(file->content,aligned_size); // the min file size is 4k cuz i have 4k pages
@@ -43,7 +76,7 @@ void tmpfs_free_file_content(data_file_t* file) {
 int tmpfs_create(char* name,int type) {
     if(!name) return 2;
     if(name[0] != '/') return 3; //it should be full path
-    if(type > 1) return 4;
+    if(type > 2) return 4;
 
     if(!String::strcmp(name,"/")) return 5; // why not
 
@@ -93,7 +126,6 @@ int tmpfs_rm(char* filename) {
 
 int tmpfs_writefile(char* buffer,char* filename,uint64_t size) {
 
-    if(!size) return -2;
     if(size > TMPFS_MAX_SIZE) return -1;
     if(!buffer) return 1;
     if(!filename) return 2;
@@ -105,7 +137,6 @@ int tmpfs_writefile(char* buffer,char* filename,uint64_t size) {
 
     data_file_t* file = tmpfs_scan_for_file(filename);
 
-    if(file->type != TMPFS_TYPE_FILE) return 6;
     if(file->protection) return 8;
 
     tmpfs_free_file_content(file);
@@ -133,8 +164,6 @@ int tmpfs_readfile(char* buffer,char* filename) {
     if(!tmpfs_scan_for_file(filename)) return 5;
 
     data_file_t* file = tmpfs_scan_for_file(filename);
-
-    if(file->type != TMPFS_TYPE_FILE) return 6;
 
     if(!file->content)
         return 7;
@@ -204,11 +233,11 @@ void tmpfs_dump() {
     while(current) {
         filestat_t stat;
         int size = tmpfs_stat(current->name,(char*)&stat);
-        Log("\"%s\": Size: %d (%d KB, %d MB, %d GB), ",current->name,stat.size,stat.size / 1024,(stat.size / 1024) / 1024,((stat.size / 1024) / 1024) / 1024);
+        NLog("\"%s\": Size: %d (%d KB, %d MB, %d GB), ",current->name,stat.size,stat.size / 1024,(stat.size / 1024) / 1024,((stat.size / 1024) / 1024) / 1024);
         current = current->next;
     }
 
-    Log("\n");
+    NLog("\n");
 
 }
 
@@ -218,6 +247,8 @@ void TMPFS::Init(filesystem_t* fs) {
     root_d->type = TMPFS_TYPE_DIRECTORY;
     root_d->name = "/";
     root_d->protection = 1;
+    root_d->content = 0;
+    root_d->size_of_content = 4096;
     root = root_d;
     last = root_d;
     fs->is_in_ram = 1;

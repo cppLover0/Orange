@@ -8,6 +8,7 @@
 
 #define TMPFS_TYPE_FILE 0
 #define TMPFS_TYPE_DIRECTORY 1
+#define TMPFS_TYPE_SYMLINK 2
 
 typedef struct data_file {
     char type;
