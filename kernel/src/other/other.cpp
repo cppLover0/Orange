@@ -109,10 +109,6 @@ extern "C" void keyHandler(int_frame_t* ctx) {
     LogUnlock();
     Paging::EnableKernel();
     char key = PS2Keyboard::Get();
-    NLog("%c",key);
-    
-    
-
     PS2Keyboard::EOI();
 }
 

@@ -6,6 +6,7 @@
 #include <config.hpp>
 #include <generic/locks/spinlock.hpp>
 #include <generic/VFS/tmpfs.hpp>
+#include <generic/VFS/devfs.hpp>
 
 mount_location_t mount_points[MAX_MOUNT_POINTS];
 uint16_t mount_points_ptr = 0;
@@ -13,9 +14,9 @@ uint16_t mount_points_ptr = 0;
 char vfs_spinlock = 0;
 
 mount_location_t* vfs_find_the_nearest_mount(char* loc) {
-    if (!loc) return NULL;
+    if (!loc) return 0;
 
-    mount_location_t* nearest = NULL;
+    mount_location_t* nearest = 0;
     int max_match = 0;
 
     for(uint16_t i = 0;i < MAX_MOUNT_POINTS;i++) {
@@ -27,7 +28,9 @@ mount_location_t* vfs_find_the_nearest_mount(char* loc) {
                 for(int b = 0;b < loc_length;b++) {
                     if(mount_points[i].loc[b]) {
                        if(mount_points[i].loc[b] == loc[b]) 
-                        temp_match++; 
+                            temp_match++;
+                        else
+                            break; 
                     } else
                         break;
                 }
@@ -42,7 +45,7 @@ mount_location_t* vfs_find_the_nearest_mount(char* loc) {
     return nearest;
 }
 
-int VFS::Read(char* buffer,char* filename) {
+int VFS::Read(char* buffer,char* filename,int hint_size) {
     if(!filename) return -1;
 
     spinlock_lock(&vfs_spinlock);
@@ -51,7 +54,7 @@ int VFS::Read(char* buffer,char* filename) {
     if(!fs) return -1;
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); // /somemount/file to /file 
-    int status = fs->fs->readfile(buffer,filename_as_fs);
+    int status = fs->fs->readfile(buffer,filename_as_fs,hint_size);
     spinlock_unlock(&vfs_spinlock);
     return status;
 }
@@ -148,4 +151,12 @@ void VFS::Init() {
     mount_points[0].fs = tmpfs;
     TMPFS::Init(tmpfs);
     Log("TmpFS initializied\n");
+
+    filesystem_t* devfs = new filesystem_t;
+    mount_points[1].loc = "/dev/";
+    mount_points[1].fs = devfs;
+    devfs_init(devfs);
+
+    Log("DevFS initializied\n");
+
 }

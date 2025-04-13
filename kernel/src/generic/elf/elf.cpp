@@ -90,7 +90,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
             char* inter = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
 
-            VFS::Read(inter,stat.name);
+            VFS::Read(inter,stat.name,0);
 
             ELFLoadResult inter_r = ELF::Load((uint8_t*)inter,cr3,flags,0,0,0);
 

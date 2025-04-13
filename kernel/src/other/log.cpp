@@ -13,12 +13,19 @@
 char log_lock = 0;
 flanterm_context* ft_ctx;
 
-void LogInit(flanterm_context* ctx) {
-    ft_ctx = ctx;
+void LogInit(char* ctx) {
+    ft_ctx = (flanterm_context*)ctx;
 }
 
 void LogUnlock() {
     log_lock = 0;
+}
+
+void LogBuffer(char* buffer,uint64_t size) {
+    for(uint64_t i = 0;i < size;i++) {
+        flanterm_write(ft_ctx,&buffer[i],1);
+        Serial::Write(buffer[i]);
+    }
 }
 
 void NLog(char* format, ...) {

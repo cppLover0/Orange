@@ -29,6 +29,7 @@
         "utility": "cpp",
         "string": "cpp",
         "cstddef": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "flanterm_private.h": "c"
     }
 }

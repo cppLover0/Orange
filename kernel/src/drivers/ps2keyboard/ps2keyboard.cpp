@@ -5,6 +5,7 @@
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/interrupts/ioapic.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
+#include <generic/VFS/devfs.hpp>
 #include <drivers/io/io.hpp>
 
 char kmap[255] = {
@@ -19,6 +20,7 @@ char kmap[255] = {
 
 void (*keyboard_handler)();
 char __shift_pressed = 0;
+char __last_key = 0;
 
 inline char __ps_2_to_upper(char c) {
     
@@ -48,6 +50,14 @@ inline char __ps_2_to_upper(char c) {
 
 }
 
+int kbd_read(char* buffer,uint64_t hint_size) {
+    
+    if(!buffer) return 10;
+
+    *buffer = __last_key;
+
+    return 0;
+}
 
 static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *node, uacpi_u32 depth)
 {
@@ -59,8 +69,6 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
         Log("PS/2 Keyboard is not initializied\n");
         return UACPI_ITERATION_DECISION_NEXT_PEER;
     }
-
-    Log("PS/2 Keyboard is initializied !\n");
 
     uacpi_resource* current_res;
     int i = 0;
@@ -88,6 +96,10 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
     }
 
+    devfs_reg_device("/kbd",0,kbd_read);
+
+    Log("PS/2 Keyboard is initializied !\n");
+
     uacpi_free_resources(kb_res);
     UACPI_RESOURCE_TYPE_IRQ;
 
@@ -112,18 +124,10 @@ short PS2Keyboard::Get() {
         if(keycode == SHIFT_RELEASED)
             __shift_pressed = 0;
 
-        if(keycode <= 0x58) {
-            keycode = kmap[keycode];
+        __last_key = keycode;
 
-            if(__shift_pressed)
-                keycode = __ps_2_to_upper(keycode);
-        
-        }
+        return __last_key;
 
-        if(keycode & (1 << 7))
-            return '\0';
-
-        return keycode;
     }
 
     return 0;

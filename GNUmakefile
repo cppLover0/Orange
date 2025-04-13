@@ -8,7 +8,7 @@ override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
 HOST_CC := cc
-HOST_CFLAGS := -g -pipe
+HOST_CFLAGS := -g -pipe 
 HOST_CPPFLAGS :=
 HOST_LDFLAGS :=
 HOST_LIBS :=

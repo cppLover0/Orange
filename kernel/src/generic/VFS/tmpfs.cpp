@@ -154,7 +154,7 @@ int tmpfs_writefile(char* buffer,char* filename,uint64_t size) {
 
 }
 
-int tmpfs_readfile(char* buffer,char* filename) {
+int tmpfs_readfile(char* buffer,char* filename,uint64_t hint_size) {
     if(!buffer) return 1;
     if(!filename) return 2;
     if(filename[0] != '/') return 3; 

@@ -1,5 +1,6 @@
-#include <cstdint>
-#include <cstddef>
+#define FLANTERM_IN_FLANTERM
+#include <lib/flanterm/flanterm.h>
+#include <lib/flanterm/backends/fb.h>
 #include <lib/limineA/limine.h>
 #include <drivers/serial/serial.hpp>
 #include <generic/status/status.hpp>
@@ -18,8 +19,6 @@
 #include <generic/acpi/acpi.hpp>
 #include <drivers/hpet/hpet.hpp>
 #include <other/log.hpp>
-#include <lib/flanterm/flanterm.h>
-#include <lib/flanterm/backends/fb.h>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <drivers/cmos/cmos.hpp>
 #include <generic/mp/mp.hpp>
@@ -63,6 +62,7 @@ void _2() {
     }
 }
 
+
 extern "C" void keyStub();
 extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx);
 
@@ -98,7 +98,7 @@ extern "C" void kmain() {
     ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
     ft_ctx->cursor_enabled = 0;
 
-    LogInit(ft_ctx);
+    LogInit((char*)ft_ctx);
 
     Log("Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
     Log("RSDP: 0x%p\n",info.rsdp_address);
@@ -169,17 +169,13 @@ extern "C" void kmain() {
 
     Log("Kernel is initializied !\n");
 
-    HPET::Sleep(1000 * 100);
-
-    ft_ctx->clear(ft_ctx,1);
-
     filestat_t stat;
 
     VFS::Stat("/bin/initrd",(char*)&stat);
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
 
-    VFS::Read(elf,"/bin/initrd");
+    VFS::Read(elf,"/bin/initrd",0);
 
     ft_ctx->cursor_enabled = 1;
 
@@ -193,7 +189,12 @@ extern "C" void kmain() {
     Process::WakeUp(initrd);
     Process::WakeUp(_1i);
 
+    const char* str = "Hello, world from /dev/tty !\n";
+    pAssert(VFS::Write((char*)str,"/dev/tty",String::strlen((char*)str)) == 0,"devfs need to cry :(");
+
     Log("Waiting for interrupts...\n");
+
+    ft_ctx->clear(ft_ctx,1);
 
     MP::Sync();
 

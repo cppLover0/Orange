@@ -1,10 +1,9 @@
 
-#include <lib/flanterm/flanterm.h>
-
 #pragma once
 
 void Log(char* format, ...);
 void NLog(char* format, ...);
 void LogUnlock();
+void LogBuffer(char* buffer,uint64_t size);
 
-void LogInit(flanterm_context* ctx);
+void LogInit(char* ctx);
