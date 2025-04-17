@@ -14,6 +14,7 @@
 
 typedef struct process_struct {
     uint64_t id;
+    int return_status;
 
     struct process_struct* next;
 
@@ -29,6 +30,7 @@ typedef struct process_struct {
     uint8_t ss;
     
     char is_eoi;
+    char is_cli;
 
     int_frame_t ctx;
 } __attribute__((packed)) process_t;

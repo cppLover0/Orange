@@ -32,18 +32,18 @@ orange_status Serial::Init() {
 }
 
 uint8_t Serial::Read() {
-    spinlock_lock(&serial_spinlock);
+    //spinlock_lock(&serial_spinlock);
     while(IO::IN(COM1 + 5,1) & 1 == 0) {} 
     uint8_t value = IO::IN(COM1,1);
-    spinlock_unlock(&serial_spinlock);
+    //spinlock_unlock(&serial_spinlock);
     return value;
 }
 
 void Serial::Write(uint8_t data) {
-    //spinlock_lock(&serial_spinlock);
+    spinlock_lock(&serial_spinlock);
     while(IO::IN(COM1 + 5,1) & (1 << 5) == 0) {}
     IO::OUT(COM1,data,1);
-    //spinlock_unlock(&serial_spinlock);
+    spinlock_unlock(&serial_spinlock);
 }
 
 void Serial::WriteArray(uint8_t* data,uint64_t len) {

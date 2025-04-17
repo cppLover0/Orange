@@ -68,6 +68,60 @@ void NLog(char* format, ...) {
     spinlock_unlock(&log_lock);
 }
 
+void LogSerial(char* format, ...) { // actually serial doesnt need spinlock
+    va_list args;
+    va_start(args, format);
+    int i = 0;
+
+    char sec_b[4];
+    char min_b[4];
+    char hour_b[4];
+
+    String::itoa(CMOS::Second(), sec_b,10);
+    String::itoa(CMOS::Minute(), min_b,10);
+    String::itoa(CMOS::Hour(), hour_b,10);
+
+    Serial::WriteString("[");
+
+    Serial::WriteString(hour_b);
+    Serial::WriteString(".");
+
+    Serial::WriteString(min_b);
+
+    Serial::WriteString(".");
+
+    Serial::WriteString(sec_b);
+
+    Serial::WriteString("] ");
+
+    while (i < String::strlen(format)) {
+        if (format[i] == '%') {
+            i++;
+            char buffer[256];
+            if (format[i] == 'd' || format[i] == 'i') {
+                String::itoa(va_arg(args, uint64_t), buffer,10);
+                buffer[255] = 0;
+                Serial::WriteString(buffer);
+            } else if (format[i] == 's') {
+                char* buffer1 = va_arg(args, char*);
+                Serial::WriteString(buffer1);
+            } else if (format[i] == 'p') {
+                String::itoa(va_arg(args,uint64_t),buffer,16);
+                buffer[255] = 0;
+                Serial::WriteString(buffer);
+            } else if (format[i] == 'c') {
+                buffer[0] = (char)va_arg(args,uint64_t);
+                buffer[1] = '\0';
+                Serial::WriteString(buffer);
+            }
+        } else {
+            Serial::Write(format[i]);
+        }
+        i++;
+    }
+    va_end(args);
+}
+
 void Log(char* format, ...) {
     spinlock_lock(&log_lock);
     va_list args;

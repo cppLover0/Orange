@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <arch/x86_64/interrupts/idt.hpp>
 
 #define STAR_MSR 0xC0000081
 #define LSTAR 0xC0000082
@@ -8,7 +9,7 @@
 
 typedef struct {
     uint32_t num;
-    void* func;
+    int (*func)(int_frame_t* frame);
 } syscall_t;
 
 class Syscall {

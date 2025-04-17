@@ -183,11 +183,13 @@ extern "C" void kmain() {
 
     int initrd = Process::createProcess(0,0,1,0);
     int _1i = Process::createProcess((uint64_t)_1,0,0,0);
+    int _2i = Process::createProcess((uint64_t)_1,0,0,0); // work harder
 
     Process::loadELFProcess(initrd,(uint8_t*)elf,0,0);
 
     Process::WakeUp(initrd);
     Process::WakeUp(_1i);
+    Process::WakeUp(_2i);
 
     const char* str = "Hello, world from /dev/tty !\n";
     pAssert(VFS::Write((char*)str,"/dev/tty",String::strlen((char*)str)) == 0,"devfs need to cry :(");

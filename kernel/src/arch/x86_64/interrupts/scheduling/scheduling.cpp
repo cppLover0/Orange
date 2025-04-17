@@ -54,10 +54,14 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                 if(proc->status == PROCESS_STATUS_RUN) {
                     proc->status = PROCESS_STATUS_IN_USE;
                     data->current = proc;
+
+                    if(proc->is_cli) 
+                        proc->ctx.rflags &= ~(1 << 9); // clear IF
+
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
                     
                     if(proc->is_eoi)
-                        Lapic::EOI();
+                        Lapic::EOI(); // for kernel mode proc-s
                 
                     frame1->cs = proc->cs;
                     frame1->ss = proc->ss;
