@@ -34,13 +34,18 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     
     if(data->current) {
 
-        if(frame) 
-            String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
+        if(proc->status != PROCESS_STATUS_BLOCKED) {
+            if(frame) 
+                String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
 
-        data->current->status = PROCESS_STATUS_RUN;
+            if(proc->status == PROCESS_STATUS_IN_USE)
+                data->current->status = PROCESS_STATUS_RUN;
+        }
+
         data->current = 0;
 
         proc = proc->next;
+
     } else
         proc = head_proc;
 
@@ -132,13 +137,52 @@ void Process::WakeUp(uint64_t id) {
 
 uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
     process_t* parent_proc = ByID(parent);
-    uint64_t i = createProcess(rip,1,parent_proc->user,(uint64_t*)parent_proc->ctx.cr3);
+    uint64_t i = createProcess(rip,1,parent_proc->user,(uint64_t*)HHDM::toVirt(parent_proc->ctx.cr3),parent_proc->id);
     process_t* proc = ByID(i);
     proc->parent_process = parent_proc->id;
     return i;
 }
 
-uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_t* cr3_parent) {
+void Process::futexWait(process_t* proc, int* lock,int val) {
+
+    int st = proc->status;
+    proc->status = PROCESS_STATUS_BLOCKED;
+
+    if(lock && proc->ctx.cr3) {
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(proc->ctx.cr3)); // enter to userspace paging
+
+        int lock_value = *lock;
+
+        Paging::EnableKernel();
+
+        if(lock_value == val) {
+            proc->futex = lock;
+            proc->status = PROCESS_STATUS_BLOCKED;
+            return;
+        }
+    }
+
+    proc->status = st; // restore
+
+}
+
+void Process::futexWake(process_t* parent,int* lock) {
+
+    process_t* proc = head_proc;
+    while(proc) {
+        
+        if(proc->futex == lock && parent->id == proc->parent_process) {
+            proc->futex = 0;
+            proc->status = PROCESS_STATUS_RUN;
+            return;
+        }
+
+        proc = proc->next;
+    }
+
+}
+
+uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_t* cr3_parent,uint64_t parent_id) {
 
     process_t* proc = (process_t*)PMM::VirtualAlloc();
     pAssert(proc,"No memory :(");
@@ -158,6 +202,8 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->is_eoi = 1;
     proc->ctx.rflags = (1 << 9); // setup IF
     proc->status = PROCESS_STATUS_KILLED;
+    proc->parent_process = parent_id;
+    proc->futex = 0;
 
     uint64_t* stack_start = (uint64_t*)PMM::VirtualBigAlloc(PROCESS_STACK_SIZE);
     uint64_t* stack_end = (uint64_t*)((uint64_t)stack_start + (PROCESS_STACK_SIZE * PAGE_SIZE));
@@ -171,10 +217,10 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     pAssert(cr3 && stack_start,"No memory :(");
 
     if(is_thread) {
+        PMM::VirtualFree(cr3);
         cr3 = cr3_parent;
     } else {
         Paging::Kernel(cr3);
-        Paging::MemoryEntry(cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
         Paging::alwaysMappedMap(cr3);
     }
 

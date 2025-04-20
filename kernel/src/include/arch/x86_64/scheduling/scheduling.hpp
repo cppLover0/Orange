@@ -11,6 +11,7 @@
 #define PROCESS_STATUS_RUN 0
 #define PROCESS_STATUS_IN_USE 1
 #define PROCESS_STATUS_KILLED 2
+#define PROCESS_STATUS_BLOCKED 3
 
 typedef struct process_struct {
     uint64_t id;
@@ -25,6 +26,8 @@ typedef struct process_struct {
     uint64_t* stack_start; // to free if process killed
 
     uint64_t parent_process; // for threads
+
+    int* futex; // for futex
 
     uint8_t cs;
     uint8_t ss;
@@ -47,12 +50,16 @@ public:
 
     static process_t* ByID(uint64_t id);
 
-    static uint64_t createProcess(uint64_t rip,char is_thread,char is_user,uint64_t* cr3_parent);
+    static uint64_t createProcess(uint64_t rip,char is_thread,char is_user,uint64_t* cr3_parent,uint64_t parent_id);
 
     static void WakeUp(uint64_t id);
 
     static uint64_t createThread(uint64_t rip,uint64_t parent);
 
     static void loadELFProcess(uint64_t procid,uint8_t* elf,char** argv,char** envp);
+
+    static void futexWait(process_t* proc, int* lock,int val);
+
+    static void futexWake(process_t* parent,int* lock);
 
 };

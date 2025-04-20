@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 1024M -d int -no-reboot -serial file:output.txt -M q35 -s
+QEMUFLAGS := -m 1024M -d int -no-reboot -serial file:output.txt -M q35 -s -smp 4 -enable-kvm
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.

@@ -11,6 +11,7 @@
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/cpu/data.hpp>
 #include <config.hpp>
+#include <other/hhdm.hpp>
 #include <other/string.hpp>
 
 extern "C" void syscall_handler();
@@ -27,16 +28,24 @@ int syscall_exit(int_frame_t* ctx) {
         PMM::VirtualBigFree((void*)proc->stack_start,PROCESS_STACK_SIZE);
     }
 
-    ctx->cr3 = 0; // just schedule
-    return 0;
+    Log("Process %d is died with code %d !\n",proc->id,proc->return_status);
+
+    schedulingSchedule(ctx);
+    
 }
 
 int syscall_debug_print(int_frame_t* ctx) {
 
     uint64_t size = ctx->rsi;
+    char buffer[1024];
+    
+    String::memset(buffer,0,1024);
 
-    char* ptr = (char*)KHeap::Malloc(size);
-    char* src = ctx->rdi;
+    char* ptr = &buffer[0];
+
+    String::memset(ptr,0,size);
+
+    char* src = (char*)ctx->rdi;
 
     process_t* proc = CpuData::Access()->current;
 
@@ -44,27 +53,54 @@ int syscall_debug_print(int_frame_t* ctx) {
 
 
 
-        Paging::EnablePaging(ctx->cr3);
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
         String::memcpy(ptr,src,size);
         Paging::EnableKernel();
 
-        Log("[Process %d]: %s\n",proc->id,ptr);
+        Log("[Process %d] %s\n",proc->id,ptr);
 
-        ctx->rax = 0;
-
+        return 0;
 
     } else {
-        ctx->rax = -1;
+        return -1;
     }
 
-    KHeap::Free((void*)ptr);
-    return;
+    return 0;
+
+}
+
+int syscall_futex_wait(int_frame_t* ctx) {
+
+    int* p = (int*)ctx->rdi;
+    int e = ctx->rsi;
+
+    process_t* proc = CpuData::Access()->current;
+    Process::futexWait(proc,p,e);
+
+    return 0;
+
+}
+
+int syscall_futex_wake(int_frame_t* ctx) {
+
+    int *p = (int*)ctx->rdi;
+
+    process_t* proc = CpuData::Access()->current;
+
+    if(proc->parent_process)
+        proc = Process::ByID(proc->parent_process);
+
+    Process::futexWake(proc,p);
+
+    return 0;
 
 }
 
 syscall_t syscall_table[] = {
     {1,syscall_exit},
-    {2,syscall_debug_print}
+    {2,syscall_debug_print},
+    {3,syscall_futex_wait},
+    {4,syscall_futex_wake}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -85,12 +121,6 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     }
 
     ctx->rax = sys->func(ctx);
-
-    if(ctx->cr3 = 0) { // just schedule, skip this
-        __sti();
-        __hlt();
-    }
-
     return;
 }
 

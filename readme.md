@@ -27,7 +27,8 @@ Orange is my limine x86_64 OS
 ## Unix-like TODO
 
 - [x] Syscalls
-- [ ] Start libc porting
+- [x] Start libc porting
+- [ ] End libc porting
 
 ## Porting TODO
 
@@ -35,7 +36,6 @@ Orange is my limine x86_64 OS
 - [ ] nasm
 - [ ] gcc
 - [ ] lua
-- [ ] luau
 - [ ] python
 - [ ] etc. apps
 
@@ -59,7 +59,7 @@ Orange is my limine x86_64 OS
 - [x] VFS
 - [x] TMPFS
 - [x] USTAR
-- [ ] DevFS
+- [x] DevFS
 - [ ] ProcFS
 - [ ] ISO9660
 - [ ] FAT32
