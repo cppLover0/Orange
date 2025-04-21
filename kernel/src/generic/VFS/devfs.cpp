@@ -99,10 +99,17 @@ int tty_write(char* buffer,uint64_t size) {
     return 0;
 }
 
+int serial_write(char* buffer,uint64_t size) {
+    if(!buffer) return 10;
+    Serial::WriteString(buffer);
+    return 0;
+}
+
 void devfs_init(filesystem_t* fs) {
     devfs_reg_device("/zero",0,zero_read);
     devfs_reg_device("/null",0,zero_read);
     devfs_reg_device("/tty",tty_write,0);
+    devfs_reg_device("/serial",serial_write,0);
 
     fs->create = 0;
     fs->disk = 0;

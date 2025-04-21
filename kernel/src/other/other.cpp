@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <generic/memory/heap.hpp>
+#include <other/other.hpp>
+#include <other/string.hpp>
 
 extern "C" {
 
@@ -56,6 +58,21 @@ int memcmp(const void *s1, const void *s2, std::size_t n) {
     return 0;
 }
 
+char* strrchr(const char *str, int c) {
+    char* last = NULL;
+    while (*str) {
+        if (*str == c) {
+            last = (char *)str;
+        }
+        str++;
+    }
+
+    if (*str == c) {
+        last = (char *)str;
+    }
+    return last;
+}
+
 }
 
 namespace {
@@ -103,6 +120,7 @@ void operator delete[](void *p)
 #include <drivers/ps2keyboard/ps2keyboard.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/cpu/data.hpp>
+#include <generic/memory/pmm.hpp>
 
 extern "C" void keyHandler(int_frame_t* ctx) {
     __cli();
@@ -131,4 +149,101 @@ extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
 
     __hlt();
+}
+
+char* cwd_get(const char *path) {
+
+    char* result = (char*)PMM::VirtualAlloc();
+    memcpy(result,path,String::strlen((char*)path));
+
+    char *last_slash = strrchr(result, '/');
+    
+    if (last_slash != NULL) {
+        if (last_slash != result) {
+            *last_slash = '\0';
+        } else {
+            *(last_slash + 1) = '\0';
+        }
+    } else {
+        result[0] = '\0';
+    }
+
+    return result;
+
+}
+char* join_paths(const char* path1, const char* path2) {
+    char* result = (char*)PMM::VirtualAlloc();
+    if (!result) {
+        return 0;
+    }
+
+    if (path2[0] == '/') {
+        int i = 0;
+        while (path2[i] != '\0' && i < 4095) {
+            result[i] = path2[i];
+            i++;
+        }
+        result[i] = '\0';
+        return result;
+    }
+
+    int len1 = 0;
+    while (path1[len1] != '\0') {
+        len1++;
+    }
+
+    if (len1 > 0 && path1[len1-1] == '/') {
+        len1--;
+    }
+
+    if (len1 == 1 && path1[0] == '/') {
+        int i = 0;
+        result[0] = '/';
+        i = 1;
+        int j = 0;
+        while (path2[j] != '\0' && i < 4095) {
+            result[i] = path2[j];
+            i++;
+            j++;
+        }
+        result[i] = '\0';
+        return result;
+    }
+
+    int offset2 = 0;
+    if (path2[0] == '.' && path2[1] == '/') {
+        path2 += 2; 
+        offset2 = 2;
+    } else if (path2[0] == '.' && path2[1] == '.' && path2[2] == '/') {
+        while (len1 > 0 && path1[len1-1] != '/') {
+            len1--;
+        }
+        if (len1 > 0) {
+            len1--;
+        }
+        path2 += 3; 
+        offset2 = 3;
+    }
+
+    int i = 0;
+    for (int j = 0; j < len1 && i < 4095; j++) {
+        result[i] = path1[j];
+        i++;
+    }
+
+    if (i < 4095) {
+        result[i] = '/';
+        i++;
+    }
+
+    int j = offset2;
+    while (path2[j-offset2] != '\0' && i < 4095) {
+        result[i] = path2[j-offset2];
+        i++;
+        j++;
+    }
+
+    result[i] = '\0';
+
+    return result;
 }

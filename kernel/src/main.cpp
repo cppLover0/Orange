@@ -188,7 +188,7 @@ extern "C" void kmain() {
 
     int initrd = Process::createProcess(0,0,1,0,0);
 
-    Process::loadELFProcess(initrd,(uint8_t*)elf,0,0);
+    Process::loadELFProcess(initrd,"/bin/init",(uint8_t*)elf,0,0);
 
     Process::WakeUp(initrd);
 

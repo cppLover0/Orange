@@ -22,8 +22,12 @@ typedef struct process_struct {
     char type;
     char status;
     char user;
+    char* cwd;
+    char* name;
     uint64_t* stack;
     uint64_t* stack_start; // to free if process killed
+
+    uint64_t fs_base;
 
     uint64_t parent_process; // for threads
 
@@ -56,7 +60,7 @@ public:
 
     static uint64_t createThread(uint64_t rip,uint64_t parent);
 
-    static void loadELFProcess(uint64_t procid,uint8_t* elf,char** argv,char** envp);
+    static void loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,char** envp);
 
     static void futexWait(process_t* proc, int* lock,int val);
 

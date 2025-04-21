@@ -14,6 +14,7 @@
 #include <config.hpp>
 #include <other/log.hpp>
 #include <other/string.hpp>
+#include <other/other.hpp>
 
 uint64_t id_ptr = 0;
 
@@ -35,8 +36,10 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     if(data->current) {
 
         if(proc->status != PROCESS_STATUS_BLOCKED) {
-            if(frame) 
+            if(frame) {
                 String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
+                proc->fs_base = __rdmsr(0xC0000100);
+            }
 
             if(proc->status == PROCESS_STATUS_IN_USE)
                 data->current->status = PROCESS_STATUS_RUN;
@@ -64,6 +67,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                         proc->ctx.rflags &= ~(1 << 9); // clear IF
 
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
+                    __wrmsr(0xC0000100,proc->fs_base);
                     
                     if(proc->is_eoi)
                         Lapic::EOI(); // for kernel mode proc-s
@@ -101,15 +105,21 @@ void __process_load_queue(process_t* proc) {
 }
 
 void Process::Init() {
-    createProcess(0,0,0,0); // just load 0 as rip 
+    createProcess(0,0,0,0,0); // just load 0 as rip 
     idt_entry_t* entry = IDT::SetEntry(32,(void*)schedulingStub,0x8E);
     entry->ist = 2;
 }
 
-void Process::loadELFProcess(uint64_t procid,uint8_t* elf,char** argv,char** envp) {    
+void Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,char** envp) {    
     
     process_t* proc = ByID(procid);
     uint64_t* vcr3 = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
+
+    proc->cwd = cwd_get((const char*)path);
+    
+    char* name = (char*)PMM::VirtualAlloc();
+    String::memcpy(name,path,String::strlen(path));
+    proc->name = name;
 
     ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,proc->stack,argv,envp);
 
@@ -139,6 +149,12 @@ uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
     process_t* parent_proc = ByID(parent);
     uint64_t i = createProcess(rip,1,parent_proc->user,(uint64_t*)HHDM::toVirt(parent_proc->ctx.cr3),parent_proc->id);
     process_t* proc = ByID(i);
+    
+    char* name = (char*)PMM::VirtualAlloc();
+    String::memcpy(name,parent_proc->name,String::strlen(parent_proc->name));
+    proc->name = name;
+    proc->cwd = cwd_get(name);
+
     proc->parent_process = parent_proc->id;
     return i;
 }

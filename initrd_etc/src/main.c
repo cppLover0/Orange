@@ -14,22 +14,27 @@ void exit() {
     asm volatile("syscall" : : "a"(1), "D"(0) : "rcx", "r11");
 }
 
+void open(const char* filename,int* fd) {
+    asm volatile("syscall" : : "a"(7), "D"(filename), "S"(fd) : "rcx", "r11");
+}
+
+void tmpfs_dump() {
+    asm volatile("syscall" : : "a"(6) : "rcx", "r11");
+}
+
 void _start() {
 
+    print("Testing open syscall, opening (creating) file \"syscall_open_test.txt\"");
+
+    int fd;
+    open("syscall_open_test.txt",&fd);
+
+    tmpfs_dump();
+
+    print("Welcome to the \033[38;2;255;165;0mOrange\033[38;2;255;255;255m !");
+
+    exit(0);
     
-    print("Hello, World #1 !");
-    print("Hello, World #2 !");
-    print("Hello, World #3 !");
-    print("Hello, World #4 !");
-    print("Hello, World #5 !");
-
-    for(int i = 0;i < 15;i++) {
-        print("I am alive !");
-    }
-
-    print("Okay i died");
-    exit();
-
     while(1) {
         print("I am alive ?");
     }

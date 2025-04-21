@@ -7,6 +7,13 @@
 #define STAR_MASK 0xC0000084
 #define EFER 0xC0000080
 
+typedef struct fd_struct {
+    int index;
+    char is_in_use;
+    struct fd_struct* next;
+    char path[4083]; // align 4k
+} __attribute__((packed)) fd_t;
+
 typedef struct {
     uint32_t num;
     int (*func)(int_frame_t* frame);
