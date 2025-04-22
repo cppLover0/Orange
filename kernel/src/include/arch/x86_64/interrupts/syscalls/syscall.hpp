@@ -10,8 +10,9 @@
 typedef struct fd_struct {
     int index;
     char is_in_use;
+    long seek_offset;
     struct fd_struct* next;
-    char path[4083]; // align 4k
+    char path[4075]; // align 4k
 } __attribute__((packed)) fd_t;
 
 typedef struct {

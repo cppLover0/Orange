@@ -45,7 +45,7 @@ mount_location_t* vfs_find_the_nearest_mount(char* loc) {
     return nearest;
 }
 
-int VFS::Read(char* buffer,char* filename,int hint_size) {
+int VFS::Read(char* buffer,char* filename,long hint_size) {
     if(!filename) return -1;
 
     spinlock_lock(&vfs_spinlock);

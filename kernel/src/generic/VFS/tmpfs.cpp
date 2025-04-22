@@ -154,7 +154,7 @@ int tmpfs_writefile(char* buffer,char* filename,uint64_t size) {
 
 }
 
-int tmpfs_readfile(char* buffer,char* filename,uint64_t hint_size) {
+int tmpfs_readfile(char* buffer,char* filename,long hint_size) {
     if(!buffer) return 1;
     if(!filename) return 2;
     if(filename[0] != '/') return 3; 
@@ -168,7 +168,13 @@ int tmpfs_readfile(char* buffer,char* filename,uint64_t hint_size) {
     if(!file->content)
         return 7;
 
-    String::memcpy(buffer,file->content,file->size_of_content);
+    char* start = file->content;
+
+    if(hint_size < 0) {
+        start = (char*)((uint64_t)start + (hint_size * -1));
+    }
+
+    String::memcpy(buffer,start,file->size_of_content);
 
     return 0;
 }
@@ -193,6 +199,7 @@ int tmpfs_stat(char* filename,char* buffer) {
     stat.fs_prefix1 = 'T';
     stat.fs_prefix2 = 'M';
     stat.fs_prefix3 = 'P';
+    stat.content = file->content;
 
     String::memcpy(buffer,&stat,sizeof(filestat_t));
 

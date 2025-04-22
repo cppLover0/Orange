@@ -50,7 +50,7 @@ inline char __ps_2_to_upper(char c) {
 
 }
 
-int kbd_read(char* buffer,uint64_t hint_size) {
+int kbd_read(char* buffer,long hint_size) {
     
     if(!buffer) return 10;
 

@@ -5,6 +5,7 @@
 #include <other/log.hpp>
 #include <other/string.hpp>
 #include <config.hpp>
+#include <generic/memory/heap.hpp>
 
 devfs_dev_t* head_dev = 0;
 devfs_dev_t* last_dev = 0;
@@ -25,7 +26,7 @@ devfs_dev_t* devfs_find_dev(const char* loc) {
 
 }
 
-int devfs_read(char* buffer,char* filename,uint64_t hint_size) {
+int devfs_read(char* buffer,char* filename,long hint_size) {
 
     if(!filename) return 1;
     if(!buffer) return 2;
@@ -52,7 +53,7 @@ int devfs_write(char* buffer,char* filename,uint64_t size) {
 
 }
 
-void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,uint64_t hint_size)) {
+void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size)) {
 
     struct devfs_dev* dev = new struct devfs_dev;
     
@@ -70,7 +71,7 @@ void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),
         }
 
     } else {
-        delete dev;
+        KHeap::Free(dev);
     }
 
 }
@@ -81,11 +82,11 @@ Some basic devfs
 
 */
 
-int zero_read(char* buffer,uint64_t hint_size) {
+int zero_read(char* buffer,long hint_size) {
     if(!hint_size) return 7;
     if(hint_size > TMPFS_MAX_SIZE) return 8;
 
-    String::memset(buffer,0,hint_size);
+    String::memset(buffer,0,hint_size < 0 ? hint_size * (-1) : hint_size);
 
     return 0;
 

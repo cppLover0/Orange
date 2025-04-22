@@ -83,6 +83,7 @@ int create_fd(char* path) {
     } 
     
     fd->is_in_use = 1;
+    fd->seek_offset = 0;
     last_fd->next = fd;
     last_fd = fd;
 
@@ -241,6 +242,137 @@ int syscall_open(int_frame_t* ctx) {
 
 }
 
+// SEEK_SET 0 start
+// SEEK_CUR 1 current
+// SEEK_END 2 end
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
+int syscall_seek(int_frame_t* ctx) {
+
+    int fd = ctx->rdi;
+    long offset = ctx->rsi;
+    int whence = ctx->rdx;
+    long* new_offset = (long*)ctx->rcx;
+
+    fd_t* file = find_fd(fd);
+    filestat_t stat;
+
+    if(VFS::Stat(file->path,(char*)&stat)) {
+        return -4;
+    }
+
+    if(!file)
+        return -1;
+
+    if(!new_offset && !offset)
+        return -2;
+
+    if(fd < 3)
+        return -3;
+
+
+    switch (whence)
+    {
+        case SEEK_SET:
+            file->seek_offset = offset;
+            break;
+
+        case SEEK_CUR:
+            file->seek_offset += offset;
+            break;
+
+        case SEEK_END:
+            file->seek_offset = offset;
+            break;
+
+        default:
+            Log("Process %d, sys_seek, unhandled whence: %d.",CpuData::Access()->current->id,whence);
+            return -5;
+
+    }
+
+    ctx->rdi = file->seek_offset;
+
+    return 0;
+
+}
+
+void __prepare_file_content_syscall(char* content,uint64_t size,uint64_t phys_cr3) {
+
+    uint64_t* cr3 = (uint64_t*)HHDM::toVirt(phys_cr3);
+    uint64_t phys_file = HHDM::toPhys((uint64_t)content);
+    uint64_t aligned_size_in_pages = ALIGNPAGEUP(size) / PAGE_SIZE;
+    for(uint64_t i = 0;i < aligned_size_in_pages;i++) {
+        Paging::HHDMMap(cr3,phys_file + (i * PAGE_SIZE),PTE_PRESENT | PTE_RW);
+    }
+
+
+}
+
+int syscall_read(int_frame_t* ctx) {
+
+    int fd = ctx->rdi;
+    void* buf = (void*)ctx->rsi;
+    uint64_t count = ctx->rdx;
+    long* bytes_read = (long*)ctx->rcx;
+
+    fd_t* file = find_fd(fd);
+    filestat_t stat;
+
+    if(VFS::Stat(file->path,(char*)&stat)) {
+        return -4;
+    }
+
+    if(!file)
+        return -1;
+
+    if(fd < 3)
+        return -3;
+
+    long seek_off = file->seek_offset;
+
+    uint64_t actual_size = 0;
+    char is_file_bigger = 0;
+
+    if(count < stat.size) {
+        actual_size = count;
+        is_file_bigger = 1;
+    } else if(count > stat.size) {
+        actual_size = stat.size;
+        is_file_bigger = 0;
+    } else {
+        actual_size = count;
+        is_file_bigger = 1;
+    }
+
+    char* actual_src = stat.content;
+
+    if(seek_off > 0)
+        actual_src = (char*)((uint64_t)actual_src + seek_off);
+    else if(seek_off < 0)
+        actual_size += seek_off;
+
+    if(stat.content) {
+        __prepare_file_content_syscall(stat.content,stat.size,ctx->cr3);
+    } else {
+        actual_src = "";
+        actual_size = 0;
+    }
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memset(buf,0,count);
+    String::memcpy(buf,actual_src,actual_size);
+    Paging::EnableKernel();
+
+    ctx->rdi = actual_size;
+
+    return 0;
+
+}
+
 int syscall_dump_tmpfs(int_frame_t* ctx) {
 
     tmpfs_dump();
@@ -254,7 +386,9 @@ syscall_t syscall_table[] = {
     {4,syscall_futex_wake},
     {5,syscall_tcb_set},
     {6,syscall_dump_tmpfs},
-    {7,syscall_open}
+    {7,syscall_open},
+    {8,syscall_seek},
+    {9,syscall_read}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -275,6 +409,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     }
 
     ctx->rax = sys->func(ctx);
+    
     return;
 }
 

@@ -12,7 +12,7 @@ typedef struct {
 } disk_t;
 
 typedef struct {
-    int (*readfile)(char* buffer,char* filename,uint64_t hint_size);
+    int (*readfile)(char* buffer,char* filename,long hint_size);
     int (*writefile)(char* buffer,char* filename,uint64_t size);
     int (*touch)(char* filename);
     int (*create)(char* filename,int type);
@@ -36,6 +36,8 @@ typedef struct {
     char type;
     char* name;
 
+    char* content;
+
     uint32_t size;
 
     uint64_t file_create_date;
@@ -50,7 +52,7 @@ typedef struct {
 class VFS {
 public:
     static void Init();
-    static int Read(char* buffer,char* filename,int hint_size);
+    static int Read(char* buffer,char* filename,long hint_size);
     static int Write(char* buffer,char* filename,uint64_t size);
     static int Touch(char* filename);
     static int Create(char* filename,int type);
