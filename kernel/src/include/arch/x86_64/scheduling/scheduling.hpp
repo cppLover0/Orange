@@ -13,6 +13,18 @@
 #define PROCESS_STATUS_KILLED 2
 #define PROCESS_STATUS_BLOCKED 3
 
+typedef struct termios {
+    uint32_t c_iflag;		
+    uint32_t c_oflag;	
+    uint32_t c_cflag;		
+    uint32_t c_lflag;	
+    uint8_t c_line;			
+    uint8_t c_cc[32];		
+    uint32_t c_ispeed;		
+    uint32_t c_ospeed;		
+} __attribute__((packed)) termios_t;
+
+
 typedef struct process_struct {
     uint64_t id;
     int return_status;
@@ -24,14 +36,24 @@ typedef struct process_struct {
     char user;
     char* cwd;
     char* name;
+
+    termios_t* termios;
+
     uint64_t* stack;
     uint64_t* stack_start; // to free if process killed
+
+    uint64_t* wait_stack; // to waitings in syscall
+    int_frame_t* syscall_wait_ctx;
 
     uint64_t fs_base;
 
     uint64_t parent_process; // for threads
 
     int* futex; // for futex
+
+    int fd_ptr;
+    char* start_fd; // i cant include loop sooo i just put char*
+    char* last_fd; // optimizations
 
     uint8_t cs;
     uint8_t ss;
@@ -46,6 +68,8 @@ extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);
 extern "C" void schedulingStub();
 
 extern "C" void schedulingSchedule(int_frame_t* frame);
+
+process_t* get_head_proc();
 
 class Process {
 public:

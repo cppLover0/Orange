@@ -15,100 +15,10 @@
 #include <config.hpp>
 #include <other/hhdm.hpp>
 #include <other/string.hpp>
+#include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <other/other.hpp>
 
 extern "C" void syscall_handler();
-
-// simple fd implementation
-
-fd_t head_fd;
-fd_t stdout_fd;
-fd_t stderr_fd;
-
-int fd_ptr = 3; 
-
-fd_t* last_fd;
-char is_fd_initializied = 0;
-
-int create_fd(char* path) {
-
-    if(!is_fd_initializied) {
-
-        const char* stdout = "/dev/tty";
-        const char* stdin = "/dev/kbd";
-        const char* stderr = "/dev/serial";
-
-        head_fd.index = 0;
-        head_fd.is_in_use = 1;
-        head_fd.next = &stdout_fd;
-        
-        String::memcpy(head_fd.path,stdin,String::strlen((char*)stdin));
-
-        stdout_fd.index = 1;
-        stdout_fd.is_in_use = 1;
-        stdout_fd.next = &stderr_fd;
-
-        String::memcpy(stdout_fd.path,stdout,String::strlen((char*)stdout));
-
-        stderr_fd.index = 2;
-        stderr_fd.is_in_use = 1;
-        stderr_fd.next = 0;
-
-        String::memcpy(stderr_fd.path,stderr,String::strlen((char*)stderr));
-
-        last_fd = &stderr_fd;
-
-        is_fd_initializied = 1;
-    }
-
-    fd_t* fd = &head_fd;
-
-    char success = 0;
-
-    while (fd)
-    {
-
-        if(!fd->is_in_use) {
-            success = 1;
-            fd->is_in_use = 1;
-            break;
-        }
-
-        fd = fd->next;
-    }
-    
-    if(!success) {
-        fd = (fd_t*)PMM::VirtualAlloc();
-        fd->index = fd_ptr++;
-    } 
-    
-    fd->is_in_use = 1;
-    fd->seek_offset = 0;
-    last_fd->next = fd;
-    last_fd = fd;
-
-    String::memcpy(fd->path,path,String::strlen((char*)path));
-
-    return fd->index;
-
-}
-
-fd_t* find_fd(int index) {
-
-    fd_t* fd = &head_fd;
-
-    while (fd)
-    {
-        
-        if(fd->index == index)
-            return fd;
-
-        fd = fd->next;
-    }
-
-    return 0;
-    
-}
 
 // syscalls
 
@@ -226,8 +136,11 @@ int syscall_open(int_frame_t* ctx) {
 
     char* path = join_paths(first,buffer);
 
-    int fd = create_fd(path);
-    fd_t* fd_s = find_fd(fd);
+    int fd = FD::Create(proc,0);
+    fd_t* fd_s = FD::Search(proc,fd);
+
+    String::memset(fd_s->path_point,0,2048);
+    String::memcpy(fd_s->path_point,path,String::strlen(path));
 
     if(!fd_s)
         return -3;
@@ -257,10 +170,12 @@ int syscall_seek(int_frame_t* ctx) {
     int whence = ctx->rdx;
     long* new_offset = (long*)ctx->rcx;
 
-    fd_t* file = find_fd(fd);
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* file = FD::Search(proc,fd);
     filestat_t stat;
 
-    if(VFS::Stat(file->path,(char*)&stat)) {
+    if(VFS::Stat(file->path_point,(char*)&stat)) {
         return -4;
     }
 
@@ -300,6 +215,21 @@ int syscall_seek(int_frame_t* ctx) {
 
 }
 
+/*
+[[gnu::weak]] int sys_tcgetattr(int fd, struct termios *attr);
+[[gnu::weak]] int sys_tcsetattr(int, int, const struct termios *attr);
+*/
+
+int syscall_tcgetattr(int_frame_t* ctx) {
+
+    
+
+}
+
+int syscall_tcsetattr(int_frame_t* ctx) {
+
+}
+
 void __prepare_file_content_syscall(char* content,uint64_t size,uint64_t phys_cr3) {
 
     uint64_t* cr3 = (uint64_t*)HHDM::toVirt(phys_cr3);
@@ -312,35 +242,91 @@ void __prepare_file_content_syscall(char* content,uint64_t size,uint64_t phys_cr
 
 }
 
+extern "C" void syscall_end(int_frame_t* ctx);
+
+extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
+
+    void* buf = (void*)ctx->rsi;
+    uint64_t count = ctx->rdx;
+
+    if(file->path_point[0])
+        VFS::AskForPipe(file->path_point,&file->pipe);
+
+    while(1) {
+        if(!file->pipe.is_received) {
+
+            if(file->pipe.buffer_size < count)
+                count = file->pipe.buffer_size;
+
+            char* pipe_buffer = file->pipe.buffer;
+
+            __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
+            Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+            String::memcpy(buf,pipe_buffer,count);
+            Paging::EnableKernel();
+            file->pipe.is_received = 1;
+            ctx->rax = 0;
+            syscall_end(ctx);
+
+        } else {
+            __sti();
+        }
+    }
+
+}
+
+extern "C" void syscall_read_stage_2_asm(uint64_t new_stack,int_frame_t* ctx,fd_t* file);
+
 int syscall_read(int_frame_t* ctx) {
 
     int fd = ctx->rdi;
     void* buf = (void*)ctx->rsi;
     uint64_t count = ctx->rdx;
-    long* bytes_read = (long*)ctx->rcx;
+    process_t* proc = CpuData::Access()->current;
 
-    fd_t* file = find_fd(fd);
+    fd_t* file = FD::Search(proc,fd);
     filestat_t stat;
-
-    if(VFS::Stat(file->path,(char*)&stat)) {
-        return -4;
-    }
 
     if(!file)
         return -1;
 
-    if(fd < 3)
-        return -3;
+    if(file->type == FD_PIPE) {
+        
+        proc->is_cli = 1;
+        String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
+        syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
+        return -20;
+        
+    
+    }
+
+    if(VFS::Stat(file->path_point,(char*)&stat)) {
+        
+        char* dest_buf = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(count));
+
+        __prepare_file_content_syscall(dest_buf,count,ctx->cr3);
+
+        VFS::Read(file->path_point,file->path_point,count);
+
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+        String::memset(buf,0,count);
+        String::memcpy(buf,dest_buf,count);
+        Paging::EnableKernel();
+
+        ctx->rdi = count;
+        
+        return 0;
+    }
 
     long seek_off = file->seek_offset;
 
     uint64_t actual_size = 0;
     char is_file_bigger = 0;
 
-    if(count < stat.size) {
+    if(count < stat.size + seek_off) {
         actual_size = count;
         is_file_bigger = 1;
-    } else if(count > stat.size) {
+    } else if(count > stat.size + seek_off) {
         actual_size = stat.size;
         is_file_bigger = 0;
     } else {
@@ -352,8 +338,10 @@ int syscall_read(int_frame_t* ctx) {
 
     if(seek_off > 0)
         actual_src = (char*)((uint64_t)actual_src + seek_off);
-    else if(seek_off < 0)
+    else if(seek_off < 0){
         actual_size += seek_off;
+        
+    }
 
     if(stat.content) {
         __prepare_file_content_syscall(stat.content,stat.size,ctx->cr3);
@@ -364,10 +352,87 @@ int syscall_read(int_frame_t* ctx) {
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memset(buf,0,count);
-    String::memcpy(buf,actual_src,actual_size);
+    if(!is_file_bigger) {
+        String::memcpy(buf,actual_src,actual_size);
+    } else {
+        String::memcpy(buf,actual_src,count);
+    }
     Paging::EnableKernel();
 
     ctx->rdi = actual_size;
+
+    return 0;
+
+}
+
+int syscall_write(int_frame_t* ctx) {
+
+    int fd = ctx->rdi;
+    void* buf = (void*)ctx->rsi;
+    uint64_t count = ctx->rdx;
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* file = FD::Search(proc,fd);
+    filestat_t stat;
+
+    if(!file)
+        return -1;
+
+    if(file->type == FD_PIPE) {
+        
+        if(count > (1024 * 64))
+            count = (1024 * 64) - 1;
+
+        char* pipe_buffer = file->pipe.buffer;
+        file->pipe.buffer_size = count;
+
+        __prepare_file_content_syscall(pipe_buffer,count,ctx->cr3);
+
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+        String::memcpy(pipe_buffer,buf,count);
+        Paging::EnableKernel();
+
+        file->pipe.is_received = 0;
+
+        ctx->rdi = count;
+
+        return 0;
+
+    }
+
+    char* dest_buf = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(count));
+
+    __prepare_file_content_syscall(dest_buf,count,ctx->cr3);
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memcpy(dest_buf,buf,count);
+    Paging::EnableKernel();
+
+    VFS::Write(dest_buf,file->path_point,count);
+
+    PMM::VirtualBigFree(dest_buf,SIZE_TO_PAGES(count));
+
+    ctx->rdi = count;
+
+    return 0;
+
+
+}
+
+int syscall_close(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+
+    process_t* proc = CpuData::Access()->current;
+    fd_t* file = FD::Search(proc,fd);
+
+    if(!file)
+        return -2;
+
+    if(file->index < 3)
+        return -1;
+        
+    file->type = FD_NONE;
 
     return 0;
 
@@ -388,7 +453,9 @@ syscall_t syscall_table[] = {
     {6,syscall_dump_tmpfs},
     {7,syscall_open},
     {8,syscall_seek},
-    {9,syscall_read}
+    {9,syscall_read},
+    {10,syscall_write},
+    {11,syscall_close}
 };
 
 syscall_t* syscall_find_table(int num) {

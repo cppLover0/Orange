@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <arch/x86_64/scheduling/scheduling.hpp>
 #include <arch/x86_64/cpu/data.hpp>
 #include <generic/memory/paging.hpp>
@@ -63,17 +64,20 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     proc->status = PROCESS_STATUS_IN_USE;
                     data->current = proc;
 
-                    if(proc->is_cli) 
-                        proc->ctx.rflags &= ~(1 << 9); // clear IF
-
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
                     __wrmsr(0xC0000100,proc->fs_base);
+
+                    if(proc->is_cli) 
+                        frame1->rflags &= ~(1 << 9); // clear IF
+                
+                    if(frame1->cs & 3)
+                        frame1->ss |= 3;
                     
+                    if(frame1->ss & 3)
+                        frame1->cs |= 3;
+
                     if(proc->is_eoi)
                         Lapic::EOI(); // for kernel mode proc-s
-                
-                    frame1->cs = proc->cs;
-                    frame1->ss = proc->ss;
 
                     // Log("0x%p 0x%p 0x%p\n",frame1->cs,frame->ss,frame->rip);
 
@@ -102,6 +106,10 @@ void __process_load_queue(process_t* proc) {
     }
     
     spinlock_unlock(&proc_spinlock);
+}
+
+process_t* get_head_proc() {
+    return head_proc;
 }
 
 void Process::Init() {
@@ -228,6 +236,39 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->stack = stack_end;
     proc->ctx.rsp = (uint64_t)stack_end;
 
+    fd_t* stdin = (fd_t*)PMM::VirtualAlloc(); //head fd
+    stdin->index = 0;
+    stdin->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);
+    stdin->pipe.buffer_size = 5;
+    stdin->pipe.is_received = 1;
+    stdin->parent = 0;
+    stdin->next = 0;
+    stdin->proc = proc;
+    stdin->type = FD_PIPE; 
+
+    String::memcpy(stdin->path_point,"/dev/kbd",sizeof("/dev/kbd"));
+    String::memcpy(stdin->pipe.buffer,"how are you reading this ???\n",5);
+
+    proc->start_fd = (char*)stdin;
+    proc->last_fd = (char*)stdin;
+
+    proc->wait_stack = (uint64_t*)PMM::VirtualAlloc();
+    proc->syscall_wait_ctx = (int_frame_t*)PMM::VirtualAlloc();
+
+    proc->fd_ptr = 1;
+
+    int fd = FD::Create(proc,0);
+    fd_t* stdout = FD::Search(proc,fd);
+    String::memcpy(stdout->path_point,"/dev/tty",sizeof("/dev/tty"));
+
+    fd = FD::Create(proc,0);
+    fd_t* stderr = FD::Search(proc,fd);
+    String::memcpy(stderr->path_point,"/dev/serial",sizeof("/dev/serial"));
+
+    proc->termios = (termios_t*)PMM::VirtualAlloc();
+
+    String::memset(proc->termios,0,sizeof(termios_t));
+
     uint64_t* cr3 = (uint64_t*)PMM::VirtualAlloc();
 
     pAssert(cr3 && stack_start,"No memory :(");
@@ -240,6 +281,9 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         Paging::alwaysMappedMap(cr3);
     }
 
+
+    Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
+    Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
     uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
     for(uint64_t i = 0;i < PROCESS_STACK_SIZE;i++) {
         Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);

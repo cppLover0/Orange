@@ -4,6 +4,7 @@
 #include <drivers/ps2keyboard/ps2keyboard.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/interrupts/ioapic.hpp>
+#include <generic/locks/spinlock.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <generic/VFS/devfs.hpp>
 #include <drivers/io/io.hpp>
@@ -59,6 +60,90 @@ int kbd_read(char* buffer,long hint_size) {
     return 0;
 }
 
+ps2keyboard_pipe_struct_t* head_ps2pipe;
+ps2keyboard_pipe_struct_t* last_ps2pipe;
+
+ps2keyboard_pipe_struct_t* __kbd_allocate_pipe() {
+
+    if(!head_ps2pipe) {
+        head_ps2pipe = new ps2keyboard_pipe_struct_t;
+        head_ps2pipe->is_used_anymore = 0;
+    }
+
+    ps2keyboard_pipe_struct_t* current = head_ps2pipe;
+    while(current) {
+        if(!current->is_used_anymore)
+            break;
+        current = current->next;
+    }
+
+    if(!current) {
+        current = new ps2keyboard_pipe_struct_t;
+        last_ps2pipe->next = current;
+        last_ps2pipe = current;
+    }
+
+    return current;
+
+
+}
+
+void __kbd_send_ipc(uint8_t keycode) {
+
+    if(!head_ps2pipe) {
+        head_ps2pipe = new ps2keyboard_pipe_struct_t;
+        head_ps2pipe->is_used_anymore = 0;
+    }
+    
+    ps2keyboard_pipe_struct_t* current = head_ps2pipe;
+    while(current) { 
+
+        if(current->is_used_anymore && current->pipe) {
+            current->pipe->buffer[0] = keycode;
+            current->pipe->buffer_size = 1;
+            current->is_used_anymore = 0;
+            current->pipe->is_received = 0; 
+        }
+        current = current->next;
+    }
+
+}
+
+int kbd_askforpipe(pipe_t* pipe) {
+
+    ps2keyboard_pipe_struct_t* pip = __kbd_allocate_pipe();
+
+    pip->pipe = pipe;
+    pip->is_used_anymore = 1;
+
+    return 0;
+
+}
+
+short PS2Keyboard::Get() {
+    char status = IO::IN(0x64,1);
+
+    if(status & 0x01) {
+        uint8_t keycode = IO::IN(0x60,1);
+
+        if(keycode == SHIFT_PRESSED)
+            __shift_pressed = 1;
+        
+        if(keycode == SHIFT_RELEASED)
+            __shift_pressed = 0;
+
+        __last_key = keycode;
+
+        __kbd_send_ipc(keycode);
+
+        return __last_key;
+
+    }
+
+    return 0;
+
+}
+
 static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *node, uacpi_u32 depth)
 {
 
@@ -96,7 +181,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
     }
 
-    devfs_reg_device("/kbd",0,kbd_read);
+    devfs_reg_device("/kbd",0,kbd_read,kbd_askforpipe);
 
     Log("PS/2 Keyboard is initializied !\n");
 
@@ -110,29 +195,6 @@ void PS2Keyboard::EOI() {
     Lapic::EOI();
 }
 
-
-
-short PS2Keyboard::Get() {
-    char status = IO::IN(0x64,1);
-
-    if(status & 0x01) {
-        uint8_t keycode = IO::IN(0x60,1);
-
-        if(keycode == SHIFT_PRESSED)
-            __shift_pressed = 1;
-        
-        if(keycode == SHIFT_RELEASED)
-            __shift_pressed = 0;
-
-        __last_key = keycode;
-
-        return __last_key;
-
-    }
-
-    return 0;
-
-}
 
 void PS2Keyboard::Init(void (*key)())
 {

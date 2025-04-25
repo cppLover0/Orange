@@ -53,7 +53,22 @@ int devfs_write(char* buffer,char* filename,uint64_t size) {
 
 }
 
-void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size)) {
+int devfs_askforpipe(char* filename,pipe_t* pipe) {
+
+    if(!filename) return 1;
+
+    if(!pipe) return 2;
+
+    devfs_dev_t* dev = devfs_find_dev(filename);
+
+    if(!dev) return 4;
+    if(!dev->askforpipe) return 5;
+
+    return dev->askforpipe(pipe);
+
+}
+
+void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe)) {
 
     struct devfs_dev* dev = new struct devfs_dev;
     
@@ -61,6 +76,7 @@ void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),
         dev->loc = (char*)name;
         dev->write = write;
         dev->read = read;
+        dev->askforpipe = askforpipe;
 
         if(!head_dev) {
             head_dev = dev;
@@ -107,10 +123,10 @@ int serial_write(char* buffer,uint64_t size) {
 }
 
 void devfs_init(filesystem_t* fs) {
-    devfs_reg_device("/zero",0,zero_read);
-    devfs_reg_device("/null",0,zero_read);
-    devfs_reg_device("/tty",tty_write,0);
-    devfs_reg_device("/serial",serial_write,0);
+    devfs_reg_device("/zero",0,zero_read,0);
+    devfs_reg_device("/null",0,zero_read,0);
+    devfs_reg_device("/tty",tty_write,0,0);
+    devfs_reg_device("/serial",serial_write,0,0);
 
     fs->create = 0;
     fs->disk = 0;
@@ -118,6 +134,7 @@ void devfs_init(filesystem_t* fs) {
     fs->is_in_ram = 1;
     fs->readfile = devfs_read;
     fs->writefile = devfs_write;
+    fs->askforpipe = devfs_askforpipe;
     fs->touch = 0;
     fs->stat = 0;
     fs->rm = 0;

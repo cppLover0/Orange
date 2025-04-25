@@ -53,3 +53,36 @@ syscall_handler:
     mov rsp,[gs:0] 
     swapgs
     o64 sysret
+
+global syscall_end
+syscall_end:
+    mov rsp,rdi
+    pop rax
+    mov cr3,rax
+    pop rax
+    pop rbx
+    pop rcx
+    pop rdx
+    pop rsi
+    pop rdi
+    pop rbp
+    pop r8
+    pop r9
+    pop r10
+    pop r11
+    pop r12
+    pop r13
+    pop r14
+    pop r15
+    mov rsp,[gs:0] 
+    swapgs
+    o64 sysret
+
+global syscall_read_stage_2_asm
+extern syscall_read_stage_2
+
+syscall_read_stage_2_asm:
+    mov rsp,rdi
+    mov rdi,rsi
+    mov rsi,rdx
+    jmp syscall_read_stage_2
