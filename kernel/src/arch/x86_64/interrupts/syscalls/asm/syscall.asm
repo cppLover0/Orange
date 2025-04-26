@@ -3,10 +3,10 @@ extern c_syscall_handler
 
 global syscall_handler
 syscall_handler:
+    cli
     swapgs
     mov qword [gs:0],rsp ;save stack
     mov rsp, qword [gs:8]
-    cli
     push qword (0x20 | 3)
     push qword [gs:0]
     push qword r11
@@ -74,7 +74,8 @@ syscall_end:
     pop r13
     pop r14
     pop r15
-    mov rsp,[gs:0] 
+    add rsp,40
+    pop rsp
     swapgs
     o64 sysret
 

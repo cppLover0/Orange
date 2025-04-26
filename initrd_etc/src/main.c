@@ -110,76 +110,55 @@ void close(int fd) {
     asm volatile("syscall" : : "a"(11) : "rcx", "r11");
 }
 
+char* itoa(long value, char* str, int base ) {
+    char * rc;
+    char * ptr;
+    char * low;
+    if ( base < 2 || base > 36 )
+    {
+        *str = '\0';
+        return str;
+    }
+    rc = ptr = str;
+    if ( value < 0 && base == 10 )
+    {
+        *ptr++ = '-';
+    }
+    low = ptr;
+    do
+    {
+        *ptr++ = "ZYXWVUTSRQPONMLKJIHGFEDCBA9876543210123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[35 + value % base];
+        value /= base;
+    } while ( value );
+    *ptr-- = '\0';
+    while ( low < ptr )
+    {
+        char tmp = *low;
+        *low++ = *ptr;
+        *ptr-- = tmp;
+    }
+    return rc;
+}
+
 
 void _start() {
 
-    print("Testing open syscall, opening (creating) file \"syscall_open_test.txt\"");
-
-    int fd;
-    open("syscall_open_test.txt",&fd);
-
-    int bytes_read;
-    long sw;
+    int sw;
     long bw;
-    char buf[1024];
-    print("Reading \"/hello.txt\" with seek 2 left");
-
-    open("../hello.txt",&fd);
-
-    seek(fd,-2,2,&sw);
-    read(fd,(void*)buf,512,&bytes_read);
-
-    print(buf);
-
-    print("writing \"hello, world\" to file and resetting seek");
-
-    seek(fd,0,0,&sw);
-
-    write(fd,"hello, world",12,&bw);
-
-    print("Reading \"/hello.txt\" again");
-
-    read(fd,(void*)buf,512,&bytes_read);
-
-    print(buf);
-
-    close(fd);
-
-    print("Closing and creating new file \"new_file.txt\"");
-
-    open("new_file.txt",&fd);
-
-    print("Writing \"hello\" and reading");
-
-    write(fd,"hello",5,&bw);
-
-    read(fd,buf,512,&sw);
-
-    print(buf);
-
-    print("closing, after open and reading again");
-
-    close(fd);
-
-    open("new_file.txt",&fd);
-    read(fd,buf,512,&sw);
-
-    print(buf);
-
-    close(fd);
-
-    tmpfs_dump();
 
     print("Welcome to the \033[38;2;255;165;0mOrange\033[38;2;255;255;255m !");
 
     print("Now just type a some text !");
 
     char char_buffer = 0;
+
+    char buf2[128];
+
     while(1) {
         read(0,&char_buffer,1,&sw);
 
         char_buffer = ps2_to_ascii(char_buffer);
-        write(1,&char_buffer,1,&sw);
+        write(1,&char_buffer,1,&bw);
 
     }
 

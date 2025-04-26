@@ -55,8 +55,6 @@ int syscall_debug_print(int_frame_t* ctx) {
 
     if(ctx->cr3) { 
 
-
-
         Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
         String::memcpy(ptr,src,size);
         Paging::EnableKernel();
@@ -266,10 +264,11 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
             Paging::EnableKernel();
             file->pipe.is_received = 1;
             ctx->rax = 0;
+
             syscall_end(ctx);
 
         } else {
-            __sti();
+            asm volatile("int $32");
         }
     }
 
@@ -292,7 +291,7 @@ int syscall_read(int_frame_t* ctx) {
 
     if(file->type == FD_PIPE) {
         
-        proc->is_cli = 1;
+        //proc->is_cli = 0;
         String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
         syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
         return -20;

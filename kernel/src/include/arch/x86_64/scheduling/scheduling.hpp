@@ -68,6 +68,7 @@ extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);
 extern "C" void schedulingStub();
 
 extern "C" void schedulingSchedule(int_frame_t* frame);
+extern "C" void schedulingScheduleStack(int_frame_t* frame);
 
 process_t* get_head_proc();
 

@@ -30,6 +30,8 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
 
     Paging::EnableKernel();
 
+    
+
     cpudata_t* data = CpuData::Access();
     int_frame_t* frame1 = &data->temp_frame;
     process_t* proc = data->current;
@@ -62,7 +64,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
             if(proc != head_proc) {
                 if(proc->status == PROCESS_STATUS_RUN) {
                     proc->status = PROCESS_STATUS_IN_USE;
-                    data->current = proc;
+                    CpuData::Access()->current = proc;
 
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
                     __wrmsr(0xC0000100,proc->fs_base);
@@ -75,6 +77,12 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     
                     if(frame1->ss & 3)
                         frame1->cs |= 3;
+
+                    if(frame1->cs == 0x20)
+                        frame1->cs |= 3;
+                    
+                    if(frame1->ss == 0x18)
+                        frame1->ss |= 3;
 
                     if(proc->is_eoi)
                         Lapic::EOI(); // for kernel mode proc-s

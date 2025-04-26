@@ -33,13 +33,15 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
 
-    CpuData::Access()->kernel_stack = stack + (TSS_STACK_IN_PAGES * PAGE_SIZE);
-    CpuData::Access()->user_stack = 0;
-
     Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
 
     Lapic::Init();
     Log("CPU %d is online !\n",smp_info->lapic_id);
+
+    CpuData::Access()->kernel_stack = stack + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    CpuData::Access()->user_stack = 0;
+
+    Log("stack: 0x%p\n",stack);
 
     Log("Waiting for other CPUs...\n");
     MP::Sync();

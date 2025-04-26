@@ -107,7 +107,7 @@ extern "C" void kmain() {
     Log("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
     Log("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
-    __wrmsr(0xC0000101,0); // write to zero cuz idk what can be in this msr
+    
 
     HHDM::applyHHDM(info.hhdm_offset);
 
@@ -118,6 +118,7 @@ extern "C" void kmain() {
     Log("Paging Initializied\n"); //it will be initializied anyway
     KHeap::Init();
     Log("KHeap Initializied\n");
+    
     cpudata_t* data = CpuData::Access();
     Log("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
 
@@ -181,7 +182,7 @@ extern "C" void kmain() {
 
     //res.entry();
 
-    for(int i = 0;i < 2;i++) {
+    for(int i = 0;i < 12;i++) {
         int proc = Process::createProcess((uint64_t)_1,0,0,0,0);
         Process::WakeUp(proc);
     }
@@ -198,6 +199,7 @@ extern "C" void kmain() {
     Log("Waiting for interrupts...\n");
 
     ft_ctx->clear(ft_ctx,1);
+    //__hlt();
 
     MP::Sync();
 

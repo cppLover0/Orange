@@ -1,9 +1,15 @@
 
 extern schedulingSchedule
 
+global schedulingScheduleStack
+schedulingScheduleStack:
+    mov rsp,qword [gs:8]
+    jmp schedulingSchedule
+
 global schedulingStub
 schedulingStub:
 
+    cli
     cmp byte [rsp + 8],0x08
     jz .continue
     swapgs
