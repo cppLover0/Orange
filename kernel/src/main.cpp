@@ -97,6 +97,7 @@ extern "C" void kmain() {
 
     ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
     ft_ctx->cursor_enabled = 0;
+    ft_ctx->clear(ft_ctx,1);
 
     LogInit((char*)ft_ctx);
 
@@ -161,7 +162,7 @@ extern "C" void kmain() {
     Log("Scheduling initializied\n");
 
     Syscall::Init();
-    Log("Syscall initializied");
+    Log("Syscall initializied\n");
 
     cpudata_t* cpu_data = CpuData::Access();
 
@@ -178,11 +179,13 @@ extern "C" void kmain() {
 
     VFS::Read(elf,"/bin/initrd",0);
 
+    Log("Loaded initrd !\n");
+
     ft_ctx->cursor_enabled = 1;
 
     //res.entry();
 
-    for(int i = 0;i < 12;i++) {
+    for(int i = 0;i < 2;i++) {
         int proc = Process::createProcess((uint64_t)_1,0,0,0,0);
         Process::WakeUp(proc);
     }

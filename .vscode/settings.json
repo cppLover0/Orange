@@ -30,6 +30,7 @@
         "string": "cpp",
         "cstddef": "cpp",
         "source_location": "cpp",
-        "flanterm_private.h": "c"
+        "flanterm_private.h": "c",
+        "stdio.h": "c"
     }
 }

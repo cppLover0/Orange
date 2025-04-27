@@ -26,9 +26,6 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame) {
     cpudata_t* data = CpuData::Access();
     NLog("CPU Data: 0x%p, UserStack: 0x%p, KernelStack: 0x%p\n",CpuData::Access(),CpuData::Access()->user_stack,CpuData::Access()->kernel_stack);
 
-    asm volatile("swapgs");
-    NLog("CPU Data: 0x%p, UserStack: 0x%p, KernelStack: 0x%p\n",CpuData::Access(),CpuData::Access()->user_stack,CpuData::Access()->kernel_stack);
-
     __hlt();
 }
 

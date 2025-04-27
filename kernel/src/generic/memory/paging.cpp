@@ -31,6 +31,25 @@ void* Paging::Map(uint64_t* cr3,uint64_t phys,uint64_t virt,uint64_t flags) {
     return (void*)virt;
 }
 
+uint64_t Paging::PhysFromVirt(uint64_t* cr3,uint64_t virt) {
+    uint64_t aligned_virt = ALIGNPAGEDOWN(virt); 
+    uint64_t* pml3 = __paging_next_level(cr3,PTE_INDEX(aligned_virt,39),PTE_PRESENT | PTE_RW);
+    uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(aligned_virt,30),PTE_PRESENT | PTE_RW);
+    uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(aligned_virt,21),PTE_PRESENT | PTE_RW);
+    return pml[PTE_INDEX(aligned_virt,12)] & PTE_MASK_VALUE;
+}
+
+void Paging::Unmap(uint64_t* cr3, uint64_t virt, uint64_t size_in_pages) {
+    uint64_t aligned_virt = ALIGNPAGEDOWN(virt); 
+    for(uint64_t i = aligned_virt;i < aligned_virt + (size_in_pages * PAGE_SIZE);i+= PAGE_SIZE) {
+        uint64_t* pml3 = __paging_next_level(cr3,PTE_INDEX(i,39),PTE_PRESENT | PTE_RW);
+        uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(i,30),PTE_PRESENT | PTE_RW);
+        uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(i,21),PTE_PRESENT | PTE_RW);
+        pml[PTE_INDEX(i,12)] = 0;
+    }
+}
+
+
 void* Paging::HHDMMap(uint64_t* cr3,uint64_t phys,uint64_t flags) {
     return Map(cr3,phys,HHDM::toVirt(phys),flags);
 }

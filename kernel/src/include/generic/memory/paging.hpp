@@ -54,6 +54,10 @@ public:
 
     static void EnableKernel();
 
+    static uint64_t PhysFromVirt(uint64_t* cr3,uint64_t virt);
+
+    static void Unmap(uint64_t* cr3, uint64_t virt, uint64_t size_in_pages);
+
     static uint64_t* KernelGet();
 
 };

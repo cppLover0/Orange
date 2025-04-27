@@ -75,6 +75,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         uint64_t end = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
 
+        Log("Type: %d\n",current_head->p_type);
+
         if(current_head->p_type == PT_PHDR) {
             phdr = current_head->p_vaddr;
         } else if(current_head->p_type == PT_INTERP) {
@@ -82,6 +84,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
             filestat_t stat;
 
             int status = VFS::Stat((char*)((uint64_t)base + current_head->p_offset),(char*)&stat);
+
+            Log("Interp: %s\n",(char*)((uint64_t)base + current_head->p_offset));
 
             if(status) {
                 res.entry = 0;

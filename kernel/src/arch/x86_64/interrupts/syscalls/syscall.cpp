@@ -149,6 +149,8 @@ int syscall_open(int_frame_t* ctx) {
 
     VFS::Touch(path);
 
+    Log("opening: %s\n",path);
+
     return 0;
 
 }
@@ -438,9 +440,49 @@ int syscall_close(int_frame_t* ctx) {
 }
 
 int syscall_dump_tmpfs(int_frame_t* ctx) {
-
     tmpfs_dump();
     return 0;
+}
+
+int syscall_mmap(int_frame_t* ctx) {
+    
+    uint64_t hint = ctx->rdi;
+    uint64_t size = ctx->rsi;
+
+    if(!size) return -1;
+
+    uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
+
+    uint64_t allocated = PMM::BigAlloc(size_in_pages);
+    if(!allocated) return -2;
+
+    uint64_t* cr3 = (uint64_t*)HHDM::toVirt(ctx->cr3);
+    if(!hint) hint = HHDM::toVirt(allocated);
+
+    for(uint64_t i = 0;i < (size_in_pages * PAGE_SIZE); i += PAGE_SIZE) {
+        Paging::Map(cr3,allocated + i,hint + i,PTE_PRESENT | PTE_RW | PTE_USER);
+    }
+
+    ctx->rdi = hint;
+    return 0;
+
+}
+
+int syscall_free(int_frame_t* ctx) {
+    
+    uint64_t ptr = ctx->rdi;
+    uint64_t size = ctx->rsi;
+    uint64_t* cr3 = (uint64_t*)HHDM::toVirt(ctx->cr3);
+
+    if(!ptr) return -1;
+    if(!size) return -2;
+    uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096;     
+    uint64_t phys = Paging::PhysFromVirt(cr3,ptr);
+
+    Paging::Unmap(cr3,ptr,size_in_pages);
+    PMM::BigFree(phys,size_in_pages);
+    return 0;
+
 }
 
 syscall_t syscall_table[] = {
@@ -454,7 +496,9 @@ syscall_t syscall_table[] = {
     {8,syscall_seek},
     {9,syscall_read},
     {10,syscall_write},
-    {11,syscall_close}
+    {11,syscall_close},
+    {12,syscall_mmap},
+    {13,syscall_free}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -468,6 +512,8 @@ syscall_t* syscall_find_table(int num) {
 extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
+
+    //Log("Syscall %d\n",ctx->rax);
     
     if(sys == 0) {
         ctx->rax = -1;

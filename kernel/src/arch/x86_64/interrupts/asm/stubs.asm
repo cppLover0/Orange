@@ -2,6 +2,11 @@
 %macro isr_err_stub 1
 isr_stub_%+%1:
     cli
+    cmp byte [rsp + 8],0x08
+    jz .cont
+    swapgs
+.cont:
+
     mov rbp,%+%1
     push rbp
     jmp asmException
@@ -12,6 +17,11 @@ isr_stub_%+%1:
 %macro isr_no_err_stub 1
 isr_stub_%+%1:
     cli
+    cmp byte [rsp + 8],0x08
+    jz .cont
+    swapgs
+.cont:
+
     push qword 0
     mov rbp,%+%1 ; no one care about rbp lol
     push rbp
