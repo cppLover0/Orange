@@ -14,6 +14,7 @@
 #include <drivers/hpet/hpet.hpp>
 #include <generic/memory/pmm.hpp>
 #include <arch/x86_64/interrupts/syscalls/syscall.hpp>
+#include <arch/x86_64/cpu/sse.hpp>
 
 uint64_t how_much_cpus = 0;
 uint64_t temp_how_much_cpus = 0;
@@ -31,19 +32,19 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     Syscall::Init();
 
-    uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
-
-    Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
+    enable_sse();
 
     Lapic::Init();
-    Log("CPU %d is online !\n",smp_info->lapic_id);
+    //Log("CPU %d is online !\n",smp_info->lapic_id);
 
+    uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
+    Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
     CpuData::Access()->kernel_stack = stack + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     CpuData::Access()->user_stack = 0;
 
-    Log("stack: 0x%p\n",stack);
+    //Log("stack: 0x%p\n",stack);
 
-    Log("Waiting for other CPUs...\n");
+    //Log("Waiting for other CPUs...\n");
     MP::Sync();
     __sti();
     while(1) {

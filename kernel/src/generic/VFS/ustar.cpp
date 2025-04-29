@@ -20,6 +20,132 @@ inline int oct2bin(unsigned char *str, int size) {
     return n;
 }
 
+#define MAX_PATH 1024
+#define MAX_PARTS 100
+
+char* __ustar__strtok(char* str, const char* delim) {
+    static char* next_token = 0;
+    char* token;
+
+    if (str != 0) {
+        next_token = str;
+    }
+
+    if (next_token == 0 || *next_token == '\0') {
+        return 0;
+    }
+
+    while (*next_token != '\0') {
+        const char* d = delim;
+        int is_delim = 0;
+        while (*d != '\0') {
+            if (*next_token == *d) {
+                is_delim = 1;
+                break;
+            }
+            d++;
+        }
+        if (!is_delim) {
+            break;
+        }
+        next_token++;
+    }
+
+    if (*next_token == '\0') {
+        next_token = 0;
+        return 0;
+    }
+
+    token = next_token;
+
+    while (*next_token != '\0') {
+        const char* d = delim;
+        while (*d != '\0') {
+            if (*next_token == *d) {
+                *next_token = '\0';
+                next_token++;
+                return token;
+            }
+            d++;
+        }
+        next_token++;
+    }
+
+    next_token = 0;
+    return token;
+}
+
+uint64_t resolve_count(char* str,uint64_t sptr,char delim) {
+    char* current = str;
+    uint16_t att = 0;
+    uint64_t ptr = sptr;
+    uint64_t ptr_count = 0;
+    while(current[ptr] != delim) {
+        if(att > 1024)
+            return 0;
+        att++;
+
+        if(ptr != 0) {
+            ptr_count++;
+            ptr--;
+        }
+    }
+    return ptr;
+}
+
+void resolve_path(const char* inter,const char* base, char *result) {
+    char buffer_in_stack[1024];
+    char buffer2_in_stack[1024];
+    char* buffer = (char*)buffer_in_stack;
+    char* final_buffer = (char*)buffer2_in_stack;
+    uint64_t ptr = String::strlen((char*)base);
+    char is_first = 1;
+
+    String::memcpy(final_buffer,base,String::strlen((char*)base));
+
+    buffer = __ustar__strtok((char*)inter,"/");
+    while(buffer) {
+
+        if(!String::strcmp(buffer,"..")) {
+            uint64_t mm = resolve_count(final_buffer,ptr,'/');
+
+            if(ptr < mm) {
+                final_buffer[0] = '/';
+                final_buffer[1] = '\0';
+                ptr = 1;
+                continue;
+            } 
+
+            ptr = mm;
+            final_buffer[ptr] = '\0';
+
+            if(is_first) {
+                uint64_t mm = resolve_count(final_buffer,ptr,'/');
+                ptr = mm;
+                final_buffer[ptr] = '\0';
+                is_first = 0;
+            }
+
+
+        } else {
+
+            final_buffer[ptr] = '/';
+            ptr++;
+
+            uint64_t mm = String::strlen(buffer);
+            String::memcpy((char*)((uint64_t)final_buffer + ptr),buffer,mm);
+            ptr += mm;
+            final_buffer[ptr] = '\0';
+
+        }
+
+        buffer = __ustar__strtok(0,"/");
+    }
+    
+    String::memcpy(result,final_buffer,String::strlen(final_buffer));
+
+}
+
 void USTAR::ParseAndCopy() {
     LimineInfo info;
     pAssert(info.initrd,"Can't continue without initrd");
@@ -45,7 +171,7 @@ void USTAR::ParseAndCopy() {
 
             aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
 
-            VFS::Write((char*)((uint64_t)current + 512),filename,size);
+            VFS::Write((char*)((uint64_t)current + 512),filename,size,0);
 
 		} else if(type == 5) {
 
@@ -53,12 +179,23 @@ void USTAR::ParseAndCopy() {
 
             int _2 = VFS::Create(filename,1);
 
-            Log("dir: %s %d\n",filename,_2);
-
             int size = oct2bin((uint8_t*)current->file_size,String::strlen(current->file_size));
 
             aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
 
+        } else if(type == 2) { 
+            char* filename = (char*)((uint64_t)current->file_name + 1);
+
+            int _2 = VFS::Create(filename,2);
+
+            int size = oct2bin((uint8_t*)current->file_size,String::strlen(current->file_size));
+
+            aligned_size = 512;
+
+            char result_path[MAX_PATH];
+            resolve_path(current->name_linked,filename,result_path);
+
+            VFS::Write((char*)result_path,filename,String::strlen(result_path),1);
         } else {
             aligned_size = 512;
         }

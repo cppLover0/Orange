@@ -39,7 +39,7 @@ int devfs_read(char* buffer,char* filename,long hint_size) {
     return dev->read(buffer,hint_size);
 }
 
-int devfs_write(char* buffer,char* filename,uint64_t size) {
+int devfs_write(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
     if(!filename) return 1;
     if(!buffer) return 2;
     if(!size) return 3;

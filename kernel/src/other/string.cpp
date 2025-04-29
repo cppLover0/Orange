@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <other/string.hpp>
 #include <cstdlib>
+#include <generic/memory/heap.hpp>
 
 uint64_t String::strlen(char* str) {
     uint64_t len = 0; 
@@ -75,6 +76,12 @@ uint64_t String::strncmp(const char* str1, const char* str2, uint64_t n) {
   return (unsigned char)str1[i] - (unsigned char)str2[i];
 }
 
+char* String::strdup(const char* str) {
+    uint64_t size = String::strlen((char*)str);
+    char* buffer = (char*)KHeap::Malloc(size);
+    String::memcpy(buffer,str,size);
+    return buffer;
+}
 
 char * String::strchr(const char *str, int ch) {
   while (*str) {

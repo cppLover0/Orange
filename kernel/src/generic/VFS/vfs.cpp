@@ -60,7 +60,7 @@ int VFS::Read(char* buffer,char* filename,long hint_size) {
     return status;
 }
 
-int VFS::Write(char* buffer,char* filename,uint64_t size) {
+int VFS::Write(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
     if(!filename) return -1;
 
     spinlock_lock(&vfs_spinlock);
@@ -70,7 +70,7 @@ int VFS::Write(char* buffer,char* filename,uint64_t size) {
     if(!fs->fs->writefile) return 0;
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
-    int status = fs->fs->writefile(buffer,filename_as_fs,size);
+    int status = fs->fs->writefile(buffer,filename_as_fs,size,is_symlink_path);
     spinlock_unlock(&vfs_spinlock);
     return status;
 }

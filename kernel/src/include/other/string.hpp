@@ -31,4 +31,6 @@ public:
 
     static char* strncat(char* dest, const char* src, uint64_t n);
 
+    static char* strdup(const char* str);
+
 };

@@ -1,130 +1,110 @@
 Serial initializied
-[9.2.10] Bootloader: Limine 8.7.0
-[9.2.10] RSDP: 0xF52C0
-[9.2.10] HHDM: 0xFFFF800000000000
-[9.2.10] Kernel: Phys: 0x37D0E000, Virt: 0xFFFFFFFF80000000
-[9.2.10] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
-[9.2.10] Memmap: Start: 0xFFFF80003784B000, Entry_count: 16
-[9.2.10] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
-[9.2.10] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
-[9.2.10] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
-[9.2.10] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
-[9.2.10] Entry #4. Base: 0x100000, size: 0x3774B000, type: Usable (0)
-[9.2.10] Entry #5. Base: 0x3784B000, size: 0x29000, type: Non usable (5)
-[9.2.10] Entry #6. Base: 0x37874000, size: 0x48B000, type: Non usable (6)
-[9.2.10] Entry #7. Base: 0x37CFF000, size: 0xF000, type: Non usable (5)
-[9.2.10] Entry #8. Base: 0x37D0E000, size: 0x810D000, type: Non usable (6)
-[9.2.10] Entry #9. Base: 0x3FE1B000, size: 0x1C4000, type: Non usable (5)
-[9.2.10] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
-[9.2.10] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
-[9.2.10] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
-[9.2.10] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
-[9.2.10] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
-[9.2.10] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
-[9.2.10] Biggest entry: Base: 0x100000, Size: 0x3774B000 (887 MB)
-[9.2.10] PMM Initializied
-[9.2.10] Mapping usable memory
-[9.2.10] Mapping framebuffer
-[9.2.10] Mapping bootloader reclaimable
-[9.2.10] Activating paging
-[9.2.10] Mapping kernel
-[9.2.10] Paging Initializied
-[9.2.10] KHeap Initializied
-[9.2.10] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
-[9.2.10] GDT Initializied
-[9.2.10] IDT Initializied
-[9.2.10] [UACPI:3] RSDP 0x00000000000F52C0 00000000 v00 (BOCHS )
-[9.2.10] [UACPI:3] RSDT 0x000000003FFE22FC 00000038 v01 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] DSDT 0x000000003FFE0040 000020B4 v01 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] FACP 0x000000003FFE20F4 000000F4 v03 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] APIC 0x000000003FFE21E8 00000078 v03 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] HPET 0x000000003FFE2260 00000038 v01 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] MCFG 0x000000003FFE2298 0000003C v01 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] WAET 0x000000003FFE22D4 00000028 v01 (BOCHS  BXPC    )
-[9.2.10] [UACPI:3] FACS 0x000000003FFE0000 00000040
-[9.2.10] 64 Bit HPET: 0xFFFF8000FED00000
-[9.2.10] HPET Initializied
-[9.2.10] IOAPIC: Start: 0xFFFF80003FFE2214, End: 0xFFFF80003FFE228C
-[9.2.10] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE2214
-[9.2.10] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE221C
-[9.2.10] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
-[9.2.10] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2228
-[9.2.10] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
-[9.2.10] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2232
-[9.2.10] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
-[9.2.10] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE223C
-[9.2.10] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
-[9.2.10] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2246
-[9.2.10] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
-[9.2.10] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2250
-[9.2.10] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
-[9.2.10] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE225A
-[9.2.10] IOAPIC Initializied
-[9.2.10] [UACPI:3] successfully loaded 1 AML blob, 1705 ops in 13ms (avg 125364/s)
-[9.2.10] [UACPI:3] namespace initialization done in 5ms: 36 devices, 0 thermal zones
-[9.2.10] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
-[9.2.10] ACPI Initializied
-[9.2.10] LAPIC Initializied
-[9.2.10] CPUs count: 1
-[9.2.10] MP Initializied
-[9.2.10] PowerButton initializied
-[9.2.10] TmpFS initializied
-[9.2.10] DevFS initializied
-[9.2.10] VFS Initializied
-[9.2.10] Adding protection to head
-[9.2.10] Valid initrd !
-[9.2.10] dir: / 5
-[9.2.10] dir: /lib/ 0
-[9.2.10] dir: /lib64/ 0
-[9.2.10] dir: /bin/ 0
-[9.2.10] Loaded initrd
-[9.2.10] tmpfs dump: "/": Size: 4286579511 (4186112 KB, 4088 MB, 3 GB), "/head": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/libm.so": Size: 14584 (14 KB, 0 MB, 0 GB), "/lib/librt.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/lib/libssp.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/lib/libc.so": Size: 3756648 (3668 KB, 3 MB, 0 GB), "/lib/libpthread.so": Size: 14616 (14 KB, 0 MB, 0 GB), "/lib/libssp_nonshared.so": Size: 14640 (14 KB, 0 MB, 0 GB), "/lib/libutil.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/lib/libdl.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/lib/libresolv.so": Size: 14608 (14 KB, 0 MB, 0 GB), "/lib64/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib64/ld-linux-x86-64.so.2": Size: 853736 (833 KB, 0 MB, 0 GB), "/bin/": Size: 0 (0 KB, 0 MB, 0 GB), "/bin/initrd": Size: 16008 (15 KB, 0 MB, 0 GB), 
-[9.2.10] Found PS/2 Keyboard IRQ 1 !
-[9.2.10] Registered PS/2 Keyboard IRQ at 34
-[9.2.10] PS/2 Keyboard is initializied !
-[9.2.11] Scheduling initializied
-[9.2.11] Syscall initializied
-[9.2.11] Kernel is initializied !
-[9.2.11] Loaded initrd !
-[9.2.11] Type: 6
-[9.2.11] Type: 3
-[9.2.11] Interp: /lib64/ld-linux-x86-64.so.2
-[9.2.11] Type: 1
-[9.2.11] Type: 1
-[9.2.11] Type: 1
-[9.2.11] Type: 1
-[9.2.11] Type: 2
-[9.2.11] Type: 4
-[9.2.11] Type: 1685382480
-[9.2.11] Type: 1685382481
-[9.2.11] Type: 1685382482
-[9.2.11] 0x0 0x2F518
-[9.2.11] Type: 1
-[9.2.11] Type: 1
-[9.2.11] Type: 1
-[9.2.11] Type: 1
-[9.2.11] Type: 2
-[9.2.11] Type: 4
-[9.2.11] Type: 4
-[9.2.11] Type: 1685382483
-[9.2.11] Type: 1685382480
-[9.2.11] Type: 1685382481
-[9.2.11] Type: 1685382482
-[9.2.11] 0x0 0x4020
-Hello, world from /dev/tty !
-[9.2.11] Waiting for interrupts...
-
-
-
-Kernel panic
-
-Reason: CPU Exception
-CPU: 0
-Vector: 6/0x6 (error code: 0/0x0)
-Proc: 0xFFFF800001C67000, ID: 3, is_user: 1
-Registers dump
-RIP: 0x8C8D, SS: 0x1B, CS: 0x23, RFLAGS: 0x212, RSP: 0xFFFF800001D67F40
-RAX: 0x10F0, RBX: 0x0, RCX: 0x0, RDX: 0x10F0, RSI: 0x0
-RDI: 0x4010, RBP: 0x6, R8: 0x0, R9: 0x0, R10: 0x0, CR2: 0x0
-R11: 0x0, R12: 0x0, R13: 0x0, R14: 0x0, R15: 0x0 CR3: 0x1D7E000
-CPU Data: 0xFFFF8000003FCE18, UserStack: 0x0, KernelStack: 0xFFFF80000139F000
+[16.26.57] Bootloader: Limine 8.7.0
+[16.26.57] RSDP: 0xF52C0
+[16.26.57] HHDM: 0xFFFF800000000000
+[16.26.57] Kernel: Phys: 0x37D0D000, Virt: 0xFFFFFFFF80000000
+[16.26.57] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
+[16.26.57] Memmap: Start: 0xFFFF800037848000, Entry_count: 16
+[16.26.57] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
+[16.26.57] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
+[16.26.57] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
+[16.26.57] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
+[16.26.57] Entry #4. Base: 0x100000, size: 0x37748000, type: Usable (0)
+[16.26.57] Entry #5. Base: 0x37848000, size: 0x29000, type: Non usable (5)
+[16.26.57] Entry #6. Base: 0x37871000, size: 0x48D000, type: Non usable (6)
+[16.26.57] Entry #7. Base: 0x37CFE000, size: 0xF000, type: Non usable (5)
+[16.26.57] Entry #8. Base: 0x37D0D000, size: 0x810D000, type: Non usable (6)
+[16.26.57] Entry #9. Base: 0x3FE1A000, size: 0x1C5000, type: Non usable (5)
+[16.26.57] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
+[16.26.57] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
+[16.26.57] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
+[16.26.57] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
+[16.26.57] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
+[16.26.57] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
+[16.26.57] Biggest entry: Base: 0x100000, Size: 0x37748000 (887 MB)
+[16.26.57] PMM Initializied
+[16.26.57] Mapping usable memory
+[16.26.57] Mapping framebuffer
+[16.26.57] Mapping bootloader reclaimable
+[16.26.57] Activating paging
+[16.26.57] Mapping kernel
+[16.26.57] Paging Initializied
+[16.26.57] KHeap Initializied
+[16.26.57] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
+[16.26.57] GDT Initializied
+[16.26.57] IDT Initializied
+[16.26.57] [UACPI:3] RSDP 0x00000000000F52C0 00000000 v00 (BOCHS )
+[16.26.57] [UACPI:3] RSDT 0x000000003FFE22FC 00000038 v01 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] DSDT 0x000000003FFE0040 000020B4 v01 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] FACP 0x000000003FFE20F4 000000F4 v03 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] APIC 0x000000003FFE21E8 00000078 v03 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] HPET 0x000000003FFE2260 00000038 v01 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] MCFG 0x000000003FFE2298 0000003C v01 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] WAET 0x000000003FFE22D4 00000028 v01 (BOCHS  BXPC    )
+[16.26.57] [UACPI:3] FACS 0x000000003FFE0000 00000040
+[16.26.57] 64 Bit HPET: 0xFFFF8000FED00000
+[16.26.57] HPET Initializied
+[16.26.57] IOAPIC: Start: 0xFFFF80003FFE2214, End: 0xFFFF80003FFE228C
+[16.26.57] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE2214
+[16.26.57] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE221C
+[16.26.57] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
+[16.26.57] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2228
+[16.26.57] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
+[16.26.57] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2232
+[16.26.57] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
+[16.26.57] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE223C
+[16.26.57] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
+[16.26.57] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2246
+[16.26.57] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
+[16.26.57] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2250
+[16.26.57] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
+[16.26.57] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE225A
+[16.26.57] IOAPIC Initializied
+[16.26.57] [UACPI:3] successfully loaded 1 AML blob, 1705 ops in 13ms (avg 127491/s)
+[16.26.57] [UACPI:3] namespace initialization done in 5ms: 36 devices, 0 thermal zones
+[16.26.57] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
+[16.26.57] ACPI Initializied
+[16.26.57] LAPIC Initializied
+[16.26.57] CPUs count: 1
+[16.26.57] MP Initializied
+[16.26.57] PowerButton initializied
+[16.26.57] TmpFS initializied
+[16.26.57] DevFS initializied
+[16.26.57] VFS Initializied
+[16.26.57] Adding protection to head
+[16.26.57] Valid initrd !
+[16.26.57] Loaded initrd
+[16.26.57] tmpfs dump: "/": Size: 13552 (13 KB, 0 MB, 0 GB), "/head": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/ld.so": Size: 866000 (845 KB, 0 MB, 0 GB), "/usr/lib/crt0.o": Size: 904 (0 KB, 0 MB, 0 GB), "/usr/lib/crtn.o": Size: 640 (0 KB, 0 MB, 0 GB), "/usr/lib/libm.so": Size: 14584 (14 KB, 0 MB, 0 GB), "/usr/lib/librt.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libssp.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libc.so": Size: 3760872 (3672 KB, 3 MB, 0 GB), "/usr/lib/libpthread.so": Size: 14616 (14 KB, 0 MB, 0 GB), "/usr/lib/crti.o": Size: 872 (0 KB, 0 MB, 0 GB), "/usr/lib/libssp_nonshared.so": Size: 14640 (14 KB, 0 MB, 0 GB), "/usr/lib/libutil.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libdl.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libresolv.so": Size: 14608 (14 KB, 0 MB, 0 GB), "/usr/bin/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/bin/initrd": Size: 4392 (4 KB, 0 MB, 0 GB), "/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/ld64.so.1": Size: 866000 (845 KB, 0 MB, 0 GB), "/etc/": Size: 0 (0 KB, 0 MB, 0 GB), 
+[16.26.57] Found PS/2 Keyboard IRQ 1 !
+[16.26.57] Registered PS/2 Keyboard IRQ at 34
+[16.26.57] PS/2 Keyboard is initializied !
+[16.26.58] Scheduling initializied
+[16.26.58] Syscall initializied
+[16.26.58] SSE Is enabled (or not) 
+[16.26.58] Kernel is initializied !
+[16.26.58] Loaded initrd !
+[16.26.58] Found phdr: 0x400040 
+ 4195008 (0x4002C0)  9 (0x9)  4194368 (0x400040)  3 (0x3)  56 (0x38)  4 (0x4)  6 (0x6)  5 (0x5)  4096 (0x1000)  6 (0x6)  18446603336252051328 (0xFFFF800001D6CF80)  18446603336252051456 (0xFFFF800001D6D000) Hello, world from /dev/tty !
+[16.26.58] Waiting for interrupts...
+[2J [1;1H[16.26.58] Syscall 5
+[16.26.58] Syscall 2
+[16.26.58] ldso: Own base address is: 0x0
+[16.26.58] Syscall 2
+[16.26.58] ldso: Own dynamic section is at: 0x30ef8
+[16.26.58] Syscall 12
+[16.26.58] Syscall 12
+[16.26.58] Syscall 2
+[16.26.58] ldso: Executable PHDRs are at 0x400040
+[16.26.58] Syscall 12
+[16.26.58] Syscall 12
+[16.26.58] Syscall 12
+[16.26.58] Syscall 12
+[16.26.58] Syscall 7
+[16.26.58] opening: /lib
+[16.26.58] Syscall 9
+[16.26.58] Syscall 2
+[16.26.58] In function tryReadExactly, file ../options/rtld/generic/linker.cpp:92
+__ensure(chunk > 0) failed
+[16.26.58] Syscall 2
+[16.26.58] MLIBC Panic !
+[16.26.58] Syscall 1

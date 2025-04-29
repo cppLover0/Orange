@@ -41,6 +41,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
         if(proc->status != PROCESS_STATUS_BLOCKED) {
             if(frame) {
                 String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
+                asm volatile(" fxsave %0 "::"m"(proc->sse_ctx));
                 proc->fs_base = __rdmsr(0xC0000100);
             }
 
@@ -68,6 +69,8 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
 
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
                     __wrmsr(0xC0000100,proc->fs_base);
+
+                    asm volatile(" fxrstor %0 "::"m"(proc->sse_ctx));
 
                     if(proc->is_cli) 
                         frame1->rflags &= ~(1 << 9); // clear IF
@@ -139,7 +142,7 @@ void Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv
 
     ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,proc->stack,argv,envp);
 
-    //proc->ctx.rsp = (uint64_t)l.ready_stack;
+    proc->ctx.rsp = (uint64_t)l.ready_stack;
     proc->ctx.rip = (uint64_t)l.entry;
 }
 

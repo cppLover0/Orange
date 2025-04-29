@@ -13,8 +13,8 @@
 #include <other/string.hpp>
 
 #define PUT_STACK(dest,value) *--dest = value;
-#define PUT_STACK_STRING(dest,string) String::memcpy(dest,string,String::strlen(string)); \
-    dest -= CALIGNPAGEUP(String::strlen(string),8);
+#define PUT_STACK_STRING(dest,string) String::memcpy(dest,string,String::strlen(string)); 
+    
 
 uint64_t __elf_get_length(char** arr) {
     uint64_t counter = 0;
@@ -31,7 +31,8 @@ uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t le
 
     for(uint64_t i = 0;i < len; i++) {
         PUT_STACK_STRING(temp_stack,arr[i])
-        out[i] = arr[i];
+        out[i] = (char*)temp_stack;
+        temp_stack -= CALIGNPAGEUP(String::strlen(arr[i]),8);
     }
 
     return temp_stack;
@@ -44,6 +45,7 @@ uint64_t* __elf_copy_to_stack_without_out(uint64_t* arr,uint64_t* stack,uint64_t
 
     for(uint64_t i = 0;i < len;i++) {
         PUT_STACK(_stack,arr[i]);
+        NLog(" %d (0x%p) ",arr[i],arr[i]);
     }   
 
     return _stack;
@@ -68,14 +70,16 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     for (int i = 0; i < head->e_phnum; i++) {
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
-        elf_base = MIN2(elf_base, current_head->p_vaddr);
+
+        if (current_head->p_type == PT_LOAD) {
+            elf_base = MIN2(elf_base, current_head->p_vaddr);
+        }
+        
     }
 
     for(int i = 0;i < head->e_phnum; i++) {
         uint64_t end = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
-
-        Log("Type: %d\n",current_head->p_type);
 
         if(current_head->p_type == PT_PHDR) {
             phdr = current_head->p_vaddr;
@@ -84,8 +88,6 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
             filestat_t stat;
 
             int status = VFS::Stat((char*)((uint64_t)base + current_head->p_offset),(char*)&stat);
-
-            Log("Interp: %s\n",(char*)((uint64_t)base + current_head->p_offset));
 
             if(status) {
                 res.entry = 0;
@@ -102,8 +104,13 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
         }
 
-        end = current_head->p_vaddr - elf_base + current_head->p_memsz;
-        size = MAX2(size,end);
+
+        if (current_head->p_type == PT_LOAD ) {
+            end = current_head->p_vaddr - elf_base + current_head->p_memsz;
+            size = MAX2(size,end);
+        }
+
+        
     }
 
     uint8_t* elf = (uint8_t*)elf_base;
@@ -125,9 +132,11 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     for(int i = 0;i < head->e_phnum; i++) {
         uint64_t dest = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
-        dest = (uint64_t)allocated_elf + current_head->p_vaddr;
-        String::memset((void*)dest,0,current_head->p_filesz);
-        String::memcpy((void*)dest,(void*)((uint64_t)base + current_head->p_offset), current_head->p_filesz);
+        if(current_head->p_type == PT_LOAD) {
+            dest = (uint64_t)allocated_elf + current_head->p_vaddr;
+            String::memset((void*)dest,0,current_head->p_filesz);
+            String::memcpy((void*)dest,(void*)((uint64_t)base + current_head->p_offset), current_head->p_filesz);
+        }
 
     }
 
@@ -135,7 +144,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
         uint64_t* _stack = stack;
 
-        uint64_t auxv_stack[] = {AT_ENTRY,(uint64_t)head->e_entry,AT_PHDR,phdr,AT_PHENT,head->e_phentsize,AT_PHNUM,head->e_phnum,AT_PAGESZ,PAGE_SIZE};
+        uint64_t auxv_stack[] = {(uint64_t)head->e_entry,AT_ENTRY,phdr,AT_PHDR,head->e_phentsize,AT_PHENT,head->e_phnum,AT_PHNUM,PAGE_SIZE,AT_PAGESZ};
         uint64_t argv_length = __elf_get_length(argv);
         uint64_t envp_length = __elf_get_length(envp);
 
@@ -145,7 +154,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
         _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
 
-        PUT_STACK(_stack,AT_NULL);
+        PUT_STACK(_stack,0);
 
         _stack = __elf_copy_to_stack_without_out(auxv_stack,_stack,sizeof(auxv_stack) / 8);
         PUT_STACK(_stack,0);
@@ -157,10 +166,9 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         PUT_STACK(_stack,argv_length);
 
         res.ready_stack = _stack;
-        res.argv = stack_argv;
-        res.envp = stack_envp;
-        res.argc = argv_length;
 
+        KHeap::Free(stack_argv);
+        KHeap::Free(stack_envp);
 
     } else {
         res.ready_stack = stack;
@@ -168,8 +176,6 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         res.envp = 0;
         res.argc = 0;
     }
-
-    Log("0x%p 0x%p\n",elf_base,size);
 
     return res;
 

@@ -86,6 +86,7 @@ int tmpfs_create(char* name,int type) {
 
     String::memset(new_data,0,sizeof(data_file_t));
 
+    new_data->type = type;
     new_data->name = name;
     new_data->parent = last;
     last->next = new_data;
@@ -113,6 +114,11 @@ int tmpfs_rm(char* filename) {
     if(!tmpfs_scan_for_file(filename)) return -1;
 
     data_file_t* data = tmpfs_scan_for_file(filename);
+    while(data) {
+        if(data->type != TMPFS_TYPE_SYMLINK)
+            break;
+        data = tmpfs_scan_for_file(data->content);
+    }
     if(data->protection) return 8;
     data->protection = 1; // just put protection
 
@@ -124,7 +130,7 @@ int tmpfs_rm(char* filename) {
 
 }
 
-int tmpfs_writefile(char* buffer,char* filename,uint64_t size) {
+int tmpfs_writefile(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
 
     if(size > TMPFS_MAX_SIZE) return -1;
     if(!buffer) return 1;
@@ -136,6 +142,13 @@ int tmpfs_writefile(char* buffer,char* filename,uint64_t size) {
     if(!tmpfs_scan_for_file(filename)) return 5;
 
     data_file_t* file = tmpfs_scan_for_file(filename);
+    if(!is_symlink_path) {
+        while(file) {
+            if(file->type != TMPFS_TYPE_SYMLINK)
+                break;
+            file = tmpfs_scan_for_file(file->content);
+        }
+    }
 
     if(file->protection) return 8;
 
@@ -164,6 +177,13 @@ int tmpfs_readfile(char* buffer,char* filename,long hint_size) {
     if(!tmpfs_scan_for_file(filename)) return 5;
 
     data_file_t* file = tmpfs_scan_for_file(filename);
+    while(file) {
+        if(file->type != TMPFS_TYPE_SYMLINK)
+            break;
+        file = tmpfs_scan_for_file(file->content);
+    }
+
+    //Log("%s %s %d\n",file->name,file->content,file->type);
 
     if(!file->content)
         return 7;
@@ -189,6 +209,11 @@ int tmpfs_stat(char* filename,char* buffer) {
     if(!tmpfs_scan_for_file(filename)) return 5;
 
     data_file_t* file = tmpfs_scan_for_file(filename);
+    while(file) {
+        if(file->type != TMPFS_TYPE_SYMLINK)
+            break;
+        file = tmpfs_scan_for_file(file->content);
+    }
 
     filestat_t stat;
     stat.size = file->size_of_content;
@@ -215,6 +240,11 @@ int tmpfs_touch(char* filename) {
     if(!filename) return -1;
 
     data_file_t* data = tmpfs_scan_for_file(filename);
+    while(data) {
+        if(data->type != TMPFS_TYPE_SYMLINK)
+            break;
+        data = tmpfs_scan_for_file(data->content);
+    }
 
     if(!data) {
         if(tmpfs_create(filename,TMPFS_TYPE_FILE) == 0) {

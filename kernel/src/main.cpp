@@ -33,6 +33,7 @@
 #include <drivers/ps2keyboard/ps2keyboard.hpp>
 #include <arch/x86_64/scheduling/scheduling.hpp>
 #include <arch/x86_64/interrupts/syscalls/syscall.hpp>
+#include <arch/x86_64/cpu/sse.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -108,7 +109,7 @@ extern "C" void kmain() {
     Log("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
     Log("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
-    
+    ft_ctx->cursor_enabled = 1;
 
     HHDM::applyHHDM(info.hhdm_offset);
 
@@ -125,9 +126,6 @@ extern "C" void kmain() {
 
     GDT::Init();
     Log("GDT Initializied\n");
-
-    uint64_t stack_5 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
-    Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
 
     IDT::Init();
     Log("IDT Initializied\n");
@@ -164,8 +162,13 @@ extern "C" void kmain() {
     Syscall::Init();
     Log("Syscall initializied\n");
 
+    enable_sse();
+    Log("SSE Is enabled (or not) \n");
+
     cpudata_t* cpu_data = CpuData::Access();
 
+    uint64_t stack_5 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
+    Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
     cpu_data->kernel_stack = stack_5 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     cpu_data->user_stack = 0;
 
@@ -173,15 +176,13 @@ extern "C" void kmain() {
 
     filestat_t stat;
 
-    VFS::Stat("/bin/initrd",(char*)&stat);
+    VFS::Stat("/usr/bin/initrd",(char*)&stat);
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
 
-    VFS::Read(elf,"/bin/initrd",0);
+    VFS::Read(elf,"/usr/bin/initrd",0);
 
     Log("Loaded initrd !\n");
-
-    ft_ctx->cursor_enabled = 1;
 
     //res.entry();
 
@@ -192,16 +193,27 @@ extern "C" void kmain() {
 
     int initrd = Process::createProcess(0,0,1,0,0);
 
-    Process::loadELFProcess(initrd,"/bin/init",(uint8_t*)elf,0,0);
+    const char* pa = "/usr/bin/initrd";
+    const char* ea = "test=test";
+
+    char* initrd_argv[2];
+    initrd_argv[0] = (char*)pa;
+    initrd_argv[1] = 0;
+
+    char* initrd_envp[2];
+    initrd_envp[0] = (char*)ea;
+    initrd_envp[1] = 0;
+
+    Process::loadELFProcess(initrd,"/usr/bin/initrd",(uint8_t*)elf,initrd_argv,initrd_envp);
 
     Process::WakeUp(initrd);
 
     const char* str = "Hello, world from /dev/tty !\n";
-    pAssert(VFS::Write((char*)str,"/dev/tty",String::strlen((char*)str)) == 0,"devfs need to cry :(");
+    pAssert(VFS::Write((char*)str,"/dev/tty",String::strlen((char*)str),0) == 0,"devfs need to cry :(");
 
     Log("Waiting for interrupts...\n");
-
-    ft_ctx->clear(ft_ctx,1);
+    
+    NLog("\033[2J \033[1;1H");
     //__hlt();
 
     MP::Sync();

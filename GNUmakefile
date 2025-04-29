@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 1G -no-reboot -serial file:output.txt -M q35 
+QEMUFLAGS := -m 1G -no-reboot -serial file:output.txt -M q35 -s
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
@@ -33,7 +33,7 @@ initrd: initrd_build
 initrd_build:
 	rm -rf initrd/bin/initrd
 	mkdir -p initrd/bin
-	~/opt/cross/bin/x86_64-elf-gcc initrd_etc/src/main.c -o initrd/bin/initrd
+	x86_64-orange-gcc initrd_etc/src/main.c -o initrd/usr/bin/initrd -Wl,-Bdynamic
 
 
 

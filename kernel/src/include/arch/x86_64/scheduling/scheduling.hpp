@@ -62,6 +62,7 @@ typedef struct process_struct {
     char is_cli;
 
     int_frame_t ctx;
+    char sse_ctx[512] __attribute__((aligned(16)));
 } __attribute__((packed)) process_t;
 
 extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);

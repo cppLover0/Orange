@@ -128,12 +128,17 @@ int syscall_open(int_frame_t* ctx) {
     String::memcpy(buffer,name,String::strlen(name));
     Paging::EnableKernel();
 
+    
+
+    if(buffer[String::strlen(buffer) - 1] == '/')
+        buffer[String::strlen(buffer) - 1] = '\0';
+
     char* first = proc->cwd;
     if(!first)
         first = "/";
 
     char* path = join_paths(first,buffer);
-
+    
     int fd = FD::Create(proc,0);
     fd_t* fd_s = FD::Search(proc,fd);
 
@@ -148,8 +153,6 @@ int syscall_open(int_frame_t* ctx) {
     Paging::EnableKernel();
 
     VFS::Touch(path);
-
-    Log("opening: %s\n",path);
 
     return 0;
 
@@ -209,7 +212,7 @@ int syscall_seek(int_frame_t* ctx) {
 
     }
 
-    ctx->rdi = file->seek_offset;
+    ctx->rdx = file->seek_offset;
 
     return 0;
 
@@ -265,6 +268,7 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
             String::memcpy(buf,pipe_buffer,count);
             Paging::EnableKernel();
             file->pipe.is_received = 1;
+            ctx->rdx = 1;
             ctx->rax = 0;
 
             syscall_end(ctx);
@@ -314,7 +318,7 @@ int syscall_read(int_frame_t* ctx) {
         String::memcpy(buf,dest_buf,count);
         Paging::EnableKernel();
 
-        ctx->rdi = count;
+        ctx->rdx = count;
         
         return 0;
     }
@@ -360,7 +364,7 @@ int syscall_read(int_frame_t* ctx) {
     }
     Paging::EnableKernel();
 
-    ctx->rdi = actual_size;
+    ctx->rdx = actual_size;
 
     return 0;
 
@@ -410,11 +414,11 @@ int syscall_write(int_frame_t* ctx) {
     String::memcpy(dest_buf,buf,count);
     Paging::EnableKernel();
 
-    VFS::Write(dest_buf,file->path_point,count);
+    VFS::Write(dest_buf,file->path_point,count,0);
 
     PMM::VirtualBigFree(dest_buf,SIZE_TO_PAGES(count));
 
-    ctx->rdi = count;
+    ctx->rdx = count;
 
     return 0;
 
@@ -449,6 +453,9 @@ int syscall_mmap(int_frame_t* ctx) {
     uint64_t hint = ctx->rdi;
     uint64_t size = ctx->rsi;
 
+
+    
+
     if(!size) return -1;
 
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
@@ -463,7 +470,7 @@ int syscall_mmap(int_frame_t* ctx) {
         Paging::Map(cr3,allocated + i,hint + i,PTE_PRESENT | PTE_RW | PTE_USER);
     }
 
-    ctx->rdi = hint;
+    ctx->rdx = hint;
     return 0;
 
 }
@@ -513,7 +520,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log("Syscall %d\n",ctx->rax);
+    Log("Syscall %d\n",ctx->rax);
     
     if(sys == 0) {
         ctx->rax = -1;
