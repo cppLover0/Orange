@@ -118,12 +118,12 @@ void resolve_path(const char* inter,const char* base, char *result) {
 
             ptr = mm;
             final_buffer[ptr] = '\0';
-
             if(is_first) {
                 uint64_t mm = resolve_count(final_buffer,ptr,'/');
                 ptr = mm;
                 final_buffer[ptr] = '\0';
                 is_first = 0;
+
             }
 
 
@@ -136,12 +136,12 @@ void resolve_path(const char* inter,const char* base, char *result) {
             String::memcpy((char*)((uint64_t)final_buffer + ptr),buffer,mm);
             ptr += mm;
             final_buffer[ptr] = '\0';
-
         }
 
         buffer = __ustar__strtok(0,"/");
     }
     
+    String::memset(result,0,1024);
     String::memcpy(result,final_buffer,String::strlen(final_buffer));
 
 }
@@ -190,7 +190,7 @@ void USTAR::ParseAndCopy() {
 
             int size = oct2bin((uint8_t*)current->file_size,String::strlen(current->file_size));
 
-            aligned_size = 512;
+            aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
 
             char result_path[MAX_PATH];
             resolve_path(current->name_linked,filename,result_path);

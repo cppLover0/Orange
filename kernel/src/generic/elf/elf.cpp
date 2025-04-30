@@ -133,7 +133,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         uint64_t dest = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
         if(current_head->p_type == PT_LOAD) {
-            dest = (uint64_t)allocated_elf + current_head->p_vaddr;
+            dest = (uint64_t)allocated_elf + (current_head->p_vaddr - elf_base);
+            //Log("Dest: 0x%p, calc: 0x%p 0x%p 0x%p\n",dest,(current_head->p_vaddr - elf_base),current_head->p_vaddr,(uint64_t)allocated_elf + (current_head->p_vaddr - elf_base));
             String::memset((void*)dest,0,current_head->p_filesz);
             String::memcpy((void*)dest,(void*)((uint64_t)base + current_head->p_offset), current_head->p_filesz);
         }

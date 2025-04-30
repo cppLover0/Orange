@@ -22,8 +22,10 @@ data_file_t* tmpfs_scan_for_file(char* name) {
     
     while(current) {
         
-        if(!String::strcmp(name,current->name)) {
-            return current;
+        if(current->name && name) {
+            if(!String::strcmp(name,current->name)) {
+                return current;
+            }
         }
         current = current->next;
     }

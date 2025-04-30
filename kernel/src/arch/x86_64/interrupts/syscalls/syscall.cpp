@@ -17,6 +17,7 @@
 #include <other/string.hpp>
 #include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <other/other.hpp>
+#include <other/assert.hpp>
 
 extern "C" void syscall_handler();
 
@@ -30,6 +31,11 @@ int syscall_exit(int_frame_t* ctx) {
     
     if(proc->stack_start) {
         PMM::VirtualBigFree((void*)proc->stack_start,PROCESS_STACK_SIZE);
+    }
+
+    if(proc->id == 1) {
+        Log("Initrd finished with code %d!\n",proc->return_status);
+        pAssert(0,"Initrd is killed !");
     }
 
     //Log("Process %d is died with code %d !\n",proc->id,proc->return_status);
@@ -59,7 +65,9 @@ int syscall_debug_print(int_frame_t* ctx) {
         String::memcpy(ptr,src,size);
         Paging::EnableKernel();
 
+#ifdef DEBUG_PRINT
         Log("%s\n",ptr);
+#endif
 
         return 0;
 
@@ -139,6 +147,8 @@ int syscall_open(int_frame_t* ctx) {
 
     char* path = join_paths(first,buffer);
     
+    //Log("%s\n",path);
+
     int fd = FD::Create(proc,0);
     fd_t* fd_s = FD::Search(proc,fd);
 
@@ -207,8 +217,8 @@ int syscall_seek(int_frame_t* ctx) {
             break;
 
         default:
-            Log("Process %d, sys_seek, unhandled whence: %d.",CpuData::Access()->current->id,whence);
-            return -5;
+            Log("Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
+            return 22;
 
     }
 
@@ -453,9 +463,6 @@ int syscall_mmap(int_frame_t* ctx) {
     uint64_t hint = ctx->rdi;
     uint64_t size = ctx->rsi;
 
-
-    
-
     if(!size) return -1;
 
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
@@ -492,6 +499,25 @@ int syscall_free(int_frame_t* ctx) {
 
 }
 
+int syscall_isatty(int_frame_t* ctx) {
+
+    int fd = ctx->rdi;
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* file = FD::Search(proc,fd);
+
+    if(file->path_point[0] != '\0') {
+        if(!String::strcmp("/dev/tty",file->path_point))
+            return 0;
+        else 
+            return 25;
+    }
+    
+    return 25;
+
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -505,7 +531,8 @@ syscall_t syscall_table[] = {
     {10,syscall_write},
     {11,syscall_close},
     {12,syscall_mmap},
-    {13,syscall_free}
+    {13,syscall_free},
+    {14,syscall_isatty}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -520,7 +547,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    Log("Syscall %d\n",ctx->rax);
+    //Log("Syscall %d\n",ctx->rax);
     
     if(sys == 0) {
         ctx->rax = -1;
@@ -528,6 +555,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     }
 
     ctx->rax = sys->func(ctx);
+    //Log("done\n");
     
     return;
 }

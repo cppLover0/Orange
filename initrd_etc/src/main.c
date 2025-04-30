@@ -2,5 +2,6 @@
 #include <stdio.h>
 
 int main() {
-    printf("Hello, wrodl from libc,initrd !");
+    printf("Hello, World from Libc !\n");
+    while(1);
 }

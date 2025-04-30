@@ -240,7 +240,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->parent_process = parent_id;
     proc->futex = 0;
 
-    uint64_t* stack_start = (uint64_t*)PMM::VirtualBigAlloc(PROCESS_STACK_SIZE);
+    uint64_t* stack_start = (uint64_t*)PMM::VirtualBigAlloc(PROCESS_STACK_SIZE + 1);
     uint64_t* stack_end = (uint64_t*)((uint64_t)stack_start + (PROCESS_STACK_SIZE * PAGE_SIZE));
 
     proc->stack_start = stack_start;
@@ -296,7 +296,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
     uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
-    for(uint64_t i = 0;i < PROCESS_STACK_SIZE;i++) {
+    for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
         Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
     }
 

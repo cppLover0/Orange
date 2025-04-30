@@ -186,15 +186,15 @@ extern "C" void kmain() {
 
     //res.entry();
 
+    int initrd = Process::createProcess(0,0,1,0,0);
+
     for(int i = 0;i < 2;i++) {
         int proc = Process::createProcess((uint64_t)_1,0,0,0,0);
         Process::WakeUp(proc);
     }
 
-    int initrd = Process::createProcess(0,0,1,0,0);
-
     const char* pa = "/usr/bin/initrd";
-    const char* ea = "test=test";
+    const char* ea = "=";
 
     char* initrd_argv[2];
     initrd_argv[0] = (char*)pa;

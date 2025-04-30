@@ -8,6 +8,8 @@
 #define STATUS_NOT_IMPLEMENTED -1
 #define STATUS_ERROR -2
 
+#define SUBSTATUS_TTY 99
+
 typedef struct {
     char i; // not implemented
 } disk_t;
@@ -37,6 +39,8 @@ typedef struct {
 typedef struct {
     
     char type;
+    char sub_type;
+
     char* name;
 
     char* content;

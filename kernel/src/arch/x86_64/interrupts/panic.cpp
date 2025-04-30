@@ -18,7 +18,7 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame) {
 
     NLog("\n\n\nKernel panic\n");
    
-    NLog("\nReason: %s\nCPU: %d\nVector: %d/0x%p (error code: %d/0x%p)\nProc: 0x%p, ID: %d, is_user: %d\n",msg,Lapic::ID(),frame->vec,frame->vec,frame->err_code,frame->err_code,CpuData::Access()->current,CpuData::Access()->current ? CpuData::Access()->current->id : 0,CpuData::Access()->current ? CpuData::Access()->current->user : 0);
+    NLog("\nReason: %s\nCPU: %d\nVector: %d/0x%p (error code: %d/0x%p)\nProc: 0x%p, ID: %d, is_user: %d start_rsp:0x%p\n",msg,Lapic::ID(),frame->vec,frame->vec,frame->err_code,frame->err_code,CpuData::Access()->current,CpuData::Access()->current ? CpuData::Access()->current->id : 0,CpuData::Access()->current ? CpuData::Access()->current->user : 0,CpuData::Access()->current ? (uint64_t)CpuData::Access()->current->stack_start + (PROCESS_STACK_SIZE * PAGE_SIZE) : 0);
     NLog("Proc FS: 0x%p\n",CpuData::Access()->current ? CpuData::Access()->current->fs_base : 0);
     NLog("Registers dump\n");
     NLog("RIP: 0x%p, SS: 0x%p, CS: 0x%p, RFLAGS: 0x%p, RSP: 0x%p\nRAX: 0x%p, RBX: 0x%p, RCX: 0x%p, RDX: 0x%p, RSI: 0x%p\nRDI: 0x%p, RBP: 0x%p, R8: 0x%p, R9: 0x%p, R10: 0x%p, CR2: 0x%p\nR11: 0x%p, R12: 0x%p, R13: 0x%p, R14: 0x%p, R15: 0x%p CR3: 0x%p\n",
