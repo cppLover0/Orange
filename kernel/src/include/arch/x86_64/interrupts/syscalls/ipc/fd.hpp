@@ -13,6 +13,8 @@ typedef struct {
     char* buffer;
     uint64_t buffer_size;
 
+    process_t* parent;
+
     _Atomic char is_received;
 
 } __attribute__((packed)) pipe_t;

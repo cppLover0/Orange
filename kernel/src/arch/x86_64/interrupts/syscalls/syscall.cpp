@@ -17,6 +17,7 @@
 #include <other/string.hpp>
 #include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <other/other.hpp>
+#include <arch/x86_64/cpu/lapic.hpp>
 #include <other/assert.hpp>
 
 extern "C" void syscall_handler();
@@ -186,11 +187,6 @@ int syscall_seek(int_frame_t* ctx) {
     process_t* proc = CpuData::Access()->current;
 
     fd_t* file = FD::Search(proc,fd);
-    filestat_t stat;
-
-    if(VFS::Stat(file->path_point,(char*)&stat)) {
-        return -4;
-    }
 
     if(!file)
         return -1;
@@ -199,7 +195,7 @@ int syscall_seek(int_frame_t* ctx) {
         return -2;
 
     if(fd < 3)
-        return -3;
+        return 0;
 
 
     switch (whence)
@@ -265,6 +261,8 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
     if(file->path_point[0])
         VFS::AskForPipe(file->path_point,&file->pipe);
 
+    process_t* proc = CpuData::Access()->current;
+
     while(1) {
         if(!file->pipe.is_received) {
 
@@ -281,6 +279,9 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
             ctx->rdx = 1;
             ctx->rax = 0;
 
+            proc->is_eoi = 1;
+
+            Lapic::EOI();
             syscall_end(ctx);
 
         } else {
@@ -308,6 +309,7 @@ int syscall_read(int_frame_t* ctx) {
     if(file->type == FD_PIPE) {
         
         //proc->is_cli = 0;
+        proc->is_eoi = 0;
         String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
         syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
         return -20;
@@ -518,6 +520,46 @@ int syscall_isatty(int_frame_t* ctx) {
 
 }
 
+int syscall_fork(int_frame_t* ctx) {
+
+    process_t* parent = CpuData::Access()->current;
+    uint64_t id = Process::createThread(ctx->rip,parent->id);
+
+    ctx->rdx = id;
+
+    process_t* new_proc = Process::ByID(id);
+    String::memcpy(&new_proc->ctx,&parent->ctx,sizeof(int_frame_t));
+    //String::memcpy(new_proc->stack_start,parent->stack_start,PROCESS_STACK_SIZE * PAGE_SIZE);
+
+    uint64_t stack = CpuData::Access()->user_stack;
+
+    new_proc->ctx.rsp = (uint64_t)new_proc->stack;
+    new_proc->ctx.rsp -= ((uint64_t)parent->stack - stack);
+    new_proc->ctx.rip = ctx->rcx;
+    new_proc->fs_base = parent->fs_base;
+    new_proc->ctx.rdx = id;
+    new_proc->ctx.rax = 0;
+
+    Process::WakeUp(id);
+    return 0;
+
+}
+
+int syscall_getpid(int_frame_t* ctx) {
+    return CpuData::Access()->current->id;
+}
+
+int syscall_exec(int_frame_t* ctx) {
+    /*
+    Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
+    Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
+    uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
+    for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
+        Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
+    }
+        */
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -532,7 +574,10 @@ syscall_t syscall_table[] = {
     {11,syscall_close},
     {12,syscall_mmap},
     {13,syscall_free},
-    {14,syscall_isatty}
+    {14,syscall_isatty},
+    {15,syscall_fork},
+    {16,syscall_exec},
+    {17,syscall_getpid}
 };
 
 syscall_t* syscall_find_table(int num) {

@@ -12,6 +12,7 @@
 #define PROCESS_STATUS_IN_USE 1
 #define PROCESS_STATUS_KILLED 2
 #define PROCESS_STATUS_BLOCKED 3
+#define PROCESS_STATUS_WAITING 4
 
 typedef struct termios {
     uint32_t c_iflag;		
@@ -57,6 +58,8 @@ typedef struct process_struct {
 
     uint8_t cs;
     uint8_t ss;
+
+    char* wait_pipe;
     
     char is_eoi;
     char is_cli;

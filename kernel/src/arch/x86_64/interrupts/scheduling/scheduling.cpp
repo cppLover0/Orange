@@ -239,6 +239,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->status = PROCESS_STATUS_KILLED;
     proc->parent_process = parent_id;
     proc->futex = 0;
+    proc->wait_pipe = 0;
 
     uint64_t* stack_start = (uint64_t*)PMM::VirtualBigAlloc(PROCESS_STACK_SIZE + 1);
     uint64_t* stack_end = (uint64_t*)((uint64_t)stack_start + (PROCESS_STACK_SIZE * PAGE_SIZE));
@@ -246,35 +247,6 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->stack_start = stack_start;
     proc->stack = stack_end;
     proc->ctx.rsp = (uint64_t)stack_end;
-
-    fd_t* stdin = (fd_t*)PMM::VirtualAlloc(); //head fd
-    stdin->index = 0;
-    stdin->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);
-    stdin->pipe.buffer_size = 5;
-    stdin->pipe.is_received = 1;
-    stdin->parent = 0;
-    stdin->next = 0;
-    stdin->proc = proc;
-    stdin->type = FD_PIPE; 
-
-    String::memcpy(stdin->path_point,"/dev/kbd",sizeof("/dev/kbd"));
-    String::memcpy(stdin->pipe.buffer,"how are you reading this ???\n",5);
-
-    proc->start_fd = (char*)stdin;
-    proc->last_fd = (char*)stdin;
-
-    proc->wait_stack = (uint64_t*)PMM::VirtualAlloc();
-    proc->syscall_wait_ctx = (int_frame_t*)PMM::VirtualAlloc();
-
-    proc->fd_ptr = 1;
-
-    int fd = FD::Create(proc,0);
-    fd_t* stdout = FD::Search(proc,fd);
-    String::memcpy(stdout->path_point,"/dev/tty",sizeof("/dev/tty"));
-
-    fd = FD::Create(proc,0);
-    fd_t* stderr = FD::Search(proc,fd);
-    String::memcpy(stderr->path_point,"/dev/serial",sizeof("/dev/serial"));
 
     proc->termios = (termios_t*)PMM::VirtualAlloc();
 
@@ -287,9 +259,69 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     if(is_thread) {
         PMM::VirtualFree(cr3);
         cr3 = cr3_parent;
+
+        process_t* parent = Process::ByID(parent_id);
+
+        if(parent) {
+
+            fd_t* fd = (fd_t*)parent->start_fd;
+            
+            while(fd) {
+
+
+                fd_t* fdd = (fd_t*)PMM::VirtualAlloc();
+
+                String::memcpy(fdd,fd,sizeof(fd_t));
+
+                if(!proc->start_fd) {
+                    proc->start_fd = (char*)fdd;
+                    proc->last_fd = (char*)fdd;
+                } else {
+                    fd_t* last = (fd_t*)proc->last_fd;
+                    last->next = fdd;
+                    proc->last_fd = (char*)fdd;
+                }
+                
+                fdd->next = 0;
+                fd = fd->next;
+            }
+
+        }
+
     } else {
         Paging::Kernel(cr3);
         Paging::alwaysMappedMap(cr3);
+
+        fd_t* stdin = (fd_t*)PMM::VirtualAlloc(); //head fd
+        stdin->index = 0;
+        stdin->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);
+        stdin->pipe.buffer_size = 5;
+        stdin->pipe.is_received = 1;
+        stdin->parent = 0;
+        stdin->next = 0;
+        stdin->proc = proc;
+        stdin->type = FD_PIPE; 
+        stdin->pipe.parent = proc;
+
+        String::memcpy(stdin->path_point,"/dev/kbd",sizeof("/dev/kbd"));
+        String::memcpy(stdin->pipe.buffer,"how are you reading this ???\n",5);
+
+        proc->start_fd = (char*)stdin;
+        proc->last_fd = (char*)stdin;
+
+        proc->wait_stack = (uint64_t*)PMM::VirtualAlloc();
+        proc->syscall_wait_ctx = (int_frame_t*)PMM::VirtualAlloc();
+
+        proc->fd_ptr = 1;
+
+        int fd = FD::Create(proc,0);
+        fd_t* stdout = FD::Search(proc,fd);
+        String::memcpy(stdout->path_point,"/dev/tty",sizeof("/dev/tty"));
+
+        fd = FD::Create(proc,0);
+        fd_t* stderr = FD::Search(proc,fd);
+        String::memcpy(stderr->path_point,"/dev/serial",sizeof("/dev/serial"));
+
     }
 
 

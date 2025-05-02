@@ -7,8 +7,7 @@ isr_stub_%+%1:
     swapgs
 .cont:
 
-    mov rbp,%+%1
-    push rbp
+    push qword (%+%1)
     jmp asmException
     cli
     hlt 
@@ -23,8 +22,7 @@ isr_stub_%+%1:
 .cont:
 
     push qword 0
-    mov rbp,%+%1 ; no one care about rbp lol
-    push rbp
+    push qword (%+%1)
     jmp asmException
     cli
     hlt

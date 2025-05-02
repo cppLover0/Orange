@@ -206,6 +206,10 @@ extern "C" void kmain() {
 
     Process::loadELFProcess(initrd,"/usr/bin/initrd",(uint8_t*)elf,initrd_argv,initrd_envp);
 
+    process_t* initrd_proc = Process::ByID(initrd);
+
+    Log("Initrd: stack_start: 0x%p, stack_end: 0x%p\n",initrd_proc->stack_start,initrd_proc->stack);
+
     Process::WakeUp(initrd);
 
     const char* str = "Hello, world from /dev/tty !\n";
