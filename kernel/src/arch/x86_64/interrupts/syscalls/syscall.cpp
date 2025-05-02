@@ -529,7 +529,7 @@ int syscall_fork(int_frame_t* ctx) {
 
     process_t* new_proc = Process::ByID(id);
     String::memcpy(&new_proc->ctx,&parent->ctx,sizeof(int_frame_t));
-    //String::memcpy(new_proc->stack_start,parent->stack_start,PROCESS_STACK_SIZE * PAGE_SIZE);
+    String::memcpy(new_proc->stack_start,parent->stack_start,PROCESS_STACK_SIZE * PAGE_SIZE);
 
     uint64_t stack = CpuData::Access()->user_stack;
 
