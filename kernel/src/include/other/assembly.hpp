@@ -30,3 +30,7 @@ inline void __sti() {
 inline void __hlt() {
     __asm__ volatile ("hlt");
 }
+
+inline void __invlpg(unsigned long long virt) {
+    __asm__ volatile ("invlpg (%0)" : : "r" (virt) : "memory");
+}

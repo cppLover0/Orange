@@ -34,6 +34,7 @@
 #include <arch/x86_64/scheduling/scheduling.hpp>
 #include <arch/x86_64/interrupts/syscalls/syscall.hpp>
 #include <arch/x86_64/cpu/sse.hpp>
+#include <generic/memory/vmm.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -171,6 +172,10 @@ extern "C" void kmain() {
     Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
     cpu_data->kernel_stack = stack_5 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     cpu_data->user_stack = 0;
+
+    VMM::Init(0);
+    //VMM::Alloc(0,0,0);
+    //__hlt();
 
     Log("Kernel is initializied !\n");
 

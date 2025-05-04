@@ -16,6 +16,8 @@
 #include <other/log.hpp>
 #include <other/string.hpp>
 #include <other/other.hpp>
+#include <generic/memory/vmm.hpp>
+#include <other/assembly.hpp>
 
 uint64_t id_ptr = 0;
 
@@ -92,6 +94,8 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
 
                     // Log("0x%p 0x%p 0x%p\n",frame1->cs,frame->ss,frame->rip);
 
+                    //Log("sc 0x%p 0x%p\n",proc->ctx.rsp,proc->user_stack_start);
+
                     spinlock_unlock(&proc_spinlock);
                     spinlock_unlock(&proc_spinlock2);
                     spinlock_unlock(&proc_spinlock3);
@@ -140,9 +144,14 @@ void Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv
     String::memcpy(name,path,String::strlen(path));
     proc->name = name;
 
-    ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,proc->stack,argv,envp);
+    //Log(":)\n");
+
+    ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,0,argv,envp,proc);
+
+    //Log(":###\n");
 
     proc->ctx.rsp = (uint64_t)l.ready_stack;
+
     proc->ctx.rip = (uint64_t)l.entry;
 }
 
@@ -175,6 +184,9 @@ uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
     proc->cwd = cwd_get(name);
 
     proc->parent_process = parent_proc->id;
+
+    VMM::Init(proc);
+
     return i;
 }
 
@@ -241,20 +253,28 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->futex = 0;
     proc->wait_pipe = 0;
 
-    uint64_t* stack_start = (uint64_t*)PMM::VirtualBigAlloc(PROCESS_STACK_SIZE + 1);
-    uint64_t* stack_end = (uint64_t*)((uint64_t)stack_start + (PROCESS_STACK_SIZE * PAGE_SIZE));
-
-    proc->stack_start = stack_start;
-    proc->stack = stack_end;
-    proc->ctx.rsp = (uint64_t)stack_end;
-
-    proc->termios = (termios_t*)PMM::VirtualAlloc();
-
-    String::memset(proc->termios,0,sizeof(termios_t));
-
     uint64_t* cr3 = (uint64_t*)PMM::VirtualAlloc();
 
-    pAssert(cr3 && stack_start,"No memory :(");
+    proc->ctx.cr3 = HHDM::toPhys((uint64_t)cr3);
+
+    if(!is_user) {
+        uint64_t* stack_start = (uint64_t*)PMM::VirtualBigAlloc(PROCESS_STACK_SIZE + 1);
+        uint64_t* stack_end = (uint64_t*)((uint64_t)stack_start + (PROCESS_STACK_SIZE * PAGE_SIZE));
+
+        proc->stack_start = stack_start;
+        proc->stack = stack_end;
+        proc->ctx.rsp = (uint64_t)stack_end;
+
+        uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
+        for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
+            Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),PTE_PRESENT | PTE_RW);
+        }
+
+    }
+
+    String::memset(&proc->termios,0,sizeof(termios_t));
+
+    
 
     if(is_thread) {
         PMM::VirtualFree(cr3);
@@ -312,6 +332,8 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         proc->wait_stack = (uint64_t*)PMM::VirtualAlloc();
         proc->syscall_wait_ctx = (int_frame_t*)PMM::VirtualAlloc();
 
+        VMM::Init(proc);
+
         proc->fd_ptr = 1;
 
         int fd = FD::Create(proc,0);
@@ -324,15 +346,9 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
 
     }
 
-
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
-    uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
-    for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
-        Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
-    }
 
-    proc->ctx.cr3 = HHDM::toPhys((uint64_t)cr3);
     proc->next = 0;
     __process_load_queue(proc);
     

@@ -38,10 +38,15 @@ typedef struct process_struct {
     char* cwd;
     char* name;
 
-    termios_t* termios;
+    termios_t termios;
+
+    char* vmm_start;
+    char* vmm_last;
 
     uint64_t* stack;
     uint64_t* stack_start; // to free if process killed
+
+    uint64_t user_stack_start;
 
     uint64_t* wait_stack; // to waitings in syscall
     int_frame_t* syscall_wait_ctx;

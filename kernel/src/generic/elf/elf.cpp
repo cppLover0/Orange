@@ -11,6 +11,8 @@
 #include <generic/VFS/vfs.hpp>
 #include <generic/memory/heap.hpp>
 #include <other/string.hpp>
+#include <generic/memory/vmm.hpp>
+#include <other/assembly.hpp>
 
 #define PUT_STACK(dest,value) *--dest = value;
 #define PUT_STACK_STRING(dest,string) String::memcpy(dest,string,String::strlen(string)); 
@@ -35,6 +37,8 @@ uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t le
         temp_stack -= CALIGNPAGEUP(String::strlen(arr[i]),8);
     }
 
+    Log("CXC");
+
     return temp_stack;
 
 }
@@ -45,14 +49,13 @@ uint64_t* __elf_copy_to_stack_without_out(uint64_t* arr,uint64_t* stack,uint64_t
 
     for(uint64_t i = 0;i < len;i++) {
         PUT_STACK(_stack,arr[i]);
-        NLog(" %d (0x%p) ",arr[i],arr[i]);
     }   
 
     return _stack;
 
 }
 
-ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp) {
+ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp,process_t* proc) {
     elfheader_t* head = (elfheader_t*)base;
 
     elfprogramheader_t* current_head;
@@ -98,7 +101,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
             VFS::Read(inter,stat.name,0);
 
-            ELFLoadResult inter_r = ELF::Load((uint8_t*)inter,cr3,flags,0,0,0);
+            ELFLoadResult inter_r = ELF::Load((uint8_t*)inter,cr3,flags,(uint64_t*)1,0,0,proc);
 
             res.entry = inter_r.entry;
 
@@ -116,14 +119,17 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     uint8_t* elf = (uint8_t*)elf_base;
 
     uint64_t aligned_size = ALIGNPAGEUP(size) / PAGE_SIZE;
-    uint8_t* allocated_elf = (uint8_t*)PMM::VirtualBigAlloc(aligned_size);
-    uint64_t phys_elf = HHDM::toPhys((uint64_t)allocated_elf);
 
-    if(!allocated_elf) 
-        return res;
+    void* elf_vmm = VMM::Alloc(proc,elf_base + size,PTE_PRESENT | PTE_RW | PTE_USER);
 
+    uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_vmm)->phys;
+    uint64_t phys_elf = (uint64_t)allocated_elf;
 
-    for(uint64_t i = 0;i < size; i += PAGE_SIZE)
+    allocated_elf = (uint8_t*)HHDM::toVirt((uint64_t)allocated_elf);
+
+    Log("phys_elf: 0x%p, virt_elf: 0x%p\n",phys_elf,elf_base);
+
+    for(uint64_t i = 0;i < size; i += PAGE_SIZE) 
         Paging::Map(cr3,phys_elf + i,elf_base + i,flags);
 
 
@@ -141,7 +147,29 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     }
 
-    if(stack && argv && envp) {
+    if(!stack)  {
+
+        stack = (uint64_t*)VMM::Alloc(proc,(PROCESS_STACK_SIZE + 1) * PAGE_SIZE,PTE_RW | PTE_PRESENT | PTE_USER);
+
+        proc->user_stack_start = (uint64_t)stack;
+    
+        uint64_t* prepare_cr3 = Paging::KernelGet();
+
+        uint64_t virt = (uint64_t)proc->user_stack_start;
+        uint64_t phys = VMM::Get(proc,(uint64_t)stack)->phys;
+
+        //Log("ddd\n");
+        for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
+            Paging::Map(prepare_cr3,phys + (i * PAGE_SIZE),virt + (i * PAGE_SIZE),PTE_PRESENT | PTE_RW);
+            __invlpg(virt + (i * PAGE_SIZE));
+        }
+
+        stack = (uint64_t*)((uint64_t)stack + (PROCESS_STACK_SIZE * PAGE_SIZE));
+
+        Log("stack: 0x%p\n",stack);
+    }
+
+    if(stack && argv && envp && ((uint64_t)stack != 1)) {
 
         uint64_t* _stack = stack;
 
@@ -151,9 +179,13 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
         char** stack_argv = (char**)KHeap::Malloc(8 * argv_length);
         char** stack_envp = (char**)KHeap::Malloc(8 * envp_length);
+        Log("CXC");
 
         _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
+        Log("CXC");
         _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
+
+        Log("CXC");
 
         PUT_STACK(_stack,0);
 
@@ -177,6 +209,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         res.envp = 0;
         res.argc = 0;
     }
+
+    Log("Copying st1ack\n");
 
     return res;
 

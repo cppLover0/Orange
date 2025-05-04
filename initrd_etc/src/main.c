@@ -102,6 +102,9 @@ char __ps2_read(char keycodeps2) {
 int main() {
     printf("Hello, World from Libc !\n");
     fork();
+    while(1);
     printf("pid: %d\n",getpid());
+    asm volatile("syscall" : : "a"(18) : "rcx", "r11");
+
     while(1) ;
 }

@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <arch/x86_64/scheduling/scheduling.hpp>
 
 #pragma once
 
@@ -87,5 +88,5 @@ typedef enum {
 
 class ELF {
 public:
-    static ELFLoadResult Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp);
+    static ELFLoadResult Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp,process_t* proc);
 };

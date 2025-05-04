@@ -18,6 +18,7 @@
 #include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <other/other.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
+#include <generic/memory/vmm.hpp>
 #include <other/assert.hpp>
 
 extern "C" void syscall_handler();
@@ -465,6 +466,8 @@ int syscall_mmap(int_frame_t* ctx) {
     uint64_t hint = ctx->rdi;
     uint64_t size = ctx->rsi;
 
+    process_t* proc = CpuData::Access()->current;
+
     if(!size) return -1;
 
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
@@ -473,11 +476,11 @@ int syscall_mmap(int_frame_t* ctx) {
     if(!allocated) return -2;
 
     uint64_t* cr3 = (uint64_t*)HHDM::toVirt(ctx->cr3);
-    if(!hint) hint = HHDM::toVirt(allocated);
-
-    for(uint64_t i = 0;i < (size_in_pages * PAGE_SIZE); i += PAGE_SIZE) {
-        Paging::Map(cr3,allocated + i,hint + i,PTE_PRESENT | PTE_RW | PTE_USER);
-    }
+    
+    if(!hint) 
+        hint = (uint64_t)VMM::Alloc(proc,size,PTE_RW | PTE_PRESENT | PTE_USER);    
+    else
+        VMM::CustomAlloc(proc,hint,size,PTE_RW | PTE_PRESENT | PTE_USER);
 
     ctx->rdx = hint;
     return 0;
@@ -522,31 +525,46 @@ int syscall_isatty(int_frame_t* ctx) {
 
 int syscall_fork(int_frame_t* ctx) {
 
+    Log("fork()\n");
     process_t* parent = CpuData::Access()->current;
     uint64_t id = Process::createThread(ctx->rip,parent->id);
 
     ctx->rdx = id;
+    ctx->rax = 0;
 
     process_t* new_proc = Process::ByID(id);
     String::memcpy(&new_proc->ctx,&parent->ctx,sizeof(int_frame_t));
-    String::memcpy(new_proc->stack_start,parent->stack_start,PROCESS_STACK_SIZE * PAGE_SIZE);
 
-    uint64_t stack = CpuData::Access()->user_stack;
+    uint64_t* virt = (uint64_t*)HHDM::toVirt(new_proc->ctx.cr3);
+    Paging::alwaysMappedMap(virt);
+    Paging::Kernel(virt);
 
-    new_proc->ctx.rsp = (uint64_t)new_proc->stack;
-    new_proc->ctx.rsp -= ((uint64_t)parent->stack - stack);
-    new_proc->ctx.rip = ctx->rcx;
+    new_proc->user_stack_start = parent->user_stack_start;
+    VMM::Clone(new_proc,parent);
     new_proc->fs_base = parent->fs_base;
-    new_proc->ctx.rdx = id;
-    new_proc->ctx.rax = 0;
+
+    uint64_t new_stack = PMM::BigAlloc(PROCESS_STACK_SIZE + 1);
+    uint64_t parent_stack = HHDM::toVirt(VMM::Get(parent,parent->user_stack_start)->phys);
+
+    String::memcpy((void*)HHDM::toVirt(new_stack),(void*)parent_stack,(PROCESS_STACK_SIZE + 1) * PAGE_SIZE);
+
+    VMM::Reload(new_proc);
 
     Process::WakeUp(id);
+
+    //VMM::Reload(parent);
+
     return 0;
 
 }
 
 int syscall_getpid(int_frame_t* ctx) {
     return CpuData::Access()->current->id;
+}
+
+int syscall_dump_memory(int_frame_t* ctx) {
+    VMM::Dump(CpuData::Access()->current);
+    return 0;
 }
 
 int syscall_exec(int_frame_t* ctx) {
@@ -577,7 +595,8 @@ syscall_t syscall_table[] = {
     {14,syscall_isatty},
     {15,syscall_fork},
     {16,syscall_exec},
-    {17,syscall_getpid}
+    {17,syscall_getpid},
+    {18,syscall_dump_memory}
 };
 
 syscall_t* syscall_find_table(int num) {

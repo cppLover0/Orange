@@ -60,4 +60,6 @@ public:
 
     static uint64_t* KernelGet();
 
+    static void Copy(uint64_t* dest_cr3, uint64_t* src_cr3);
+
 };

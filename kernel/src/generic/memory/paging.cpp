@@ -8,6 +8,7 @@
 #include <lib/limineA/limine.h>
 #include <drivers/serial/serial.hpp>
 #include <generic/locks/spinlock.hpp>
+#include <other/string.hpp>
 #include <other/log.hpp>
 
 uint64_t* __paging_next_level(uint64_t* table,uint64_t index,uint64_t flags) {
@@ -130,6 +131,12 @@ void Paging::alwaysMappedMap(uint64_t* cr3) {
         }
         current_map = current_map->next;
     }
+}
+
+
+
+void Paging::Copy(uint64_t* dest_cr3,uint64_t* src_cr3) {
+    
 }
 
 void Paging::Init() {
