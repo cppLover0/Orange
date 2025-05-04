@@ -37,7 +37,7 @@ uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t le
         temp_stack -= CALIGNPAGEUP(String::strlen(arr[i]),8);
     }
 
-    Log("CXC");
+    //Log("CXC");
 
     return temp_stack;
 
@@ -120,18 +120,15 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     uint64_t aligned_size = ALIGNPAGEUP(size) / PAGE_SIZE;
 
-    void* elf_vmm = VMM::Alloc(proc,elf_base + size,PTE_PRESENT | PTE_RW | PTE_USER);
+    void* elf_vmm = VMM::CustomAlloc(proc,elf_base,size,PTE_PRESENT | PTE_RW | PTE_USER);
 
-    uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_vmm)->phys;
+    uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_base)->phys;
+
+    //Log("Allocated elf: 0x%p\n",allocated_elf);
+
     uint64_t phys_elf = (uint64_t)allocated_elf;
 
     allocated_elf = (uint8_t*)HHDM::toVirt((uint64_t)allocated_elf);
-
-    Log("phys_elf: 0x%p, virt_elf: 0x%p\n",phys_elf,elf_base);
-
-    for(uint64_t i = 0;i < size; i += PAGE_SIZE) 
-        Paging::Map(cr3,phys_elf + i,elf_base + i,flags);
-
 
     res.phys_cr3 = (uint64_t*)HHDM::toPhys((uint64_t)cr3);
 
@@ -147,7 +144,9 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     }
 
-    if(!stack)  {
+    //Log("Put stack\n");
+
+    if(!stack && proc)  {
 
         stack = (uint64_t*)VMM::Alloc(proc,(PROCESS_STACK_SIZE + 1) * PAGE_SIZE,PTE_RW | PTE_PRESENT | PTE_USER);
 
@@ -166,7 +165,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
         stack = (uint64_t*)((uint64_t)stack + (PROCESS_STACK_SIZE * PAGE_SIZE));
 
-        Log("stack: 0x%p\n",stack);
+        //Log("stack: 0x%p\n",stack);
     }
 
     if(stack && argv && envp && ((uint64_t)stack != 1)) {
@@ -179,13 +178,13 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
         char** stack_argv = (char**)KHeap::Malloc(8 * argv_length);
         char** stack_envp = (char**)KHeap::Malloc(8 * envp_length);
-        Log("CXC");
+        //Log("CXC");
 
         _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
-        Log("CXC");
+        //Log("CXC");
         _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
 
-        Log("CXC");
+        //Log("CXC");
 
         PUT_STACK(_stack,0);
 

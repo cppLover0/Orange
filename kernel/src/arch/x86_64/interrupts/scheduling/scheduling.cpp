@@ -185,7 +185,7 @@ uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
 
     proc->parent_process = parent_proc->id;
 
-    VMM::Init(proc);
+    //VMM::Init(proc);
 
     return i;
 }
@@ -281,6 +281,9 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         cr3 = cr3_parent;
 
         process_t* parent = Process::ByID(parent_id);
+
+        proc->wait_stack = (uint64_t*)PMM::VirtualAlloc();
+        proc->syscall_wait_ctx = (int_frame_t*)PMM::VirtualAlloc();
 
         if(parent) {
 

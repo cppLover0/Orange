@@ -1,165 +1,98 @@
 Serial initializied
-[8.29.17] Bootloader: Limine 8.7.0
-[8.29.17] RSDP: 0xF52C0
-[8.29.17] HHDM: 0xFFFF800000000000
-[8.29.17] Kernel: Phys: 0x37D07000, Virt: 0xFFFFFFFF80000000
-[8.29.17] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
-[8.29.17] Memmap: Start: 0xFFFF800037838000, Entry_count: 16
-[8.29.17] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
-[8.29.17] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
-[8.29.17] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
-[8.29.17] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
-[8.29.17] Entry #4. Base: 0x100000, size: 0x37738000, type: Usable (0)
-[8.29.17] Entry #5. Base: 0x37838000, size: 0x29000, type: Non usable (5)
-[8.29.17] Entry #6. Base: 0x37861000, size: 0x497000, type: Non usable (6)
-[8.29.17] Entry #7. Base: 0x37CF8000, size: 0xF000, type: Non usable (5)
-[8.29.17] Entry #8. Base: 0x37D07000, size: 0x810E000, type: Non usable (6)
-[8.29.17] Entry #9. Base: 0x3FE15000, size: 0x1CA000, type: Non usable (5)
-[8.29.17] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
-[8.29.17] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
-[8.29.17] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
-[8.29.17] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
-[8.29.17] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
-[8.29.17] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
-[8.29.17] Biggest entry: Base: 0x100000, Size: 0x37738000 (887 MB)
-[8.29.17] PMM Initializied
-[8.29.17] Mapping usable memory
-[8.29.17] Mapping framebuffer
-[8.29.17] Mapping bootloader reclaimable
-[8.29.17] Activating paging
-[8.29.17] Mapping kernel
-[8.29.17] Paging Initializied
-[8.29.17] KHeap Initializied
-[8.29.17] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
-[8.29.17] GDT Initializied
-[8.29.17] IDT Initializied
-[8.29.17] [UACPI:3] RSDP 0x00000000000F52C0 00000000 v00 (BOCHS )
-[8.29.17] [UACPI:3] RSDT 0x000000003FFE22FC 00000038 v01 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] DSDT 0x000000003FFE0040 000020B4 v01 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] FACP 0x000000003FFE20F4 000000F4 v03 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] APIC 0x000000003FFE21E8 00000078 v03 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] HPET 0x000000003FFE2260 00000038 v01 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] MCFG 0x000000003FFE2298 0000003C v01 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] WAET 0x000000003FFE22D4 00000028 v01 (BOCHS  BXPC    )
-[8.29.17] [UACPI:3] FACS 0x000000003FFE0000 00000040
-[8.29.17] 64 Bit HPET: 0xFFFF8000FED00000
-[8.29.17] HPET Initializied
-[8.29.17] IOAPIC: Start: 0xFFFF80003FFE2214, End: 0xFFFF80003FFE228C
-[8.29.17] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE2214
-[8.29.17] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE221C
-[8.29.17] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
-[8.29.17] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2228
-[8.29.17] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
-[8.29.17] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2232
-[8.29.17] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
-[8.29.17] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE223C
-[8.29.17] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
-[8.29.17] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2246
-[8.29.17] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
-[8.29.17] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2250
-[8.29.17] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
-[8.29.17] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE225A
-[8.29.17] IOAPIC Initializied
-[8.29.17] [UACPI:3] successfully loaded 1 AML blob, 1705 ops in 13ms (avg 124263/s)
-[8.29.17] [UACPI:3] namespace initialization done in 5ms: 36 devices, 0 thermal zones
-[8.29.17] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
-[8.29.17] ACPI Initializied
-[8.29.17] LAPIC Initializied
-[8.29.17] CPUs count: 1
-[8.29.17] MP Initializied
-[8.29.17] PowerButton initializied
-[8.29.17] TmpFS initializied
-[8.29.17] DevFS initializied
-[8.29.17] VFS Initializied
-[8.29.17] Adding protection to head
-[8.29.17] Valid initrd !
-[8.29.17] Loaded initrd
-[8.29.17] tmpfs dump: "/": Size: 13552 (13 KB, 0 MB, 0 GB), "/head": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/ld.so": Size: 881304 (860 KB, 0 MB, 0 GB), "/usr/lib/crt0.o": Size: 904 (0 KB, 0 MB, 0 GB), "/usr/lib/crtn.o": Size: 640 (0 KB, 0 MB, 0 GB), "/usr/lib/libm.so": Size: 14584 (14 KB, 0 MB, 0 GB), "/usr/lib/librt.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libssp.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libc.so": Size: 3785000 (3696 KB, 3 MB, 0 GB), "/usr/lib/libpthread.so": Size: 14616 (14 KB, 0 MB, 0 GB), "/usr/lib/crti.o": Size: 872 (0 KB, 0 MB, 0 GB), "/usr/lib/libssp_nonshared.so": Size: 14640 (14 KB, 0 MB, 0 GB), "/usr/lib/libutil.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libdl.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libresolv.so": Size: 14608 (14 KB, 0 MB, 0 GB), "/usr/bin/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/bin/initrd": Size: 5408 (5 KB, 0 MB, 0 GB), "/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/libc.so": Size: 3785000 (3696 KB, 3 MB, 0 GB), "/lib/ld64.so.1": Size: 881304 (860 KB, 0 MB, 0 GB), "/bin/": Size: 0 (0 KB, 0 MB, 0 GB), 
-[8.29.17] Found PS/2 Keyboard IRQ 1 !
-[8.29.17] Registered PS/2 Keyboard IRQ at 34
-[8.29.17] PS/2 Keyboard is initializied !
-[8.29.17] Scheduling initializied
-[8.29.17] Syscall initializied
-[8.29.17] SSE Is enabled (or not) 
-[8.29.17] Kernel is initializied !
-[8.29.17] Loaded initrd !
-[8.29.18] phys_elf: 0x1DB8000, virt_elf: 0x0
-[8.29.18] Copying st1ack
-[8.29.18] phys_elf: 0x1DEE000, virt_elf: 0x400000
-[8.29.18] stack: 0x536000
-[8.29.18] CXC[8.29.18] CXC[8.29.18] CXC[8.29.18] CXC[8.29.18] CXC[8.29.18] Copying st1ack
-[8.29.18] Initrd: stack_start: 0x0, stack_end: 0x0
+[16.56.45] Bootloader: Limine 8.7.0
+[16.56.45] RSDP: 0xF52A0
+[16.56.45] HHDM: 0xFFFF800000000000
+[16.56.45] Kernel: Phys: 0x77D06000, Virt: 0xFFFFFFFF80000000
+[16.56.45] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
+[16.56.45] Memmap: Start: 0xFFFF800077CBE000, Entry_count: 18
+[16.56.45] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
+[16.56.45] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
+[16.56.45] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
+[16.56.45] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
+[16.56.45] Entry #4. Base: 0x100000, size: 0x77AE1000, type: Usable (0)
+[16.56.45] Entry #5. Base: 0x77BE1000, size: 0x16000, type: Non usable (5)
+[16.56.45] Entry #6. Base: 0x77BF7000, size: 0xC7000, type: Usable (0)
+[16.56.45] Entry #7. Base: 0x77CBE000, size: 0x48000, type: Non usable (5)
+[16.56.45] Entry #8. Base: 0x77D06000, size: 0x810E000, type: Non usable (6)
+[16.56.45] Entry #9. Base: 0x7FE14000, size: 0x1CB000, type: Non usable (5)
+[16.56.45] Entry #10. Base: 0x7FFDF000, size: 0x21000, type: Non usable (1)
+[16.56.45] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
+[16.56.45] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
+[16.56.45] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
+[16.56.45] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
+[16.56.45] Entry #15. Base: 0x100000000, size: 0x37FB73000, type: Usable (0)
+[16.56.45] Entry #16. Base: 0x47FB73000, size: 0x48D000, type: Non usable (6)
+[16.56.45] Entry #17. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
+[16.56.45] Biggest entry: Base: 0x100000000, Size: 0x37FB73000 (14331 MB)
+[16.56.45] PMM Initializied
+[16.56.45] Mapping usable memory
+[16.56.50] Mapping framebuffer
+[16.56.50] Mapping bootloader reclaimable
+[16.56.50] Activating paging
+[16.56.50] Mapping kernel
+[16.56.50] Paging Initializied
+[16.56.50] KHeap Initializied
+[16.56.50] BSP CPU Data test: 1:0xFFFF8001020C7018 2:0xFFFF8001020C7018
+[16.56.50] GDT Initializied
+[16.56.50] IDT Initializied
+[16.56.50] [UACPI:3] RSDP 0x00000000000F52A0 00000000 v00 (BOCHS )
+[16.56.50] [UACPI:3] RSDT 0x000000007FFE22FC 00000038 v01 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] DSDT 0x000000007FFE0040 000020B4 v01 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] FACP 0x000000007FFE20F4 000000F4 v03 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] APIC 0x000000007FFE21E8 00000078 v03 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] HPET 0x000000007FFE2260 00000038 v01 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] MCFG 0x000000007FFE2298 0000003C v01 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] WAET 0x000000007FFE22D4 00000028 v01 (BOCHS  BXPC    )
+[16.56.50] [UACPI:3] FACS 0x000000007FFE0000 00000040
+[16.56.50] 64 Bit HPET: 0xFFFF8000FED00000
+[16.56.50] HPET Initializied
+[16.56.50] IOAPIC: Start: 0xFFFF80007FFE2214, End: 0xFFFF80007FFE228C
+[16.56.50] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80007FFE2214
+[16.56.50] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80007FFE221C
+[16.56.50] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
+[16.56.50] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2228
+[16.56.50] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
+[16.56.50] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2232
+[16.56.50] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
+[16.56.50] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE223C
+[16.56.50] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
+[16.56.50] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2246
+[16.56.50] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
+[16.56.50] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2250
+[16.56.50] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
+[16.56.50] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80007FFE225A
+[16.56.50] IOAPIC Initializied
+[16.56.50] [UACPI:3] successfully loaded 1 AML blob, 1705 ops in 14ms (avg 120597/s)
+[16.56.50] [UACPI:3] namespace initialization done in 5ms: 36 devices, 0 thermal zones
+[16.56.50] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
+[16.56.50] ACPI Initializied
+[16.56.50] LAPIC Initializied
+[16.56.50] CPUs count: 1
+[16.56.50] MP Initializied
+[16.56.50] PowerButton initializied
+[16.56.50] TmpFS initializied
+[16.56.50] DevFS initializied
+[16.56.50] VFS Initializied
+[16.56.50] Adding protection to head
+[16.56.50] Valid initrd !
+[16.56.50] Loaded initrd
+[16.56.50] tmpfs dump: "/": Size: 16911472 (16515 KB, 16 MB, 0 GB), "/head": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/ld.so": Size: 863232 (843 KB, 0 MB, 0 GB), "/usr/lib/crt0.o": Size: 904 (0 KB, 0 MB, 0 GB), "/usr/lib/crtn.o": Size: 640 (0 KB, 0 MB, 0 GB), "/usr/lib/libm.so": Size: 14584 (14 KB, 0 MB, 0 GB), "/usr/lib/librt.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libssp.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libc.so": Size: 3762832 (3674 KB, 3 MB, 0 GB), "/usr/lib/libpthread.so": Size: 14616 (14 KB, 0 MB, 0 GB), "/usr/lib/crti.o": Size: 872 (0 KB, 0 MB, 0 GB), "/usr/lib/libssp_nonshared.so": Size: 14640 (14 KB, 0 MB, 0 GB), "/usr/lib/libutil.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libdl.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libresolv.so": Size: 14608 (14 KB, 0 MB, 0 GB), "/usr/bin/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/bin/initrd": Size: 6128 (5 KB, 0 MB, 0 GB), "/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/libc.so": Size: 3762832 (3674 KB, 3 MB, 0 GB), "/lib/ld64.so.1": Size: 863232 (843 KB, 0 MB, 0 GB), "/bin/": Size: 0 (0 KB, 0 MB, 0 GB), 
+[16.56.50] Found PS/2 Keyboard IRQ 1 !
+[16.56.50] Registered PS/2 Keyboard IRQ at 34
+[16.56.50] PS/2 Keyboard is initializied !
+[16.56.50] Scheduling initializied
+[16.56.50] Syscall initializied
+[16.56.50] SSE Is enabled (or not) 
+[16.56.50] Kernel is initializied !
+[16.56.50] Loaded initrd !
+[16.56.51] Copying st1ack
+[16.56.51] Copying st1ack
+[16.56.51] Initrd: stack_start: 0x0, stack_end: 0x0
 Hello, world from /dev/tty !
-[8.29.18] Waiting for interrupts...
+[16.56.51] Waiting for interrupts...
 [2J [1;1HHello, World from Libc !
-[8.29.18] fork()
+Hello, from child process 4 !
+Hello, from parent process 1 !
+You can type now from children process...
 
-
-
-Kernel panic
-
-Reason: CPU Exception
-CPU: 0
-Vector: 14/0xE (error code: 4/0x4)
-Proc: 0xFFFF80000301D000, ID: 4, is_user: 1 start_rsp: 0x0 stack_end: 0x0 proc_userspace_stack: 0x436000
-Proc FS: 0x67EDE0
-Registers dump
-RIP: 0x400605, SS: 0x1B, CS: 0x23, RFLAGS: 0x246, RSP: 0x535E80
-RAX: 0x0, RBX: 0x0, RCX: 0x41014B2B, RDX: 0x535E30, RSI: 0xA7E008
-RDI: 0x1, RBP: 0x535E80, R8: 0x4105E10C, R9: 0x2, R10: 0x0, CR2: 0x0
-R11: 0x206, R12: 0x0, R13: 0x0, R14: 0x0, R15: 0x0 CR3: 0x3126000
-CPU Data: 0xFFFF8000003FD092, UserStack: 0x535BF0, KernelStack: 0xFFFF8000019A4000
-CPU Data: 0xFFFF8000003FE024, UserStack: 0x0, KernelStack: 0x0
-
-Dumping proccess 4 virtual space
-mem 0x0-0x1000:len: 0x1000,flag: 0x0,ph: 0x0,base: 0x0
-mem 0x1000-0x34000:len: 0x33000,flag: 0x7,ph: 0x1DB8000,base: 0x1000
-mem 0x34000-0x436000:len: 0x402000,flag: 0x7,ph: 0x1DEE000,base: 0x34000
-mem 0x436000-0x537000:len: 0x101000,flag: 0x7,ph: 0x21F2000,base: 0x436000
-mem 0x537000-0x5B7000:len: 0x80000,flag: 0x7,ph: 0x2376000,base: 0x537000
-mem 0x5B7000-0x637000:len: 0x80000,flag: 0x7,ph: 0x2476000,base: 0x5B7000
-mem 0x637000-0x6B7000:len: 0x80000,flag: 0x7,ph: 0x2577000,base: 0x637000
-mem 0x6B7000-0x737000:len: 0x80000,flag: 0x7,ph: 0x2677000,base: 0x6B7000
-mem 0x737000-0x7B7000:len: 0x80000,flag: 0x7,ph: 0x2777000,base: 0x737000
-mem 0x7B7000-0x837000:len: 0x80000,flag: 0x7,ph: 0x2877000,base: 0x7B7000
-mem 0x837000-0x8B7000:len: 0x80000,flag: 0x7,ph: 0x2B9C000,base: 0x837000
-mem 0x8B7000-0x937000:len: 0x80000,flag: 0x7,ph: 0x2C9C000,base: 0x8B7000
-mem 0x937000-0x9B7000:len: 0x80000,flag: 0x7,ph: 0x2D9C000,base: 0x937000
-mem 0x9B7000-0xA37000:len: 0x80000,flag: 0x7,ph: 0x2E9C000,base: 0x9B7000
-mem 0xA37000-0xAB7000:len: 0x80000,flag: 0x7,ph: 0x2F9D000,base: 0xA37000
-mem 0x41000000-0x41013000:len: 0x13000,flag: 0x7,ph: 0x290F000,base: 0x41000000
-mem 0x41013000-0x410B7000:len: 0xA4000,flag: 0x7,ph: 0x29C8000,base: 0x41013000
-mem 0x410B7000-0x41103000:len: 0x4C000,flag: 0x7,ph: 0x2AB8000,base: 0x410B7000
-mem 0x41103000-0x4110F000:len: 0xC000,flag: 0x7,ph: 0x2B10000,base: 0x41103000
-mem 0xFFFF7FFFFFFFF000-0xFFFF800000000000:len: 0x1000,flag: 0x0,ph: 0x0,base: 0xFFFF7FFFFFFFF000
-
-Parent: id: 1, is_user: 1, start_rsp: 0x0, stack_end: 0x0
-
-Parent Registers dump
-RIP: 0x41014D4D, SS: 0x1B, CS: 0x23, RFLAGS: 0x206, RSP: 0x535BF0
-RAX: 0x0, RBX: 0x0, RCX: 0x41014D4D, RDX: 0x4, RSI: 0xA7E008
-RDI: 0x535E50, RBP: 0x535E40, R8: 0x4105E10C, R9: 0x2, R10: 0x0, CR2: 0x0
-R11: 0x206, R12: 0x0, R13: 0x0, R14: 0x0, R15: 0x0 CR3: 0x19A7000
-Stack difference: 0xFFFFFFFFFFACA410
-
-Dumping proccess 1 virtual space
-mem 0x0-0x1000:len: 0x1000,flag: 0x0,ph: 0x0,base: 0x0
-mem 0x1000-0x34000:len: 0x33000,flag: 0x7,ph: 0x1DB8000,base: 0x1000
-mem 0x34000-0x436000:len: 0x402000,flag: 0x7,ph: 0x1DEE000,base: 0x34000
-mem 0x436000-0x537000:len: 0x101000,flag: 0x7,ph: 0x21F2000,base: 0x436000
-mem 0x537000-0x5B7000:len: 0x80000,flag: 0x7,ph: 0x2376000,base: 0x537000
-mem 0x5B7000-0x637000:len: 0x80000,flag: 0x7,ph: 0x2476000,base: 0x5B7000
-mem 0x637000-0x6B7000:len: 0x80000,flag: 0x7,ph: 0x2577000,base: 0x637000
-mem 0x6B7000-0x737000:len: 0x80000,flag: 0x7,ph: 0x2677000,base: 0x6B7000
-mem 0x737000-0x7B7000:len: 0x80000,flag: 0x7,ph: 0x2777000,base: 0x737000
-mem 0x7B7000-0x837000:len: 0x80000,flag: 0x7,ph: 0x2877000,base: 0x7B7000
-mem 0x837000-0x8B7000:len: 0x80000,flag: 0x7,ph: 0x2B9C000,base: 0x837000
-mem 0x8B7000-0x937000:len: 0x80000,flag: 0x7,ph: 0x2C9C000,base: 0x8B7000
-mem 0x937000-0x9B7000:len: 0x80000,flag: 0x7,ph: 0x2D9C000,base: 0x937000
-mem 0x9B7000-0xA37000:len: 0x80000,flag: 0x7,ph: 0x2E9C000,base: 0x9B7000
-mem 0xA37000-0xAB7000:len: 0x80000,flag: 0x7,ph: 0x2F9D000,base: 0xA37000
-mem 0x41000000-0x41013000:len: 0x13000,flag: 0x7,ph: 0x290F000,base: 0x41000000
-mem 0x41013000-0x410B7000:len: 0xA4000,flag: 0x7,ph: 0x29C8000,base: 0x41013000
-mem 0x410B7000-0x41103000:len: 0x4C000,flag: 0x7,ph: 0x2AB8000,base: 0x410B7000
-mem 0x41103000-0x4110F000:len: 0xC000,flag: 0x7,ph: 0x2B10000,base: 0x41103000
-mem 0xFFFF7FFFFFFFF000-0xFFFF800000000000:len: 0x1000,flag: 0x0,ph: 0x0,base: 0xFFFF7FFFFFFFF000
+Hello, World from children fork() with ps/2 keyboard !

@@ -525,7 +525,7 @@ int syscall_isatty(int_frame_t* ctx) {
 
 int syscall_fork(int_frame_t* ctx) {
 
-    Log("fork()\n");
+    //Log("fork()\n");
     process_t* parent = CpuData::Access()->current;
     uint64_t id = Process::createThread(ctx->rip,parent->id);
 
@@ -533,12 +533,17 @@ int syscall_fork(int_frame_t* ctx) {
     ctx->rax = 0;
 
     process_t* new_proc = Process::ByID(id);
-    String::memcpy(&new_proc->ctx,&parent->ctx,sizeof(int_frame_t));
+
+    String::memcpy(&new_proc->ctx,ctx,sizeof(int_frame_t));
+    new_proc->ctx.rsp = CpuData::Access()->user_stack;
+    new_proc->ctx.ss = 0x18 | 3;
+    new_proc->ctx.cs = 0x20 | 3;
 
     uint64_t* virt = (uint64_t*)HHDM::toVirt(new_proc->ctx.cr3);
     Paging::alwaysMappedMap(virt);
     Paging::Kernel(virt);
 
+    VMM::Init(new_proc);
     new_proc->user_stack_start = parent->user_stack_start;
     VMM::Clone(new_proc,parent);
     new_proc->fs_base = parent->fs_base;
@@ -550,12 +555,11 @@ int syscall_fork(int_frame_t* ctx) {
 
     VMM::Reload(new_proc);
 
+    new_proc->ctx.rdx = 0;
+
     Process::WakeUp(id);
 
-    //VMM::Reload(parent);
-
     return 0;
-
 }
 
 int syscall_getpid(int_frame_t* ctx) {

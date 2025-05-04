@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 char kmap[255] = {
  
@@ -101,10 +102,24 @@ char __ps2_read(char keycodeps2) {
 
 int main() {
     printf("Hello, World from Libc !\n");
-    fork();
-    while(1);
-    printf("pid: %d\n",getpid());
-    asm volatile("syscall" : : "a"(18) : "rcx", "r11");
+    int i = fork();
+
+    if(i == 0) {
+        printf("Hello, from child process %d !\n",getpid());
+        printf("You can type now from children process...\n");
+        char key = 0;
+        while(1) {
+            read(STDIN_FILENO,&key,1);
+            key = __ps2_read(key);
+            if(key)
+                write(STDOUT_FILENO,&key,1);
+        }
+        
+    } 
+    else {
+        printf("Hello, from parent process %d !\n",getpid());
+
+    }
 
     while(1) ;
 }

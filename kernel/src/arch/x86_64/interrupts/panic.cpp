@@ -8,7 +8,13 @@
 #include <generic/memory/paging.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <generic/memory/vmm.hpp>
-        
+   
+
+typedef struct stackframe {
+    struct stackframe* rbp;
+    uint64_t rip;
+} __attribute__((packed)) stackframe_t;
+
 extern "C" void CPanic(const char* msg,int_frame_t* frame1) {
     __cli();
     Paging::EnableKernel();
@@ -34,6 +40,21 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame1) {
     asm volatile("swapgs");
 
     process_t* proc = CpuData::Access()->current;
+    
+    if(!proc) {// exception occured in kernel, we can backtrace 
+        
+        stackframe_t* rbp = (stackframe_t*)frame1->rbp;
+
+        NLog("\nBack Trace\n");
+        for(unsigned int frame = 0; rbp && frame < 10; ++frame)
+        {
+            NLog("Address #%d: 0x%p\n",frame,rbp->rip);
+            rbp = rbp->rbp;
+        }
+    
+    }
+
+
     if(proc){
 
         VMM::Dump(proc);

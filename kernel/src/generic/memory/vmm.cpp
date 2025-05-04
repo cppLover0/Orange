@@ -93,13 +93,17 @@ vmm_obj_t* __vmm_find(vmm_obj_t* vmm_start,uint64_t base,uint64_t length) {
             uint64_t prev_end = (prev->base + prev->len);
             uint64_t current_end = base + length;
 
-            if(current->base == base)
+            if(current->base == base) {
+                delete vmm_new;
+                vmm_new = current;
                 break;
+            }
 
             if(current->base >= current_end && prev_end <= base) {
 
                 vmm_new->base = base;
                 vmm_new->len = align_length;
+                
                 prev->next = vmm_new;
                 vmm_new->next = current;
 
@@ -121,7 +125,7 @@ void __vmm_map(uint64_t cr3_phys,uint64_t virt,uint64_t phys,uint64_t flags,uint
 
     //Log("Trying to map 0x%p with len 0x%p to 0x%p\n",phys,length,virt);
 
-    for(uint64_t i = 0; i < length;i += PAGE_SIZE) {
+    for(uint64_t i = 0; i <= length;i += PAGE_SIZE) {
         Paging::Map(cr3,phys + i,virt + i,flags);
     }
 
@@ -188,9 +192,14 @@ void* VMM::Mark(process_t* proc,uint64_t base,uint64_t phys,uint64_t length,uint
     //Log("no yay\n");
     vmm_obj_t* vmm_new = __vmm_find(current,base,length);
     //Log("yay\n");
+
+    //Log("0x%p 0x%p yay\n",vmm_new->base,base);
+
     vmm_new->flags = flags;
     vmm_new->phys = phys;
     vmm_new->src_len = length;
+    vmm_new->len = ALIGNPAGEUP(length);
+    vmm_new->base = base;
 
     return (void*)vmm_new->base;
 }
@@ -227,7 +236,17 @@ void VMM::Clone(process_t* dest_proc,process_t* src_proc) {
 
         while(src_current) {
 
-            Mark(dest_proc,src_current->base,src_current->phys,src_current->len,src_current->flags);
+            uint64_t phys;
+
+            if(src_current->src_len < PAGE_SIZE)
+                phys = PMM::Alloc();
+            else if(src_current->src_len > PAGE_SIZE)
+                phys = PMM::BigAlloc(ALIGNPAGEUP(src_current->src_len) / PAGE_SIZE);
+
+            if(src_current->phys)
+            String::memcpy((void*)HHDM::toVirt(phys),(void*)HHDM::toVirt(src_current->phys),src_current->len);
+
+            Mark(dest_proc,src_current->base,phys,src_current->len,src_current->flags);
 
             if(src_current->base == info.hhdm_offset - PAGE_SIZE)
                 break;
@@ -283,12 +302,12 @@ void VMM::Dump(process_t* proc) {
 
 }
 
-void VMM::CustomAlloc(process_t* proc,uint64_t virt,uint64_t length,uint64_t flags) {
+void* VMM::CustomAlloc(process_t* proc,uint64_t virt,uint64_t length,uint64_t flags) {
     vmm_obj_t* current = 0;
     uint64_t phys = 0;
 
     if(!proc)  
-        return;
+        return 0;
 
     current = vmm_main;
 
@@ -297,8 +316,12 @@ void VMM::CustomAlloc(process_t* proc,uint64_t virt,uint64_t length,uint64_t fla
     else if(length > PAGE_SIZE)
         phys = PMM::BigAlloc(ALIGNPAGEUP(length) / PAGE_SIZE);
 
+    //Log("0x%p\n",phys);
+
     Mark(proc,virt,phys,length,flags);
     __vmm_map(proc->ctx.cr3,virt,phys,flags,length);
+
+    return (void*)virt;
 
 }
 
@@ -314,6 +337,9 @@ void VMM::Reload(process_t* proc) {
 
     Paging::Kernel(virt);
     Paging::alwaysMappedMap(virt);
+
+    Paging::HHDMMap(virt,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
+    Paging::HHDMMap(virt,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
 
     while(current) {
 
