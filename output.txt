@@ -1,98 +1,106 @@
 Serial initializied
-[16.56.45] Bootloader: Limine 8.7.0
-[16.56.45] RSDP: 0xF52A0
-[16.56.45] HHDM: 0xFFFF800000000000
-[16.56.45] Kernel: Phys: 0x77D06000, Virt: 0xFFFFFFFF80000000
-[16.56.45] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
-[16.56.45] Memmap: Start: 0xFFFF800077CBE000, Entry_count: 18
-[16.56.45] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
-[16.56.45] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
-[16.56.45] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
-[16.56.45] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
-[16.56.45] Entry #4. Base: 0x100000, size: 0x77AE1000, type: Usable (0)
-[16.56.45] Entry #5. Base: 0x77BE1000, size: 0x16000, type: Non usable (5)
-[16.56.45] Entry #6. Base: 0x77BF7000, size: 0xC7000, type: Usable (0)
-[16.56.45] Entry #7. Base: 0x77CBE000, size: 0x48000, type: Non usable (5)
-[16.56.45] Entry #8. Base: 0x77D06000, size: 0x810E000, type: Non usable (6)
-[16.56.45] Entry #9. Base: 0x7FE14000, size: 0x1CB000, type: Non usable (5)
-[16.56.45] Entry #10. Base: 0x7FFDF000, size: 0x21000, type: Non usable (1)
-[16.56.45] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
-[16.56.45] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
-[16.56.45] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
-[16.56.45] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
-[16.56.45] Entry #15. Base: 0x100000000, size: 0x37FB73000, type: Usable (0)
-[16.56.45] Entry #16. Base: 0x47FB73000, size: 0x48D000, type: Non usable (6)
-[16.56.45] Entry #17. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
-[16.56.45] Biggest entry: Base: 0x100000000, Size: 0x37FB73000 (14331 MB)
-[16.56.45] PMM Initializied
-[16.56.45] Mapping usable memory
-[16.56.50] Mapping framebuffer
-[16.56.50] Mapping bootloader reclaimable
-[16.56.50] Activating paging
-[16.56.50] Mapping kernel
-[16.56.50] Paging Initializied
-[16.56.50] KHeap Initializied
-[16.56.50] BSP CPU Data test: 1:0xFFFF8001020C7018 2:0xFFFF8001020C7018
-[16.56.50] GDT Initializied
-[16.56.50] IDT Initializied
-[16.56.50] [UACPI:3] RSDP 0x00000000000F52A0 00000000 v00 (BOCHS )
-[16.56.50] [UACPI:3] RSDT 0x000000007FFE22FC 00000038 v01 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] DSDT 0x000000007FFE0040 000020B4 v01 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] FACP 0x000000007FFE20F4 000000F4 v03 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] APIC 0x000000007FFE21E8 00000078 v03 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] HPET 0x000000007FFE2260 00000038 v01 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] MCFG 0x000000007FFE2298 0000003C v01 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] WAET 0x000000007FFE22D4 00000028 v01 (BOCHS  BXPC    )
-[16.56.50] [UACPI:3] FACS 0x000000007FFE0000 00000040
-[16.56.50] 64 Bit HPET: 0xFFFF8000FED00000
-[16.56.50] HPET Initializied
-[16.56.50] IOAPIC: Start: 0xFFFF80007FFE2214, End: 0xFFFF80007FFE228C
-[16.56.50] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80007FFE2214
-[16.56.50] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80007FFE221C
-[16.56.50] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
-[16.56.50] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2228
-[16.56.50] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
-[16.56.50] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2232
-[16.56.50] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
-[16.56.50] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE223C
-[16.56.50] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
-[16.56.50] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2246
-[16.56.50] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
-[16.56.50] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80007FFE2250
-[16.56.50] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
-[16.56.50] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80007FFE225A
-[16.56.50] IOAPIC Initializied
-[16.56.50] [UACPI:3] successfully loaded 1 AML blob, 1705 ops in 14ms (avg 120597/s)
-[16.56.50] [UACPI:3] namespace initialization done in 5ms: 36 devices, 0 thermal zones
-[16.56.50] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
-[16.56.50] ACPI Initializied
-[16.56.50] LAPIC Initializied
-[16.56.50] CPUs count: 1
-[16.56.50] MP Initializied
-[16.56.50] PowerButton initializied
-[16.56.50] TmpFS initializied
-[16.56.50] DevFS initializied
-[16.56.50] VFS Initializied
-[16.56.50] Adding protection to head
-[16.56.50] Valid initrd !
-[16.56.50] Loaded initrd
-[16.56.50] tmpfs dump: "/": Size: 16911472 (16515 KB, 16 MB, 0 GB), "/head": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/ld.so": Size: 863232 (843 KB, 0 MB, 0 GB), "/usr/lib/crt0.o": Size: 904 (0 KB, 0 MB, 0 GB), "/usr/lib/crtn.o": Size: 640 (0 KB, 0 MB, 0 GB), "/usr/lib/libm.so": Size: 14584 (14 KB, 0 MB, 0 GB), "/usr/lib/librt.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libssp.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libc.so": Size: 3762832 (3674 KB, 3 MB, 0 GB), "/usr/lib/libpthread.so": Size: 14616 (14 KB, 0 MB, 0 GB), "/usr/lib/crti.o": Size: 872 (0 KB, 0 MB, 0 GB), "/usr/lib/libssp_nonshared.so": Size: 14640 (14 KB, 0 MB, 0 GB), "/usr/lib/libutil.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libdl.so": Size: 14592 (14 KB, 0 MB, 0 GB), "/usr/lib/libresolv.so": Size: 14608 (14 KB, 0 MB, 0 GB), "/usr/bin/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/bin/initrd": Size: 6128 (5 KB, 0 MB, 0 GB), "/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/libc.so": Size: 3762832 (3674 KB, 3 MB, 0 GB), "/lib/ld64.so.1": Size: 863232 (843 KB, 0 MB, 0 GB), "/bin/": Size: 0 (0 KB, 0 MB, 0 GB), 
-[16.56.50] Found PS/2 Keyboard IRQ 1 !
-[16.56.50] Registered PS/2 Keyboard IRQ at 34
-[16.56.50] PS/2 Keyboard is initializied !
-[16.56.50] Scheduling initializied
-[16.56.50] Syscall initializied
-[16.56.50] SSE Is enabled (or not) 
-[16.56.50] Kernel is initializied !
-[16.56.50] Loaded initrd !
-[16.56.51] Copying st1ack
-[16.56.51] Copying st1ack
-[16.56.51] Initrd: stack_start: 0x0, stack_end: 0x0
+[12.16.6] Bootloader: Limine 8.7.0
+[12.16.6] RSDP: 0xF6540
+[12.16.6] HHDM: 0xFFFF800000000000
+[12.16.6] Kernel: Phys: 0x37D05000, Virt: 0xFFFFFFFF80000000
+[12.16.6] Framebuffer: Addr: 0xFFFF8000FD000000, Resolution: 1280x800x32
+[12.16.6] Memmap: Start: 0xFFFF800037868000, Entry_count: 16
+[12.16.6] Entry #0. Base: 0x1000, size: 0x52000, type: Non usable (5)
+[12.16.6] Entry #1. Base: 0x53000, size: 0x4C000, type: Usable (0)
+[12.16.6] Entry #2. Base: 0x9FC00, size: 0x400, type: Non usable (1)
+[12.16.6] Entry #3. Base: 0xF0000, size: 0x10000, type: Non usable (1)
+[12.16.6] Entry #4. Base: 0x100000, size: 0x37768000, type: Usable (0)
+[12.16.6] Entry #5. Base: 0x37868000, size: 0x29000, type: Non usable (5)
+[12.16.6] Entry #6. Base: 0x37891000, size: 0x465000, type: Non usable (6)
+[12.16.6] Entry #7. Base: 0x37CF6000, size: 0xF000, type: Non usable (5)
+[12.16.6] Entry #8. Base: 0x37D05000, size: 0x810E000, type: Non usable (6)
+[12.16.6] Entry #9. Base: 0x3FE13000, size: 0x1CC000, type: Non usable (5)
+[12.16.6] Entry #10. Base: 0x3FFDF000, size: 0x21000, type: Non usable (1)
+[12.16.6] Entry #11. Base: 0xB0000000, size: 0x10000000, type: Non usable (1)
+[12.16.6] Entry #12. Base: 0xFD000000, size: 0x3E8000, type: Non usable (7)
+[12.16.6] Entry #13. Base: 0xFED1C000, size: 0x4000, type: Non usable (1)
+[12.16.6] Entry #14. Base: 0xFFFC0000, size: 0x40000, type: Non usable (1)
+[12.16.6] Entry #15. Base: 0xFD00000000, size: 0x300000000, type: Non usable (1)
+[12.16.6] Biggest entry: Base: 0x100000, Size: 0x37768000 (887 MB)
+[12.16.6] PMM Initializied
+[12.16.6] Mapping usable memory
+[12.16.6] Mapping framebuffer
+[12.16.6] Mapping bootloader reclaimable
+[12.16.6] Activating paging
+[12.16.6] Mapping kernel
+[12.16.6] Paging Initializied
+[12.16.6] KHeap Initializied
+[12.16.6] BSP CPU Data test: 1:0xFFFF80000034F018 2:0xFFFF80000034F018
+[12.16.6] GDT Initializied
+[12.16.6] IDT Initializied
+[12.16.6] [UACPI:3] RSDP 0x00000000000F6540 00000000 v00 (BOCHS )
+[12.16.6] [UACPI:3] RSDT 0x000000003FFE230E 00000038 v01 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] DSDT 0x000000003FFE0040 000020C6 v01 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] FACP 0x000000003FFE2106 000000F4 v03 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] APIC 0x000000003FFE21FA 00000078 v03 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] HPET 0x000000003FFE2272 00000038 v01 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] MCFG 0x000000003FFE22AA 0000003C v01 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] WAET 0x000000003FFE22E6 00000028 v01 (BOCHS  BXPC    )
+[12.16.6] [UACPI:3] FACS 0x000000003FFE0000 00000040
+[12.16.6] 64 Bit HPET: 0xFFFF8000FED00000
+[12.16.6] HPET Initializied
+[12.16.6] IOAPIC: Start: 0xFFFF80003FFE2226, End: 0xFFFF80003FFE229E
+[12.16.6] MADT Entry 0: Length: 0x8, Type: 0x0, Addr: 0xFFFF80003FFE2226
+[12.16.6] MADT Entry 1: Length: 0xC, Type: 0x1, Addr: 0xFFFF80003FFE222E
+[12.16.6] IOAPIC 0: Base: 0xFEC00000, GSI_Base: 0x0
+[12.16.6] MADT Entry 2: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE223A
+[12.16.6] ISO 0: Source: 0, GSI: 2, Bus: 0, Flags: 0x0
+[12.16.6] MADT Entry 3: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2244
+[12.16.6] ISO 1: Source: 5, GSI: 5, Bus: 0, Flags: 0xD
+[12.16.6] MADT Entry 4: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE224E
+[12.16.6] ISO 2: Source: 9, GSI: 9, Bus: 0, Flags: 0xD
+[12.16.6] MADT Entry 5: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2258
+[12.16.6] ISO 3: Source: 10, GSI: 10, Bus: 0, Flags: 0xD
+[12.16.6] MADT Entry 6: Length: 0xA, Type: 0x2, Addr: 0xFFFF80003FFE2262
+[12.16.6] ISO 4: Source: 11, GSI: 11, Bus: 0, Flags: 0xD
+[12.16.6] MADT Entry 7: Length: 0x6, Type: 0x4, Addr: 0xFFFF80003FFE226C
+[12.16.6] IOAPIC Initializied
+[12.16.6] [UACPI:3] successfully loaded 1 AML blob, 1705 ops in 14ms (avg 118801/s)
+[12.16.6] [UACPI:3] namespace initialization done in 6ms: 36 devices, 0 thermal zones
+[12.16.6] [UACPI:3] enabled 2 GPEs in block _GPE@[0->64]
+[12.16.6] ACPI Initializied
+[12.16.6] LAPIC Initializied
+[12.16.6] CPUs count: 1
+[12.16.6] MP Initializied
+[12.16.6] PowerButton initializied
+[12.16.6] TmpFS initializied
+[12.16.6] DevFS initializied
+[12.16.6] VFS Initializied
+[12.16.6] Adding protection to head
+[12.16.6] Valid initrd !
+[12.16.7] Loaded initrd
+[12.16.7] tmpfs dump: "/": Size: 13552 (13 KB, 0 MB, 0 GB), "/head": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/lib/ld64.so.1": Size: 851640 (831 KB, 0 MB, 0 GB), "/lib/libc.so": Size: 3610696 (3526 KB, 3 MB, 0 GB), "/usr/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/bin/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/bin/initrd": Size: 6128 (5 KB, 0 MB, 0 GB), "/usr/lib/": Size: 0 (0 KB, 0 MB, 0 GB), "/usr/lib/crt0.o": Size: 1032 (1 KB, 0 MB, 0 GB), "/usr/lib/crti.o": Size: 1000 (0 KB, 0 MB, 0 GB), "/usr/lib/crtn.o": Size: 776 (0 KB, 0 MB, 0 GB), "/usr/lib/ld.so": Size: 851640 (831 KB, 0 MB, 0 GB), "/usr/lib/libc.so": Size: 3610696 (3526 KB, 3 MB, 0 GB), "/usr/lib/libdl.so": Size: 14520 (14 KB, 0 MB, 0 GB), "/usr/lib/libm.so": Size: 14520 (14 KB, 0 MB, 0 GB), "/usr/lib/libpthread.so": Size: 14544 (14 KB, 0 MB, 0 GB), "/usr/lib/libresolv.so": Size: 14544 (14 KB, 0 MB, 0 GB), "/usr/lib/librt.so": Size: 14520 (14 KB, 0 MB, 0 GB), "/usr/lib/libssp.so": Size: 14528 (14 KB, 0 MB, 0 GB), "/usr/lib/libssp_nonshared.so": Size: 14576 (14 KB, 0 MB, 0 GB), "/usr/lib/libutil.so": Size: 14528 (14 KB, 0 MB, 0 GB), "/bin/": Size: 0 (0 KB, 0 MB, 0 GB), 
+[12.16.7] Found PS/2 Keyboard IRQ 1 !
+[12.16.7] Registered PS/2 Keyboard IRQ at 34
+[12.16.7] PS/2 Keyboard is initializied !
+[12.16.7] Scheduling initializied
+[12.16.7] Syscall initializied
+[12.16.7] SSE Is enabled (or not) 
+[12.16.7] Kernel is initializied !
+[12.16.7] Loaded initrd !
+[12.16.7] Copying st1ack
+[12.16.7] Copying st1ack
+[12.16.7] Initrd: stack_start: 0x0, stack_end: 0x0
 Hello, world from /dev/tty !
-[16.56.51] Waiting for interrupts...
+[12.16.7] Waiting for interrupts...
 [2J [1;1HHello, World from Libc !
-Hello, from child process 4 !
 Hello, from parent process 1 !
+Hello, from child process 4 !
 You can type now from children process...
 
-Hello, World from children fork() with ps/2 keyboard !
+Hello, World !sssxSSSsssdcxczxc
+v
+cvc
+v
+v
+vvvc
+
+CTRL 3 
+
+
+CTRL + C_**__==++00))99((88**77&&66^^55%%44$$33##22@@11!!``~~		sasaasaaAX

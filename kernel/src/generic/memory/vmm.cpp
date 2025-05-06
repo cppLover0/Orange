@@ -94,7 +94,7 @@ vmm_obj_t* __vmm_find(vmm_obj_t* vmm_start,uint64_t base,uint64_t length) {
             uint64_t current_end = base + length;
 
             if(current->base == base) {
-                delete vmm_new;
+                KHeap::Free(vmm_new);
                 vmm_new = current;
                 break;
             }
@@ -224,6 +224,25 @@ void VMM::Modify(process_t* proc,uint64_t dest_base,uint64_t new_phys) {
     }
     
 
+}
+
+void VMM::Free(process_t* proc) {
+    
+    vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+    vmm_obj_t* next = current->next;
+    while (current)
+    {
+        next = current->next;
+
+        PMM::BigFree(current->phys,current->len / PAGE_SIZE);
+        KHeap::Free(current);
+
+        current = next;
+    }
+
+    current = new vmm_obj_t;
+
+    VMM::Init(proc);
 }
 
 void VMM::Clone(process_t* dest_proc,process_t* src_proc) {

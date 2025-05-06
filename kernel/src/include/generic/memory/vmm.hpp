@@ -24,6 +24,8 @@ public:
     static void Modify(process_t* proc,uint64_t dest_base,uint64_t new_phys);
     static vmm_obj_t* Get(process_t* proc,uint64_t base);
 
+    static void Free(process_t* proc);
+
     static void Reload(process_t* proc);
 
     static void Dump(process_t* proc);
