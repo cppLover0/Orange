@@ -11,6 +11,7 @@
 #include <generic/VFS/vfs.hpp>
 #include <generic/memory/heap.hpp>
 #include <other/string.hpp>
+#include <generic/locks/spinlock.hpp>
 #include <generic/memory/vmm.hpp>
 #include <other/assembly.hpp>
 
@@ -32,8 +33,10 @@ uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t le
     uint64_t* temp_stack = stack;
 
     for(uint64_t i = 0;i < len; i++) {
+        //Log("0x%p\n",arr[i]);
         PUT_STACK_STRING(temp_stack,arr[i])
         out[i] = (char*)temp_stack;
+        PUT_STACK(temp_stack,0);
         temp_stack -= CALIGNPAGEUP(String::strlen(arr[i]),8);
     }
 
@@ -55,7 +58,10 @@ uint64_t* __elf_copy_to_stack_without_out(uint64_t* arr,uint64_t* stack,uint64_t
 
 }
 
+char elf_spinlock = 0;
+
 ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* stack,char** argv,char** envp,process_t* proc) {
+
     elfheader_t* head = (elfheader_t*)base;
 
     elfprogramheader_t* current_head;
@@ -146,45 +152,40 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     //Log("Put stack\n");
 
-    if(!stack && proc)  {
+    if(argv && envp && ((uint64_t)stack != 1) && proc) {
+
+        spinlock_lock(&elf_spinlock);
 
         stack = (uint64_t*)VMM::Alloc(proc,(PROCESS_STACK_SIZE + 1) * PAGE_SIZE,PTE_RW | PTE_PRESENT | PTE_USER);
 
         proc->user_stack_start = (uint64_t)stack;
-    
+        
         uint64_t* prepare_cr3 = Paging::KernelGet();
-
+    
         uint64_t virt = (uint64_t)proc->user_stack_start;
         uint64_t phys = VMM::Get(proc,(uint64_t)stack)->phys;
-
-        //Log("ddd\n");
+    
+            //Log("ddd\n");
         for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
             Paging::Map(prepare_cr3,phys + (i * PAGE_SIZE),virt + (i * PAGE_SIZE),PTE_PRESENT | PTE_RW);
             __invlpg(virt + (i * PAGE_SIZE));
         }
-
+    
         stack = (uint64_t*)((uint64_t)stack + (PROCESS_STACK_SIZE * PAGE_SIZE));
-
-        //Log("stack: 0x%p\n",stack);
-    }
-
-    if(stack && argv && envp && ((uint64_t)stack != 1)) {
-
         uint64_t* _stack = stack;
 
         uint64_t auxv_stack[] = {(uint64_t)head->e_entry,AT_ENTRY,phdr,AT_PHDR,head->e_phentsize,AT_PHENT,head->e_phnum,AT_PHNUM,PAGE_SIZE,AT_PAGESZ};
         uint64_t argv_length = __elf_get_length(argv);
         uint64_t envp_length = __elf_get_length(envp);
 
-        char** stack_argv = (char**)KHeap::Malloc(8 * argv_length);
-        char** stack_envp = (char**)KHeap::Malloc(8 * envp_length);
-        //Log("CXC");
+        char** stack_argv = (char**)KHeap::Malloc(8 * (argv_length + 1));
+        char** stack_envp = (char**)KHeap::Malloc(8 * (envp_length + 1));
+
+        String::memset(stack_argv,0,8 * (argv_length + 1));
+        String::memset(stack_envp,0,8 * (envp_length + 1));
 
         _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
-        //Log("CXC");
         _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
-
-        //Log("CXC");
 
         PUT_STACK(_stack,0);
 
@@ -202,6 +203,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         KHeap::Free(stack_argv);
         KHeap::Free(stack_envp);
 
+        spinlock_unlock(&elf_spinlock);
+
     } else {
         res.ready_stack = stack;
         res.argv = 0;
@@ -209,7 +212,9 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         res.argc = 0;
     }
 
-    Log("Copying st1ack\n");
+    //Log("Copying st1ack\n");
+
+    //spinlock_unlock(&elf_spinlock);
 
     return res;
 

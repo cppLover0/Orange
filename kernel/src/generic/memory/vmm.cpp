@@ -230,12 +230,21 @@ void VMM::Free(process_t* proc) {
     
     vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
     vmm_obj_t* next = current->next;
+    
+    LimineInfo info;
+
     while (current)
     {
         next = current->next;
 
+        if(current->base == info.hhdm_offset - PAGE_SIZE)
+            next = 0;
+
         PMM::BigFree(current->phys,current->len / PAGE_SIZE);
         KHeap::Free(current);
+
+        if(!next)   
+            break;
 
         current = next;
     }

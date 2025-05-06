@@ -101,25 +101,27 @@ char __ps2_read(char keycodeps2) {
 }
 
 int main() {
-    printf("Hello, World from Libc !\n");
+    //printf("Hello, World from Libc !\n");
     int i = fork();
 
     if(i == 0) {
         printf("Hello, from child process %d !\n",getpid());
-        printf("You can type now from children process...\n");
+        
+        execl("/usr/bin/exec_test","hello","world",NULL);
+        
+    } 
+    else {
+        printf("Hello, from parent process %d !\n",getpid());
+
+        printf("You can type now from parent process...\n");
         char key = 0;
         while(1) {
             read(STDIN_FILENO,&key,1);
             key = __ps2_read(key);
             if(key)
                 write(STDOUT_FILENO,&key,1);
+
         }
-        
+
     } 
-    else {
-        printf("Hello, from parent process %d !\n",getpid());
-
-    }
-
-    while(1) ;
 }

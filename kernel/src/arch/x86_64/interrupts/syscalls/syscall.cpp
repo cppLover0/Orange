@@ -148,6 +148,8 @@ int syscall_open(int_frame_t* ctx) {
         first = "/";
 
     char* path = join_paths(first,buffer);
+
+    //Log("OPEN %s %s %s\n",path,first,buffer);
     
     //Log("%s\n",path);
 
@@ -571,15 +573,113 @@ int syscall_dump_memory(int_frame_t* ctx) {
     return 0;
 }
 
+//[[gnu::weak]] int sys_execve(const char *path, char *const argv[], char *const envp[]);
+
+uint64_t __elf_get_length2(char** arr) {
+    uint64_t counter = 0;
+
+    while(arr[counter])
+        counter++;
+
+    return counter;
+}
+
 int syscall_exec(int_frame_t* ctx) {
-    /*
-    Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
-    Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
-    uint64_t phys_stack = HHDM::toPhys((uint64_t)stack_start);
-    for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
-        Paging::HHDMMap(cr3,phys_stack + (i * PAGE_SIZE),proc->user ? PTE_PRESENT | PTE_RW | PTE_USER : PTE_PRESENT | PTE_RW);
+    
+    char* path = (char*)ctx->rdi;
+    char** argv = (char**)ctx->rsi;
+    char** envp = (char**)ctx->rdx;
+
+    process_t* proc = CpuData::Access()->current;
+
+    uint64_t argv_length = 0;
+    uint64_t envp_length = 0;
+
+    //Paging::MemoryEntry((uint64_t*)HHDM::toVirt(ctx->cr3),LIMINE_MEMMAP_FRAMEBUFFER,PTE_RW | PTE_PRESENT);
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+
+    argv_length = __elf_get_length2((char**)argv);
+    envp_length = __elf_get_length2((char**)envp);
+
+    Paging::EnableKernel();
+
+    char** stack_argv = (char**)KHeap::Malloc(8 * (argv_length + 1));
+    char** stack_envp = (char**)KHeap::Malloc(8 * (envp_length + 1));
+
+    char stack_path[2048];
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+
+    String::memset(stack_argv,0,8 * (argv_length + 1));
+    String::memset(stack_envp,0,8 * (envp_length + 1));
+
+    for(int i = 0;i < argv_length; i++) {
+
+        char* str = argv[i];
+
+        char* new_str = (char*)KHeap::Malloc(String::strlen(str) + 1);
+
+        String::memcpy(new_str,str,String::strlen(str));
+
+        stack_argv[i] = new_str;
+
     }
-        */
+
+    for(int i = 0;i < envp_length; i++) {
+
+        char* str = envp[i];
+
+        char* new_str = (char*)KHeap::Malloc(String::strlen(str) + 1);
+
+        String::memcpy(new_str,str,String::strlen(str));
+
+        stack_envp[i] = new_str;
+
+    }
+
+    String::memset(stack_path,0,2048);
+    String::memcpy(stack_path,path,String::strlen(path));
+
+    Paging::EnableKernel();
+
+    char* first = proc->cwd;
+    if(!first)
+        first = "/";
+
+    char* path1 = join_paths(first,stack_path);
+
+    VMM::Free(proc);
+
+    VMM::Init(proc);
+
+    filestat_t stat;
+
+    VFS::Stat(path1,(char*)&stat);
+
+    char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
+
+    VFS::Read(elf,path1,0);
+
+    String::memset(&proc->ctx,0,sizeof(int_frame_t));
+
+    proc->ctx.cs = 0x20 | 3;
+    proc->ctx.ss = 0x18 | 3;
+    proc->ctx.rflags = (1 << 9); // setup IF
+
+    fd_t* current_fd = (fd_t*)proc->start_fd;
+    while(current_fd) {
+
+        current_fd->seek_offset = 0;
+
+        current_fd = current_fd->next;
+    }
+
+    VMM::Reload(proc);
+
+    Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
+
+    schedulingSchedule(0);
+
 }
 
 syscall_t syscall_table[] = {
@@ -600,7 +700,8 @@ syscall_t syscall_table[] = {
     {15,syscall_fork},
     {16,syscall_exec},
     {17,syscall_getpid},
-    {18,syscall_dump_memory}
+    {18,syscall_dump_memory},
+    {19,syscall_exec}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -615,16 +716,15 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log("Syscall %d\n",ctx->rax);
-    
+    //Log("Syscall: %d\n",ctx->rax);
+
     if(sys == 0) {
         ctx->rax = -1;
         return;
     }
 
     ctx->rax = sys->func(ctx);
-    //Log("done\n");
-    
+
     return;
 }
 
