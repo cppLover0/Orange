@@ -169,6 +169,23 @@ int VFS::AskForPipe(char* filename,pipe_t* pipe) {
     return status;
 }
 
+int VFS::InstantPipeRead(char* filename,pipe_t* pipe) {
+    if(!filename) return -1;
+
+    spinlock_lock(&vfs_spinlock);
+    
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+
+    if(!fs->fs->instantreadpipe) return -15;
+    
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+    int status = fs->fs->instantreadpipe(filename_as_fs,pipe);
+    spinlock_unlock(&vfs_spinlock);
+    return status;
+}
+
 void VFS::Init() {
     filesystem_t* tmpfs = new filesystem_t;
     mount_points[0].loc = "/";

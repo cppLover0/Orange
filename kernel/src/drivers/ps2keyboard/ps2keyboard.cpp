@@ -101,7 +101,8 @@ void __kbd_send_ipc(uint8_t keycode) {
         if(current->is_used_anymore && current->pipe) {
             current->pipe->buffer[0] = keycode;
             current->pipe->buffer_size = 1;
-            current->is_used_anymore = 0;
+            if(current->pipe->type == PIPE_WAIT)
+                current->is_used_anymore = 0;
             current->pipe->is_received = 0; 
         }
         current = current->next;
@@ -115,6 +116,8 @@ int kbd_askforpipe(pipe_t* pipe) {
 
     pip->pipe = pipe;
     pip->is_used_anymore = 1;
+    pip->pipe->type = PIPE_INSTANT;
+    pip->pipe->is_used = 1;
 
     return 0;
 
@@ -181,7 +184,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
     }
 
-    devfs_reg_device("/kbd",0,kbd_read,kbd_askforpipe);
+    devfs_reg_device("/kbd",0,kbd_read,kbd_askforpipe,0);
 
     Log("PS/2 Keyboard is initializied !\n");
 

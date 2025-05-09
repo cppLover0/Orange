@@ -323,6 +323,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         stdin->parent = 0;
         stdin->next = 0;
         stdin->proc = proc;
+        stdin->pipe.type = PIPE_INSTANT;
         stdin->type = FD_PIPE; 
         stdin->pipe.parent = proc;
 

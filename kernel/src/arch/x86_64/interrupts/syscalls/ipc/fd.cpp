@@ -39,8 +39,13 @@ int FD::Create(process_t* proc,char is_pipe) {
     current->pipe.buffer = 0;
     current->pipe.buffer_size = 0;
     current->pipe.is_received = 0;
+    current->pipe.type = PIPE_WAIT;
+
+    current->pipe.is_used = 0;
+    
     current->type = is_pipe ? FD_PIPE : FD_FILE;
     current->proc = proc;
+    
 
     if(is_pipe)
         current->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);

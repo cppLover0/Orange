@@ -8,12 +8,19 @@
 #define FD_FILE 1
 #define FD_PIPE 2
 
+#define PIPE_WAIT 0
+#define PIPE_INSTANT 1
+
 typedef struct {
 
     char* buffer;
     uint64_t buffer_size;
 
     process_t* parent;
+
+    int type;
+
+    int is_used;
 
     _Atomic char is_received;
 

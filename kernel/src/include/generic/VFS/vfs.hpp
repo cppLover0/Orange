@@ -25,6 +25,7 @@ typedef struct {
     int (*stat)(char* filename,char* buffer);
 
     int (*askforpipe)(char* filename,pipe_t* pipe);
+    int (*instantreadpipe)(char* filename, pipe_t* pipe);
 
     char is_in_ram;
     disk_t* disk;
@@ -67,4 +68,5 @@ public:
     static char Exists(char* filename);
     static int Stat(char* filename,char* buffer);
     static int AskForPipe(char* filename,pipe_t* pipe);
+    static int InstantPipeRead(char* filename,pipe_t* pipe);
 };
