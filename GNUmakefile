@@ -24,6 +24,15 @@ endif
 .PHONY: run-build
 run-build:all run
 
+.PHONY: headers
+headers:
+	rm -rf orange-cross-compiler-headers
+	git clone https://github.com/cpplover0/orange-cross-compiler-headers
+	mkdir -p initrd/usr/include
+	rm -rf initrd/usr/include/*
+	cp -rf orange-cross-compiler-headers/* initrd/usr/include
+	rm -rf orange-cross-compiler-headers
+
 .PHONY: initrd
 initrd: initrd_build
 	rm -rf iso_etc/boot/initrd.tar
@@ -33,7 +42,7 @@ initrd: initrd_build
 initrd_build:
 	rm -rf initrd/bin/initrd
 	mkdir -p initrd/bin
-	x86_64-orange-gcc initrd_etc/src/main.c -o initrd/usr/bin/initrd -Wl,-Bdynamic
+	x86_64-orange-gcc initrd_etc/src/main.c -o initrd/usr/bin/init -Wl,-Bdynamic
 
 
 

@@ -102,18 +102,5 @@ char __ps2_read(char keycodeps2) {
 
 int main() {
     printf("Hello, World !\n");
-    char c = 0;
-    while(1) {
-        ssize_t result = read(STDIN_FILENO, &c, 1);
-        if(result > 0) {
-            c = __ps2_read(c);
-            write(STDOUT_FILENO,&c,1);
-        }
-        else if(result == -1) {
-            perror("Error while reading\n");
-            break;
-        }
-
-
-    }
+    execl("/usr/bin/exec_test","/usr/bin/exec_test",NULL);
 }

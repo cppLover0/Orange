@@ -7,6 +7,7 @@ trash
 serial_output.txt
 kernel-deps
 limine
+initrd/usr/include
 kernel/bin
 kernel/cc-runtime
 kernel/cc-runtime-x86_64
@@ -15,3 +16,4 @@ kernel/freestnd-cxx-hdrs
 main.o
 serial.txt
 output.txt
+Orange-distro-build

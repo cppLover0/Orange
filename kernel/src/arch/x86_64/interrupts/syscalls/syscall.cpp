@@ -694,31 +694,67 @@ int syscall_exec(int_frame_t* ctx) {
 
     filestat_t stat;
 
-    VFS::Stat(path1,(char*)&stat);
+    int status = VFS::Stat(path1,(char*)&stat);
 
-    char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
+    if(!status) {
+        char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
 
-    VFS::Read(elf,path1,0);
+        VFS::Read(elf,path1,0);
 
-    String::memset(&proc->ctx,0,sizeof(int_frame_t));
+        String::memset(&proc->ctx,0,sizeof(int_frame_t));
 
-    proc->ctx.cs = 0x20 | 3;
-    proc->ctx.ss = 0x18 | 3;
-    proc->ctx.rflags = (1 << 9); // setup IF
+        proc->ctx.cs = 0x20 | 3;
+        proc->ctx.ss = 0x18 | 3;
+        proc->ctx.rflags = (1 << 9); // setup IF
 
-    fd_t* current_fd = (fd_t*)proc->start_fd;
-    while(current_fd) {
+        fd_t* current_fd = (fd_t*)proc->start_fd;
+        while(current_fd) {
 
-        current_fd->seek_offset = 0;
+            current_fd->seek_offset = 0;
 
-        current_fd = current_fd->next;
+            current_fd = current_fd->next;
+        }
+
+        VMM::Reload(proc);
+
+        Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
+
+        for(int i = 0;i < argv_length; i++) {
+
+            KHeap::Free(stack_argv[i]);
+    
+        }
+    
+        for(int i = 0;i < envp_length; i++) {
+    
+            KHeap::Free(stack_envp[i]);
+    
+        }
+    
+        KHeap::Free(stack_argv);
+        KHeap::Free(stack_envp);
+        PMM::VirtualFree(path1);
+
+        PMM::VirtualBigFree(elf,CALIGNPAGEUP(stat.size,4096) / 4096);
+
+        schedulingSchedule(0);
     }
 
-    VMM::Reload(proc);
+    for(int i = 0;i < argv_length; i++) {
 
-    Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
+        KHeap::Free(stack_argv[i]);
 
-    schedulingSchedule(0);
+    }
+
+    for(int i = 0;i < envp_length; i++) {
+
+        KHeap::Free(stack_envp[i]);
+
+    }
+
+    KHeap::Free(stack_argv);
+    KHeap::Free(stack_envp);
+    PMM::VirtualFree(path1);
 
 }
 
