@@ -30,7 +30,7 @@ headers:
 	git clone https://github.com/cpplover0/orange-cross-compiler-headers
 	mkdir -p initrd/usr/include
 	rm -rf initrd/usr/include/*
-	cp -rf orange-cross-compiler-headers/* initrd/usr/include
+	cp -rf orange-cross-compiler-headers/include/* initrd/usr/include
 	rm -rf orange-cross-compiler-headers
 
 .PHONY: initrd
