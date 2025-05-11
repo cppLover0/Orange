@@ -19,6 +19,7 @@
 #include <other/other.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <generic/memory/vmm.hpp>
+#include <generic/VFS/ustar.hpp>
 #include <other/assert.hpp>
 
 extern "C" void syscall_handler();
@@ -147,10 +148,11 @@ int syscall_open(int_frame_t* ctx) {
     if(!first)
         first = "/";
 
-    char* path = join_paths(first,buffer);
+    char buf[1024];
+    char* path = (char*)buf;
+    String::memset(buf,0,1024);
+    resolve_path(buffer,first,path);
 
-    //Log("OPEN %s %s %s\n",path,first,buffer);
-    
     //Log("%s\n",path);
 
     int fd = FD::Create(proc,0);
@@ -646,7 +648,7 @@ int syscall_exec(int_frame_t* ctx) {
     char** stack_argv = (char**)KHeap::Malloc(8 * (argv_length + 1));
     char** stack_envp = (char**)KHeap::Malloc(8 * (envp_length + 1));
 
-    char stack_path[2048];
+    char stack_path[1024];
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
 
@@ -677,7 +679,7 @@ int syscall_exec(int_frame_t* ctx) {
 
     }
 
-    String::memset(stack_path,0,2048);
+    String::memset(stack_path,0,1024);
     String::memcpy(stack_path,path,String::strlen(path));
 
     Paging::EnableKernel();
@@ -686,7 +688,11 @@ int syscall_exec(int_frame_t* ctx) {
     if(!first)
         first = "/";
 
-    char* path1 = join_paths(first,stack_path);
+    char buf[1024];
+    char* path1 = (char*)buf;
+    String::memset(buf,0,1024);
+
+    resolve_path(stack_path,first,path1);
 
     VMM::Free(proc);
 
@@ -733,7 +739,7 @@ int syscall_exec(int_frame_t* ctx) {
     
         KHeap::Free(stack_argv);
         KHeap::Free(stack_envp);
-        PMM::VirtualFree(path1);
+        //PMM::VirtualFree(path1);
 
         PMM::VirtualBigFree(elf,CALIGNPAGEUP(stat.size,4096) / 4096);
 

@@ -101,7 +101,15 @@ void resolve_path(const char* inter,const char* base, char *result) {
     uint64_t ptr = String::strlen((char*)base);
     char is_first = 1;
 
+    String::memset(buffer_in_stack,0,1024);
+    String::memset(buffer2_in_stack,0,1024);
+
     String::memcpy(final_buffer,base,String::strlen((char*)base));
+
+    if(final_buffer[0] == '/') {
+        ptr = 0;
+        String::memset(final_buffer,0,1024);
+    }
 
     buffer = __ustar__strtok((char*)inter,"/");
     while(buffer) {
@@ -193,7 +201,11 @@ void USTAR::ParseAndCopy() {
             aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
 
             char result_path[MAX_PATH];
+            String::memset(result_path,0,MAX_PATH);
+
             resolve_path(current->name_linked,filename,result_path);
+
+            //Log("PATH: %s\n",result_path);
 
             VFS::Write((char*)result_path,filename,String::strlen(result_path),1);
         } else {

@@ -209,14 +209,13 @@ int tmpfs_stat(char* filename,char* buffer) {
     if(!String::strcmp(filename,"/")) return 4;
 
     if(!tmpfs_scan_for_file(filename)) return 5;
-
     data_file_t* file = tmpfs_scan_for_file(filename);
     while(file) {
         if(file->type != TMPFS_TYPE_SYMLINK)
             break;
         file = tmpfs_scan_for_file(file->content);
+        
     }
-
     filestat_t stat;
     stat.size = file->size_of_content;
     stat.file_create_date = file->file_create_date;
@@ -227,9 +226,7 @@ int tmpfs_stat(char* filename,char* buffer) {
     stat.fs_prefix2 = 'M';
     stat.fs_prefix3 = 'P';
     stat.content = file->content;
-
     String::memcpy(buffer,&stat,sizeof(filestat_t));
-
     return 0;
 }
 

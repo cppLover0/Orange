@@ -42,7 +42,7 @@ initrd: initrd_build
 initrd_build:
 	rm -rf initrd/bin/initrd
 	mkdir -p initrd/bin
-	x86_64-orange-gcc initrd_etc/src/main.c -o initrd/usr/bin/init -Wl,-Bdynamic
+	x86_64-orange-gcc initrd_etc/src/main.c -o initrd/usr/bin/initrd -Wl,-Bdynamic
 
 
 

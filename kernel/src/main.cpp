@@ -182,9 +182,9 @@ extern "C" void kmain() {
     filestat_t stat;
 
     VFS::Stat("/usr/bin/initrd",(char*)&stat);
+    
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
-
     VFS::Read(elf,"/usr/bin/initrd",0);
 
     Log("Loaded initrd !\n");
