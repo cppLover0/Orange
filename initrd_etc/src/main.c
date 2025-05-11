@@ -102,5 +102,5 @@ char __ps2_read(char keycodeps2) {
 
 int main() {
     printf("Hello, World !\n");
-    execl("/usr/bin/exec_test","/usr/bin/exec_test",NULL);
+    execl("exec_test","/usr/bin/exec_test",NULL);
 }

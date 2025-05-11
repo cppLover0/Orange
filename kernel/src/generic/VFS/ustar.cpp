@@ -106,7 +106,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
 
     String::memcpy(final_buffer,base,String::strlen((char*)base));
 
-    if(final_buffer[0] == '/') {
+    if(inter[0] == '/') {
         ptr = 0;
         String::memset(final_buffer,0,1024);
     }
@@ -135,7 +135,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
             }
 
 
-        } else {
+        } else if(buffer[0] != '.' && buffer[1] != '\0') {
 
             final_buffer[ptr] = '/';
             ptr++;
@@ -144,6 +144,8 @@ void resolve_path(const char* inter,const char* base, char *result) {
             String::memcpy((char*)((uint64_t)final_buffer + ptr),buffer,mm);
             ptr += mm;
             final_buffer[ptr] = '\0';
+        } else {
+            ptr++;
         }
 
         buffer = __ustar__strtok(0,"/");
@@ -151,6 +153,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
     
     String::memset(result,0,1024);
     String::memcpy(result,final_buffer,String::strlen(final_buffer));
+    
 
 }
 
