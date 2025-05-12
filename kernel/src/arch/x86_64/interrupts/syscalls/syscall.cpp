@@ -845,7 +845,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    Log("Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
+    //Log("Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
 
     if(sys == 0) {
         ctx->rax = -1;

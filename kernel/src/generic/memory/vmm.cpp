@@ -165,13 +165,10 @@ void* VMM::Alloc(process_t* proc,uint64_t length,uint64_t flags) {
     vmm_new->src_len = length;
 
     uint64_t phys = 0;
-
-    Log("HMMMM 0x%p\n",length);
     if(length < PAGE_SIZE)
         phys = PMM::Alloc();
     else if(length > PAGE_SIZE)
         phys = PMM::BigAlloc(ALIGNPAGEUP(length) / PAGE_SIZE);
-    Log("CRY\n");
 
     if(!phys) {
         Log("alloc error() ram is gone :(\n");
