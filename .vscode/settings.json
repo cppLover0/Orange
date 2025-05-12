@@ -31,6 +31,8 @@
         "cstddef": "cpp",
         "source_location": "cpp",
         "flanterm_private.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "typeindex": "cpp",
+        "typeinfo": "cpp"
     }
 }

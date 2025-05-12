@@ -197,7 +197,6 @@ int tmpfs_readfile(char* buffer,char* filename,long hint_size) {
     }
 
     String::memcpy(buffer,start,file->size_of_content);
-
     return 0;
 }
 

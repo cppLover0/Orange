@@ -100,7 +100,23 @@ char __ps2_read(char keycodeps2) {
 
 }
 
+void forkandexec(const char* name) {
+    int ia = fork();
+    printf("Fokr %d\n",ia);
+    if(ia == 0) {
+        printf("Execin\n");
+        execl(name,name,NULL);
+    } 
+
+    return;
+
+}
+
 int main() {
     printf("Hello, World !\n");
-    execl("exec_test","/usr/bin/exec_test",NULL);
+    int iaa = fork();
+    if(iaa) {
+        execl("/usr/bin/exec_test","exec_test",NULL);
+    }
+    while(1);
 }

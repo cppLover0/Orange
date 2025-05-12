@@ -109,10 +109,28 @@ void resolve_path(const char* inter,const char* base, char *result) {
     if(inter[0] == '/') {
         ptr = 0;
         String::memset(final_buffer,0,1024);
+        //Log("FUl");
     }
 
     buffer = __ustar__strtok((char*)inter,"/");
     while(buffer) {
+
+        //Log("%s %s\n",buffer,final_buffer);
+
+        if(is_first) {
+            uint64_t mm = resolve_count(final_buffer,ptr,'/');
+
+            if(ptr < mm) {
+                final_buffer[0] = '/';
+                final_buffer[1] = '\0';
+                ptr = 1;
+                continue;
+            } 
+
+            ptr = mm;
+            final_buffer[ptr] = '\0';
+            is_first = 0;
+        }
 
         if(!String::strcmp(buffer,"..")) {
             uint64_t mm = resolve_count(final_buffer,ptr,'/');
@@ -126,13 +144,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
 
             ptr = mm;
             final_buffer[ptr] = '\0';
-            if(is_first) {
-                uint64_t mm = resolve_count(final_buffer,ptr,'/');
-                ptr = mm;
-                final_buffer[ptr] = '\0';
-                is_first = 0;
-
-            }
+            
 
 
         } else if(buffer[0] != '.' && buffer[1] != '\0') {
@@ -144,16 +156,14 @@ void resolve_path(const char* inter,const char* base, char *result) {
             String::memcpy((char*)((uint64_t)final_buffer + ptr),buffer,mm);
             ptr += mm;
             final_buffer[ptr] = '\0';
-        } else {
-            ptr++;
-        }
-
+        } 
+        
         buffer = __ustar__strtok(0,"/");
     }
     
     String::memset(result,0,1024);
     String::memcpy(result,final_buffer,String::strlen(final_buffer));
-    
+    //Log("F %s\n",result);
 
 }
 

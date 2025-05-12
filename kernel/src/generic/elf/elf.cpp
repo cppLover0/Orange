@@ -165,18 +165,14 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         uint64_t virt = (uint64_t)proc->user_stack_start;
         uint64_t phys = VMM::Get(proc,(uint64_t)stack)->phys;
     
-            //Log("ddd\n");
-        for(uint64_t i = 0;i < PROCESS_STACK_SIZE + 1;i++) {
-            Paging::Map(prepare_cr3,phys + (i * PAGE_SIZE),virt + (i * PAGE_SIZE),PTE_PRESENT | PTE_RW);
-            __invlpg(virt + (i * PAGE_SIZE));
-        }
-    
         stack = (uint64_t*)((uint64_t)stack + (PROCESS_STACK_SIZE * PAGE_SIZE));
         uint64_t* _stack = stack;
 
         uint64_t auxv_stack[] = {(uint64_t)head->e_entry,AT_ENTRY,phdr,AT_PHDR,head->e_phentsize,AT_PHENT,head->e_phnum,AT_PHNUM,PAGE_SIZE,AT_PAGESZ};
         uint64_t argv_length = __elf_get_length(argv);
         uint64_t envp_length = __elf_get_length(envp);
+
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(proc->ctx.cr3));
 
         char** stack_argv = (char**)KHeap::Malloc(8 * (argv_length + 1));
         char** stack_envp = (char**)KHeap::Malloc(8 * (envp_length + 1));
@@ -197,6 +193,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
         _stack = __elf_copy_to_stack_without_out((uint64_t*)stack_argv,_stack,argv_length);
         PUT_STACK(_stack,argv_length);
+
+        Paging::EnableKernel();
 
         res.ready_stack = _stack;
 

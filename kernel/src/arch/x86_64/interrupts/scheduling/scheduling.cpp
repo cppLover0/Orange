@@ -145,9 +145,9 @@ void Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv
     proc->name = name;
 
     //Log(":)\n");
-
+    //Log("Loading elf\n");
     ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,0,argv,envp,proc);
-
+    //Log("don\n");
     //Log(":###\n");
 
     proc->ctx.rsp = (uint64_t)l.ready_stack;

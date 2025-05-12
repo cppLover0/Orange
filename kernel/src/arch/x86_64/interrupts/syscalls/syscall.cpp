@@ -21,6 +21,7 @@
 #include <generic/memory/vmm.hpp>
 #include <generic/VFS/ustar.hpp>
 #include <other/assert.hpp>
+#include <other/other.hpp>
 
 extern "C" void syscall_handler();
 
@@ -151,6 +152,13 @@ int syscall_open(int_frame_t* ctx) {
     char buf[1024];
     char* path = (char*)buf;
     String::memset(buf,0,1024);
+
+    int ptr = String::strlen(first);
+    String::memcpy(buf,first,ptr);
+
+    buf[ptr] = '/';
+    buf[ptr + 1] = 'd';
+
     resolve_path(buffer,first,path);
 
     //Log("%s\n",path);
@@ -506,7 +514,6 @@ int syscall_dump_tmpfs(int_frame_t* ctx) {
 }
 
 int syscall_mmap(int_frame_t* ctx) {
-    
     uint64_t hint = ctx->rdi;
     uint64_t size = ctx->rsi;
 
@@ -601,6 +608,12 @@ int syscall_fork(int_frame_t* ctx) {
 
     new_proc->ctx.rdx = 0;
 
+    new_proc->cwd = cwd_get((const char*)parent->name);
+    
+    char* name = (char*)PMM::VirtualAlloc();
+    String::memcpy(name,parent->name,String::strlen(parent->name));
+    new_proc->name = name;
+
     Process::WakeUp(id);
 
     return 0;
@@ -692,7 +705,13 @@ int syscall_exec(int_frame_t* ctx) {
     char* path1 = (char*)buf;
     String::memset(buf,0,1024);
 
-    resolve_path(stack_path,first,path1);
+    int ptr = String::strlen(first);
+    String::memcpy(buf,first,ptr);
+
+    buf[ptr] = '/';
+    buf[ptr + 1] = 'd';
+
+    resolve_path(stack_path,buf,path1);
 
     VMM::Free(proc);
 
@@ -703,11 +722,18 @@ int syscall_exec(int_frame_t* ctx) {
     int status = VFS::Stat(path1,(char*)&stat);
 
     if(!status) {
+        //Log("alloc\n");
         char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
+        //Log("reading %s 0x%p\n",path1,elf);
+        int status1 = VFS::Read(elf,path1,0);
 
-        VFS::Read(elf,path1,0);
+        if(!elf && status1) {
+            Log("exec() error: elf: 0x%p, status of read: %d\n",elf,status1);
+            return -1;
+        }
 
         String::memset(&proc->ctx,0,sizeof(int_frame_t));
+        
 
         proc->ctx.cs = 0x20 | 3;
         proc->ctx.ss = 0x18 | 3;
@@ -724,7 +750,6 @@ int syscall_exec(int_frame_t* ctx) {
         VMM::Reload(proc);
 
         Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
-
         for(int i = 0;i < argv_length; i++) {
 
             KHeap::Free(stack_argv[i]);
@@ -820,7 +845,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log("Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
+    Log("Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
 
     if(sys == 0) {
         ctx->rax = -1;
