@@ -98,7 +98,7 @@ int tmpfs_create(char* name,int type) {
     new_data->file_create_date = convertToUnixTime();
 
     if(name == "/head") {
-        Log("Adding protection to head\n");
+        Log(LOG_LEVEL_INFO,"Adding protection to head\n");
         new_data->protection = 1;
     }
 
@@ -263,7 +263,7 @@ int tmpfs_touch(char* filename) {
 void tmpfs_dump() {
     data_file_t* current = root;
     
-    Log("tmpfs dump: ");
+    Log(LOG_LEVEL_INFO,"tmpfs dump: ");
 
     while(current) {
         filestat_t stat;

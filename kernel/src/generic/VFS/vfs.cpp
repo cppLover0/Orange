@@ -191,13 +191,13 @@ void VFS::Init() {
     mount_points[0].loc = "/";
     mount_points[0].fs = tmpfs;
     TMPFS::Init(tmpfs);
-    Log("TmpFS initializied\n");
+    Log(LOG_LEVEL_INFO,"TmpFS initializied\n");
 
     filesystem_t* devfs = new filesystem_t;
     mount_points[1].loc = "/dev/";
     mount_points[1].fs = devfs;
     devfs_init(devfs);
 
-    Log("DevFS initializied\n");
+    Log(LOG_LEVEL_INFO,"DevFS initializied\n");
 
 }

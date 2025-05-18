@@ -38,7 +38,7 @@ int syscall_exit(int_frame_t* ctx) {
     }
 
     if(proc->id == 1) {
-        Log("Initrd finished with code %d!\n",proc->return_status);
+        Log(LOG_LEVEL_INFO,"Initrd finished with code %d!\n",proc->return_status);
         pAssert(0,"Initrd is killed !");
     }
 
@@ -70,7 +70,7 @@ int syscall_debug_print(int_frame_t* ctx) {
         Paging::EnableKernel();
 
 #ifdef DEBUG_PRINT
-        Log("%s\n",ptr);
+        Log(LOG_LEVEL_INFO,"%s\n",ptr);
 #endif
 
         return 0;
@@ -226,7 +226,7 @@ int syscall_seek(int_frame_t* ctx) {
             break;
 
         default:
-            Log("Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
+            Log(LOG_LEVEL_WARNING,"Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
             return 22;
 
     }
@@ -728,7 +728,7 @@ int syscall_exec(int_frame_t* ctx) {
         int status1 = VFS::Read(elf,path1,0);
 
         if(!elf && status1) {
-            Log("exec() error: elf: 0x%p, status of read: %d\n",elf,status1);
+            Log(LOG_LEVEL_ERROR,"exec() error: elf: 0x%p, status of read: %d\n",elf,status1);
             return -1;
         }
 

@@ -175,7 +175,7 @@ void USTAR::ParseAndCopy() {
 	limine_file* initrd = info.initrd->modules[0];
 
     pAssert(!String::strncmp(current->ustar,"ustar",5),"Invalid initrd");
-    Log("Valid initrd !\n");
+    Log(LOG_LEVEL_INFO,"Valid initrd !\n");
 
 	uint64_t actual_tar_ptr_end = ((uint64_t)initrd->address + initrd->size) - 1024; //substract first header and his content
 

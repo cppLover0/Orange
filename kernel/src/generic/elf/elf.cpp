@@ -126,6 +126,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     uint64_t aligned_size = ALIGNPAGEUP(size) / PAGE_SIZE;
 
+    //Log("Allocating elf memory: %d\n",size);
     void* elf_vmm = VMM::CustomAlloc(proc,elf_base,size,PTE_PRESENT | PTE_RW | PTE_USER);
 
     uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_base)->phys;

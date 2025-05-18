@@ -5,20 +5,36 @@
 #pragma once
 
 #define SIZE_TO_PAGES(size) (((size) + 4095) / 4096)
+#define LEVEL_TO_SIZE(level) (1U << (level))
 
-typedef struct bitmap {
-    uint64_t bits;
-    uint64_t size;
-    uint64_t page_count;
-} bitmap_t;
+#define MAX_LEVEL 27 //16 mb
 
-typedef struct memory_entry {
-    uint64_t base;
-    uint64_t length;
-    bitmap_t bitmap;
-} memory_entry_t;
+typedef struct {
+    int64_t level : 8;
+    int64_t is_free : 1;
+    int64_t is_splitted : 1;
+    int64_t is_was_splitted : 1;
+    int64_t split_x : 1;
+    int64_t parent_id : 48;
+} __attribute__((packed)) buddy_info_field_t;
 
-// it uses static methods
+typedef struct buddy_info {
+    uint64_t phys_pointer;
+    buddy_info_field_t information;
+} __attribute__((packed)) buddy_info_t;
+
+typedef struct {
+    buddy_info_t* first_buddy;
+    buddy_info_t* second_buddy;
+} __attribute__((packed)) buddy_split_result_t;
+
+typedef struct buddy_t {
+    uint64_t hello_buddy;
+    uint64_t total_available_size;
+    buddy_info_t* mem;
+} __attribute__((packed)) buddy_t;
+
+
 class PMM {
 public:
     static void Init(limine_memmap_response* mem_map);

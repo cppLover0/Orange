@@ -1,131 +1,223 @@
 
-#include <generic/locks/spinlock.hpp>
+#include <stdint.h>
+#include <generic/limineA/limineinfo.hpp>
 #include <generic/memory/pmm.hpp>
-#include <lib/limineA/limine.h>
-#include <other/hhdm.hpp>
-#include <drivers/serial/serial.hpp>
-#include <other/string.hpp>
-#include <config.hpp>
 #include <other/log.hpp>
+#include <other/hhdm.hpp>
+#include <config.hpp>
+#include <generic/memory/paging.hpp>
+#include <generic/locks/spinlock.hpp>
 
-char pmm_spinlock = 0;
-memory_entry_t biggest_entry;
+buddy_t buddy;
 
-void bitmapSetBit(uint64_t index) {
-    if (index >= biggest_entry.bitmap.size) return;
-    ((uint64_t*)(HHDM::toVirt(biggest_entry.bitmap.bits)))[index / 8] |= (1ULL << (index % 8));
+char buddy_spinlock;
+
+buddy_info_t* buddy_put(uint64_t phys,int64_t parent,uint8_t level) {
+    buddy_info_t* hello_buddy = &buddy.mem[buddy.hello_buddy++];
+    hello_buddy->information.is_free = 1;
+    hello_buddy->information.level = level;
+    hello_buddy->information.parent_id = parent;
+    hello_buddy->phys_pointer = phys;
+    
+    return hello_buddy;
 }
 
-void bitmapClearBit(uint64_t index) { 
-    if (index >= biggest_entry.bitmap.size) return; 
-    ((uint64_t*)(HHDM::toVirt(biggest_entry.bitmap.bits)))[index / 8] &= ~(1ULL << (index % 8));
+buddy_info_t* buddy_find(uint64_t phys,char is_need_split) {
+    for(int64_t i = 0; i < buddy.hello_buddy;i++)
+        if(buddy.mem[i].phys_pointer == phys && buddy.mem[i].information.is_splitted == is_need_split)
+            return &buddy.mem[i];
+    return 0;
 }
 
-int bitmapIsBitSet(uint64_t index) {
-    if (index >= biggest_entry.bitmap.size) return 0; 
-    return (((uint64_t*)(HHDM::toVirt(biggest_entry.bitmap.bits)))[index / 8] & (1ULL << (index % 8))) != 0;
+buddy_info_t* buddy_find_by_parent(uint64_t parent_id,uint8_t split_x) {
+    for(int64_t i = 0; i < buddy.hello_buddy;i++)
+        if(buddy.mem[i].information.parent_id == parent_id && buddy.mem[i].information.split_x == split_x)
+            return &buddy.mem[i];
+    return 0;
+}
+
+buddy_split_result_t buddy_split(uint64_t phys) {
+    buddy_info_t* hi_buddy = buddy_find(phys,0);
+
+    //Log(LOG_LEVEL_WARNING,"0x%p 0x%p 0x%p 0x%p\n",phys,hi_buddy->information.is_free,LEVEL_TO_SIZE(hi_buddy->information.level),hi_buddy);
+
+    if(!hi_buddy)
+        return {0,0};
+
+    if(LEVEL_TO_SIZE(hi_buddy->information.level) == PAGE_SIZE) // i cant split this :(
+        return {hi_buddy,hi_buddy};
+
+    if(!hi_buddy->information.is_free)
+        return {0,0};
+
+    uint64_t parent_id = ((uint64_t)hi_buddy - (uint64_t)buddy.mem) / sizeof(buddy_info_t);
+
+    buddy_info_t* hi = 0;
+    buddy_info_t* _buddy = 0;
+    
+    if(!hi_buddy->information.is_was_splitted) {
+        hi = buddy_put(hi_buddy->phys_pointer,parent_id,hi_buddy->information.level - 1);
+        _buddy = buddy_put(hi_buddy->phys_pointer + LEVEL_TO_SIZE(hi_buddy->information.level - 1),parent_id,hi_buddy->information.level - 1);
+
+        hi->information.split_x = 0;
+        _buddy->information.split_x = 1;
+
+    } else {
+        
+        hi = buddy_find_by_parent(parent_id,0);
+        _buddy = buddy_find_by_parent(parent_id,1);
+
+        hi->information.is_free = 1;
+        _buddy->information.is_free = 1;
+
+    }
+
+    hi_buddy->information.is_free = 0;
+    hi_buddy->information.is_splitted = 1;
+    hi_buddy->information.is_was_splitted = 1;
+
+
+    return (buddy_split_result_t){hi,_buddy};
+
+}
+
+void buddy_merge(uint64_t parent_id) {
+    buddy_info_t* hi = buddy_find_by_parent(parent_id,0);
+    buddy_info_t* _buddy = buddy_find_by_parent(parent_id,1);
+
+    if(!hi || !_buddy)
+        return;
+
+    buddy_info_t* hi_buddy = &buddy.mem[parent_id];
+
+    hi->information.is_free = 0;
+    _buddy->information.is_free = 0;
+    hi_buddy->information.is_splitted = 0;
+    hi_buddy->information.is_was_splitted = 1;
+    hi_buddy->information.is_free = 1;
+
+    return;
+
+}
+
+buddy_info_t* buddy_get_and_split_if_possible(buddy_info_t* buddy,uint64_t need_size) {
+    uint64_t buddy_size = LEVEL_TO_SIZE(buddy->information.level);
+    uint64_t next_buddy_size = LEVEL_TO_SIZE(buddy->information.level - 1);
+
+    uint64_t aligned_size = ALIGNPAGEDOWN(need_size);
+
+    //Log("0x%p 0x%p 0x%p 0x%p\n",need_size,buddy_size,next_buddy_size);
+
+    if((need_size <= buddy_size && next_buddy_size < need_size) || buddy_size == PAGE_SIZE)
+        return buddy;
+
+
+    if(buddy_size != PAGE_SIZE)
+        return buddy_get_and_split_if_possible(buddy_split(buddy->phys_pointer).first_buddy,need_size);
+
+}
+
+uint64_t buddy_alloc(uint64_t size) {
+
+    uint64_t top = UINT64_MAX;
+    buddy_info_t* good_buddy = 0;
+
+    // find a available buddy info which i need
+    for(uint64_t i = 0;i < buddy.hello_buddy;i++) {
+        if(LEVEL_TO_SIZE(buddy.mem[i].information.level) >= size && LEVEL_TO_SIZE(buddy.mem[i].information.level) < top && buddy.mem[i].information.is_free) {
+            top = LEVEL_TO_SIZE(buddy.mem[i].information.level);
+            good_buddy = &buddy.mem[i];
+        }
+    }
+
+    if(good_buddy) { // we found a need buddy !!!
+        buddy_info_t* good_buddy_split = buddy_get_and_split_if_possible(good_buddy,size);
+        good_buddy_split->information.is_free = 0;
+        return good_buddy_split->phys_pointer;
+    }
+
+    //Log("Camt find bud :(\n");
+    return 0;
+
 }
 
 void PMM::Init(limine_memmap_response* mem_map) {
-    limine_memmap_entry* current_entry;
-    uint64_t top;
-    for(uint64_t i = 0; i < mem_map->entry_count;i++) {
-        current_entry = mem_map->entries[i];
-        Log("Entry #%d. Base: 0x%p, size: 0x%p, type: %s (%d)\n",i,current_entry->base,current_entry->length,current_entry->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non usable",current_entry->type);
-        if(current_entry->type == LIMINE_MEMMAP_USABLE) {
-            if(current_entry->length > top) {
-                top = current_entry->length;
-                biggest_entry.base = current_entry->base;
-                biggest_entry.length = current_entry->length;
+
+    limine_memmap_entry* current = mem_map->entries[0]; 
+
+    uint64_t top = 0;
+    uint64_t top_size = 0;
+
+    for(int i = 0;i < mem_map->entry_count;i++) {
+        current = mem_map->entries[i];
+        Log(LOG_LEVEL_INFO,"Entry %d: 0x%p-0x%p (%d MB) %s\n",i,current->base, current->base + current->length,(current->length / 1024) / 1024,current->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non-Usable");
+    
+        if(current->type == LIMINE_MEMMAP_USABLE) {
+            if(current->length > top_size) {
+                top = current->base;
+                top_size = current->length;
             }
         }
+    
     }
 
-    Log("Biggest entry: Base: 0x%p, Size: 0x%p (%d MB)\n",biggest_entry.base,biggest_entry.length,(biggest_entry.length / 1024) / 1024);
+    Log(LOG_LEVEL_INFO,"Highest usable memory: 0x%p-0x%p (%d MB)\n",top,top + top_size,(top_size / 1024) / 1024);
 
-    uint64_t pageCount = biggest_entry.length / PAGE_SIZE;
-    uint64_t bitmapSize = (pageCount + 7) / 8;
-    uint64_t bitmapPages = bitmapSize / PAGE_SIZE;
-    biggest_entry.bitmap.size = bitmapSize;
-    biggest_entry.bitmap.bits = biggest_entry.base;
-    biggest_entry.bitmap.page_count = pageCount;
+    uint64_t free_memory = top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t));
 
-    String::memset((void*)HHDM::toVirt(biggest_entry.base),0,bitmapSize);
+    buddy.mem = (buddy_info_t*)HHDM::toVirt(top);
+    
+    Log(LOG_LEVEL_INFO,"Buddy allocator memory: 0x%p-0x%p ( size of buddy_info_t: %d, buddy_info_field_t: %d, buddy_t: %d, buddy_split_result_t: %d )\n",top,(uint64_t)top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)),sizeof(buddy_info_t),sizeof(buddy_info_field_t),sizeof(buddy_t),sizeof(buddy_split_result_t));
 
-    for(uint64_t i = 0;i < bitmapPages;i++) {
-        bitmapSetBit(i);
+    Log(LOG_LEVEL_INFO,"Putting all memory to buddy allocator\n");
+
+    uint64_t final_size = ALIGNPAGEUP(top_size - ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)));
+
+    free_memory = ALIGNPAGEUP(free_memory);
+
+    uint64_t max_level_align = LEVEL_TO_SIZE(MAX_LEVEL);
+    for(uint64_t i = 0; i < (CALIGNPAGEDOWN(top_size,max_level_align));i += max_level_align) {
+        buddy_put(free_memory + i,0,MAX_LEVEL);
     }
+
 }
+
+char pmm_spinlock = 0;
 
 uint64_t PMM::Alloc() {
     spinlock_lock(&pmm_spinlock);
-    uint64_t page = 0;
-    for(uint64_t i = 0; i < biggest_entry.bitmap.page_count;i++) {
-        if(!bitmapIsBitSet(i)) {
-            bitmapSetBit(i);
-            page = i;
-            break;
-        }
-    }
-    if(page)
-        String::memset((void*)HHDM::toVirt(biggest_entry.base + (page * PAGE_SIZE)),0,PAGE_SIZE);
+    uint64_t result = buddy_alloc(PAGE_SIZE);
     spinlock_unlock(&pmm_spinlock);
-    return page ? biggest_entry.base + (page * PAGE_SIZE) : 0;
+    return result;
 }
 
-void PMM::Free(uint64_t phys) {
+uint64_t PMM::BigAlloc(uint64_t size_pages) {
     spinlock_lock(&pmm_spinlock);
-    bitmapClearBit((phys - biggest_entry.base) / PAGE_SIZE);
+    uint64_t result = buddy_alloc(PAGE_SIZE * size_pages);
     spinlock_unlock(&pmm_spinlock);
+    return result;
 }
 
 void* PMM::VirtualAlloc() {
     return (void*)HHDM::toVirt(Alloc());
 }
 
-void PMM::VirtualFree(void* ptr) {
-    Free(HHDM::toPhys((uint64_t)ptr));
+void* PMM::VirtualBigAlloc(uint64_t size_pages) {
+    return (void*)HHDM::toVirt(BigAlloc(size_pages));
 }
 
-uint64_t PMM::BigAlloc(uint64_t size_pages) {
-    spinlock_lock(&pmm_spinlock);
-    uint64_t startDone = 0;
-    uint64_t _continue = 0;
-    for(uint64_t start = 0; start < biggest_entry.bitmap.page_count; start++) {
-        if(!bitmapIsBitSet(start)) {
-            _continue++;
-            if(_continue == size_pages) {
-                startDone = start - _continue + 1; 
-                for(uint64_t i = startDone; i < startDone + size_pages; i++) {
-                    bitmapSetBit(i);
-                }
-                break;
-            }
-        } else {
-            _continue = 0; 
-        }
-    }
+void PMM::Free(uint64_t phys) {
 
-    if(startDone)
-        String::memset((void*)HHDM::toVirt(biggest_entry.base + (startDone * PAGE_SIZE)),0,PAGE_SIZE * size_pages);
+}
+    
+void PMM::VirtualFree(void* ptr) {
 
-    spinlock_unlock(&pmm_spinlock);
-    return startDone ? biggest_entry.base + (startDone * PAGE_SIZE) : 0;
 }
 
 void PMM::BigFree(uint64_t phys,uint64_t size_in_pages) {
-    spinlock_lock(&pmm_spinlock);
-    for(uint64_t i = (phys - biggest_entry.base) / PAGE_SIZE; i < ((phys - biggest_entry.base) / PAGE_SIZE) + size_in_pages;i++) {
-        bitmapClearBit(i);
-    }
-    spinlock_unlock(&pmm_spinlock);
-}
 
-void* PMM::VirtualBigAlloc(uint64_t size_pages) {
-    void* ptr = (void*)HHDM::toVirt(BigAlloc(size_pages));
-    return ptr;
 }
 
 void PMM::VirtualBigFree(void* ptr,uint64_t size_in_pages) {
-    BigFree(HHDM::toPhys((uint64_t)ptr),size_in_pages);
+    
 }

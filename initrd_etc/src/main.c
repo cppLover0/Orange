@@ -111,12 +111,30 @@ void forkandexec(const char* name) {
     return;
 
 }
-
 int main() {
-    printf("Hello, World !\n");
-    int iaa = fork();
-    if(iaa) {
-        execl("/usr/bin/exec_test","exec_test",NULL);
-    }
-    while(1);
+    //printf("Hello, World from Libc !\n");
+    int i = fork();
+
+    if(i == 0) {
+        printf("Hello, from child process %d !\n",getpid());
+        
+        execl("/usr/bin/exec_test","hello","world",NULL);
+        
+    } 
+    else {
+        printf("Hello, from parent process %d !\n",getpid());
+
+        printf("You can type now from parent process...\n");
+        char key = 0;
+        while(1) {
+            int n = read(STDIN_FILENO,&key,1);
+            if(key && n) {
+                key = __ps2_read(key);
+                if(key)
+                    write(STDOUT_FILENO,&key,1);
+            }
+
+        }
+
+    } 
 }

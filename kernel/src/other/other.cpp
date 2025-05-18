@@ -128,13 +128,23 @@ extern "C" void keyHandler(int_frame_t* ctx) {
     Paging::EnableKernel();
     char key = PS2Keyboard::Get();
     PS2Keyboard::EOI();
+    if(ctx->cs == 0x20) {
+        ctx->cs |= 3;
+        ctx->ss |= 3;
+    }
+    
+    if(ctx->ss == 0x18) {
+        ctx->cs |= 3;
+        ctx->ss |= 3;
+    }
+
 }
 
 extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     LogUnlock();
     Paging::EnableKernel();
     NLog("\n");
-    Log("Shutdowning system in 5 seconds");
+    Log(LOG_LEVEL_WARNING,"Shutdowning system in 5 seconds");
 
     __cli(); //yes i know lapic waiting for my eoi but why not ? 
 
@@ -143,7 +153,7 @@ extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
         HPET::Sleep(1*1000*1000);
     }
 
-    Log("\nBye.\n");
+    Log(LOG_LEVEL_INFO,"Bye.\n");
 
     uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
     ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);

@@ -154,7 +154,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
     uacpi_status ret = uacpi_get_current_resources(node, &kb_res);
     if (uacpi_unlikely_error(ret)) {
-        Log("PS/2 Keyboard is not initializied\n");
+        Log(LOG_LEVEL_WARNING,"PS/2 Keyboard is not initializied\n");
         return UACPI_ITERATION_DECISION_NEXT_PEER;
     }
 
@@ -169,7 +169,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
         if(current_res->type == UACPI_RESOURCE_TYPE_IRQ) {
             for(int v = 0; v < current_res->irq.num_irqs;v++) {
-                Log("Found PS/2 Keyboard IRQ %d !\n",current_res->irq.irqs[v]);
+                Log(LOG_LEVEL_INFO,"Found PS/2 Keyboard IRQ %d !\n",current_res->irq.irqs[v]);
 
                 uint8_t vector = IDT::AllocEntry();
 
@@ -177,7 +177,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
                 IOAPIC::SetEntry(vector,current_res->irq.irqs[v],(current_res->irq.polarity ? 1 : 0 << 13),Lapic::ID());
                 entry->ist = 2;
 
-                Log("Registered PS/2 Keyboard IRQ at %d\n",vector);
+                Log(LOG_LEVEL_INFO,"Registered PS/2 Keyboard IRQ at %d\n",vector);
 
             }
         }
@@ -186,7 +186,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
     devfs_reg_device("/kbd",0,kbd_read,kbd_askforpipe,0);
 
-    Log("PS/2 Keyboard is initializied !\n");
+    Log(LOG_LEVEL_INFO,"PS/2 Keyboard is initializied !\n");
 
     uacpi_free_resources(kb_res);
     UACPI_RESOURCE_TYPE_IRQ;

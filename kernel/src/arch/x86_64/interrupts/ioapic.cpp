@@ -54,21 +54,21 @@ void IOAPIC::Init() {
 
     char entry = 0;
 
-    Log("IOAPIC: Start: 0x%p, End: 0x%p\n",(uint64_t)apic->entries,(uint64_t)apic->entries + apic->hdr.length);
+    Log(LOG_LEVEL_INFO,"IOAPIC: Start: 0x%p, End: 0x%p\n",(uint64_t)apic->entries,(uint64_t)apic->entries + apic->hdr.length);
 
     while(1) {
         
         if((uint64_t)current >= (uint64_t)apic->entries + apic->hdr.length - sizeof(acpi_madt)) 
             break;
 
-        Log("MADT Entry %d: Length: 0x%p, Type: 0x%p, Addr: 0x%p\n",entry,current->length,current->type,current);
+        Log(LOG_LEVEL_INFO,"MADT Entry %d: Length: 0x%p, Type: 0x%p, Addr: 0x%p\n",entry,current->length,current->type,current);
 
         switch(current->type) {
             
             case ACPI_MADT_ENTRY_TYPE_IOAPIC: {
                 struct acpi_madt_ioapic* current_ioapic = (acpi_madt_ioapic*)current;
                 Paging::KernelMap(current_ioapic->address);
-                Log("IOAPIC %d: Base: 0x%p, GSI_Base: 0x%p\n",ioapic_entries,current_ioapic->address,current_ioapic->gsi_base);
+                Log(LOG_LEVEL_INFO,"IOAPIC %d: Base: 0x%p, GSI_Base: 0x%p\n",ioapic_entries,current_ioapic->address,current_ioapic->gsi_base);
                 String::memcpy(&io_apics[ioapic_entries],current_ioapic,sizeof(acpi_madt_ioapic));
                 ioapic_entries++;
                 break;
@@ -76,7 +76,7 @@ void IOAPIC::Init() {
 
             case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE: {
                 struct acpi_madt_interrupt_source_override* current_iso = (struct acpi_madt_interrupt_source_override*)current;
-                Log("ISO %d: Source: %d, GSI: %d, Bus: %d, Flags: 0x%p\n",iso_entries,current_iso->source,current_iso->gsi,current_iso->bus,current_iso->flags);
+                Log(LOG_LEVEL_INFO,"ISO %d: Source: %d, GSI: %d, Bus: %d, Flags: 0x%p\n",iso_entries,current_iso->source,current_iso->gsi,current_iso->bus,current_iso->flags);
                 String::memcpy(&iso[iso_entries],current_iso,sizeof(acpi_madt_interrupt_source_override));
                 iso_entries++;
                 break;

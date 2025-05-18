@@ -228,7 +228,14 @@ void uacpi_kernel_free(void *mem, uacpi_size size_hint);
 
 #ifndef UACPI_FORMATTED_LOGGING
 void uacpi_kernel_log(uacpi_log_level lvl, const uacpi_char* str) {
-    Log("[UACPI:%d] %s",lvl,str);
+    int level = LOG_LEVEL_INFO;
+    if(lvl == UACPI_LOG_WARN)
+        level = LOG_LEVEL_WARNING;
+    else if(lvl == UACPI_LOG_ERROR)
+        level = LOG_LEVEL_ERROR;
+
+    Log(level,"%s",str);
+
 }
 #else
 UACPI_PRINTF_DECL(2, 3)

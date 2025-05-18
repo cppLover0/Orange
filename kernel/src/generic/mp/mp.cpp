@@ -26,9 +26,15 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     Paging::EnableKernel();
 
+    
+
     GDT::Init();
+    __hlt();
     CpuData::Access()->smp_info = smp_info;
+    
     IDT::Load();
+
+    
 
     Syscall::Init();
 
@@ -37,9 +43,11 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     Lapic::Init();
     //Log("CPU %d is online !\n",smp_info->lapic_id);
 
-    uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
-    Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
-    CpuData::Access()->kernel_stack = stack + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    Log(LOG_LEVEL_INFO,"Allocating stack\n");
+    //uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
+    Log(LOG_LEVEL_INFO,"Done\n");
+    //Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
+    //CpuData::Access()->kernel_stack = stack + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     CpuData::Access()->user_stack = 0;
 
     //Log("stack: 0x%p\n",stack);
@@ -62,7 +70,7 @@ void MP::Init() {
             limine_info.smp->cpus[i]->goto_address = __mp_bootstrap; // in x86 it atomic soooo
         }
     }
-    Log("CPUs count: %d\n",how_much_cpus);
+    Log(LOG_LEVEL_INFO,"CPUs count: %d\n",how_much_cpus);
 }
 
 void MP::Sync() {

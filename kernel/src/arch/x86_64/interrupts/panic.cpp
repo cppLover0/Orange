@@ -80,7 +80,10 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame1) {
         }
     }
 
-    __hlt();
+    while(1) {
+        __cli();
+        __hlt();
+    }
 }
 
 extern "C" void CPUKernelPanic(int_frame_t* frame) {

@@ -142,15 +142,15 @@ void Paging::Copy(uint64_t* dest_cr3,uint64_t* src_cr3) {
 void Paging::Init() {
     Pat(1,1);
     kernel_cr3 = (uint64_t*)PMM::VirtualAlloc();
-    Log("Mapping usable memory\n");
+    Log(LOG_LEVEL_INFO,"Mapping usable memory\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_USABLE,PTE_PRESENT | PTE_RW);
-    Log("Mapping framebuffer\n");
+    Log(LOG_LEVEL_INFO,"Mapping framebuffer\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
-    Log("Mapping bootloader reclaimable\n");
+    Log(LOG_LEVEL_INFO,"Mapping bootloader reclaimable\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE,PTE_PRESENT | PTE_RW);
-    Log("Activating paging\n");
+    Log(LOG_LEVEL_INFO,"Activating paging\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_EXECUTABLE_AND_MODULES,PTE_PRESENT | PTE_RW);
-    Log("Mapping kernel\n");
+    Log(LOG_LEVEL_INFO,"Mapping kernel\n");
     Kernel(kernel_cr3);
     EnableKernel();
 }

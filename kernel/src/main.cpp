@@ -39,14 +39,6 @@
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
-void test() {
-    Log("Hello, world from elf !");
-    __sti();
-    while(1) {
-        __nop();
-    }
-}
-
 void _1() {
     while(1) {
         //Serial::printf(" _1 ");
@@ -103,68 +95,70 @@ extern "C" void kmain() {
 
     LogInit((char*)ft_ctx);
 
-    Log("Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
-    Log("RSDP: 0x%p\n",info.rsdp_address);
-    Log("HHDM: 0x%p\n",info.hhdm_offset);
-    Log("Kernel: Phys: 0x%p, Virt: 0x%p\n",info.ker_addr->physical_base,info.ker_addr->virtual_base);
-    Log("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
-    Log("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
+    Log(LOG_LEVEL_INFO,"This is info message !\n");
+    Log(LOG_LEVEL_WARNING,"This is warning message !\n");
+    Log(LOG_LEVEL_ERROR,"This is error message !\n");
+
+    Log(LOG_LEVEL_INFO,"Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
+    Log(LOG_LEVEL_INFO,"RSDP: 0x%p\n",info.rsdp_address);
+    Log(LOG_LEVEL_INFO,"HHDM: 0x%p\n",info.hhdm_offset);
+    Log(LOG_LEVEL_INFO,"Kernel: Phys: 0x%p, Virt: 0x%p\n",info.ker_addr->physical_base,info.ker_addr->virtual_base);
+    Log(LOG_LEVEL_INFO,"Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
+    Log(LOG_LEVEL_INFO,"Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
     ft_ctx->cursor_enabled = 1;
 
     HHDM::applyHHDM(info.hhdm_offset);
 
     PMM::Init(info.memmap);
-    Log("PMM Initializied\n"); //it will be initializied anyway
+    Log(LOG_LEVEL_INFO,"PMM Initializied\n"); //it will be initializied anyway
 
     Paging::Init();
-    Log("Paging Initializied\n"); //it will be initializied anyway
+    Log(LOG_LEVEL_INFO,"Paging Initializied\n"); //it will be initializied anyway
     KHeap::Init();
-    Log("KHeap Initializied\n");
+    Log(LOG_LEVEL_INFO,"KHeap Initializied\n");
     
     cpudata_t* data = CpuData::Access();
-    Log("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
+    Log(LOG_LEVEL_INFO,"BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
 
     GDT::Init();
-    Log("GDT Initializied\n");
+    Log(LOG_LEVEL_INFO,"GDT Initializied\n");
 
     IDT::Init();
-    Log("IDT Initializied\n");
-
-    idt_entry_t* elf_test1 = IDT::SetEntry(0x80,(void*)test,0xEE);
+    Log(LOG_LEVEL_INFO,"IDT Initializied\n");
 
     ACPI::fullInit();
-    Log("ACPI Initializied\n");
+    Log(LOG_LEVEL_INFO,"ACPI Initializied\n");
 
     Lapic::Init();
-    Log("LAPIC Initializied\n");
+    Log(LOG_LEVEL_INFO,"LAPIC Initializied\n");
     
     MP::Init();
-    Log("MP Initializied\n");
+    Log(LOG_LEVEL_INFO,"MP Initializied\n");
 
     PowerButton::Hook(handle_power_button);
-    Log("PowerButton initializied\n");
+    Log(LOG_LEVEL_INFO,"PowerButton initializied\n");
 
     VFS::Init();
-    Log("VFS Initializied\n");
+    Log(LOG_LEVEL_INFO,"VFS Initializied\n");
 
     VFS::Create("/head",0);
 
     USTAR::ParseAndCopy();
-    Log("Loaded initrd\n");
+    Log(LOG_LEVEL_INFO,"Loaded initrd\n");
 
     //tmpfs_dump();
 
     PS2Keyboard::Init(keyStub);
     
     Process::Init();
-    Log("Scheduling initializied\n");
+    Log(LOG_LEVEL_INFO,"Scheduling initializied\n");
 
     Syscall::Init();
-    Log("Syscall initializied\n");
+    Log(LOG_LEVEL_INFO,"Syscall initializied\n");
 
     enable_sse();
-    Log("SSE Is enabled (or not) \n");
+    Log(LOG_LEVEL_INFO,"SSE Is enabled (or not) \n");
 
     cpudata_t* cpu_data = CpuData::Access();
 
@@ -177,7 +171,9 @@ extern "C" void kmain() {
     //VMM::Alloc(0,0,0);
     //__hlt();
 
-    Log("Kernel is initializied !\n");
+    Log(LOG_LEVEL_INFO,"Kernel is initializied !\n\n");
+    
+    __hlt();
 
     filestat_t stat;
 
@@ -187,7 +183,7 @@ extern "C" void kmain() {
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
     VFS::Read(elf,"/usr/bin/initrd",0);
 
-    Log("Loaded initrd !\n");
+    Log(LOG_LEVEL_INFO,"Loaded initrd !\n");
 
     //res.entry();
 
@@ -213,19 +209,19 @@ extern "C" void kmain() {
 
     process_t* initrd_proc = Process::ByID(initrd);
 
-    Log("Initrd: stack_start: 0x%p, stack_end: 0x%p\n",initrd_proc->stack_start,initrd_proc->stack);
+    Log(LOG_LEVEL_INFO,"Initrd: stack_start: 0x%p, stack_end: 0x%p\n",initrd_proc->stack_start,initrd_proc->stack);
 
     Process::WakeUp(initrd);
 
     const char* str = "Hello, world from /dev/tty !\n";
     pAssert(VFS::Write((char*)str,"/dev/tty",String::strlen((char*)str),0) == 0,"devfs need to cry :(");
 
-    Log("Waiting for interrupts...\n");
-    
+    Log(LOG_LEVEL_INFO,"Waiting for interrupts...\n");
+ 
     NLog("\033[2J \033[1;1H");
     //__hlt();
 
-    MP::Sync();
+    //MP::Sync();
 
     __sti();
 
