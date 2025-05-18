@@ -171,7 +171,7 @@ extern "C" void kmain() {
     //VMM::Alloc(0,0,0);
     //__hlt();
 
-    Log(LOG_LEVEL_INFO,"Kernel is initializied !\n\n");
+    Log(LOG_LEVEL_INFO,"Kernel is initializied !\n");
     
     __hlt();
 

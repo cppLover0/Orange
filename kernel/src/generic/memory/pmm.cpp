@@ -7,6 +7,7 @@
 #include <config.hpp>
 #include <generic/memory/paging.hpp>
 #include <generic/locks/spinlock.hpp>
+#include <other/string.hpp>
 
 buddy_t buddy;
 
@@ -18,7 +19,9 @@ buddy_info_t* buddy_put(uint64_t phys,int64_t parent,uint8_t level) {
     hello_buddy->information.level = level;
     hello_buddy->information.parent_id = parent;
     hello_buddy->phys_pointer = phys;
-    
+    hello_buddy->information.is_splitted = 0;
+    hello_buddy->information.is_was_splitted = 0;
+
     return hello_buddy;
 }
 
@@ -38,8 +41,6 @@ buddy_info_t* buddy_find_by_parent(uint64_t parent_id,uint8_t split_x) {
 
 buddy_split_result_t buddy_split(uint64_t phys) {
     buddy_info_t* hi_buddy = buddy_find(phys,0);
-
-    //Log(LOG_LEVEL_WARNING,"0x%p 0x%p 0x%p 0x%p\n",phys,hi_buddy->information.is_free,LEVEL_TO_SIZE(hi_buddy->information.level),hi_buddy);
 
     if(!hi_buddy)
         return {0,0};
@@ -101,6 +102,12 @@ void buddy_merge(uint64_t parent_id) {
 }
 
 buddy_info_t* buddy_get_and_split_if_possible(buddy_info_t* buddy,uint64_t need_size) {
+
+    if(buddy == 0) {
+        Log(LOG_LEVEL_ERROR,"Allocator bug (buddy is 0)\n");
+        return 0;
+    }
+
     uint64_t buddy_size = LEVEL_TO_SIZE(buddy->information.level);
     uint64_t next_buddy_size = LEVEL_TO_SIZE(buddy->information.level - 1);
 
@@ -133,6 +140,9 @@ uint64_t buddy_alloc(uint64_t size) {
     if(good_buddy) { // we found a need buddy !!!
         buddy_info_t* good_buddy_split = buddy_get_and_split_if_possible(good_buddy,size);
         good_buddy_split->information.is_free = 0;
+
+        String::memset((void*)HHDM::toVirt(good_buddy_split->phys_pointer),0,LEVEL_TO_SIZE(good_buddy->information.level));
+
         return good_buddy_split->phys_pointer;
     }
 
