@@ -17,3 +17,4 @@ main.o
 serial.txt
 output.txt
 Orange-distro-build
+ovmf
