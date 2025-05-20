@@ -12,6 +12,9 @@ echo Downloading binutils and gcc
 
 mkdir -p pack
 
+mkdir -p $1/initrd/usr/include
+mkdir -p $1/initrd/usr/lib
+
 cd pack
 
 wget -nc $GNU_MIRROR/gnu/gcc/gcc-11.4.0/gcc-11.4.0.tar.gz
