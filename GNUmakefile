@@ -39,8 +39,13 @@ headers:
 	cp -rf orange-cross-compiler-headers/include initrd/usr
 	rm -rf orange-cross-compiler-headers
 
+.PHONY: make-libc
+make-libc:
+	cd tools && git clone https://github.com/cpplover0/orange-mlibc --depth=1
+	cd tools/orange-mlibc && sh build_to_cross.sh "$(CURRENT_DIR)"
+
 .PHONY: cross-compiler
-cross-compiler:
+cross-compiler: make-libc
 	cd tools/toolchain/ && sh get.sh "$(CURRENT_DIR)"
 
 .PHONY: check-cross
