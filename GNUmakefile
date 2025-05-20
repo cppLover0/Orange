@@ -41,6 +41,7 @@ headers:
 
 .PHONY: make-libc
 make-libc:
+	rm -rf tools/orange-mlibc
 	cd tools && git clone https://github.com/cpplover0/orange-mlibc --depth=1
 	cd tools/orange-mlibc && sh build_to_cross.sh "$(CURRENT_DIR)"
 
