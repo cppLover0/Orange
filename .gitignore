@@ -20,6 +20,7 @@ Orange-distro-build
 ovmf
 initrd/usr/lib
 initrd/usr/include
+initrd
 orange-mlibc
 ./initrd
 qemu_log.txt
