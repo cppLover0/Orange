@@ -51,8 +51,4 @@ public:
     
     static void VirtualFree(void* ptr);
 
-    static void BigFree(uint64_t phys,uint64_t size_in_pages);
-
-    static void VirtualBigFree(void* ptr,uint64_t size_in_pages);
-
 };

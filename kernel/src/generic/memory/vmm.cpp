@@ -244,7 +244,7 @@ void VMM::Free(process_t* proc) {
         if(current->base == info.hhdm_offset - PAGE_SIZE)
             next = 0;
 
-        PMM::BigFree(current->phys,current->len / PAGE_SIZE);
+        PMM::Free(current->phys);
         KHeap::Free(current);
 
         if(!next)   

@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 1G -no-reboot -serial stdio -M q35 -s -d int -smp 4 
+QEMUFLAGS := -m 1G -no-reboot -serial stdio -M q35 -s -d int -D qemu_log.txt
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
@@ -15,6 +15,8 @@ HOST_LIBS :=
 
 HOST_LD := ld
 HOST_TAR := tar
+
+CURRENT_DIR := $(shell realpath .)
 
 ifeq ($(shell uname), Darwin)
     HOST_LD = ld.lld
@@ -33,21 +35,39 @@ headers:
 	git clone https://github.com/cpplover0/orange-cross-compiler-headers
 	mkdir -p initrd/usr/include
 	rm -rf initrd/usr/include/*
-	cp -rf orange-cross-compiler-headers/include/* initrd/usr/include
+	mkdir -p orange-cross-compiler-headers/include
+	cp -rf orange-cross-compiler-headers/include initrd/usr
 	rm -rf orange-cross-compiler-headers
 
-.PHONY: initrd
-initrd:
-	rm -rf iso_etc/boot/initrd.tar
-	$(HOST_TAR) -cf iso_etc/boot/initrd.tar -C initrd .
+.PHONY: cross-compiler
+cross-compiler:
+	cd tools/toolchain/ && sh get.sh "$(CURRENT_DIR)"
 
-.PHONY: initrd_build
-initrd_build:
-	rm -rf initrd/bin/initrd
+.PHONY: check-cross
+check-cross:
+    ifeq (, $(shell which x86_64-orange-gcc))
+		echo "It looks like you don't have cross-compiler, or you didn't add them to your PATH."; \
+		echo "If you built your cross compiler, add them to PATH with: "; \
+		echo 'export PATH="$$HOME/opt/cross/orange/bin:$$PATH"'; \
+		echo 'or build cross compiler with "make cross-compiler"'; \
+		exit 1; 
+    endif
+
+.PHONY: build-distro
+build-distro: check-cross headers 
+	rm -rf tools/orange-mlibc
+	rm -rf initrd
+	mkdir -p initrd/lib
+	cd tools && git clone https://github.com/cpplover0/orange-mlibc --depth=1
+	cd tools/orange-mlibc && sh build_to_cross.sh "$(CURRENT_DIR)"
+	rm -rf initrd/lib/*
+	cd initrd/lib && ln -s ../usr/lib/libc.so libc.so 
+	cd initrd/lib && ln -s ../usr/lib/ld.so ld64.so.1 
 	mkdir -p initrd/bin
-	x86_64-orange-gcc initrd_etc/src/main.c -o initrd/usr/bin/initrd -Wl,-Bdynamic
-
-
+	mkdir -p initrd/usr/bin
+	x86_64-orange-gcc tools/test_init/main.c -o initrd/usr/bin/initrd -Wl,-Bdynamic
+	rm -rf tools/iso/boot/initrd.tar
+	$(HOST_TAR) -cf tools/iso/boot/initrd.tar -C initrd .
 
 .PHONY: all
 all: $(IMAGE_NAME).iso
@@ -115,8 +135,8 @@ $(IMAGE_NAME).iso: limine/limine kernel
 	mkdir -p iso_root/boot
 	cp -v kernel/bin/kernel iso_root/boot/
 	mkdir -p iso_root/boot/limine
-	cp -v build_etc/limine.conf limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
-	cp -rf iso_etc/* iso_root/
+	cp -v tools/limine.conf limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
+	cp -rf tools/iso/* iso_root/
 	mkdir -p iso_root/EFI/BOOT
 	cp -v limine/BOOTX64.EFI iso_root/EFI/BOOT/
 	cp -v limine/BOOTIA32.EFI iso_root/EFI/BOOT/

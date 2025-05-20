@@ -125,7 +125,8 @@ void LogSerial(char* format, ...) { // actually serial doesnt need spinlock
 const char* level_messages[] = {
     [LOG_LEVEL_INFO] =  "[ \x1b[38;2;0;127;255mINFO\x1b[38;2;255;255;255m  ] ",
     [LOG_LEVEL_ERROR] = "[ \x1b[38;2;255;0;0mFAULT\x1b[38;2;255;255;255m ] ",
-    [LOG_LEVEL_WARNING] = "[ \x1b[38;2;255;165;0mWARN\x1b[38;2;255;255;255m  ] "
+    [LOG_LEVEL_WARNING] = "[ \x1b[38;2;255;165;0mWARN\x1b[38;2;255;255;255m  ] ",
+    [LOG_LEVEL_DEBUG] = "[ \x1b[38;2;150;150;150mDEBUG\x1b[38;2;255;255;255m ] "
 };
 
 void Log(int level,char* format, ...) {
@@ -133,6 +134,13 @@ void Log(int level,char* format, ...) {
     va_list args;
     va_start(args, format);
     int i = 0;
+
+    if(level == LOG_LEVEL_DEBUG) {
+#ifdef NO_LEVEL_DEBUG
+        return;
+#endif
+        asm volatile("nop");
+    }
 
     flanterm_write(ft_ctx,level_messages[level],String::strlen((char*)level_messages[level]));
     Serial::WriteString(level_messages[level]);

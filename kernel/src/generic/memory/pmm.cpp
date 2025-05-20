@@ -101,6 +101,16 @@ void buddy_merge(uint64_t parent_id) {
 
 }
 
+void buddy_free(uint64_t phys) {
+    buddy_info_t* hi_buddy = buddy_find(phys,0);
+
+    if(!hi_buddy)
+        return;
+
+    hi_buddy->information.is_free = 1;
+
+}
+
 buddy_info_t* buddy_get_and_split_if_possible(buddy_info_t* buddy,uint64_t need_size) {
 
     if(buddy == 0) {
@@ -143,10 +153,14 @@ uint64_t buddy_alloc(uint64_t size) {
 
         String::memset((void*)HHDM::toVirt(good_buddy_split->phys_pointer),0,LEVEL_TO_SIZE(good_buddy->information.level));
 
+        if(good_buddy_split->phys_pointer == 0) {
+            Log(LOG_LEVEL_ERROR,"Buddy allocator bug\n");
+        }
+
         return good_buddy_split->phys_pointer;
     }
 
-    //Log("Camt find bud :(\n");
+    Log(LOG_LEVEL_ERROR,"Camt find bud :(\n");
     return 0;
 
 }
@@ -217,17 +231,11 @@ void* PMM::VirtualBigAlloc(uint64_t size_pages) {
 }
 
 void PMM::Free(uint64_t phys) {
-
+    spinlock_lock(&pmm_spinlock);
+    buddy_free(phys);
+    spinlock_unlock(&pmm_spinlock);
 }
     
 void PMM::VirtualFree(void* ptr) {
-
-}
-
-void PMM::BigFree(uint64_t phys,uint64_t size_in_pages) {
-
-}
-
-void PMM::VirtualBigFree(void* ptr,uint64_t size_in_pages) {
-    
+    Free(HHDM::toPhys((uint64_t)ptr));
 }

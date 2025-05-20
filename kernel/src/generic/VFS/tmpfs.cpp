@@ -71,7 +71,7 @@ void tmpfs_free_file_content(data_file_t* file) {
     if(!file->content) return;
 
     uint64_t aligned_size = ALIGNPAGEUP(file->size_of_content) / PAGE_SIZE;
-    PMM::VirtualBigFree(file->content,aligned_size); // the min file size is 4k cuz i have 4k pages
+    PMM::VirtualFree(file->content); // the min file size is 4k cuz i have 4k pages
 
 }
 
@@ -215,6 +215,10 @@ int tmpfs_stat(char* filename,char* buffer) {
         file = tmpfs_scan_for_file(file->content);
         
     }
+
+    if(!file)
+        return 5;
+
     filestat_t stat;
     stat.size = file->size_of_content;
     stat.file_create_date = file->file_create_date;

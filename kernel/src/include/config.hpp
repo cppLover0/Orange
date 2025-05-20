@@ -6,3 +6,5 @@
 #define TMPFS_MAX_SIZE 1073741824 // 1G
 
 #define DEBUG_PRINT
+
+// #define NO_DEBUG_LEVEL

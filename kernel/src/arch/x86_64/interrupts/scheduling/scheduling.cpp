@@ -359,3 +359,10 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     return proc->id;
 
 }
+
+void Process::Kill(process_t* proc,int return_status) {
+    proc->return_status = return_status;
+    proc->status = PROCESS_STATUS_KILLED;
+    
+    VMM::Free(proc);
+}

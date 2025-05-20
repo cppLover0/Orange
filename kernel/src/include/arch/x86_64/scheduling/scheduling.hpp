@@ -100,4 +100,6 @@ public:
 
     static void futexWake(process_t* parent,int* lock);
 
+    static void Kill(process_t* proc,int return_status);
+
 };

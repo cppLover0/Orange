@@ -1,0 +1,125 @@
+diff -Naur gcc-11.4.0/config.sub gcc-patched/config.sub
+--- gcc-11.4.0/config.sub	2023-05-29 11:46:28.000000000 +0300
++++ gcc-patched/config.sub	2025-05-20 14:02:02.058567898 +0300
+@@ -1722,7 +1722,7 @@
+ 	     | os2* | vos* | palmos* | uclinux* | nucleus* | morphos* \
+ 	     | scout* | superux* | sysv* | rtmk* | tpf* | windiss* \
+ 	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
+-	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
++	     | skyos* | orange* | haiku* | rdos* | toppers* | drops* | es* \
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx*)
+diff -Naur gcc-11.4.0/fixincludes/mkfixinc.sh gcc-patched/fixincludes/mkfixinc.sh
+--- gcc-11.4.0/fixincludes/mkfixinc.sh	2023-05-29 11:46:28.000000000 +0300
++++ gcc-patched/fixincludes/mkfixinc.sh	2025-05-20 14:09:29.508395656 +0300
+@@ -19,6 +19,8 @@
+     powerpc-*-rtems*   | \
+     powerpcle-*-eabisim* | \
+     powerpcle-*-eabi* | \
++    *-orange* | \
++    *-*-orange* | \
+     *-*-vxworks7* | \
+     *-musl* )
+ 	#  IF there is no include fixing,
+diff -Naur gcc-11.4.0/gcc/config/orange.h gcc-patched/gcc/config/orange.h
+--- gcc-11.4.0/gcc/config/orange.h	1970-01-01 03:00:00.000000000 +0300
++++ gcc-patched/gcc/config/orange.h	2025-05-20 14:06:53.928630818 +0300
+@@ -0,0 +1,31 @@
++/* Useful if you wish to make target-specific GCC changes. */
++#undef TARGET_ORANGE
++#define TARGET_ORANGE 1
++
++#undef LINK_SPEC
++#define LINK_SPEC "%{shared:-shared} %{static:-static} %{!shared: %{!static: %{rdynamic:-export-dynamic}}}"
++
++/* Default arguments you want when running your
++   i686-myos-gcc/x86_64-myos-gcc toolchain */
++#undef LIB_SPEC
++#define LIB_SPEC "-lc" /* link against C standard library */
++
++/* Files that are linked before user code.
++   The %s tells GCC to look for these files in the library directory. */
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
++
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "crtend.o%s crtn.o%s"
++
++/* Additional predefined macros. */
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()      \
++  do {                                \
++    builtin_define ("__orange__");      \
++    builtin_define ("__unix__");      \
++    builtin_assert ("system=orange");   \
++    builtin_assert ("system=unix");   \
++    builtin_assert ("system=posix");   \
++  } while(0);
+diff -Naur gcc-11.4.0/gcc/config.gcc gcc-patched/gcc/config.gcc
+--- gcc-11.4.0/gcc/config.gcc	2023-05-29 11:46:29.000000000 +0300
++++ gcc-patched/gcc/config.gcc	2025-05-20 14:04:48.511595869 +0300
+@@ -901,6 +901,14 @@
+   target_has_targetcm=yes
+   target_has_targetdm=yes
+   ;;
++*-*-orange*)
++  extra_options="$extra_options gnu-user.opt"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=provide
++  ;;
++
+ *-*-netbsd*)
+   tm_p_file="${tm_p_file} netbsd-protos.h"
+   tmake_file="t-netbsd t-slibgcc"
+@@ -1947,6 +1955,12 @@
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${nbsd_tm_file} i386/x86-64.h i386/netbsd64.h"
+ 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
+ 	;;
++i[34567]86-*-orange*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h orange.h"
++    ;;
++x86_64-*-orange*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h orange.h"
++    ;;
+ i[34567]86-*-openbsd*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h"
+ 	tm_file="${tm_file} openbsd.h openbsd-stdint.h openbsd-libpthread.h i386/openbsdelf.h"
+diff -Naur gcc-11.4.0/libgcc/config.host gcc-patched/libgcc/config.host
+--- gcc-11.4.0/libgcc/config.host	2023-05-29 11:46:32.000000000 +0300
++++ gcc-patched/libgcc/config.host	2025-05-20 14:08:41.052223069 +0300
+@@ -723,6 +723,14 @@
+ i[34567]86-*-elf*)
+ 	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
+ 	;;
++i[34567]86-*-orange*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
++x86_64-*-orange*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
+ x86_64-*-elf* | x86_64-*-rtems*)
+ 	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
+ 	case ${host} in
+diff -Naur gcc-11.4.0/libstdc++-v3/crossconfig.m4 gcc-patched/libstdc++-v3/crossconfig.m4
+--- gcc-11.4.0/libstdc++-v3/crossconfig.m4	2023-05-29 11:46:33.000000000 +0300
++++ gcc-patched/libstdc++-v3/crossconfig.m4	2025-05-20 14:07:40.903767559 +0300
+@@ -243,6 +243,13 @@
+     AC_DEFINE(HAVE_SINHF)
+     AC_DEFINE(HAVE_SINHL)
+     ;;
++  *-orange*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
++
+   *-rtems*)
+     GLIBCXX_CHECK_COMPILER_FEATURES
+     GLIBCXX_CHECK_LINKER_FEATURES

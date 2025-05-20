@@ -22,6 +22,7 @@
 #include <generic/VFS/ustar.hpp>
 #include <other/assert.hpp>
 #include <other/other.hpp>
+#include <other/debug.hpp>
 
 extern "C" void syscall_handler();
 
@@ -30,12 +31,8 @@ extern "C" void syscall_handler();
 int syscall_exit(int_frame_t* ctx) {
 
     process_t* proc = CpuData::Access()->current;
-    proc->return_status = ctx->rdi;
-    proc->status = PROCESS_STATUS_KILLED;
     
-    if(proc->stack_start) {
-        PMM::VirtualBigFree((void*)proc->stack_start,PROCESS_STACK_SIZE);
-    }
+    Process::Kill(proc,ctx->rdi);
 
     if(proc->id == 1) {
         Log(LOG_LEVEL_INFO,"Initrd finished with code %d!\n",proc->return_status);
@@ -70,7 +67,7 @@ int syscall_debug_print(int_frame_t* ctx) {
         Paging::EnableKernel();
 
 #ifdef DEBUG_PRINT
-        Log(LOG_LEVEL_INFO,"%s\n",ptr);
+        Log(LOG_LEVEL_DEBUG,"%s\n",ptr);
 #endif
 
         return 0;
@@ -481,7 +478,7 @@ int syscall_write(int_frame_t* ctx) {
 
     VFS::Write(dest_buf,file->path_point,count,0);
 
-    PMM::VirtualBigFree(dest_buf,SIZE_TO_PAGES(count));
+    PMM::VirtualFree(dest_buf);
 
     ctx->rdx = count;
 
@@ -550,7 +547,7 @@ int syscall_free(int_frame_t* ctx) {
     uint64_t phys = Paging::PhysFromVirt(cr3,ptr);
 
     Paging::Unmap(cr3,ptr,size_in_pages);
-    PMM::BigFree(phys,size_in_pages);
+    PMM::Free(phys);
     return 0;
 
 }
@@ -728,48 +725,52 @@ int syscall_exec(int_frame_t* ctx) {
         int status1 = VFS::Read(elf,path1,0);
 
         if(!elf && status1) {
-            Log(LOG_LEVEL_ERROR,"exec() error: elf: 0x%p, status of read: %d\n",elf,status1);
+            if(elf)
+                PMM::VirtualFree(elf);
+
             return -1;
-        }
 
-        String::memset(&proc->ctx,0,sizeof(int_frame_t));
+        } else {
+            String::memset(&proc->ctx,0,sizeof(int_frame_t));
+            
+            proc->ctx.cs = 0x20 | 3;
+            proc->ctx.ss = 0x18 | 3;
+            proc->ctx.rflags = (1 << 9); // setup IF
+
+            fd_t* current_fd = (fd_t*)proc->start_fd;
+            while(current_fd) {
+
+                current_fd->seek_offset = 0;
+
+                current_fd = current_fd->next;
+            }
+
+            VMM::Reload(proc);
+
+            Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
+            for(int i = 0;i < argv_length; i++) {
+
+                KHeap::Free(stack_argv[i]);
         
+            }
+        
+            for(int i = 0;i < envp_length; i++) {
+        
+                KHeap::Free(stack_envp[i]);
+        
+            }
+        
+            KHeap::Free(stack_argv);
+            KHeap::Free(stack_envp);
+            //PMM::VirtualFree(path1);
 
-        proc->ctx.cs = 0x20 | 3;
-        proc->ctx.ss = 0x18 | 3;
-        proc->ctx.rflags = (1 << 9); // setup IF
+            PMM::VirtualFree(elf);
 
-        fd_t* current_fd = (fd_t*)proc->start_fd;
-        while(current_fd) {
-
-            current_fd->seek_offset = 0;
-
-            current_fd = current_fd->next;
+            schedulingSchedule(0);
         }
 
-        VMM::Reload(proc);
-
-        Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
-        for(int i = 0;i < argv_length; i++) {
-
-            KHeap::Free(stack_argv[i]);
-    
-        }
-    
-        for(int i = 0;i < envp_length; i++) {
-    
-            KHeap::Free(stack_envp[i]);
-    
-        }
-    
-        KHeap::Free(stack_argv);
-        KHeap::Free(stack_envp);
-        //PMM::VirtualFree(path1);
-
-        PMM::VirtualBigFree(elf,CALIGNPAGEUP(stat.size,4096) / 4096);
-
-        schedulingSchedule(0);
-    }
+        
+    } 
 
     for(int i = 0;i < argv_length; i++) {
 
@@ -783,9 +784,16 @@ int syscall_exec(int_frame_t* ctx) {
 
     }
 
+    Log(LOG_LEVEL_DEBUG,"exec() error in process %d, can't find/load a need file\n",proc->id);
+
+    Process::Kill(proc,-1);
+
     KHeap::Free(stack_argv);
     KHeap::Free(stack_envp);
     PMM::VirtualFree(path1);
+
+    schedulingSchedule(0);
+    
 
 }
 
@@ -845,7 +853,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log("Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
+    //Log(LOG_LEVEL_INFO,"Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
 
     if(sys == 0) {
         ctx->rax = -1;
@@ -854,7 +862,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
 
     ctx->rax = sys->func(ctx);
 
-    //Log("Done %d\n",ctx->rax);
+    //Log(LOG_LEVEL_INFO,"Done %d\n",ctx->rax);
 
     return;
 }

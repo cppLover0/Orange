@@ -172,8 +172,6 @@ extern "C" void kmain() {
     //__hlt();
 
     Log(LOG_LEVEL_INFO,"Kernel is initializied !\n");
-    
-    __hlt();
 
     filestat_t stat;
 

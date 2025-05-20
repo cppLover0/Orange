@@ -18,3 +18,11 @@ serial.txt
 output.txt
 Orange-distro-build
 ovmf
+initrd/usr/lib
+initrd/usr/include
+orange-mlibc
+./initrd
+qemu_log.txt
+orange.hdd
+./tools/toolchain/pack
+pack
