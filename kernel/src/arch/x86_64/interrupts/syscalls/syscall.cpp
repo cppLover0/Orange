@@ -34,11 +34,6 @@ int syscall_exit(int_frame_t* ctx) {
     
     Process::Kill(proc,ctx->rdi);
 
-    if(proc->id == 1) {
-        Log(LOG_LEVEL_INFO,"Initrd finished with code %d!\n",proc->return_status);
-        pAssert(0,"Initrd is killed !");
-    }
-
     //Log("Process %d is died with code %d !\n",proc->id,proc->return_status);
 
     schedulingSchedule(ctx);
@@ -135,9 +130,7 @@ int syscall_open(int_frame_t* ctx) {
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memcpy(buffer,name,String::strlen(name));
-    Paging::EnableKernel();
-
-    
+    Paging::EnableKernel();    
 
     if(buffer[String::strlen(buffer) - 1] == '/')
         buffer[String::strlen(buffer) - 1] = '\0';
@@ -158,11 +151,8 @@ int syscall_open(int_frame_t* ctx) {
 
     resolve_path(buffer,first,path);
 
-    //Log("%s\n",path);
-
     int fd = FD::Create(proc,0);
     fd_t* fd_s = FD::Search(proc,fd);
-
     String::memset(fd_s->path_point,0,2048);
     String::memcpy(fd_s->path_point,path,String::strlen(path));
 
@@ -172,6 +162,8 @@ int syscall_open(int_frame_t* ctx) {
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     *fdout = fd;
     Paging::EnableKernel();
+
+    //Log(LOG_LEVEL_DEBUG,"Touching %s\n",path);
 
     VFS::Touch(path);
 
@@ -190,9 +182,8 @@ int syscall_open(int_frame_t* ctx) {
 int syscall_seek(int_frame_t* ctx) {
 
     int fd = ctx->rdi;
-    long offset = ctx->rsi;
+    long offset = (long)ctx->rsi;
     int whence = ctx->rdx;
-    long* new_offset = (long*)ctx->rcx;
 
     process_t* proc = CpuData::Access()->current;
 
@@ -201,12 +192,8 @@ int syscall_seek(int_frame_t* ctx) {
     if(!file)
         return -1;
 
-    if(!new_offset && !offset)
-        return -2;
-
-    if(fd < 3)
-        return 0;
-
+    filestat_t stat;
+    int stx = VFS::Stat(file->path_point,(char*)&stat); 
 
     switch (whence)
     {
@@ -219,11 +206,11 @@ int syscall_seek(int_frame_t* ctx) {
             break;
 
         case SEEK_END:
-            file->seek_offset = offset;
+            file->seek_offset = stx == 0 ? stat.size + offset : offset;
             break;
 
         default:
-            Log(LOG_LEVEL_WARNING,"Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
+            Log(LOG_LEVEL_DEBUG,"Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
             return 22;
 
     }
@@ -316,8 +303,8 @@ int syscall_read(int_frame_t* ctx) {
     if(!file)
         return -1;
 
+    //Log(LOG_LEVEL_DEBUG,"%s\n",file->path_point);
 
-        //Log("fds %d\n",file->index);
     if(file->type == FD_PIPE) {
         
         //proc->is_cli = 0;
@@ -328,40 +315,39 @@ int syscall_read(int_frame_t* ctx) {
             return -20;
         } else if(file->pipe.type == PIPE_INSTANT) {
             
-            if(!file->pipe.is_used)
+            if(!file->pipe.is_used) 
                 VFS::AskForPipe(file->path_point,&file->pipe);
 
-                if(!file->pipe.is_received) {
+            if(!file->pipe.is_received) {
 
-                    if(file->pipe.buffer_size < count)
-                        count = file->pipe.buffer_size;
+                if(file->pipe.buffer_size < count)
+                    count = file->pipe.buffer_size;
         
-                    char* pipe_buffer = file->pipe.buffer;
+                char* pipe_buffer = file->pipe.buffer;
         
-                    __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
-                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-                    String::memcpy(buf,pipe_buffer,count);
-                    Paging::EnableKernel();
-                    file->pipe.is_received = 1;
-                    ctx->rdx = 1;
-        
-                    proc->is_eoi = 1;
+                __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
 
-                    return 0;
+                Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                String::memcpy(buf,pipe_buffer,count);
+                Paging::EnableKernel();
+                file->pipe.is_received = 1;
+                ctx->rdx = 1;
+        
+                proc->is_eoi = 1;
+
+                return 0;
 
         
-                } else {
-                    ctx->rdx = 0;
-                    return 0;
-                }
+            } else {
+                ctx->rdx = 0;
+                return 0;
+            }
 
         }
         
         
     
     }
-
-    //Log("fds\n");
 
     if(VFS::Stat(file->path_point,(char*)&stat) == -15) {
         
@@ -380,8 +366,6 @@ int syscall_read(int_frame_t* ctx) {
         
         return 0;
     }
-
-    //Log("Reading %s\n",stat.name);
 
     long seek_off = file->seek_offset;
 
@@ -408,6 +392,9 @@ int syscall_read(int_frame_t* ctx) {
         
     }
 
+    if(stat.type == VFS_TYPE_DIRECTORY)
+        return 21;
+
     if(stat.content) {
         __prepare_file_content_syscall(stat.content,stat.size,ctx->cr3);
     } else {
@@ -415,7 +402,7 @@ int syscall_read(int_frame_t* ctx) {
         actual_size = 0;
     }
 
-    //Log("Reading %s\n",stat.name);
+    file->seek_offset += actual_size;
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memset(buf,0,count);
@@ -477,6 +464,8 @@ int syscall_write(int_frame_t* ctx) {
     Paging::EnableKernel();
 
     VFS::Write(dest_buf,file->path_point,count,0);
+
+    file->seek_offset += count;
 
     PMM::VirtualFree(dest_buf);
 
@@ -818,6 +807,96 @@ int syscall_getcwd(int_frame_t* ctx) {
 
 }
 
+int syscall_getppid(int_frame_t* ctx) {
+    return CpuData::Access()->current->parent_process;
+}
+
+int syscall_gethostname(int_frame_t* ctx) {
+    uint64_t buf = ctx->rdi;
+    uint64_t size = ctx->rsi;
+
+    const char* host_name = "orange-pc";
+
+    uint64_t actual_size = size > String::strlen((char*)host_name) ? size : String::strlen((char*)host_name);
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memset((void*)buf,0,actual_size);
+    String::memcpy((void*)buf,host_name,actual_size == size ? String::strlen((char*)host_name) : actual_size);
+    Paging::EnableKernel();
+
+    return 0;
+
+}
+
+int syscall_stat(int_frame_t* ctx) {
+
+    uint64_t fd = ctx->rdi;
+    stat_t* out = (stat_t*)ctx->rsi;
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* fd_s = FD::Search(proc,fd);
+
+    if(!fd_s)
+        return -100;
+
+    filestat_t stat;
+    int st = VFS::Stat(fd_s->path_point,(char*)&stat);
+
+    if(st && st != -15 && st != 5)
+        return st;
+
+    if(st == 5) {
+        Log(LOG_LEVEL_DEBUG,"File %s is not found\n",fd_s->path_point);
+        return 0;
+    }
+        
+    
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+
+    String::memset(out,0,sizeof(stat_t));
+    if(st != -15) {
+        out->st_size = stat.size;
+        out->st_mode = stat.type == VFS_TYPE_FILE ? S_IFREG : S_IFDIR;
+    } else {
+        out->st_size = 0;
+        out->st_mode = S_IFREG;
+    }
+    
+    Paging::EnableKernel();
+
+    //Log(LOG_LEVEL_DEBUG,"Stating %s (size: %d)\n",fd_s->path_point,stat.size);
+
+    return 0;
+
+}
+
+int syscall_dup(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* fd_s = FD::Search(proc,fd);
+    if(!fd_s)
+        return -200;
+
+    int new_fd = FD::Create(proc,fd_s->type == FD_PIPE ? 1 : 0);
+    fd_t* fd_new = FD::Search(proc,new_fd);
+
+    String::memcpy(fd_new,fd_s,sizeof(fd_t));
+    fd_new->index = new_fd;
+    fd_new->next = 0;
+
+    ctx->rdx = new_fd;
+    return 0;
+}
+
+int syscall_kill(int_frame_t* ctx) {
+    int pid = ctx->rdi;
+    Process::Kill(Process::ByID(pid),ctx->rsi);
+    return 0;
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -838,7 +917,12 @@ syscall_t syscall_table[] = {
     {17,syscall_getpid},
     {18,syscall_dump_memory},
     {19,syscall_exec},
-    {20,syscall_getcwd}
+    {20,syscall_getcwd},
+    {21,syscall_getppid},
+    {22,syscall_gethostname},
+    {23,syscall_stat},
+    {24,syscall_dup},
+    {25,syscall_kill}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -853,8 +937,6 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log(LOG_LEVEL_INFO,"Syscall: %d 0x%p\n",ctx->rax,ctx->rip);
-
     if(sys == 0) {
         ctx->rax = -1;
         return;
@@ -862,7 +944,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
 
     ctx->rax = sys->func(ctx);
 
-    //Log(LOG_LEVEL_INFO,"Done %d\n",ctx->rax);
+    //Log(LOG_LEVEL_DEBUG,"Syscall %d with ret %d\n",sys->num,ctx->rax);
 
     return;
 }

@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 1G -no-reboot -serial stdio -M q35 -s -d int -D qemu_log.txt
+QEMUFLAGS := -m 1G -no-reboot -serial stdio -M q35 -s -d int -D qemu_log.txt -smp 2
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
@@ -58,22 +58,6 @@ check-cross:
 		echo 'or build cross compiler with "make cross-compiler"'; \
 		exit 1; 
     endif
-
-.PHONY: build-distro
-build-distro: check-cross headers 
-	rm -rf tools/orange-mlibc
-	rm -rf initrd
-	mkdir -p initrd/lib
-	cd tools && git clone https://github.com/cpplover0/orange-mlibc --depth=1
-	cd tools/orange-mlibc && sh build_to_cross.sh "$(CURRENT_DIR)"
-	rm -rf initrd/lib/*
-	cd initrd/lib && ln -s ../usr/lib/libc.so libc.so 
-	cd initrd/lib && ln -s ../usr/lib/ld.so ld64.so.1 
-	mkdir -p initrd/bin
-	mkdir -p initrd/usr/bin
-	x86_64-orange-gcc tools/test_init/main.c -o initrd/usr/bin/initrd -Wl,-Bdynamic
-	rm -rf tools/iso/boot/initrd.tar
-	$(HOST_TAR) -cf tools/iso/boot/initrd.tar -C initrd .
 
 .PHONY: all
 all: $(IMAGE_NAME).iso

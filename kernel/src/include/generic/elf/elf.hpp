@@ -57,6 +57,16 @@ enum ELF_Type {
 };
 
 typedef enum {
+    ET_NONE = 0,
+    ET_REL = 1,
+    ET_EXEC = 2,
+    ET_DYN = 3,
+    ET_CORE = 4,
+    ET_LOPROC = 0xff00,
+    ET_HIPROC = 0xffff
+} obj_type_t;
+
+typedef enum {
     AT_NULL = 0,
     AT_IGNORE = 1,
     AT_EXECFD = 2,

@@ -8,6 +8,7 @@
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <generic/VFS/devfs.hpp>
 #include <drivers/io/io.hpp>
+#include <generic/tty/tty.hpp>
 
 char kmap[255] = {
     '\0', '\0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 
@@ -137,6 +138,7 @@ short PS2Keyboard::Get() {
 
         __last_key = keycode;
 
+        __tty_receive_ipc(keycode); // tty wants to eat too
         __kbd_send_ipc(keycode);
 
         return __last_key;
@@ -184,7 +186,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
 
     }
 
-    devfs_reg_device("/kbd",0,kbd_read,kbd_askforpipe,0);
+    devfs_reg_device("/kbd",0,kbd_read,kbd_askforpipe,0,0);
 
     Log(LOG_LEVEL_INFO,"PS/2 Keyboard is initializied !\n");
 

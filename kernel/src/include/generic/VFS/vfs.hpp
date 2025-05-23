@@ -8,6 +8,10 @@
 #define STATUS_NOT_IMPLEMENTED -1
 #define STATUS_ERROR -2
 
+#define VFS_TYPE_FILE 0
+#define VFS_TYPE_DIRECTORY 1
+#define VFS_TYPE_SYMLINK 2
+
 #define SUBSTATUS_TTY 99
 
 typedef struct {
@@ -26,6 +30,8 @@ typedef struct {
 
     int (*askforpipe)(char* filename,pipe_t* pipe);
     int (*instantreadpipe)(char* filename, pipe_t* pipe);
+
+    int (*ioctl)(char* filename,unsigned long request, void *arg, int *result);
 
     char is_in_ram;
     disk_t* disk;

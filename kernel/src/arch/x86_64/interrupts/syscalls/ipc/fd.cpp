@@ -5,6 +5,8 @@
 #include <generic/memory/pmm.hpp>
 #include <stdint.h>
 #include <other/log.hpp>
+#include <other/debug.hpp>
+#include <other/string.hpp>
 
 char fd_lock = 0;
 
@@ -27,7 +29,7 @@ int FD::Create(process_t* proc,char is_pipe) {
         }
         current = current->next;
     }
-    
+
     if(!is_success) {
         current = (fd_t*)PMM::VirtualAlloc();
         current->index = last->index + 1;
@@ -42,10 +44,12 @@ int FD::Create(process_t* proc,char is_pipe) {
     current->pipe.type = PIPE_WAIT;
 
     current->pipe.is_used = 0;
+
+    String::memset(&current->termios,0,sizeof(termios_t));
     
     current->type = is_pipe ? FD_PIPE : FD_FILE;
     current->proc = proc;
-    
+    current->seek_offset = 0;
 
     if(is_pipe)
         current->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);

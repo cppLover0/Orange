@@ -81,7 +81,7 @@ int devfs_instantreadpipe(char* filename,pipe_t* pipe) {
     return dev->instantreadpipe(pipe);
 }
 
-void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe)) {
+void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, int *result)) {
 
     struct devfs_dev* dev = new struct devfs_dev;
     
@@ -91,6 +91,7 @@ void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),
         dev->read = read;
         dev->askforpipe = askforpipe;
         dev->instantreadpipe = instantreadpipe;
+        dev->ioctl = ioctl;
 
         if(!head_dev) {
             head_dev = dev;
@@ -122,25 +123,9 @@ int zero_read(char* buffer,long hint_size) {
 
 }
 
-int tty_write(char* buffer,uint64_t size) {
-    
-    if(!buffer && !size) return 10;
-
-    LogBuffer(buffer,size);
-    return 0;
-}
-
-int serial_write(char* buffer,uint64_t size) {
-    if(!buffer) return 10;
-    Serial::WriteString(buffer);
-    return 0;
-}
-
 void devfs_init(filesystem_t* fs) {
-    devfs_reg_device("/zero",0,zero_read,0,0);
-    devfs_reg_device("/null",0,zero_read,0,0);
-    devfs_reg_device("/tty",tty_write,0,0,0);
-    devfs_reg_device("/serial",serial_write,0,0,0);
+    devfs_reg_device("/zero",0,zero_read,0,0,0);
+    devfs_reg_device("/null",0,zero_read,0,0,0);
 
     fs->create = 0;
     fs->disk = 0;

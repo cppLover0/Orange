@@ -78,7 +78,7 @@ int VFS::Write(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
 int VFS::Touch(char* filename) {
     if(!filename) return -1;
 
-    spinlock_lock(&vfs_spinlock);
+    //spinlock_lock(&vfs_spinlock);
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
     if(!fs) return -1;
@@ -86,7 +86,7 @@ int VFS::Touch(char* filename) {
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
     int status = fs->fs->touch(filename_as_fs);
-    spinlock_unlock(&vfs_spinlock);
+    //spinlock_unlock(&vfs_spinlock);
     return status;
 }
     
@@ -123,7 +123,7 @@ int VFS::Remove(char* filename) {
 char VFS::Exists(char* filename) {
     if(!filename) return -1;
 
-    spinlock_lock(&vfs_spinlock);
+    //spinlock_lock(&vfs_spinlock);
     
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
@@ -132,14 +132,14 @@ char VFS::Exists(char* filename) {
     
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->exists(filename_as_fs);
-    spinlock_unlock(&vfs_spinlock);
+    //spinlock_unlock(&vfs_spinlock);
     return status;
 }
 
 int VFS::Stat(char* filename, char* buffer) {
     if(!filename) return -1;
 
-    spinlock_lock(&vfs_spinlock);
+    //spinlock_lock(&vfs_spinlock);
     
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
@@ -148,14 +148,12 @@ int VFS::Stat(char* filename, char* buffer) {
     
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->stat(filename_as_fs,buffer);
-    spinlock_unlock(&vfs_spinlock);
+    //spinlock_unlock(&vfs_spinlock);
     return status;
 }
 
 int VFS::AskForPipe(char* filename,pipe_t* pipe) {
     if(!filename) return -1;
-
-    spinlock_lock(&vfs_spinlock);
     
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
@@ -165,7 +163,6 @@ int VFS::AskForPipe(char* filename,pipe_t* pipe) {
     
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->askforpipe(filename_as_fs,pipe);
-    spinlock_unlock(&vfs_spinlock);
     return status;
 }
 

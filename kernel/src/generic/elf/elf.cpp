@@ -69,6 +69,11 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     uint64_t elf_base = UINT64_MAX;
     uint64_t size = 0;
     uint64_t phdr = 0;
+
+    uint64_t real_entry = head->e_entry;
+
+    char is_interp = 0;
+
     ELFLoadResult res;
 
     char elf_first[4] = {0x7F,'E','L','F'};
@@ -103,6 +108,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
                 return res;
             }
 
+            //Log(LOG_LEVEL_DEBUG,"Found PT_INTERP %s\n",stat.name);
+
             char* inter = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
 
             VFS::Read(inter,stat.name,0);
@@ -110,6 +117,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
             ELFLoadResult inter_r = ELF::Load((uint8_t*)inter,cr3,flags,(uint64_t*)1,0,0,proc);
 
             res.entry = inter_r.entry;
+
+            is_interp = 1;
 
         }
 
@@ -127,13 +136,32 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
     uint64_t aligned_size = ALIGNPAGEUP(size) / PAGE_SIZE;
 
     //Log("Allocating elf memory: %d\n",size);
-    void* elf_vmm = VMM::CustomAlloc(proc,elf_base,size,PTE_PRESENT | PTE_RW | PTE_USER);
+    void* elf_vmm;
 
-    uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_base)->phys;
+    if(head->e_type != ET_DYN) {
+        elf_vmm = VMM::CustomAlloc(proc,elf_base,size,PTE_PRESENT | PTE_RW | PTE_USER);
+        //Log(LOG_LEVEL_DEBUG,"process %d 0x%p ELF is absolute \n",proc->id,elf_vmm);
+    } else {
+        elf_vmm = VMM::Alloc(proc,size,PTE_PRESENT | PTE_RW | PTE_USER);
+
+        if(phdr)
+            phdr += (uint64_t)elf_vmm;
+
+        if(!is_interp)
+            res.entry = (void (*)())((uint64_t)elf_vmm + head->e_entry);
+
+        real_entry = (uint64_t)elf_vmm + head->e_entry;
+
+        //Log(LOG_LEVEL_DEBUG,"proccess %d 0x%p ELF is PIC/PIE with entry\n",proc->id,elf_vmm,res.entry);
+    }
+
+    uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_vmm)->phys;
 
     //Log("Allocated elf: 0x%p\n",allocated_elf);
 
     uint64_t phys_elf = (uint64_t)allocated_elf;
+
+    elf_base = (uint64_t)elf_vmm;
 
     allocated_elf = (uint8_t*)HHDM::toVirt((uint64_t)allocated_elf);
 
@@ -143,8 +171,13 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         uint64_t dest = 0;
         current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
         if(current_head->p_type == PT_LOAD) {
-            dest = (uint64_t)allocated_elf + (current_head->p_vaddr - elf_base);
-            //Log("Dest: 0x%p, calc: 0x%p 0x%p 0x%p\n",dest,(current_head->p_vaddr - elf_base),current_head->p_vaddr,(uint64_t)allocated_elf + (current_head->p_vaddr - elf_base));
+            
+            if(head->e_type != ET_DYN)
+                dest = (uint64_t)allocated_elf + (current_head->p_vaddr - elf_base);
+            else
+                dest = (uint64_t)allocated_elf + current_head->p_vaddr;
+
+            //Log(LOG_LEVEL_DEBUG,"Loading PT_LOAD with p_vaddr 0x%p, p_offset 0x%p\n",current_head->p_vaddr,current_head->p_offset);
             String::memset((void*)dest,0,current_head->p_filesz);
             String::memcpy((void*)dest,(void*)((uint64_t)base + current_head->p_offset), current_head->p_filesz);
         }
@@ -169,7 +202,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         stack = (uint64_t*)((uint64_t)stack + (PROCESS_STACK_SIZE * PAGE_SIZE));
         uint64_t* _stack = stack;
 
-        uint64_t auxv_stack[] = {(uint64_t)head->e_entry,AT_ENTRY,phdr,AT_PHDR,head->e_phentsize,AT_PHENT,head->e_phnum,AT_PHNUM,PAGE_SIZE,AT_PAGESZ};
+        uint64_t auxv_stack[] = {(uint64_t)real_entry,AT_ENTRY,phdr,AT_PHDR,head->e_phentsize,AT_PHENT,head->e_phnum,AT_PHNUM,PAGE_SIZE,AT_PAGESZ};
         uint64_t argv_length = __elf_get_length(argv);
         uint64_t envp_length = __elf_get_length(envp);
 

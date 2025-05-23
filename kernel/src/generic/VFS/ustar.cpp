@@ -6,6 +6,7 @@
 #include <other/assert.hpp>
 #include <other/string.hpp>
 #include <other/log.hpp>
+#include <generic/VFS/tmpfs.hpp>
 #include <generic/memory/paging.hpp> // it have align macros
 
 inline int oct2bin(unsigned char *str, int size) {
@@ -100,24 +101,29 @@ void resolve_path(const char* inter,const char* base, char *result) {
     char* final_buffer = (char*)buffer2_in_stack;
     uint64_t ptr = String::strlen((char*)base);
     char is_first = 1;
+    char is_full = 0;
 
     String::memset(buffer_in_stack,0,1024);
     String::memset(buffer2_in_stack,0,1024);
 
     String::memcpy(final_buffer,base,String::strlen((char*)base));
 
+    if(!String::strcmp(inter,".\0")) {
+        String::memset(result,0,1024);
+        String::memcpy(result,base,String::strlen((char*)base));
+        return;
+    }
+
     if(inter[0] == '/') {
         ptr = 0;
         String::memset(final_buffer,0,1024);
-        //Log("FUl");
+        is_full = 1;
     }
 
     buffer = __ustar__strtok((char*)inter,"/");
     while(buffer) {
 
-        //Log("%s %s\n",buffer,final_buffer);
-
-        if(is_first) {
+        if(is_first && !is_full) {
             uint64_t mm = resolve_count(final_buffer,ptr,'/');
 
             if(ptr < mm) {
@@ -147,7 +153,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
             
 
 
-        } else if(buffer[0] != '.' && buffer[1] != '\0') {
+        } else if(String::strcmp(buffer,"./")) {
 
             final_buffer[ptr] = '/';
             ptr++;
@@ -227,5 +233,7 @@ void USTAR::ParseAndCopy() {
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);
 
     }
+
+    //tmpfs_dump();
 
 }

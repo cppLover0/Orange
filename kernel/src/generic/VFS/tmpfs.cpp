@@ -84,6 +84,9 @@ int tmpfs_create(char* name,int type) {
 
     if(tmpfs_scan_for_file(name)) return 6;
 
+    if(name[String::strlen(name) - 1] == '/')
+        name[String::strlen(name) - 1] = '\0';
+
     data_file_t* new_data = new data_file_t;
 
     String::memset(new_data,0,sizeof(data_file_t));
@@ -96,11 +99,6 @@ int tmpfs_create(char* name,int type) {
 
     new_data->file_change_date = convertToUnixTime();
     new_data->file_create_date = convertToUnixTime();
-
-    if(name == "/head") {
-        Log(LOG_LEVEL_INFO,"Adding protection to head\n");
-        new_data->protection = 1;
-    }
 
     return 0;
 
@@ -207,6 +205,8 @@ int tmpfs_stat(char* filename,char* buffer) {
 
     if(!String::strcmp(filename,"/")) return 4;
 
+    //Log(LOG_LEVEL_DEBUG,"Stat %s\n",filename);
+
     if(!tmpfs_scan_for_file(filename)) return 5;
     data_file_t* file = tmpfs_scan_for_file(filename);
     while(file) {
@@ -217,7 +217,7 @@ int tmpfs_stat(char* filename,char* buffer) {
     }
 
     if(!file)
-        return 5;
+        return 6;
 
     filestat_t stat;
     stat.size = file->size_of_content;

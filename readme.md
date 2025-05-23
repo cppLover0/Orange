@@ -3,6 +3,24 @@
 
 Orange is my limine x86_64 OS
 
+# Build
+
+Build kernel
+```sh
+make all
+```
+
+Build initrd (You should build it before running os)
+```sh
+sh build-initrd.sh
+```
+
+Build kernel and run iso 
+```sh
+make
+```
+
+
 ## Base x86 TODO
 
 - [x] Build

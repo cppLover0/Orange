@@ -271,9 +271,6 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         }
 
     }
-
-    String::memset(&proc->termios,0,sizeof(termios_t));
-
     
 
     if(is_thread) {
@@ -327,7 +324,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         stdin->type = FD_PIPE; 
         stdin->pipe.parent = proc;
 
-        String::memcpy(stdin->path_point,"/dev/kbd",sizeof("/dev/kbd"));
+        String::memcpy(stdin->path_point,"/dev/tty",sizeof("/dev/tty"));
         String::memcpy(stdin->pipe.buffer,"how are you reading this ???\n",5);
 
         proc->start_fd = (char*)stdin;
@@ -346,7 +343,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
 
         fd = FD::Create(proc,0);
         fd_t* stderr = FD::Search(proc,fd);
-        String::memcpy(stderr->path_point,"/dev/serial",sizeof("/dev/serial"));
+        String::memcpy(stderr->path_point,"/dev/tty",sizeof("/dev/tty"));
 
     }
 

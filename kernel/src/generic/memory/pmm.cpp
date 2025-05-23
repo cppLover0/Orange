@@ -160,7 +160,7 @@ uint64_t buddy_alloc(uint64_t size) {
         return good_buddy_split->phys_pointer;
     }
 
-    Log(LOG_LEVEL_ERROR,"Camt find bud :(\n");
+    Log(LOG_LEVEL_ERROR,"Camt find bud with size 0x%p:(\n",size);
     return 0;
 
 }

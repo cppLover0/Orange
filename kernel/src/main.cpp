@@ -17,6 +17,7 @@
 #include <uacpi/event.h>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <generic/acpi/acpi.hpp>
+#include <generic/tty/tty.hpp>
 #include <drivers/hpet/hpet.hpp>
 #include <other/log.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
@@ -211,12 +212,10 @@ extern "C" void kmain() {
 
     Process::WakeUp(initrd);
 
-    const char* str = "Hello, world from /dev/tty !\n";
-    pAssert(VFS::Write((char*)str,"/dev/tty",String::strlen((char*)str),0) == 0,"devfs need to cry :(");
-
     Log(LOG_LEVEL_INFO,"Waiting for interrupts...\n");
- 
-    NLog("\033[2J \033[1;1H");
+
+    TTY::Init();
+
     //__hlt();
 
     //MP::Sync();
