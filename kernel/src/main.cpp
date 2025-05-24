@@ -57,6 +57,7 @@ void _2() {
     }
 }
 
+uint32_t default_fg = 0xFFFFFFFF;
 
 extern "C" void keyStub();
 extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx);
@@ -67,9 +68,7 @@ extern "C" void kmain() {
         __init_array[i]();
     }
 
-    orange_status ret = 0;
-
-    ret = Serial::Init();
+    Serial::Init();
 
     Serial::printf("Serial initializied\n");
     LimineInfo info;
@@ -83,14 +82,15 @@ extern "C" void kmain() {
         info.fb_info->blue_mask_size, info.fb_info->blue_mask_shift,
         NULL,
         NULL, NULL,
-        NULL, NULL,
-        NULL, NULL,
+        NULL, &default_fg,
+        NULL, &default_fg,
         NULL, 0, 0, 1,
         0, 0,
         0
     );
 
-    ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
+    //ft_ctx->set_text_fg_bright(ft_ctx,0xFFFFFFFF);
+    //ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
     ft_ctx->cursor_enabled = 0;
     ft_ctx->clear(ft_ctx,1);
 
@@ -192,6 +192,12 @@ extern "C" void kmain() {
         int proc = Process::createProcess((uint64_t)_1,0,0,0,0);
         Process::WakeUp(proc);
     }
+
+    int serial = Process::createProcess((uint64_t)__serial_process_fetch,0,0,0,0);
+    
+    process_t* serial_proc = Process::ByID(serial);
+    serial_proc->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
+    Process::WakeUp(serial);
 
     const char* pa = "/usr/bin/initrd";
     const char* ea = "=";

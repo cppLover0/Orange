@@ -45,7 +45,7 @@ int FD::Create(process_t* proc,char is_pipe) {
 
     current->pipe.is_used = 0;
 
-    String::memset(&current->termios,0,sizeof(termios_t));
+    String::memset(&current->pipe.termios,0,sizeof(termios_t));
     
     current->type = is_pipe ? FD_PIPE : FD_FILE;
     current->proc = proc;

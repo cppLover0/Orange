@@ -75,4 +75,5 @@ public:
     static int Stat(char* filename,char* buffer);
     static int AskForPipe(char* filename,pipe_t* pipe);
     static int InstantPipeRead(char* filename,pipe_t* pipe);
+    static int Ioctl(char* filename,unsigned long request, void *arg, int *result);
 };

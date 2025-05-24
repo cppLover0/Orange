@@ -20,7 +20,6 @@ char __shift_pressed = 0;
 char __ps_2_to_upper(char c) {
 
     if (c >= 'a' && c <= 'z') {
- 
         return c - ('a' - 'A');
  
     } 
@@ -28,29 +27,17 @@ char __ps_2_to_upper(char c) {
     switch (c) {
  
         case '1': return '!';
- 
         case '2': return '@';
- 
         case '3': return '#';
- 
         case '4': return '$';
- 
         case '5': return '%';
- 
         case '6': return '^';
- 
         case '7': return '&';
- 
         case '8': return '*';
- 
         case '9': return '(';
- 
         case '0': return ')';
- 
         case '-': return '_';
- 
         case '=': return '+';
- 
         case '`': return '~';
  
         default: break; 
@@ -73,25 +60,20 @@ char __ps2_read(char keycodeps2) {
         unsigned char keycode = keycodeps2;
 
         if(keycode == SHIFT_PRESSED)
- 
             __shift_pressed = 1;
  
         if(keycode == SHIFT_RELEASED)
- 
             __shift_pressed = 0;
  
         if(keycode <= 0x58) {
-
             keycode = kmap[keycode];
  
             if(__shift_pressed)
- 
                 keycode = __ps_2_to_upper(keycode);
  
         }
 
         if(keycode & (1 << 7))
- 
             return '\0';
 
         return keycode;

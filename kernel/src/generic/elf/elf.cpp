@@ -76,6 +76,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     ELFLoadResult res;
 
+    res.entry = 0;
+
     char elf_first[4] = {0x7F,'E','L','F'};
     if(String::strncmp((char*)head->e_ident,elf_first,4))
         return res;

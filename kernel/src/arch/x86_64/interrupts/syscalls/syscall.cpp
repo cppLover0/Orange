@@ -34,7 +34,7 @@ int syscall_exit(int_frame_t* ctx) {
     
     Process::Kill(proc,ctx->rdi);
 
-    //Log("Process %d is died with code %d !\n",proc->id,proc->return_status);
+    Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
 
     schedulingSchedule(ctx);
     
@@ -255,6 +255,8 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
     void* buf = (void*)ctx->rsi;
     uint64_t count = ctx->rdx;
 
+    //Log(LOG_LEVEL_DEBUG,"Reading from /dev/tty\n");
+
     if(file->path_point[0])
         VFS::AskForPipe(file->path_point,&file->pipe);
 
@@ -262,7 +264,6 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
 
     while(1) {
         if(!file->pipe.is_received) {
-
             if(file->pipe.buffer_size < count)
                 count = file->pipe.buffer_size;
 
@@ -273,7 +274,8 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
             String::memcpy(buf,pipe_buffer,count);
             Paging::EnableKernel();
             file->pipe.is_received = 1;
-            ctx->rdx = 1;
+            ctx->rdx = file->pipe.buffer_size;
+            file->pipe.buffer_size = 0;
             ctx->rax = 0;
 
             proc->is_eoi = 1;
@@ -300,15 +302,18 @@ int syscall_read(int_frame_t* ctx) {
     fd_t* file = FD::Search(proc,fd);
     filestat_t stat;
 
+    extern termios_t tty_termios;
+
     if(!file)
         return -1;
 
     //Log(LOG_LEVEL_DEBUG,"%s\n",file->path_point);
 
     if(file->type == FD_PIPE) {
+        file->pipe.buffer_size = 0;
         
         //proc->is_cli = 0;
-        if(file->pipe.type == PIPE_WAIT) {
+        if(file->pipe.type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point)&& (tty_termios.c_lflag & ICANON))) {
             proc->is_eoi = 0;
             String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
             syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
@@ -330,8 +335,11 @@ int syscall_read(int_frame_t* ctx) {
                 Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
                 String::memcpy(buf,pipe_buffer,count);
                 Paging::EnableKernel();
+
                 file->pipe.is_received = 1;
-                ctx->rdx = 1;
+                ctx->rdx = file->pipe.buffer_size;
+
+                file->pipe.buffer_size = 0;
         
                 proc->is_eoi = 1;
 
@@ -707,7 +715,7 @@ int syscall_exec(int_frame_t* ctx) {
 
     int status = VFS::Stat(path1,(char*)&stat);
 
-    if(!status) {
+    if(!status && stat.type == VFS_TYPE_FILE) {
         //Log("alloc\n");
         char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
         //Log("reading %s 0x%p\n",path1,elf);
@@ -736,26 +744,33 @@ int syscall_exec(int_frame_t* ctx) {
 
             VMM::Reload(proc);
 
-            Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
-            for(int i = 0;i < argv_length; i++) {
+            int status1 = Process::loadELFProcess(proc->id,path1,(uint8_t*)elf,stack_argv,stack_envp);
 
-                KHeap::Free(stack_argv[i]);
-        
+            if(!status1) {
+                for(int i = 0;i < argv_length; i++) {
+
+                    KHeap::Free(stack_argv[i]);
+            
+                }
+            
+                for(int i = 0;i < envp_length; i++) {
+            
+                    KHeap::Free(stack_envp[i]);
+            
+                }
+            
+                KHeap::Free(stack_argv);
+                KHeap::Free(stack_envp);
+                //PMM::VirtualFree(path1);
+
+                PMM::VirtualFree(elf);
+
+                schedulingSchedule(0);
             }
-        
-            for(int i = 0;i < envp_length; i++) {
-        
-                KHeap::Free(stack_envp[i]);
-        
-            }
-        
-            KHeap::Free(stack_argv);
-            KHeap::Free(stack_envp);
-            //PMM::VirtualFree(path1);
 
             PMM::VirtualFree(elf);
 
-            schedulingSchedule(0);
+            
         }
 
         
@@ -773,9 +788,7 @@ int syscall_exec(int_frame_t* ctx) {
 
     }
 
-    Log(LOG_LEVEL_DEBUG,"exec() error in process %d, can't find/load a need file\n",proc->id);
-
-    Process::Kill(proc,-1);
+    Process::Kill(proc,ENOENT);
 
     KHeap::Free(stack_argv);
     KHeap::Free(stack_envp);
@@ -897,6 +910,144 @@ int syscall_kill(int_frame_t* ctx) {
     return 0;
 }
 
+// int fd, unsigned long request, void *arg, int *result
+
+int syscall_ioctl(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+    uint64_t request = ctx->rsi;
+    void* arg = (void*)ctx->rdx;
+
+    process_t* proc = CpuData::Access()->current;
+
+    int size = 0;
+    switch(request) {
+        case TCGETS:
+            size = sizeof(termios_t);
+            break;
+        case TCSETS:
+            size = sizeof(termios_t);
+            break;
+        case TIOCGWINSZ:
+            size = sizeof(winsize_t);
+            break;
+        default:
+            return 38;
+    }
+
+    char temp_buffer[size + 1];
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memcpy(temp_buffer,arg,size);
+    Paging::EnableKernel();
+
+    fd_t* file = FD::Search(proc,fd);
+    if(!file)
+        return 1;
+
+    int status = VFS::Ioctl(file->path_point,request,temp_buffer,0);
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memcpy(arg,temp_buffer,size);
+    Paging::EnableKernel();
+
+    return status;
+
+}
+
+extern "C" void syscall_waitpid_stage2_asm(uint64_t new_stack,int_frame_t* ctx);
+
+extern "C" void syscall_waitpid_stage2(int_frame_t* ctx) {
+    
+    process_t* hproc = CpuData::Access()->current;
+    int pid = ctx->rdi;
+    int* ret_pid = (int*)ctx->rsi;
+
+    if(pid > 0) {
+        process_t* target_proc = Process::ByID(pid);
+        while(target_proc->status != PROCESS_STATUS_KILLED) {asm volatile("int $32");}
+        target_proc->is_waitpid_used = 1;
+        int ned_pid = target_proc->id;
+        ctx->rax = 0;
+        ctx->rdx = target_proc->return_status;
+
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+        *ret_pid = ned_pid;
+        Paging::EnableKernel();
+
+        hproc->is_eoi = 1;
+        Lapic::EOI();
+        syscall_end(ctx);
+    } else {
+        while(1) {
+            extern process_t* head_proc;
+
+            process_t* proc = head_proc;
+            while(proc) {
+                if(proc->parent_process == hproc->id && proc->status == PROCESS_STATUS_KILLED && !proc->is_waitpid_used) {
+                    proc->is_waitpid_used = 1;
+                    
+                    ctx->rax = 0;
+                    ctx->rdx = proc->return_status;
+
+                    int ned_pii = proc->id;
+
+                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                    *ret_pid = ned_pii;
+                    Paging::EnableKernel();
+
+                    ctx->rip = ctx->rcx;
+
+                    hproc->is_eoi = 1;
+                    Lapic::EOI();
+                    syscall_end(ctx);
+
+                }
+                proc = proc->next;
+            }
+            asm volatile("int $32");
+        }
+    }
+
+}
+
+int syscall_waitpid(int_frame_t* ctx) {
+    int pid = ctx->rdi;
+    process_t* hproc = CpuData::Access()->current;
+
+    int success = 0;
+
+    if(pid < -1 || pid == 0)
+        return ENOSYS;
+
+    if(pid > 0) {
+        process_t* nedporc = Process::ByID(pid);
+        if(!nedporc)
+            return ESRCH;
+
+        success = 1;
+
+    }
+
+    // search for available processes
+    extern process_t* head_proc;
+
+    process_t* proc = head_proc;
+    while(proc) {
+        if(proc->parent_process == hproc->id && proc->status != PROCESS_STATUS_KILLED) {
+            success = 1;
+            break;
+        }
+        proc = proc->next;
+    }
+
+    if(success) {
+        hproc->is_eoi = 0;
+        String::memcpy(hproc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
+        syscall_waitpid_stage2_asm((uint64_t)hproc->wait_stack + 4096,hproc->syscall_wait_ctx);
+    } else
+        return ESRCH;
+
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -922,7 +1073,9 @@ syscall_t syscall_table[] = {
     {22,syscall_gethostname},
     {23,syscall_stat},
     {24,syscall_dup},
-    {25,syscall_kill}
+    {25,syscall_kill},
+    {26,syscall_ioctl}, 
+    {27,syscall_waitpid}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -937,6 +1090,8 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
+    //Log(LOG_LEVEL_DEBUG,"Syscall %d\n",ctx->rax);
+    
     if(sys == 0) {
         ctx->rax = -1;
         return;

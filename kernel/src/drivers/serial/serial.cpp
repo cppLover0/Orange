@@ -5,12 +5,12 @@
 #include <other/string.hpp>
 #include <stdint.h>
 #include <stdarg.h>
+#include <generic/tty/tty.hpp>
 
 char serial_spinlock = 0;
 
-orange_status Serial::Init() {
+void Serial::Init() {
     spinlock_lock(&serial_spinlock);
-    orange_status status = 0;
     IO::OUT(COM1 + 1,0,1);
     IO::OUT(COM1 + 3,(1 << 7),1);
     IO::OUT(COM1 + 1,0,1);
@@ -21,19 +21,26 @@ orange_status Serial::Init() {
     IO::OUT(COM1 + 4,(1 << 1) | (1 << 2) | (1 << 3) | (1 << 4),1);
     IO::OUT(COM1,0xAE,1);
     if(IO::IN(COM1,1) != 0xAE) {
-        status |= ORANGE_STATUS_SOMETHING_WRONG_STATE | ORANGE_STATUS_NOT_SUPPORTED;
         spinlock_unlock(&serial_spinlock);
-        return status;
+        return;
     }
     IO::OUT(COM1 + 4,(1 << 0) | (1 << 1) | (1 << 2) | (1 << 3),1);
-    status |= ORANGE_STATUS_IS_ALL_OK | ORANGE_STATUS_INITIALIZIED_STATE | (0x1 << 4);
     spinlock_unlock(&serial_spinlock);
-    return status;
+}
+
+void __serial_process_fetch() {
+
+    IO::IN(COM1,1);
+    while(1) {
+        uint8_t key = Serial::Read();
+        if(key)
+            __tty_receive_ipc(key);
+    }
 }
 
 uint8_t Serial::Read() {
     //spinlock_lock(&serial_spinlock);
-    while(IO::IN(COM1 + 5,1) & 1 == 0) {} 
+    while(!(IO::IN(COM1 + 5,1) & 1)) {} 
     uint8_t value = IO::IN(COM1,1);
     //spinlock_unlock(&serial_spinlock);
     return value;

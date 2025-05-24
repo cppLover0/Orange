@@ -53,6 +53,19 @@ int devfs_write(char* buffer,char* filename,uint64_t size,char is_symlink_path) 
 
 }
 
+int devfs_ioctl(char* filename,unsigned long request, void *arg, int *result) {
+    if(!filename) return 1;
+
+    devfs_dev_t* dev = devfs_find_dev(filename);
+
+    if(!dev) return 4;
+    if(!dev->ioctl) return 25;
+
+    return dev->ioctl(request,arg,(void*)result);
+
+}
+
+
 int devfs_askforpipe(char* filename,pipe_t* pipe) {
 
     if(!filename) return 1;
@@ -81,7 +94,7 @@ int devfs_instantreadpipe(char* filename,pipe_t* pipe) {
     return dev->instantreadpipe(pipe);
 }
 
-void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, int *result)) {
+void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, void* result)) {
 
     struct devfs_dev* dev = new struct devfs_dev;
     
@@ -134,6 +147,7 @@ void devfs_init(filesystem_t* fs) {
     fs->readfile = devfs_read;
     fs->writefile = devfs_write;
     fs->askforpipe = devfs_askforpipe;
+    fs->ioctl = devfs_ioctl;
     fs->touch = 0;
     fs->stat = 0;
     fs->rm = 0;

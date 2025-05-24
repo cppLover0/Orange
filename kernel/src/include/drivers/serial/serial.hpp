@@ -7,9 +7,11 @@
 
 #define COM1 0x3F8
 
+void __serial_process_fetch();
+
 class Serial {
 public:
-    static orange_status Init();
+    static void Init();
     static uint8_t Read();
     static void Write(uint8_t data);
     static void WriteArray(uint8_t* data,uint64_t len);

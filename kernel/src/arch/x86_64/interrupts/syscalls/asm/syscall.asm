@@ -87,3 +87,11 @@ syscall_read_stage_2_asm:
     mov rdi,rsi
     mov rsi,rdx
     jmp syscall_read_stage_2
+
+global syscall_waitpid_stage2_asm
+extern syscall_waitpid_stage2 
+syscall_waitpid_stage2_asm:
+    mov rsp,rdi
+    mov rdi,rsi
+    mov rsi,rdx
+    jmp syscall_waitpid_stage2

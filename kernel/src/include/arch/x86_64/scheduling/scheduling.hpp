@@ -55,6 +55,8 @@ typedef struct process_struct {
     char is_eoi;
     char is_cli;
 
+    char is_waitpid_used;
+
     int_frame_t ctx;
     char sse_ctx[512] __attribute__((aligned(16)));
 } __attribute__((packed)) process_t;
@@ -80,7 +82,7 @@ public:
 
     static uint64_t createThread(uint64_t rip,uint64_t parent);
 
-    static void loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,char** envp);
+    static int loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,char** envp);
 
     static void futexWait(process_t* proc, int* lock,int val);
 

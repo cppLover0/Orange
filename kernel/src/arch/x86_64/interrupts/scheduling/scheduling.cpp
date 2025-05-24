@@ -133,7 +133,7 @@ void Process::Init() {
     entry->ist = 2;
 }
 
-void Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,char** envp) {    
+int Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,char** envp) {    
     
     process_t* proc = ByID(procid);
     uint64_t* vcr3 = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
@@ -150,9 +150,14 @@ void Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv
     //Log("don\n");
     //Log(":###\n");
 
+    if(l.entry == 0)
+        return 1;
+
     proc->ctx.rsp = (uint64_t)l.ready_stack;
 
     proc->ctx.rip = (uint64_t)l.entry;
+
+    return 0;
 }
 
 process_t* Process::ByID(uint64_t id) {
