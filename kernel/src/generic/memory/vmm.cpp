@@ -123,11 +123,15 @@ vmm_obj_t* __vmm_find(vmm_obj_t* vmm_start,uint64_t base,uint64_t length) {
 void __vmm_map(uint64_t cr3_phys,uint64_t virt,uint64_t phys,uint64_t flags,uint64_t length) {
     uint64_t* cr3 = (uint64_t*)HHDM::toVirt(cr3_phys);
 
-    //Log("Trying to map 0x%p with len 0x%p to 0x%p\n",phys,length,virt);
+    //Serial::printf("cr3: 0x%p trying to map 0x%p with len 0x%p to 0x%p\n",cr3_phys,phys,length,virt);
 
     for(uint64_t i = 0; i <= length;i += PAGE_SIZE) {
         Paging::Map(cr3,phys + i,virt + i,flags);
+        //__invlpg(virt + i);
     }
+
+    
+
 
 }
 
@@ -178,7 +182,7 @@ void* VMM::Alloc(process_t* proc,uint64_t length,uint64_t flags) {
     vmm_new->phys = phys;
         
     if(proc)
-        __vmm_map(proc->ctx.cr3,vmm_new->base,phys,flags,length);
+        __vmm_map(proc->nah_cr3,vmm_new->base,phys,flags,length);
 
     return (void*)vmm_new->base;
 
@@ -364,6 +368,8 @@ void VMM::Reload(process_t* proc) {
     vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
 
     proc->ctx.cr3 = PMM::Alloc();
+
+    proc->nah_cr3 = proc->ctx.cr3;
 
     uint64_t* virt = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
 

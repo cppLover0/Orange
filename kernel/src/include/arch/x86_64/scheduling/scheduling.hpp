@@ -57,6 +57,8 @@ typedef struct process_struct {
 
     char is_waitpid_used;
 
+    uint64_t nah_cr3;
+
     int_frame_t ctx;
     char sse_ctx[512] __attribute__((aligned(16)));
 } __attribute__((packed)) process_t;

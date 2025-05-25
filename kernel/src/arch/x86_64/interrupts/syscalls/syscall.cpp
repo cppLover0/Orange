@@ -34,7 +34,7 @@ int syscall_exit(int_frame_t* ctx) {
     
     Process::Kill(proc,ctx->rdi);
 
-    Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
+    //Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
 
     schedulingSchedule(ctx);
     
@@ -149,15 +149,26 @@ int syscall_open(int_frame_t* ctx) {
     buf[ptr] = '/';
     buf[ptr + 1] = 'd';
 
+    //Log(LOG_LEVEL_DEBUG,"%s + %s",buffer,first);
+
     resolve_path(buffer,first,path);
+
+    //NLog(" = %s\n",path);
+
+    filestat_t zx;
+    int stt = VFS::Stat(path,(char*)&zx); 
+
+    if(stt & stt != -15)
+        return ENOENT;
 
     int fd = FD::Create(proc,0);
     fd_t* fd_s = FD::Search(proc,fd);
-    String::memset(fd_s->path_point,0,2048);
-    String::memcpy(fd_s->path_point,path,String::strlen(path));
 
     if(!fd_s)
         return -3;
+
+    String::memset(fd_s->path_point,0,2048);
+    String::memcpy(fd_s->path_point,path,String::strlen(path));
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     *fdout = fd;
@@ -527,6 +538,8 @@ int syscall_mmap(int_frame_t* ctx) {
     else
         VMM::CustomAlloc(proc,hint,size,PTE_RW | PTE_PRESENT | PTE_USER);
 
+    Serial::printf(" %p ",hint);
+
     ctx->rdx = hint;
     return 0;
 
@@ -856,15 +869,8 @@ int syscall_stat(int_frame_t* ctx) {
     filestat_t stat;
     int st = VFS::Stat(fd_s->path_point,(char*)&stat);
 
-    if(st && st != -15 && st != 5)
-        return st;
-
-    if(st == 5) {
-        Log(LOG_LEVEL_DEBUG,"File %s is not found\n",fd_s->path_point);
-        return 0;
-    }
-        
-    
+    if(st && st != -15)
+        return ENOENT;
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
 
@@ -994,8 +1000,6 @@ extern "C" void syscall_waitpid_stage2(int_frame_t* ctx) {
                     *ret_pid = ned_pii;
                     Paging::EnableKernel();
 
-                    ctx->rip = ctx->rcx;
-
                     hproc->is_eoi = 1;
                     Lapic::EOI();
                     syscall_end(ctx);
@@ -1032,7 +1036,7 @@ int syscall_waitpid(int_frame_t* ctx) {
 
     process_t* proc = head_proc;
     while(proc) {
-        if(proc->parent_process == hproc->id && proc->status != PROCESS_STATUS_KILLED) {
+        if(proc->parent_process == hproc->id && !proc->is_waitpid_used) {
             success = 1;
             break;
         }
@@ -1043,8 +1047,10 @@ int syscall_waitpid(int_frame_t* ctx) {
         hproc->is_eoi = 0;
         String::memcpy(hproc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
         syscall_waitpid_stage2_asm((uint64_t)hproc->wait_stack + 4096,hproc->syscall_wait_ctx);
-    } else
-        return ESRCH;
+    } else {
+        ctx->rdx = 0;
+        return 0;
+    }
 
 }
 
@@ -1090,7 +1096,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log(LOG_LEVEL_DEBUG,"Syscall %d\n",ctx->rax);
+    CpuData::Access()->last_syscall = ctx->rax;
     
     if(sys == 0) {
         ctx->rax = -1;
@@ -1098,6 +1104,8 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     }
 
     ctx->rax = sys->func(ctx);
+
+    //Serial::printf("R %d ",ctx->rax);
 
     //Log(LOG_LEVEL_DEBUG,"Syscall %d with ret %d\n",sys->num,ctx->rax);
 

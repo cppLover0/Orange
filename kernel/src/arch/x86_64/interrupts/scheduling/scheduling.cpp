@@ -355,6 +355,8 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
 
+    proc->nah_cr3 = proc->ctx.cr3;
+
     proc->next = 0;
     __process_load_queue(proc);
     

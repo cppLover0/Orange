@@ -14,6 +14,7 @@ typedef struct {
     struct LIMINE_MP(info)* smp_info;
     process_t* current;
     int_frame_t temp_frame;
+    int last_syscall;
 } __attribute__((packed)) cpudata_t;
 
 

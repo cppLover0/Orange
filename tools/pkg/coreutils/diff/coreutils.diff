@@ -1,0 +1,11 @@
+diff -Naur coreutils/build-aux/config.sub coreutils-patched/build-aux/config.sub
+--- coreutils/build-aux/config.sub	2024-08-11 16:58:11.000000000 +0300
++++ coreutils-patched/build-aux/config.sub	2025-05-25 12:55:11.367837322 +0300
+@@ -2012,6 +2012,7 @@
+ 	| glidix* \
+ 	| gnu* \
+ 	| go32* \
++	| orange* \
+ 	| haiku* \
+ 	| hcos* \
+ 	| hiux* \
