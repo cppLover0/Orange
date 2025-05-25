@@ -107,6 +107,8 @@ void buddy_free(uint64_t phys) {
     if(!hi_buddy)
         return;
 
+    //NLog(" F 0x%p\n ",phys);
+
     hi_buddy->information.is_free = 1;
 
 }

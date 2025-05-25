@@ -27,3 +27,4 @@ qemu_log.txt
 orange.hdd
 ./tools/toolchain/pack
 pack
+linux-headers

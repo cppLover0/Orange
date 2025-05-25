@@ -217,6 +217,13 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
         String::memset(stack_envp,0,8 * (envp_length + 1));
 
         _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
+
+        for(int i = 0; i < argv_length / 2; ++i) {
+            char* tmp = stack_argv[i];
+            stack_argv[i] = stack_argv[argv_length - 1 - i];
+            stack_argv[argv_length - 1 - i] = tmp;
+        }
+
         _stack = __elf_copy_to_stack(envp,_stack,stack_envp,envp_length);
 
         PUT_STACK(_stack,0);

@@ -20,7 +20,7 @@ typedef struct {
     char filename_prefix[155];
 } __attribute__((packed)) ustar_t;
 
-void resolve_path(const char* inter,const char* base, char *result); // path resolver
+void resolve_path(const char* inter,const char* base, char *result,char spec); // path resolver
 
 class USTAR {
 public:

@@ -15,6 +15,7 @@ rm -rf tools/orange-mlibc
 rm -rf initrd
 mkdir -p initrd/lib
 cd tools
+sh get-linux-headers.sh "$CURRENT_DIR"
 git clone https://github.com/cpplover0/orange-mlibc --depth=1
 cd orange-mlibc 
 bash build_to_cross.sh "$CURRENT_DIR"

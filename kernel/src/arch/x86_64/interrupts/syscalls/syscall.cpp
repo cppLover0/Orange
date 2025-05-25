@@ -143,15 +143,16 @@ int syscall_open(int_frame_t* ctx) {
     char* path = (char*)buf;
     String::memset(buf,0,1024);
 
+    char buf1[1024];
+    char* path1 = (char*)buf1;
+    String::memset(buf1,0,1024);
+
     int ptr = String::strlen(first);
-    String::memcpy(buf,first,ptr);
+    String::memcpy(path1,first,ptr);
 
-    buf[ptr] = '/';
-    buf[ptr + 1] = 'd';
+    //Log(LOG_LEVEL_DEBUG,"%s + %s",buffer,path1);
 
-    //Log(LOG_LEVEL_DEBUG,"%s + %s",buffer,first);
-
-    resolve_path(buffer,first,path);
+    resolve_path(buffer,path1,path,1);    
 
     //NLog(" = %s\n",path);
 
@@ -421,7 +422,15 @@ int syscall_read(int_frame_t* ctx) {
         actual_size = 0;
     }
 
-    file->seek_offset += actual_size;
+    if(!is_file_bigger)
+        actual_size = stat.size - seek_off;
+
+    if(!is_file_bigger)
+        file->seek_offset += actual_size;
+    else
+        file->seek_offset += count;
+
+    //NLog(" %d %d %d %d ",file->seek_offset,count,is_file_bigger,stat.size);
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memset(buf,0,count);
@@ -432,7 +441,13 @@ int syscall_read(int_frame_t* ctx) {
     }
     Paging::EnableKernel();
 
-    ctx->rdx = actual_size;
+    if(!is_file_bigger)
+        ctx->rdx = actual_size;
+    else
+        ctx->rdx = count;
+
+    if(ctx->rdx == stat.size)
+
 
     return 0;
 
@@ -538,7 +553,7 @@ int syscall_mmap(int_frame_t* ctx) {
     else
         VMM::CustomAlloc(proc,hint,size,PTE_RW | PTE_PRESENT | PTE_USER);
 
-    Serial::printf(" %p ",hint);
+    //Serial::printf(" %p ",hint);
 
     ctx->rdx = hint;
     return 0;
@@ -718,7 +733,7 @@ int syscall_exec(int_frame_t* ctx) {
     buf[ptr] = '/';
     buf[ptr + 1] = 'd';
 
-    resolve_path(stack_path,buf,path1);
+    resolve_path(stack_path,buf,path1,1);
 
     VMM::Free(proc);
 

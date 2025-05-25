@@ -94,7 +94,7 @@ uint64_t resolve_count(char* str,uint64_t sptr,char delim) {
     return ptr;
 }
 
-void resolve_path(const char* inter,const char* base, char *result) {
+void resolve_path(const char* inter,const char* base, char *result, char spec) {
     char buffer_in_stack[1024];
     char buffer2_in_stack[1024];
     char* buffer = (char*)buffer_in_stack;
@@ -108,7 +108,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
 
     String::memcpy(final_buffer,base,String::strlen((char*)base));
 
-    if(!String::strcmp(inter,".\0")) {
+    if(String::strlen((char*)inter) == 1 && inter[0] == '.') {
         String::memset(result,0,1024);
         String::memcpy(result,base,String::strlen((char*)base));
         return;
@@ -119,6 +119,9 @@ void resolve_path(const char* inter,const char* base, char *result) {
         String::memset(final_buffer,0,1024);
         is_full = 1;
     }
+
+    if(spec)
+        is_first = 0;
 
     buffer = __ustar__strtok((char*)inter,"/");
     while(buffer) {
@@ -153,7 +156,7 @@ void resolve_path(const char* inter,const char* base, char *result) {
             
 
 
-        } else if(String::strcmp(buffer,"./")) {
+        } else if(String::strcmp(buffer,"./") && String::strcmp(buffer,".")) {
 
             final_buffer[ptr] = '/';
             ptr++;
@@ -222,7 +225,7 @@ void USTAR::ParseAndCopy() {
             char result_path[MAX_PATH];
             String::memset(result_path,0,MAX_PATH);
 
-            resolve_path(current->name_linked,filename,result_path);
+            resolve_path(current->name_linked,filename,result_path,0);
 
             //Log("PATH: %s\n",result_path);
 
