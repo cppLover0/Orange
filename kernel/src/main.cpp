@@ -59,6 +59,9 @@ void _2() {
 
 uint32_t default_fg = 0xFFFFFFFF;
 
+int sec = 0;
+int min = 0;
+
 extern "C" void keyStub();
 extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx);
 
@@ -72,6 +75,9 @@ extern "C" void kmain() {
 
     Serial::printf("Serial initializied\n");
     LimineInfo info;
+
+    sec = CMOS::Second();
+    min = CMOS::Minute();
 
     struct flanterm_context *ft_ctx = flanterm_fb_init(
         NULL,
@@ -172,8 +178,6 @@ extern "C" void kmain() {
     //VMM::Alloc(0,0,0);
     //__hlt();
 
-    Log(LOG_LEVEL_INFO,"Kernel is initializied !\n");
-
     filestat_t stat;
 
     VFS::Stat("/usr/bin/initrd",(char*)&stat);
@@ -214,8 +218,6 @@ extern "C" void kmain() {
 
     process_t* initrd_proc = Process::ByID(initrd);
 
-    Log(LOG_LEVEL_INFO,"Initrd: stack_start: 0x%p, stack_end: 0x%p\n",initrd_proc->stack_start,initrd_proc->stack);
-
     Process::WakeUp(initrd);
 
     Log(LOG_LEVEL_INFO,"Waiting for interrupts...\n");
@@ -225,6 +227,14 @@ extern "C" void kmain() {
     //__hlt();
 
     //MP::Sync();
+
+    int res_sec = 0;
+    if(CMOS::Minute() - min)
+        res_sec *= (CMOS::Minute() - min);
+
+    res_sec += CMOS::Second() - sec;
+
+    Log(LOG_LEVEL_INFO,"Kernel is initializied for %d seconds\n",res_sec);
 
     __sti();
 
