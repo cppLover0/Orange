@@ -20,7 +20,7 @@ typedef struct {
 
 typedef struct {
     int (*readfile)(char* buffer,char* filename,long hint_size);
-    int (*writefile)(char* buffer,char* filename,uint64_t size,char is_symlink_path);
+    int (*writefile)(char* buffer,char* filename,uint64_t size,char is_symlink_path,uint64_t offset);
     int (*touch)(char* filename);
     int (*create)(char* filename,int type);
     int (*rm)(char* filename);
@@ -67,7 +67,7 @@ class VFS {
 public:
     static void Init();
     static int Read(char* buffer,char* filename,long hint_size);
-    static int Write(char* buffer,char* filename,uint64_t size,char is_symlink_path);
+    static int Write(char* buffer,char* filename,uint64_t size,char is_symlink_path,uint64_t offset);
     static int Touch(char* filename);
     static int Create(char* filename,int type);
     static int Remove(char* filename);

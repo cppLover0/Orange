@@ -20,4 +20,11 @@ cd bash-build
 ../bash-5.2/configure --host=x86_64-orange --prefix=$1 --disable-readline --without-bash-malloc CFLAGS="-std=gnu17 -fPIC"
 make install -j$(nproc)
 
+cz=$(pwd)
+
+cd $1/bin
+ln -s bash sh
+
+cd "$cz"
+
 cd ..

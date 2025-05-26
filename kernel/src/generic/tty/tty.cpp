@@ -70,6 +70,23 @@ void __tty_send_ipc(uint8_t keycode) {
 
 }
 
+void __tty_remove_ipc() {
+    if(!head_ttypipe) {
+        head_ttypipe = new ps2keyboard_pipe_struct_t;
+        head_ttypipe->is_used_anymore = 0;
+    }
+    
+    ps2keyboard_pipe_struct_t* current = head_ttypipe;
+    while(current) { 
+
+        if(current->is_used_anymore && current->pipe) {
+            current->pipe->buffer[current->pipe->buffer_size] = '\0';
+            current->pipe->buffer_size--;
+        }
+        current = current->next;
+    }
+}
+
 void __tty_end_ipc() {
     //Log(LOG_LEVEL_DEBUG,"Ending ipc \n");
     ps2keyboard_pipe_struct_t* current = head_ttypipe;
@@ -139,30 +156,40 @@ int is_printable(char c) {
     return (c >= 32 && c <= 126) || c == 10; 
 }
 
+int p = 0;
 
 void __tty_receive_ipc(uint8_t keycode) {
     extern flanterm_context* ft_ctx;
-    
-    //Log(LOG_LEVEL_DEBUG,"%d %d\n",keycode,'\n');
 
-    if(keycode == 13)
-        keycode = '\n';
+    if(keycode != 127) {
+        if(keycode == 13)
+            keycode = '\n';
 
-    if((tty_termios.c_lflag & ECHO) && is_printable((char)keycode)) {
-        flanterm_write(ft_ctx,(char*)&keycode,1);
-            //Log(LOG_LEVEL_DEBUG,"%d\n",keycode);
-        Serial::Write(keycode);
-    }
+        if((tty_termios.c_lflag & ECHO) && is_printable((char)keycode)) {
+            flanterm_write(ft_ctx,(char*)&keycode,1);
+            Serial::Write(keycode);
+            p++;
+        }
 
-    if(tty_termios.c_lflag & ICANON) {
-        if(is_printable((char)keycode))
+        if(tty_termios.c_lflag & ICANON) {
+            if(is_printable((char)keycode))
+                __tty_send_ipc(keycode);
+            if((char)keycode == '\n') {
+                __tty_end_ipc();
+                p = 0;
+            }
+        } else {
+            p = 0;
             __tty_send_ipc(keycode);
-        if((char)keycode == '\n') {
             __tty_end_ipc();
         }
     } else {
-        __tty_send_ipc(keycode);
-        __tty_end_ipc();
+        if(p != 0) {
+            __tty_remove_ipc();
+            __tty_helper_write("\b \b");
+            Serial::WriteArray((uint8_t*)"\b \b",String::strlen("\b \b"));
+            p--;
+        }
     }
 
 }

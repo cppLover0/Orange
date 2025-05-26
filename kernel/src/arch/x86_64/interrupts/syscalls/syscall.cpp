@@ -31,7 +31,16 @@ extern "C" void syscall_handler();
 int syscall_exit(int_frame_t* ctx) {
 
     process_t* proc = CpuData::Access()->current;
-    
+
+    fd_t* fd = (fd_t*)proc->start_fd;
+    while(fd) {
+        fd = fd->next;
+        if(fd) {
+            String::memset(fd,0,4096);
+            PMM::VirtualFree(fd);
+        }
+    }
+
     Process::Kill(proc,ctx->rdi);
 
     //Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
@@ -119,6 +128,8 @@ int syscall_open(int_frame_t* ctx) {
     char* name = (char*)ctx->rdi;
     int* fdout = (int*)ctx->rsi;
 
+    int flags = ctx->rdx;
+
     process_t* proc = CpuData::Access()->current;
 
     if(!name && !fdout)
@@ -154,13 +165,21 @@ int syscall_open(int_frame_t* ctx) {
 
     resolve_path(buffer,path1,path,1);    
 
-    //NLog(" = %s\n",path);
+    //NLog(" = %s (%d)\n",path,flags);
 
+    if(flags & O_CREAT)
+        VFS::Touch(path);
+
+    int is_exi = VFS::Exists(path);
+    if(!is_exi) 
+        return ENOENT;
+
+    
     filestat_t zx;
     int stt = VFS::Stat(path,(char*)&zx); 
 
-    if(stt & stt != -15)
-        return ENOENT;
+    if((flags & O_TRUNC) && ((flags & O_WRONLY) || (flags & O_RDWR)))
+        VFS::Write({0},path,1,0,0);
 
     int fd = FD::Create(proc,0);
     fd_t* fd_s = FD::Search(proc,fd);
@@ -230,21 +249,6 @@ int syscall_seek(int_frame_t* ctx) {
     ctx->rdx = file->seek_offset;
 
     return 0;
-
-}
-
-/*
-[[gnu::weak]] int sys_tcgetattr(int fd, struct termios *attr);
-[[gnu::weak]] int sys_tcsetattr(int, int, const struct termios *attr);
-*/
-
-int syscall_tcgetattr(int_frame_t* ctx) {
-
-    
-
-}
-
-int syscall_tcsetattr(int_frame_t* ctx) {
 
 }
 
@@ -497,7 +501,9 @@ int syscall_write(int_frame_t* ctx) {
     String::memcpy(dest_buf,buf,count);
     Paging::EnableKernel();
 
-    VFS::Write(dest_buf,file->path_point,count,0);
+    //Log(LOG_LEVEL_DEBUG,"writ %d %s\n",fd,file->path_point);
+
+    VFS::Write(dest_buf,file->path_point,count,0,file->seek_offset);
 
     file->seek_offset += count;
 
@@ -519,10 +525,17 @@ int syscall_close(int_frame_t* ctx) {
     if(!file)
         return -2;
 
-    if(file->index < 3)
-        return -1;
+    if(fd < 3) {
+        // restore state
+        String::memset(file->path_point,0,2048);
+        String::memcpy(file->path_point,"/dev/tty",String::strlen("/dev/tty"));
+        file->type = file->old_type;
+        file->pipe.buffer = file->pipe.old_buffer;
+    } else {
+        file->type = FD_NONE;
+    }
         
-    file->type = FD_NONE;
+    
 
     return 0;
 
@@ -729,9 +742,6 @@ int syscall_exec(int_frame_t* ctx) {
 
     int ptr = String::strlen(first);
     String::memcpy(buf,first,ptr);
-
-    buf[ptr] = '/';
-    buf[ptr + 1] = 'd';
 
     resolve_path(stack_path,buf,path1,1);
 
@@ -1069,6 +1079,36 @@ int syscall_waitpid(int_frame_t* ctx) {
 
 }
 
+int syscall_dup2(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+    int new_fd = ctx->rsi;
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* old_fd = FD::Search(proc,fd);
+    fd_t* new_fd1 = FD::Search(proc,new_fd);
+
+    if(!old_fd || !new_fd1)
+        return ENOENT;
+
+    //Log(LOG_LEVEL_DEBUG,"dup2 from %s to %s\n",new_fd1->path_point,old_fd->path_point);
+
+    String::memset(new_fd1->path_point,0,2048);
+    String::memcpy(new_fd1->path_point,old_fd->path_point,2048);
+
+    if(new_fd1->type == PIPE_WAIT || new_fd1->type == PIPE_INSTANT) {
+        new_fd1->old_type = new_fd1->type;
+        new_fd1->type = old_fd->type;
+        new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
+        new_fd1->pipe.buffer = old_fd->pipe.buffer;
+    }
+
+    //Log(LOG_LEVEL_DEBUG,"new %s\n",new_fd1->path_point);
+
+    return 0;
+
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -1096,7 +1136,8 @@ syscall_t syscall_table[] = {
     {24,syscall_dup},
     {25,syscall_kill},
     {26,syscall_ioctl}, 
-    {27,syscall_waitpid}
+    {27,syscall_waitpid},
+    {28,syscall_dup2}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -1110,6 +1151,8 @@ syscall_t* syscall_find_table(int num) {
 extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
+
+    //Log(LOG_LEVEL_DEBUG,"Syscall %d \n",sys->num,ctx->rax);
 
     CpuData::Access()->last_syscall = ctx->rax;
     

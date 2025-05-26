@@ -32,10 +32,21 @@ cd tools/pkg
 bash build_pkg.sh "$CURRENT_DIR/initrd/usr"
 cd ../../
 
+mkdir -p initrd/lib
+mkdir -p initrd/bin
+
 cd initrd/lib
 
 echo Creating symlinks ./*.so
 for file in ../usr/lib/*.so; do
+	echo $file "$(basename "$file")"
+    ln -s "$file" "$(basename "$file")"
+done
+
+cd ../bin
+
+echo Creating symlinks ./*.so
+for file in ../usr/bin/*.so; do
 	echo $file "$(basename "$file")"
     ln -s "$file" "$(basename "$file")"
 done

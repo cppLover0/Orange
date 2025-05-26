@@ -60,7 +60,7 @@ int VFS::Read(char* buffer,char* filename,long hint_size) {
     return status;
 }
 
-int VFS::Write(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
+int VFS::Write(char* buffer,char* filename,uint64_t size,char is_symlink_path,uint64_t offset) {
     if(!filename) return -1;
 
     spinlock_lock(&vfs_spinlock);
@@ -70,7 +70,7 @@ int VFS::Write(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
     if(!fs->fs->writefile) return 0;
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
-    int status = fs->fs->writefile(buffer,filename_as_fs,size,is_symlink_path);
+    int status = fs->fs->writefile(buffer,filename_as_fs,size,is_symlink_path,offset);
     spinlock_unlock(&vfs_spinlock);
     return status;
 }
@@ -95,6 +95,8 @@ int VFS::Create(char* filename,int type) {
 
     spinlock_lock(&vfs_spinlock);
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    //Log(LOG_LEVEL_DEBUG,"Creating %s\n",filename);
 
     if(!fs) return -1;
     if(!fs->fs->create) return 0;

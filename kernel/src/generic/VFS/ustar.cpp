@@ -201,7 +201,7 @@ void USTAR::ParseAndCopy() {
 
             aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
 
-            VFS::Write((char*)((uint64_t)current + 512),filename,size,0);
+            VFS::Write((char*)((uint64_t)current + 512),filename,size,0,0);
 
 		} else if(type == 5) {
 
@@ -229,7 +229,7 @@ void USTAR::ParseAndCopy() {
 
             //Log("PATH: %s\n",result_path);
 
-            VFS::Write((char*)result_path,filename,String::strlen(result_path),1);
+            VFS::Write((char*)result_path,filename,String::strlen(result_path),1,0);
         } else {
             aligned_size = 512;
         }

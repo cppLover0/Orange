@@ -239,7 +239,9 @@ typedef struct {
 typedef struct {
 
     char* buffer;
+    char* old_buffer;
     uint64_t buffer_size;
+    
 
     process_t* parent;
 
@@ -266,6 +268,8 @@ typedef struct fd_struct {
 
     char type;
     pipe_t pipe;
+
+    char old_type;
 
     char path_point[2048];
 

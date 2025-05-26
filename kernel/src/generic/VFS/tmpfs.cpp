@@ -19,11 +19,13 @@ data_file_t* last;
 
 data_file_t* tmpfs_scan_for_file(char* name) {
     data_file_t* current = root;
+    //NLog("MM %s\n",name);
     
     while(current) {
         
         if(current->name && name) {
             if(!String::strcmp(name,current->name)) {
+                //Log(LOG_LEVEL_DEBUG,"%s %s %d return\n",name,current->name,1);
                 return current;
             }
         }
@@ -75,21 +77,29 @@ void tmpfs_free_file_content(data_file_t* file) {
 
 }
 
-int tmpfs_create(char* name,int type) {
-    if(!name) return 2;
-    if(name[0] != '/') return 3; //it should be full path
+int tmpfs_create(char* name1,int type) {
+    if(!name1) return 2;
+    if(name1[0] != '/') return 3; //it should be full path
     if(type > 2) return 4;
 
-    if(!String::strcmp(name,"/")) return 5; // why not
+    char* name = (char*)PMM::VirtualAlloc();
+    String::memcpy(name,name1,String::strlen(name1));
 
-    if(tmpfs_scan_for_file(name)) return 6;
+    if(!String::strcmp(name,"/")) {
+        PMM::VirtualFree(name);
+        return 5;    
+    }
 
     if(name[String::strlen(name) - 1] == '/')
         name[String::strlen(name) - 1] = '\0';
 
+    if(tmpfs_scan_for_file(name)) return 6;
+
     data_file_t* new_data = new data_file_t;
 
     String::memset(new_data,0,sizeof(data_file_t));
+
+    //Log(LOG_LEVEL_DEBUG,"New %s\n",name);
 
     new_data->type = type;
     new_data->name = name;
@@ -130,7 +140,7 @@ int tmpfs_rm(char* filename) {
 
 }
 
-int tmpfs_writefile(char* buffer,char* filename,uint64_t size,char is_symlink_path) {
+int tmpfs_writefile(char* buffer,char* filename,uint64_t size,char is_symlink_path,uint64_t offset) {
 
     if(size > TMPFS_MAX_SIZE) return -1;
     if(!buffer) return 1;
@@ -152,16 +162,35 @@ int tmpfs_writefile(char* buffer,char* filename,uint64_t size,char is_symlink_pa
 
     if(file->protection) return 8;
 
+    uint64_t actual_size = size;
+    char* offset_base = 0;
+
+    if(tmpfs_scan_for_file(filename) && offset) {
+        if(file->content) {
+            if(file->size_of_content && file->size_of_content >= offset) {
+                offset_base = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(offset));
+                actual_size += offset;
+                String::memcpy(offset_base,file->content,offset);
+            }
+        }
+    } 
+
     tmpfs_free_file_content(file);
 
-    file->size_of_content = size;
-    file->content = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(size));
+    file->size_of_content = actual_size;
+    file->content = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(actual_size));
     file->file_change_date = convertToUnixTime();
 
     if(!file->content)
         return 7;
 
-    String::memcpy(file->content,buffer,size);
+    if(offset_base) {
+        String::memcpy(file->content,offset_base,offset);
+        String::memcpy((char*)((uint64_t)file->content + offset),buffer,size);
+        PMM::VirtualFree(offset_base);
+    } else {
+        String::memcpy(file->content,buffer,size);
+    }
 
     return 0;
 
