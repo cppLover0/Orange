@@ -18,6 +18,7 @@
 #include <other/other.hpp>
 #include <generic/memory/vmm.hpp>
 #include <other/assembly.hpp>
+#include <arch/x86_64/cpu/sse.hpp>
 
 uint64_t id_ptr = 0;
 
@@ -43,7 +44,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
         if(proc->status != PROCESS_STATUS_BLOCKED) {
             if(frame) {
                 String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
-                asm volatile(" fxsave %0 "::"m"(proc->sse_ctx));
+                SSE::Save((uint8_t*)proc->sse_ctx);
                 proc->fs_base = __rdmsr(0xC0000100);
             }
 
@@ -72,7 +73,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
                     __wrmsr(0xC0000100,proc->fs_base);
 
-                    asm volatile(" fxrstor %0 "::"m"(proc->sse_ctx));
+                    SSE::Load((uint8_t*)proc->sse_ctx);
 
                     if(proc->is_cli) 
                         frame1->rflags &= ~(1 << 9); // clear IF
@@ -257,6 +258,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->parent_process = parent_id;
     proc->futex = 0;
     proc->wait_pipe = 0;
+    proc->sse_ctx = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(SSE::Size()));
 
     uint64_t* cr3 = (uint64_t*)PMM::VirtualAlloc();
 

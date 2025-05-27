@@ -16,7 +16,7 @@
 #define ALIGNPAGEDOWN(VALUE) ((VALUE / PAGE_SIZE) * PAGE_SIZE)
 
 #define CROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
-#define CALIGNPAGEUP(VALUE,c) (ROUNDUP(VALUE,c) * c)
+#define CALIGNPAGEUP(VALUE,c) ((VALUE + c - 1) & ~(c - 1))
 #define CALIGNPAGEDOWN(VALUE,c) ((VALUE / c) * c)
 
 #define PTE_MASK_VALUE 0x000ffffffffff000

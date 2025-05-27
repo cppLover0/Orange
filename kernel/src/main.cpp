@@ -157,15 +157,15 @@ extern "C" void kmain() {
     //tmpfs_dump();
 
     PS2Keyboard::Init(keyStub);
+
+    SSE::Init();
+    Log(LOG_LEVEL_INFO,"SSE Is enabled (or not) \n");
     
     Process::Init();
     Log(LOG_LEVEL_INFO,"Scheduling initializied\n");
 
     Syscall::Init();
     Log(LOG_LEVEL_INFO,"Syscall initializied\n");
-
-    enable_sse();
-    Log(LOG_LEVEL_INFO,"SSE Is enabled (or not) \n");
 
     cpudata_t* cpu_data = CpuData::Access();
 

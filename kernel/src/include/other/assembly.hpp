@@ -34,3 +34,12 @@ inline void __hlt() {
 inline void __invlpg(unsigned long long virt) {
     __asm__ volatile ("invlpg (%0)" : : "r" (virt) : "memory");
 }
+
+inline void __cpuid(int code, int code2, uint32_t *a, uint32_t *b, uint32_t *c , uint32_t *d) {
+    __asm__ volatile("cpuid":"=a"(*a),"=b"(*b),"=c"(*c),"=d"(*d):"a"(code),"c"(code2));
+}
+
+inline int __cpuid_string(int code, uint32_t where[4]) {
+    __asm__ volatile("cpuid":"=a"(*where),"=b"(*(where+1)),"=c"(*(where+2)),"=d"(*(where+3)):"a"(code));
+    return (int)where[0];
+}
