@@ -19,6 +19,28 @@ typedef struct {
 } disk_t;
 
 typedef struct {
+    
+    char type;
+    char sub_type;
+
+    char* name;
+
+    char* content;
+
+    uint32_t size;
+
+    int idx;
+
+    uint64_t file_create_date;
+    uint64_t file_change_date;
+
+    char fs_prefix1;
+    char fs_prefix2;
+    char fs_prefix3;
+
+} __attribute__((packed)) filestat_t;
+
+typedef struct {
     int (*readfile)(char* buffer,char* filename,long hint_size);
     int (*writefile)(char* buffer,char* filename,uint64_t size,char is_symlink_path,uint64_t offset);
     int (*touch)(char* filename);
@@ -27,9 +49,13 @@ typedef struct {
     
     char (*exists)(char* filename);
     int (*stat)(char* filename,char* buffer);
+    
+    int (*iterate)(filestat_t* stat);
 
     int (*askforpipe)(char* filename,pipe_t* pipe);
     int (*instantreadpipe)(char* filename, pipe_t* pipe);
+
+
 
     int (*ioctl)(char* filename,unsigned long request, void *arg, int *result);
 
@@ -43,26 +69,6 @@ typedef struct {
     filesystem_t* fs;
 } mount_location_t;
 
-typedef struct {
-    
-    char type;
-    char sub_type;
-
-    char* name;
-
-    char* content;
-
-    uint32_t size;
-
-    uint64_t file_create_date;
-    uint64_t file_change_date;
-
-    char fs_prefix1;
-    char fs_prefix2;
-    char fs_prefix3;
-
-} __attribute__((packed)) filestat_t;
-
 class VFS {
 public:
     static void Init();
@@ -75,5 +81,6 @@ public:
     static int Stat(char* filename,char* buffer);
     static int AskForPipe(char* filename,pipe_t* pipe);
     static int InstantPipeRead(char* filename,pipe_t* pipe);
+    static int Iterate(char* filename,filestat_t* stat);
     static int Ioctl(char* filename,unsigned long request, void *arg, int *result);
 };

@@ -33,8 +33,6 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
 
     Paging::EnableKernel();
 
-    
-
     cpudata_t* data = CpuData::Access();
     int_frame_t* frame1 = &data->temp_frame;
     process_t* proc = data->current;
@@ -139,23 +137,24 @@ int Process::loadELFProcess(uint64_t procid,char* path,uint8_t* elf,char** argv,
     process_t* proc = ByID(procid);
     uint64_t* vcr3 = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
 
-    proc->cwd = cwd_get((const char*)path);
-    
+    if(!proc->cwd) {
+        proc->cwd = (char*)PMM::VirtualAlloc();
+        String::memcpy(proc->cwd,"/\0",sizeof("/\0"));
+    }
+
+    if(proc->name)
+        PMM::VirtualFree(proc->name);
+
     char* name = (char*)PMM::VirtualAlloc();
     String::memcpy(name,path,String::strlen(path));
     proc->name = name;
 
-    //Log(":)\n");
-    //Log("Loading elf\n");
     ELFLoadResult l = ELF::Load((uint8_t*)elf,vcr3,proc->user ? PTE_RW | PTE_PRESENT | PTE_USER : PTE_RW | PTE_PRESENT,0,argv,envp,proc);
-    //Log("don\n");
-    //Log(":###\n");
 
     if(l.entry == 0)
         return 1;
 
     proc->ctx.rsp = (uint64_t)l.ready_stack;
-
     proc->ctx.rip = (uint64_t)l.entry;
 
     return 0;
@@ -187,7 +186,6 @@ uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
     char* name = (char*)PMM::VirtualAlloc();
     String::memcpy(name,parent_proc->name,String::strlen(parent_proc->name));
     proc->name = name;
-    proc->cwd = cwd_get(name);
 
     proc->parent_process = parent_proc->id;
 
@@ -308,6 +306,9 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
                     last->next = fdd;
                     proc->last_fd = (char*)fdd;
                 }
+
+                if(fdd->is_pipe_pointer && fdd->pipe_side == PIPE_SIDE_WRITE && !fdd->is_pipe_dup2)
+                    fdd->p_pipe->connected_pipes++;
                 
                 fdd->next = 0;
                 fd = fd->next;

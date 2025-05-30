@@ -42,6 +42,7 @@ int FD::Create(process_t* proc,char is_pipe) {
     current->pipe.buffer_size = 0;
     current->pipe.is_received = 0;
     current->pipe.type = PIPE_WAIT;
+    current->is_pipe_pointer = 0;
 
     current->pipe.is_used = 0;
 

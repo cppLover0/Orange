@@ -22,11 +22,32 @@
 #include <generic/VFS/ustar.hpp>
 #include <other/assert.hpp>
 #include <other/other.hpp>
+#include <generic/limineA/limineinfo.hpp>
 #include <other/debug.hpp>
 
 extern "C" void syscall_handler();
 
 // syscalls
+
+uint64_t address_max = 0;
+
+char __syscall_is_safe_pointer(void* p) {
+    uint64_t pp = (uint64_t)p;
+    if(!address_max) {
+        LimineInfo info;
+        address_max = info.hhdm_offset;
+    }
+
+    if(pp >= address_max)
+        return 0;
+
+    return 1;
+
+}
+
+#define __syscall_is_safe(x) \
+    if(!__syscall_is_safe_pointer(x)) \
+        return EFAULT;
 
 int syscall_exit(int_frame_t* ctx) {
 
@@ -36,6 +57,13 @@ int syscall_exit(int_frame_t* ctx) {
     while(fd) {
         fd = fd->next;
         if(fd) {
+            if(fd->is_pipe_pointer && fd->type == FD_PIPE && fd->pipe_side == PIPE_SIDE_WRITE) {
+                fd->p_pipe->connected_pipes--;
+                if(fd->p_pipe->connected_pipes == 0) {
+                    fd->p_pipe->is_received = 0;
+                }
+            }
+                
             String::memset(fd,0,4096);
             PMM::VirtualFree(fd);
         }
@@ -61,6 +89,8 @@ int syscall_debug_print(int_frame_t* ctx) {
     String::memset(ptr,0,size);
 
     char* src = (char*)ctx->rdi;
+
+    __syscall_is_safe(src);
 
     process_t* proc = CpuData::Access()->current;
 
@@ -128,6 +158,9 @@ int syscall_open(int_frame_t* ctx) {
     char* name = (char*)ctx->rdi;
     int* fdout = (int*)ctx->rsi;
 
+    __syscall_is_safe(name);
+    __syscall_is_safe(fdout);
+
     int flags = ctx->rdx;
 
     process_t* proc = CpuData::Access()->current;
@@ -143,7 +176,7 @@ int syscall_open(int_frame_t* ctx) {
     String::memcpy(buffer,name,String::strlen(name));
     Paging::EnableKernel();    
 
-    if(buffer[String::strlen(buffer) - 1] == '/')
+    if(buffer[String::strlen(buffer) - 1] == '/' && String::strcmp(buffer,"/"))
         buffer[String::strlen(buffer) - 1] = '\0';
 
     char* first = proc->cwd;
@@ -161,22 +194,16 @@ int syscall_open(int_frame_t* ctx) {
     int ptr = String::strlen(first);
     String::memcpy(path1,first,ptr);
 
-    //Log(LOG_LEVEL_DEBUG,"%s + %s",buffer,path1);
-
     resolve_path(buffer,path1,path,1);    
-
-    //NLog(" = %s (%d)\n",path,flags);
 
     if(flags & O_CREAT)
         VFS::Touch(path);
-
-    int is_exi = VFS::Exists(path);
-    if(!is_exi) 
-        return ENOENT;
-
     
     filestat_t zx;
     int stt = VFS::Stat(path,(char*)&zx); 
+
+    if(stt && stt != -15)
+        return ENOENT;
 
     if((flags & O_TRUNC) && ((flags & O_WRONLY) || (flags & O_RDWR)))
         VFS::Write({0},path,1,0,0);
@@ -221,7 +248,7 @@ int syscall_seek(int_frame_t* ctx) {
     fd_t* file = FD::Search(proc,fd);
 
     if(!file)
-        return -1;
+        return EBADF;
 
     filestat_t stat;
     int stx = VFS::Stat(file->path_point,(char*)&stat); 
@@ -266,10 +293,12 @@ void __prepare_file_content_syscall(char* content,uint64_t size,uint64_t phys_cr
 
 extern "C" void syscall_end(int_frame_t* ctx);
 
+// sorry for this shitcode
 extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
 
     void* buf = (void*)ctx->rsi;
     uint64_t count = ctx->rdx;
+    uint64_t real_count = ctx->rdx;
 
     //Log(LOG_LEVEL_DEBUG,"Reading from /dev/tty\n");
 
@@ -278,29 +307,74 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
 
     process_t* proc = CpuData::Access()->current;
 
-    while(1) {
-        if(!file->pipe.is_received) {
-            if(file->pipe.buffer_size < count)
-                count = file->pipe.buffer_size;
+    if(!file->is_pipe_pointer) {
+        while(1) {
+            if(!file->pipe.is_received) {
+                if(file->pipe.buffer_size < count)
+                    count = file->pipe.buffer_size;
 
-            char* pipe_buffer = file->pipe.buffer;
+                char* pipe_buffer = file->pipe.buffer;
 
-            __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
-            Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-            String::memcpy(buf,pipe_buffer,count);
-            Paging::EnableKernel();
-            file->pipe.is_received = 1;
-            ctx->rdx = file->pipe.buffer_size;
-            file->pipe.buffer_size = 0;
-            ctx->rax = 0;
+                __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
+                Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                String::memcpy(buf,pipe_buffer,count);
+                Paging::EnableKernel();
+                file->pipe.is_received = 1;
+                ctx->rdx = file->pipe.buffer_size;
+                file->pipe.buffer_size = 0;
+                ctx->rax = 0;
 
-            proc->is_eoi = 1;
+                proc->is_eoi = 1;
 
-            Lapic::EOI();
-            syscall_end(ctx);
+                Lapic::EOI();
+                syscall_end(ctx);
 
-        } else {
-            asm volatile("int $32");
+            } else {
+                asm volatile("int $32");
+            }
+        }
+    } else {
+        while(1) {
+
+            if(file->p_pipe->is_eof) {
+                ctx->rdx = 0;
+                ctx->rax = 0;
+                Lapic::EOI();
+                syscall_end(ctx);
+            }
+
+            if(!file->p_pipe->is_received) {
+                if(file->p_pipe->buffer_size - file->p_pipe->buffer_read_ptr < count)
+                    count = file->p_pipe->buffer_size - file->p_pipe->buffer_read_ptr;
+
+                char* pipe_buffer = file->p_pipe->buffer;
+
+                pipe_buffer = (char*)((uint64_t)pipe_buffer + file->p_pipe->buffer_read_ptr);
+                file->p_pipe->buffer_read_ptr += count;
+
+                __prepare_file_content_syscall(file->p_pipe->buffer,count,ctx->cr3);
+                Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                String::memset(buf,0,real_count);
+                String::memcpy(buf,pipe_buffer,count);
+                Paging::EnableKernel();
+                
+                ctx->rdx = count;
+                ctx->rax = 0;
+                if(file->p_pipe->buffer_size <= file->p_pipe->buffer_read_ptr) {
+                    file->p_pipe->is_eof = 1;
+                    file->p_pipe->is_received = 1;
+                } else {
+                    file->p_pipe->is_received = 0;
+                }
+
+                proc->is_eoi = 1;
+
+                Lapic::EOI();
+                syscall_end(ctx);
+
+            } else {
+                asm volatile("int $32");
+            }
         }
     }
 
@@ -312,6 +386,9 @@ int syscall_read(int_frame_t* ctx) {
 
     int fd = ctx->rdi;
     void* buf = (void*)ctx->rsi;
+
+    __syscall_is_safe(buf);
+
     uint64_t count = ctx->rdx;
     process_t* proc = CpuData::Access()->current;
 
@@ -323,51 +400,106 @@ int syscall_read(int_frame_t* ctx) {
     if(!file)
         return -1;
 
-    //Log(LOG_LEVEL_DEBUG,"%s\n",file->path_point);
+    if(file->type == FD_NONE)
+        return EBADF;
 
     if(file->type == FD_PIPE) {
         file->pipe.buffer_size = 0;
         
         //proc->is_cli = 0;
-        if(file->pipe.type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point)&& (tty_termios.c_lflag & ICANON))) {
-            proc->is_eoi = 0;
-            String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
-            syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
-            return -20;
-        } else if(file->pipe.type == PIPE_INSTANT) {
+        if(!file->is_pipe_pointer) {
+
+            if(file->pipe.type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point)&& (tty_termios.c_lflag & ICANON))) {
+                proc->is_eoi = 0;
+                String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
+                syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
+                return -20;
+            }
+
+            if(file->pipe.type == PIPE_INSTANT) {
+                
+                if(!file->pipe.is_used) 
+                    VFS::AskForPipe(file->path_point,&file->pipe);
+
+                if(!file->pipe.is_received) {
+
+                    if(file->pipe.buffer_size < count)
+                        count = file->pipe.buffer_size;
             
-            if(!file->pipe.is_used) 
-                VFS::AskForPipe(file->path_point,&file->pipe);
+                    char* pipe_buffer = file->pipe.buffer;
+            
+                    __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
 
-            if(!file->pipe.is_received) {
+                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                    String::memcpy(buf,pipe_buffer,count);
+                    Paging::EnableKernel();
 
-                if(file->pipe.buffer_size < count)
-                    count = file->pipe.buffer_size;
-        
-                char* pipe_buffer = file->pipe.buffer;
-        
-                __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
+                    file->pipe.is_received = 1;
+                    ctx->rdx = file->pipe.buffer_size;
 
-                Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-                String::memcpy(buf,pipe_buffer,count);
-                Paging::EnableKernel();
+                    file->pipe.buffer_size = 0;
+            
+                    proc->is_eoi = 1;
 
-                file->pipe.is_received = 1;
-                ctx->rdx = file->pipe.buffer_size;
+                    return 0;
 
-                file->pipe.buffer_size = 0;
-        
-                proc->is_eoi = 1;
+            
+                } else {
+                    ctx->rdx = 0;
+                    return 0;
+                }
 
-                return 0;
+            }
 
-        
-            } else {
-                ctx->rdx = 0;
-                return 0;
+        } else {
+
+            if(file->pipe_side != PIPE_SIDE_READ)
+                return EFAULT;
+
+            if(file->p_pipe->type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point)&& (tty_termios.c_lflag & ICANON))) {
+                proc->is_eoi = 0;
+                String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
+                syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
+                return -20;
+            }
+
+            if(file->p_pipe->type == PIPE_INSTANT) {
+                
+                if(!file->p_pipe->is_used) 
+                    VFS::AskForPipe(file->path_point,file->p_pipe);
+
+                if(!file->p_pipe->is_received) {
+
+                    if(file->p_pipe->buffer_size < count)
+                        count = file->p_pipe->buffer_size;
+            
+                    char* pipe_buffer = file->p_pipe->buffer;
+            
+                    __prepare_file_content_syscall(file->p_pipe->buffer,count,ctx->cr3);
+
+                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                    String::memcpy(buf,pipe_buffer,count);
+                    Paging::EnableKernel();
+
+                    file->p_pipe->is_received = 1;
+                    ctx->rdx = file->p_pipe->buffer_size;
+
+                    file->p_pipe->buffer_size = 0;
+            
+                    proc->is_eoi = 1;
+
+                    return 0;
+
+            
+                } else {
+                    ctx->rdx = 0;
+                    return 0;
+                }
+
             }
 
         }
+        
         
         
     
@@ -434,7 +566,10 @@ int syscall_read(int_frame_t* ctx) {
     else
         file->seek_offset += count;
 
-    //NLog(" %d %d %d %d ",file->seek_offset,count,is_file_bigger,stat.size);
+    if(file->seek_offset > stat.size) {
+        ctx->rdx = 0;
+        return 0;
+    }
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memset(buf,0,count);
@@ -450,9 +585,6 @@ int syscall_read(int_frame_t* ctx) {
     else
         ctx->rdx = count;
 
-    if(ctx->rdx == stat.size)
-
-
     return 0;
 
 }
@@ -461,6 +593,9 @@ int syscall_write(int_frame_t* ctx) {
 
     int fd = ctx->rdi;
     void* buf = (void*)ctx->rsi;
+
+    __syscall_is_safe(buf);
+
     uint64_t count = ctx->rdx;
 
     process_t* proc = CpuData::Access()->current;
@@ -469,23 +604,38 @@ int syscall_write(int_frame_t* ctx) {
     filestat_t stat;
 
     if(!file)
-        return -1;
+        return EBADF;
 
     if(file->type == FD_PIPE) {
         
         if(count > (1024 * 64))
             count = (1024 * 64) - 1;
 
-        char* pipe_buffer = file->pipe.buffer;
-        file->pipe.buffer_size = count;
+        if(!file->is_pipe_pointer) {
+            char* pipe_buffer = file->pipe.buffer;
+            file->pipe.buffer_size = count;
 
-        __prepare_file_content_syscall(pipe_buffer,count,ctx->cr3);
+            __prepare_file_content_syscall(pipe_buffer,count,ctx->cr3);
 
-        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-        String::memcpy(pipe_buffer,buf,count);
-        Paging::EnableKernel();
+            Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+            String::memcpy(pipe_buffer,buf,count);
+            Paging::EnableKernel();
 
-        file->pipe.is_received = 0;
+            file->pipe.is_received = 0;
+        } else {
+            char* pipe_buffer = file->p_pipe->buffer;
+
+            pipe_buffer = (char*)((uint64_t)pipe_buffer + file->p_pipe->buffer_size);
+            file->p_pipe->buffer_size += count;
+
+            
+            __prepare_file_content_syscall(pipe_buffer,count,ctx->cr3);
+
+            Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+            String::memcpy(pipe_buffer,buf,count);
+            Paging::EnableKernel();
+            
+        }
 
         ctx->rdi = count;
 
@@ -525,16 +675,32 @@ int syscall_close(int_frame_t* ctx) {
     if(!file)
         return -2;
 
+
+
     if(fd < 3) {
         // restore state
         String::memset(file->path_point,0,2048);
         String::memcpy(file->path_point,"/dev/tty",String::strlen("/dev/tty"));
         file->type = file->old_type;
         file->pipe.buffer = file->pipe.old_buffer;
+    } else if(file->type == FD_PIPE) {
+        if(file->is_pipe_pointer) {
+            if(file->pipe_side == PIPE_SIDE_WRITE && !file->is_pipe_dup2) {
+                if(file->p_pipe->connected_pipes == 1) {
+                    file->p_pipe->is_received = 0;
+                }
+                file->p_pipe->connected_pipes--;
+            }
+            file->p_pipe = file->old_p_pipe;
+            file->is_pipe_pointer = file->old_is_pipe_pointer;
+        
+        } else {
+            PMM::VirtualFree(file->pipe.buffer);
+        }
+        file->type = FD_NONE;
     } else {
         file->type = FD_NONE;
     }
-        
     
 
     return 0;
@@ -548,11 +714,34 @@ int syscall_dump_tmpfs(int_frame_t* ctx) {
 
 int syscall_mmap(int_frame_t* ctx) {
     uint64_t hint = ctx->rdi;
+
+    __syscall_is_safe((void*)hint);
+
     uint64_t size = ctx->rsi;
+    int fd = ctx->rdx;
 
     process_t* proc = CpuData::Access()->current;
 
     if(!size) return -1;
+
+    if(fd && fd > 0) {
+
+        fd_t* file = FD::Search(proc,fd);
+
+        if(file) {
+            filestat_t stat;
+            int stat_st = VFS::Stat(file->path_point,(char*)&stat);
+
+            if(stat_st)
+                return ENOSYS;
+
+            uint64_t virt = (uint64_t)VMM::Map(proc,(uint64_t)stat.content,stat.size,PTE_RW | PTE_PRESENT | PTE_USER);
+            ctx->rdx = virt;
+            return 0;
+
+        } else
+            return ENOENT;
+    }
 
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
 
@@ -579,6 +768,8 @@ int syscall_free(int_frame_t* ctx) {
     uint64_t size = ctx->rsi;
     uint64_t* cr3 = (uint64_t*)HHDM::toVirt(ctx->cr3);
 
+    __syscall_is_safe((void*)ptr);
+
     if(!ptr) return -1;
     if(!size) return -2;
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096;     
@@ -602,10 +793,10 @@ int syscall_isatty(int_frame_t* ctx) {
         if(!String::strcmp("/dev/tty",file->path_point))
             return 0;
         else 
-            return 25;
+            return ENOTTY;
     }
     
-    return 25;
+    return ENOTTY;
 
 }
 
@@ -643,11 +834,9 @@ int syscall_fork(int_frame_t* ctx) {
 
     new_proc->ctx.rdx = 0;
 
-    new_proc->cwd = cwd_get((const char*)parent->name);
-    
-    char* name = (char*)PMM::VirtualAlloc();
-    String::memcpy(name,parent->name,String::strlen(parent->name));
-    new_proc->name = name;
+    new_proc->cwd = (char*)PMM::VirtualAlloc();
+    String::memset(new_proc->cwd,0,4096);
+    String::memcpy(new_proc->cwd,parent->cwd,String::strlen(parent->cwd));
 
     Process::WakeUp(id);
 
@@ -841,17 +1030,20 @@ int syscall_getcwd(int_frame_t* ctx) {
     char* buf = (char*)ctx->rdi;
     uint64_t size = ctx->rsi;
 
+    __syscall_is_safe(buf);
+
     char cwd[2048];
 
     String::memset(cwd,0,2048);
+    String::memcpy(cwd,CpuData::Access()->current->cwd,String::strlen(CpuData::Access()->current->cwd));
 
-    String::memcpy(cwd,CpuData::Access()->current->cwd ? CpuData::Access()->current->cwd : 0,String::strlen(CpuData::Access()->current->cwd ? CpuData::Access()->current->cwd : 0));
+    if(size < String::strlen(cwd))
+        return ERANGE;
 
-    uint64_t actual_size = (size > String::strlen(CpuData::Access()->current->cwd ? CpuData::Access()->current->cwd : 0)) ? String::strlen(CpuData::Access()->current->cwd ? CpuData::Access()->current->cwd : 0) : size;
+   
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-    String::memcpy(buf,cwd,actual_size);
-
+    String::memcpy(buf,cwd,String::strlen(cwd));
     Paging::EnableKernel();
 
     return 0;
@@ -866,13 +1058,16 @@ int syscall_gethostname(int_frame_t* ctx) {
     uint64_t buf = ctx->rdi;
     uint64_t size = ctx->rsi;
 
+    __syscall_is_safe((void*)buf);
+
     const char* host_name = "orange-pc";
 
-    uint64_t actual_size = size > String::strlen((char*)host_name) ? size : String::strlen((char*)host_name);
+    if(String::strlen((char*)host_name) < size)
+        return ERANGE;
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-    String::memset((void*)buf,0,actual_size);
-    String::memcpy((void*)buf,host_name,actual_size == size ? String::strlen((char*)host_name) : actual_size);
+    String::memset((void*)buf,0,size);
+    String::memcpy((void*)buf,host_name,String::strlen((char*)host_name));
     Paging::EnableKernel();
 
     return 0;
@@ -884,15 +1079,21 @@ int syscall_stat(int_frame_t* ctx) {
     uint64_t fd = ctx->rdi;
     stat_t* out = (stat_t*)ctx->rsi;
 
+    __syscall_is_safe(out);
+
     process_t* proc = CpuData::Access()->current;
 
     fd_t* fd_s = FD::Search(proc,fd);
 
     if(!fd_s)
-        return -100;
+        return EBADF;
 
     filestat_t stat;
     int st = VFS::Stat(fd_s->path_point,(char*)&stat);
+
+
+    if(fd_s->type == FD_PIPE)
+        st = -15;
 
     if(st && st != -15)
         return ENOENT;
@@ -910,8 +1111,6 @@ int syscall_stat(int_frame_t* ctx) {
     
     Paging::EnableKernel();
 
-    //Log(LOG_LEVEL_DEBUG,"Stating %s (size: %d)\n",fd_s->path_point,stat.size);
-
     return 0;
 
 }
@@ -922,7 +1121,7 @@ int syscall_dup(int_frame_t* ctx) {
 
     fd_t* fd_s = FD::Search(proc,fd);
     if(!fd_s)
-        return -200;
+        return EBADF;
 
     int new_fd = FD::Create(proc,fd_s->type == FD_PIPE ? 1 : 0);
     fd_t* fd_new = FD::Search(proc,new_fd);
@@ -947,6 +1146,8 @@ int syscall_ioctl(int_frame_t* ctx) {
     int fd = ctx->rdi;
     uint64_t request = ctx->rsi;
     void* arg = (void*)ctx->rdx;
+
+    __syscall_is_safe(arg);
 
     process_t* proc = CpuData::Access()->current;
 
@@ -1091,19 +1292,170 @@ int syscall_dup2(int_frame_t* ctx) {
     if(!old_fd || !new_fd1)
         return ENOENT;
 
-    //Log(LOG_LEVEL_DEBUG,"dup2 from %s to %s\n",new_fd1->path_point,old_fd->path_point);
-
     String::memset(new_fd1->path_point,0,2048);
     String::memcpy(new_fd1->path_point,old_fd->path_point,2048);
 
-    if(new_fd1->type == PIPE_WAIT || new_fd1->type == PIPE_INSTANT) {
+    if(old_fd->type == FD_PIPE) {
+        new_fd1->old_type = new_fd1->type;
+        new_fd1->type = old_fd->type;
+        if(old_fd->is_pipe_pointer) {
+            old_fd->is_pipe_dup2 = 1;
+            new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
+            new_fd1->pipe.buffer = old_fd->pipe.buffer;
+            new_fd1->old_is_pipe_pointer = new_fd1->is_pipe_pointer;
+            new_fd1->is_pipe_pointer = 1;
+            new_fd1->old_p_pipe = new_fd1->p_pipe;
+            new_fd1->p_pipe = old_fd->p_pipe;
+            new_fd1->pipe_side = old_fd->pipe_side;
+        } else {
+            new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
+            new_fd1->pipe.buffer = old_fd->pipe.buffer;
+        }
+    } else {
         new_fd1->old_type = new_fd1->type;
         new_fd1->type = old_fd->type;
         new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
         new_fd1->pipe.buffer = old_fd->pipe.buffer;
     }
 
+    if(FD::Search(proc,new_fd)->p_pipe != old_fd->p_pipe)
+        Log(LOG_LEVEL_WARNING,"dup2 doesn't copied fds correctly\n");
+
     //Log(LOG_LEVEL_DEBUG,"new %s\n",new_fd1->path_point);
+
+    return 0;
+
+}
+
+int syscall_fchdir(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* file = FD::Search(proc,fd);
+    if(!file)
+        return ENOENT;
+
+    filestat_t stat;
+    int status = VFS::Stat(file->path_point,(char*)&stat);
+
+    if(status)
+        return ENOENT;
+    
+    if(stat.type != VFS_TYPE_DIRECTORY)
+        return ENOTDIR;
+
+    String::memset(proc->cwd,0,4096);
+    String::memcpy(proc->cwd,file->path_point,String::strlen(file->path_point));
+
+    return 0;
+}
+
+int syscall_ttyname(int_frame_t* ctx) {
+
+    int fd = ctx->rdi;
+    void* buf = (void*)ctx->rsi;
+    uint64_t size = ctx->rdx;  
+
+    __syscall_is_safe(buf);
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* file = FD::Search(proc,fd);
+    if(!file)
+        return EBADF;
+
+    if(!buf)
+        return EFAULT;
+
+    if(!size)
+        return EFAULT;
+
+    if(!String::strcmp("/dev/tty",file->path_point)) {
+        
+        char sbuf[2048];
+        String::memset(sbuf,0,2048);
+        String::memcpy(sbuf,file->path_point,String::strlen(file->path_point));
+
+        if(size <= String::strlen(sbuf))
+            return ERANGE;
+
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+        String::memset(buf,0,size);
+        String::memcpy(buf,sbuf,String::strlen(sbuf));
+        Paging::EnableKernel();
+
+        return 0;
+
+
+    } else 
+        return ENOTTY;
+
+}
+
+inline void __syscall_uname_helper_cpy(char* addr,const char* val) {
+    String::memcpy(addr,val,String::strlen((char*)val));
+}
+
+int syscall_uname(int_frame_t* ctx) {
+
+    utsname_t* uname = (utsname_t*)ctx->rdi;
+    
+    __syscall_is_safe(uname);
+    if(!uname) 
+        return EFAULT;
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memset(uname,0,sizeof(utsname_t));
+    __syscall_uname_helper_cpy(uname->machine,"orange");
+    Paging::EnableKernel();
+
+    return 0;
+
+}
+
+int syscall_pipe(int_frame_t* ctx) {
+    int* fds = (int*)ctx->rdi;
+    int flags = ctx->rsi;
+
+    __syscall_is_safe(fds);
+
+    process_t* proc = CpuData::Access()->current;
+    if(!fds)
+        return EFAULT;
+
+    int first = FD::Create(proc,0);
+    int second = FD::Create(proc,0);
+
+    fd_t* first_file = FD::Search(proc,first);
+    fd_t* second_file = FD::Search(proc,second);
+
+    pipe_t* shared_pipe = (pipe_t*)PMM::VirtualAlloc();
+
+    shared_pipe->buffer = (char*)PMM::VirtualBigAlloc(16);
+    shared_pipe->type = PIPE_WAIT;
+    shared_pipe->connected_pipes = 1;
+    shared_pipe->is_used = 1;
+    shared_pipe->is_received = 1;
+    shared_pipe->buffer_size = 0;
+    shared_pipe->buffer_read_ptr = 0;
+
+    first_file->is_pipe_pointer = 1;
+    first_file->type = FD_PIPE;
+    first_file->p_pipe = shared_pipe;
+    first_file->pipe_side = PIPE_SIDE_READ;
+    
+    second_file->is_pipe_pointer = 1;
+    second_file->type = FD_PIPE;
+    second_file->p_pipe = shared_pipe;
+    second_file->pipe_side = PIPE_SIDE_WRITE;
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    fds[0] = first;
+    fds[1] = second;
+    Paging::EnableKernel();
+
+    String::memset(first_file->path_point,0,2048);
+    String::memset(second_file->path_point,0,2048);
 
     return 0;
 
@@ -1137,7 +1489,11 @@ syscall_t syscall_table[] = {
     {25,syscall_kill},
     {26,syscall_ioctl}, 
     {27,syscall_waitpid},
-    {28,syscall_dup2}
+    {28,syscall_dup2},
+    {29,syscall_fchdir},
+    {30,syscall_ttyname},
+    {31,syscall_uname},
+    {32,syscall_pipe}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -1152,20 +1508,16 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //Log(LOG_LEVEL_DEBUG,"Syscall %d \n",sys->num,ctx->rax);
-
     CpuData::Access()->last_syscall = ctx->rax;
-    
+
+    //Serial::printf("sys %d\n",sys->num);
+
     if(sys == 0) {
         ctx->rax = -1;
         return;
     }
 
     ctx->rax = sys->func(ctx);
-
-    //Serial::printf("R %d ",ctx->rax);
-
-    //Log(LOG_LEVEL_DEBUG,"Syscall %d with ret %d\n",sys->num,ctx->rax);
 
     return;
 }

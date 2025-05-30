@@ -189,10 +189,23 @@ int VFS::Ioctl(char* filename,unsigned long request, void *arg, int *result) {
 
     if(!fs) return -1;
 
-    if(!fs->fs->ioctl) return -15;
+    if(!fs->fs->ioctl) return 0;
     
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->ioctl(filename_as_fs,request,arg,result);
+    return status;
+}
+
+int VFS::Iterate(char* filename,filestat_t* stat) {
+    if(!filename) return -1;
+    
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+    if(!fs->fs->iterate) return -15;
+    if(!stat) return 0; 
+
+    int status = fs->fs->iterate(stat);
     return status;
 }
 

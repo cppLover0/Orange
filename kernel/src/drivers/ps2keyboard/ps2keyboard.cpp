@@ -49,6 +49,7 @@ char __ps_2_to_upper(char c) {
         case '`': return '~';
         case '.': return '>';
         case ',': return '<';
+        case '\\': return '|';
  
         default: break; 
  

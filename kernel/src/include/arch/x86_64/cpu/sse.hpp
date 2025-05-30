@@ -1,6 +1,8 @@
 
 #include <stdint.h>
 
+#pragma once
+
 #define DEFAULT_SSE_FLAGS ((1 << 9) | (1 << 10) | (1 << 1))
 #define SSE_DISABLE_EMUL ~(1 << 2)
 #define SSE_XSAVE_SUPPORT (1 << 26)

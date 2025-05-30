@@ -5,6 +5,7 @@
 #include <other/log.hpp>
 #include <other/string.hpp>
 #include <config.hpp>
+#include <generic/memory/pmm.hpp>
 #include <generic/memory/heap.hpp>
 
 devfs_dev_t* head_dev = 0;
@@ -59,7 +60,7 @@ int devfs_ioctl(char* filename,unsigned long request, void *arg, int *result) {
     devfs_dev_t* dev = devfs_find_dev(filename);
 
     if(!dev) return 4;
-    if(!dev->ioctl) return 25;
+    if(!dev->ioctl) return 0;
 
     return dev->ioctl(request,arg,(void*)result);
 
@@ -96,10 +97,11 @@ int devfs_instantreadpipe(char* filename,pipe_t* pipe) {
 
 void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, void* result)) {
 
-    struct devfs_dev* dev = new struct devfs_dev;
+    struct devfs_dev* dev = (devfs_dev_t*)PMM::VirtualAlloc();
     
     if(dev) {
-        dev->loc = (char*)name;
+        String::memset(dev,0,4096);
+        String::memcpy(dev->loc,name,String::strlen((char*)name));
         dev->write = write;
         dev->read = read;
         dev->askforpipe = askforpipe;

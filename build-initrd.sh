@@ -46,7 +46,7 @@ done
 cd ../bin
 
 echo Creating symlinks ./*.so
-for file in ../usr/bin/*.so; do
+for file in ../usr/bin/*; do
 	echo $file "$(basename "$file")"
     ln -s "$file" "$(basename "$file")"
 done

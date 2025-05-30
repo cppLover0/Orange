@@ -94,6 +94,31 @@ uint64_t resolve_count(char* str,uint64_t sptr,char delim) {
     return ptr;
 }
 
+int normalize_path(const char* src, char* dest, uint64_t dest_size) {
+    if (!src ||!dest || dest_size < 2) return -1;
+    uint64_t j = 0;
+    int prev_slash = 0;
+    for (uint64_t i = 0; src[i] && j < dest_size - 1; i++) {
+        if (src[i] == '/') {
+            if (!prev_slash) {
+                dest[j++] = '/';
+                prev_slash = 1;
+            }
+        } else {
+            dest[j++] = src[i];
+            prev_slash = 0;
+        }
+    }
+
+    if (j > 1 && dest[j-1] == '/') j--;
+    if (j >= dest_size) {
+        dest[0] = '\0';
+        return -1;
+    }
+    dest[j] = '\0';
+    return 0;
+}
+
 void resolve_path(const char* inter,const char* base, char *result, char spec) {
     char buffer_in_stack[1024];
     char buffer2_in_stack[1024];
@@ -111,6 +136,12 @@ void resolve_path(const char* inter,const char* base, char *result, char spec) {
     if(String::strlen((char*)inter) == 1 && inter[0] == '.') {
         String::memset(result,0,1024);
         String::memcpy(result,base,String::strlen((char*)base));
+        return;
+    }
+
+    if(!String::strcmp(inter,"/")) {
+        String::memset(result,0,1024);
+        String::memcpy(result,inter,String::strlen((char*)inter));
         return;
     }
 
@@ -171,7 +202,8 @@ void resolve_path(const char* inter,const char* base, char *result, char spec) {
     }
     
     String::memset(result,0,1024);
-    String::memcpy(result,final_buffer,String::strlen(final_buffer));
+    normalize_path(final_buffer,result,2048);
+
     //Log("F %s\n",result);
 
 }

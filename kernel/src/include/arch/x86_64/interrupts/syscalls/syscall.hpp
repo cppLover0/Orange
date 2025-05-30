@@ -204,6 +204,14 @@ typedef struct {
 #define O_NOATIME   01000000
 #define O_TMPFILE  020000000
 
+typedef struct {
+	char sysname[65];
+	char nodename[65];
+	char release[65];
+	char version[65];
+	char machine[65];
+} __attribute__((packed)) utsname_t;
+
 class Syscall {
 public:
     static void Init();

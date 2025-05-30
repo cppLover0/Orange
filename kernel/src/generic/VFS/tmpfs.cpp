@@ -232,8 +232,6 @@ int tmpfs_stat(char* filename,char* buffer) {
     if(!filename) return 2;
     if(filename[0] != '/') return 3; 
 
-    if(!String::strcmp(filename,"/")) return 4;
-
     //Log(LOG_LEVEL_DEBUG,"Stat %s\n",filename);
 
     if(!tmpfs_scan_for_file(filename)) return 5;

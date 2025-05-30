@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <generic/VFS/vfs.hpp>
 
+#pragma once
+
 typedef struct devfs_dev {
     
     int (*write)(char* buffer,uint64_t size);
@@ -10,8 +12,10 @@ typedef struct devfs_dev {
     int (*instantreadpipe)(pipe_t* pipe);
     int (*ioctl)(unsigned long request, void* arg, void* result);
 
-    char* loc;
     struct devfs_dev* next;
+
+    char loc[2048];
+    
 
 } __attribute__((packed)) devfs_dev_t;
 

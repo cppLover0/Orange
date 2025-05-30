@@ -236,18 +236,21 @@ typedef struct {
 	speed_t obaud;
 } __attribute__((packed)) termios_t;
 
-typedef struct {
+typedef struct pipe {
 
     char* buffer;
     char* old_buffer;
     uint64_t buffer_size;
     
+    uint64_t buffer_read_ptr;
 
     process_t* parent;
 
     int type;
-
     int is_used;
+    char is_eof;
+    
+    char connected_pipes;
 
     uint32_t reserved;
 
@@ -256,6 +259,9 @@ typedef struct {
     _Atomic char is_received;
 
 } __attribute__((packed)) pipe_t;
+
+#define PIPE_SIDE_WRITE 1
+#define PIPE_SIDE_READ 2
 
 typedef struct fd_struct {  
     int index;
@@ -267,7 +273,16 @@ typedef struct fd_struct {
     long seek_offset;
 
     char type;
+
+    char pipe_side;
+    
+    uint8_t is_pipe_pointer;
+    uint8_t old_is_pipe_pointer;
     pipe_t pipe;
+    pipe_t* old_p_pipe;
+    pipe_t* p_pipe;
+
+    char is_pipe_dup2;
 
     char old_type;
 

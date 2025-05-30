@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <arch/x86_64/scheduling/scheduling.hpp>
 
+#pragma once
+
 typedef struct vmm_obj {
     uint64_t base;
     uint64_t phys;
