@@ -4,6 +4,8 @@
 rm -rf pack
 mkdir -p pack
 
+cd pack
+
 wget https://www.lua.org/ftp/lua-5.4.7.tar.gz
 
 tar -xvf lua-5.4.7.tar.gz
