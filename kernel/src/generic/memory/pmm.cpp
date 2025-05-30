@@ -13,11 +13,15 @@ buddy_t buddy;
 
 char buddy_spinlock;
 
+uint64_t __pmm_cache_offset = 0;
+
 buddy_info_t* buddy_put(uint64_t phys,int64_t parent,uint8_t level) {
+
     buddy_info_t* hello_buddy = &buddy.mem[buddy.hello_buddy++];
     hello_buddy->information.is_free = 1;
     hello_buddy->information.level = level;
     hello_buddy->information.parent_id = parent;
+
     hello_buddy->phys_pointer = phys;
     hello_buddy->information.is_splitted = 0;
     hello_buddy->information.is_was_splitted = 0;
@@ -174,6 +178,9 @@ void PMM::Init(limine_memmap_response* mem_map) {
     uint64_t top = 0;
     uint64_t top_size = 0;
 
+    LimineInfo info;
+    __pmm_cache_offset = info.hhdm_offset;
+
     for(int i = 0;i < mem_map->entry_count;i++) {
         current = mem_map->entries[i];
         Log(LOG_LEVEL_INFO,"Entry %d: 0x%p-0x%p (%d MB) %s\n",i,current->base, current->base + current->length,(current->length / 1024) / 1024,current->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non-Usable");
@@ -205,6 +212,7 @@ void PMM::Init(limine_memmap_response* mem_map) {
     for(uint64_t i = 0; i < (CALIGNPAGEDOWN(top_size,max_level_align));i += max_level_align) {
         buddy_put(free_memory + i,0,MAX_LEVEL);
     }
+
 
 }
 

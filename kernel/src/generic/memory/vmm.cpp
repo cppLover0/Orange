@@ -10,6 +10,7 @@
 #include <other/string.hpp>
 #include <generic/memory/pmm.hpp>
 #include <other/assembly.hpp>
+#include <other/debug.hpp>
 
 vmm_obj_t* vmm_main = 0;
 vmm_obj_t* vmm_last = 0;
@@ -274,13 +275,13 @@ void VMM::Clone(process_t* dest_proc,process_t* src_proc) {
 
             uint64_t phys;
 
-            if(src_current->src_len < PAGE_SIZE)
+            if(src_current->src_len <= PAGE_SIZE)
                 phys = PMM::Alloc();
             else if(src_current->src_len > PAGE_SIZE)
                 phys = PMM::BigAlloc(ALIGNPAGEUP(src_current->src_len) / PAGE_SIZE);
 
             if(src_current->phys)
-            String::memcpy((void*)HHDM::toVirt(phys),(void*)HHDM::toVirt(src_current->phys),src_current->len);
+                String::memcpy((void*)HHDM::toVirt(phys),(void*)HHDM::toVirt(src_current->phys),src_current->len);
 
             Mark(dest_proc,src_current->base,phys,src_current->len,src_current->flags);
 

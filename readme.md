@@ -50,10 +50,12 @@ make
 
 ## Porting TODO
 
+- [x] bash
+- [x] coreutils
 - [ ] doom2
 - [ ] nasm
 - [ ] gcc
-- [ ] lua
+- [x] lua
 - [ ] python
 - [ ] etc. apps
 

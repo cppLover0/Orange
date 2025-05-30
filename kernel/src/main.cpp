@@ -113,6 +113,10 @@ extern "C" void kmain() {
     Log(LOG_LEVEL_INFO,"Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
     Log(LOG_LEVEL_INFO,"Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
+    extern char is_ignored;
+
+    is_ignored = 0;
+
     ft_ctx->cursor_enabled = 1;
 
     HHDM::applyHHDM(info.hhdm_offset);

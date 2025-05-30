@@ -54,7 +54,6 @@ done
 cd ../../
 
 cp -rf tools/base/* initrd/
-rm -rf initrd/usr/share/*
 
 echo Building initrd is done
 

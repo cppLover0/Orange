@@ -9,15 +9,15 @@ cd pack
 
 echo $1
 
-install_gnu bash bash 5.2
+install_gnu bash bash 5.2.21
 mkdir -p bash-build
 
-cd bash-5.2
+cd bash-5.2.21
 diff_patch ../../diff/bash.diff
 cd ..
 
 cd bash-build
-../bash-5.2/configure --host=x86_64-orange --prefix=$1 --disable-readline --without-bash-malloc CFLAGS="-std=gnu17 -fPIC"
+../bash-5.2.21/configure --host=x86_64-orange --prefix=$1 --disable-readline --without-bash-malloc CFLAGS="-std=gnu17 -fPIC"
 make install -j$(nproc)
 
 cz=$(pwd)

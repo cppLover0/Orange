@@ -92,8 +92,7 @@ int VFS::Touch(char* filename) {
     
 int VFS::Create(char* filename,int type) {
     if(!filename) return -1;
-
-    spinlock_lock(&vfs_spinlock);
+ 
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
     //Log(LOG_LEVEL_DEBUG,"Creating %s\n",filename);
@@ -103,7 +102,6 @@ int VFS::Create(char* filename,int type) {
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
     int status = fs->fs->create(filename_as_fs,type);
-    spinlock_unlock(&vfs_spinlock);
     return status;
 }
 
