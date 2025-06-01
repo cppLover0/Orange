@@ -11,7 +11,7 @@ Currenly it have bash,coreutils,lua and fastfetch ports
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/m/cpplover0/orange)](https://github.com/cpplover0/orange/commits)
 
 ## Preview
-![fastfetch and lua](https://github.com/cpplover0/orange/blob/orange/tools/img/work.png?raw=true)
+![fastfetch and lua](https://github.com/cppLover0/Orange/blob/main/tools/img/work.png?raw=true)
 
 # Build
 
