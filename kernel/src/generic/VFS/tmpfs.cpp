@@ -230,7 +230,7 @@ int tmpfs_readfile(char* buffer,char* filename,long hint_size) {
     return 0;
 }
 
-int tmpfs_stat(char* filename,char* buffer) {
+int tmpfs_stat(char* filename,char* buffer,char follow_symlinks) {
     if(!buffer) return 1;
     if(!filename) return 2;
     if(filename[0] != '/') return 3; 
@@ -238,12 +238,17 @@ int tmpfs_stat(char* filename,char* buffer) {
     //Log(LOG_LEVEL_DEBUG,"Stat %s\n",filename);
 
     if(!tmpfs_scan_for_file(filename)) return 5;
+    
     data_file_t* file = tmpfs_scan_for_file(filename);
-    while(file) {
-        if(file->type != TMPFS_TYPE_SYMLINK)
-            break;
-        file = tmpfs_scan_for_file(file->content);
+
+    if(follow_symlinks) {
         
+        while(file) {
+            if(file->type != TMPFS_TYPE_SYMLINK)
+                break;
+            file = tmpfs_scan_for_file(file->content);
+            
+        }
     }
 
     if(!file)
@@ -319,7 +324,7 @@ void tmpfs_dump() {
 
     while(current) {
         filestat_t stat;
-        int size = tmpfs_stat(current->name,(char*)&stat);
+        int size = tmpfs_stat(current->name,(char*)&stat,0);
         NLog("\"%s\": Size: %d (%d KB, %d MB, %d GB), ",current->name,stat.size,stat.size / 1024,(stat.size / 1024) / 1024,((stat.size / 1024) / 1024) / 1024);
         current = current->next;
     }
@@ -349,6 +354,28 @@ int tmpfs_count(char* filename,int idx,int count) {
 
 }
 
+int tmpfs_iterate(filestat_t* stat) {
+    
+    if(!stat->name || stat->name == (char*)1) {
+        tmpfs_stat("/",(char*)stat,0);
+    }
+    else {
+        data_file_t* file = tmpfs_scan_for_file(stat->name);
+        if(!file)
+            return 1;
+
+        data_file_t* next = file->next;
+        if(!next)
+            return 1;
+
+        tmpfs_stat(next->name,(char*)stat,0);
+        
+    }
+
+    return 0;
+
+}
+
 void TMPFS::Init(filesystem_t* fs) {
     data_file_t* root_d = new data_file_t;
     String::memset(root_d,0,sizeof(data_file_t));
@@ -370,5 +397,6 @@ void TMPFS::Init(filesystem_t* fs) {
     fs->stat = tmpfs_stat;
     fs->chmod = tmpfs_chmod;
     fs->count  = tmpfs_count;
-    
+    fs->iterate = tmpfs_iterate;
+
 }

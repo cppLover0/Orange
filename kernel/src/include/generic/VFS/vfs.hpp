@@ -1,6 +1,6 @@
 
 #include <stdint.h>
-#include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
+#include <arch/x86_64/interrupts/syscalls/ipc/pipe.hpp>
 
 #pragma once
 
@@ -49,7 +49,7 @@ typedef struct {
     int (*rm)(char* filename);
     
     char (*exists)(char* filename);
-    int (*stat)(char* filename,char* buffer);
+    int (*stat)(char* filename,char* buffer,char follow_symlinks);
     
     int (*iterate)(filestat_t* stat);
 
@@ -81,7 +81,7 @@ public:
     static int Create(char* filename,int type);
     static int Remove(char* filename);
     static char Exists(char* filename);
-    static int Stat(char* filename,char* buffer);
+    static int Stat(char* filename,char* buffer,char follow_symlinks);
     static int AskForPipe(char* filename,pipe_t* pipe);
     static int InstantPipeRead(char* filename,pipe_t* pipe);
     static int Iterate(char* filename,filestat_t* stat);

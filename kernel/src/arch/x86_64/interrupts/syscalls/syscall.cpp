@@ -204,10 +204,13 @@ int syscall_open(int_frame_t* ctx) {
         VFS::Touch(path);
     
     filestat_t zx;
-    int stt = VFS::Stat(path,(char*)&zx); 
+    int stt = VFS::Stat(path,(char*)&zx,1); 
 
     if(stt && stt != -15)
         return ENOENT;
+
+    if(zx.type != VFS_TYPE_DIRECTORY && (flags & O_DIRECTORY))
+        return ENOTDIR;
 
     if((flags & O_TRUNC) && ((flags & O_WRONLY) || (flags & O_RDWR)))
         VFS::Write({0},path,1,0,0);
@@ -218,8 +221,14 @@ int syscall_open(int_frame_t* ctx) {
     if(!fd_s)
         return -3;
 
+    fd_s->flags = flags;
+
     String::memset(fd_s->path_point,0,2048);
     String::memcpy(fd_s->path_point,path,String::strlen(path));
+
+    String::memset(&fd_s->reserved_stat,0,sizeof(filestat_t));
+
+    fd_s->reserved_stat.name = (char*)1;
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     *fdout = fd;
@@ -256,7 +265,7 @@ int syscall_seek(int_frame_t* ctx) {
         return EBADF;
 
     filestat_t stat;
-    int stx = VFS::Stat(file->path_point,(char*)&stat); 
+    int stx = VFS::Stat(file->path_point,(char*)&stat,1); 
 
     switch (whence)
     {
@@ -510,7 +519,7 @@ int syscall_read(int_frame_t* ctx) {
     
     }
 
-    if(VFS::Stat(file->path_point,(char*)&stat) == -15) {
+    if(VFS::Stat(file->path_point,(char*)&stat,1) == -15) {
         
         char* dest_buf = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(count));
 
@@ -728,14 +737,13 @@ int syscall_mmap(int_frame_t* ctx) {
     process_t* proc = CpuData::Access()->current;
 
     if(!size) return -1;
-
     if(fd && fd > 0) {
 
         fd_t* file = FD::Search(proc,fd);
 
         if(file) {
             filestat_t stat;
-            int stat_st = VFS::Stat(file->path_point,(char*)&stat);
+            int stat_st = VFS::Stat(file->path_point,(char*)&stat,1);
 
             if(stat_st)
                 return ENOSYS;
@@ -759,8 +767,6 @@ int syscall_mmap(int_frame_t* ctx) {
         hint = (uint64_t)VMM::Alloc(proc,size,PTE_RW | PTE_PRESENT | PTE_USER);    
     else
         VMM::CustomAlloc(proc,hint,size,PTE_RW | PTE_PRESENT | PTE_USER);
-
-    //Serial::printf(" %p ",hint);
 
     ctx->rdx = hint;
     return 0;
@@ -945,7 +951,7 @@ int syscall_exec(int_frame_t* ctx) {
 
     filestat_t stat;
 
-    int status = VFS::Stat(path1,(char*)&stat);
+    int status = VFS::Stat(path1,(char*)&stat,1);
 
     if(!status && stat.type == VFS_TYPE_FILE && (stat.mode & S_IXUSR)) {
         //Log("alloc\n");
@@ -1113,7 +1119,7 @@ int syscall_stat(int_frame_t* ctx) {
         return EBADF;
 
     filestat_t stat;
-    int st = VFS::Stat(fd_s->path_point,(char*)&stat);
+    int st = VFS::Stat(fd_s->path_point,(char*)&stat,1);
 
 
     if(fd_s->type == FD_PIPE)
@@ -1351,7 +1357,7 @@ int syscall_fchdir(int_frame_t* ctx) {
         return ENOENT;
 
     filestat_t stat;
-    int status = VFS::Stat(file->path_point,(char*)&stat);
+    int status = VFS::Stat(file->path_point,(char*)&stat,1);
 
     if(status)
         return ENOENT;
@@ -1421,7 +1427,8 @@ int syscall_uname(int_frame_t* ctx) {
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memset(uname,0,sizeof(utsname_t));
-    __syscall_uname_helper_cpy(uname->machine,"orange");
+    __syscall_uname_helper_cpy(uname->machine,"Orange");
+    __syscall_uname_helper_cpy(uname->sysname,"Orange");
     Paging::EnableKernel();
 
     return 0;
@@ -1488,7 +1495,7 @@ int syscall_fchmod(int_frame_t* ctx) {
 
     filestat_t stat;
 
-    int status = VFS::Stat(fd_s->path_point,(char*)&stat);
+    int status = VFS::Stat(fd_s->path_point,(char*)&stat,1);
     if(status)
         return ENOENT;
 
@@ -1550,7 +1557,128 @@ int syscall_poll(int_frame_t* ctx) {
     uint64_t count = ctx->rsi;
     int timeout = ctx->rdx;
 
-    return 1; // i still dont know why i need it but i leave it here
+    return 0; // i still dont know why i need it but i leave it here
+}
+
+int syscall_readdir(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+    void* out_buffer = (void*)ctx->rsi;
+
+    __syscall_is_safe(out_buffer);
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* dir = FD::Search(proc,fd);
+
+    if(!dir)
+        return EBADF;
+
+
+    if(!(dir->flags & O_DIRECTORY))
+        return ENOTDIR;
+
+again:
+    int status = VFS::Iterate(dir->path_point,&dir->reserved_stat);
+    int count = 0;
+    char buffer[2048];
+    while(status == 0) {
+        if(!String::strncmp(dir->reserved_stat.name,dir->path_point,String::strlen(dir->path_point))) {
+            if(!(String::strlen(dir->reserved_stat.name) == String::strlen(dir->path_point))) {
+                count = String::strlen(dir->path_point);
+                String::memset(buffer,0,2048);
+                String::memcpy(buffer,(char*)((uint64_t)dir->reserved_stat.name + count),String::strlen((char*)((uint64_t)dir->reserved_stat.name + count)));
+
+                if(buffer[0] == '/') {
+                    String::memset(buffer,0,2048);
+                    String::memcpy(buffer,(char*)((uint64_t)dir->reserved_stat.name + count + 1),String::strlen((char*)((uint64_t)dir->reserved_stat.name + count + 1)));
+                }
+
+                break;
+            }
+        }
+        status = VFS::Iterate(dir->path_point,&dir->reserved_stat);
+    }
+
+    if(status == 1) {
+        dir->reserved_stat.name = (char*)1;
+        return -1;
+    }
+
+    for(int i = 0;i < String::strlen((char*)buffer);i++) {
+        if(buffer[i] == '/') {
+            goto again;
+        }
+    }  
+
+    unsigned char type = 0;
+
+    switch(dir->reserved_stat.type) {
+        case VFS_TYPE_DIRECTORY:
+            type = DT_DIR;
+            break;
+        case VFS_TYPE_FILE:
+            type = DT_REG;
+            break;
+        case VFS_TYPE_SYMLINK:
+            type = DT_LNK;
+            break;
+        default:
+            type = DT_REG;
+            break;
+    }
+
+    dirent_t ent;
+
+    String::memset(ent.d_name,0,1024);
+    String::memcpy(ent.d_name,buffer,String::strlen(buffer));
+    ent.d_reclen = sizeof(dirent_t);
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memset(out_buffer,0,sizeof(dirent_t));
+    String::memcpy(out_buffer,&ent,sizeof(dirent_t));
+    Paging::EnableKernel();
+
+    return 0;
+
+}
+
+int syscall_readlink(int_frame_t* ctx) {
+    char* path1 = (char*)ctx->rdi;
+    char* buf = (char*)ctx->rsi;
+    uint64_t size = ctx->rdx;
+
+    char path[2048];
+
+    __syscall_is_safe(path1);
+    __syscall_is_safe(buf);
+
+    String::memset(path,0,2048);
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memcpy(path,path1,String::strlen(path1));
+    Paging::EnableKernel();
+
+    filestat_t stat;
+
+    if(VFS::Stat(path,(char*)&stat,0)) 
+        return ENOENT;
+
+    if(!stat.content)
+        return EFAULT;
+
+    uint64_t actual_size = 0;
+    uint64_t string_len = String::strlen(path);
+
+    actual_size = string_len <= size ? string_len : size;
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memset(buf,0,size);
+    String::memcpy(buf,stat.content,actual_size);
+    Paging::EnableKernel();
+
+    ctx->rdx = actual_size;
+    return 0;
+
 }
 
 syscall_t syscall_table[] = {
@@ -1588,7 +1716,9 @@ syscall_t syscall_table[] = {
     {32,syscall_pipe},
     {33,syscall_fchmod},
     {34,syscall_unlink},
-    {35,syscall_poll}
+    {35,syscall_poll},
+    {36,syscall_readdir},
+    {37,syscall_readlink}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -1604,8 +1734,6 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     syscall_t* sys = syscall_find_table(ctx->rax);
 
     CpuData::Access()->last_syscall = ctx->rax;
-
-    //Serial::printf("sys %d\n",sys->num);
 
     if(sys == 0) {
         ctx->rax = -1;

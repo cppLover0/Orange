@@ -103,7 +103,7 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
             filestat_t stat;
 
-            int status = VFS::Stat((char*)((uint64_t)base + current_head->p_offset),(char*)&stat);
+            int status = VFS::Stat((char*)((uint64_t)base + current_head->p_offset),(char*)&stat,1);
 
             if(status) {
                 res.entry = 0;

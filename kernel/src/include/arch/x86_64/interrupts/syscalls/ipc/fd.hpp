@@ -1,6 +1,8 @@
 
 #include <stdint.h>
 #include <arch/x86_64/scheduling/scheduling.hpp>
+#include <arch/x86_64/interrupts/syscalls/ipc/pipe.hpp>
+#include <generic/VFS/vfs.hpp>
 
 #pragma once
 
@@ -11,12 +13,7 @@
 #define PIPE_WAIT 0
 #define PIPE_INSTANT 1
 
-typedef unsigned char cc_t;
-typedef unsigned int speed_t;
-typedef unsigned int tcflag_t;
-
 /* indices for the c_cc array in struct termios */
-#define NCCS     32
 #define VINTR    0
 #define VQUIT    1
 #define VERASE   2
@@ -225,41 +222,6 @@ typedef struct {
 
 #define XTABS 0014000
 
-typedef struct {
-	tcflag_t c_iflag;
-	tcflag_t c_oflag;
-	tcflag_t c_cflag;
-	tcflag_t c_lflag;
-	cc_t c_line;
-	cc_t c_cc[NCCS];
-	speed_t ibaud;
-	speed_t obaud;
-} __attribute__((packed)) termios_t;
-
-typedef struct pipe {
-
-    char* buffer;
-    char* old_buffer;
-    uint64_t buffer_size;
-    
-    uint64_t buffer_read_ptr;
-
-    process_t* parent;
-
-    int type;
-    int is_used;
-    char is_eof;
-    
-    char connected_pipes;
-
-    uint32_t reserved;
-
-    termios_t termios;
-
-    _Atomic char is_received;
-
-} __attribute__((packed)) pipe_t;
-
 #define PIPE_SIDE_WRITE 1
 #define PIPE_SIDE_READ 2
 
@@ -281,6 +243,9 @@ typedef struct fd_struct {
     pipe_t pipe;
     pipe_t* old_p_pipe;
     pipe_t* p_pipe;
+
+    uint64_t flags;
+    filestat_t reserved_stat;
 
     char is_pipe_dup2;
 

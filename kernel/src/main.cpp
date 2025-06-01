@@ -153,8 +153,6 @@ extern "C" void kmain() {
     VFS::Init();
     Log(LOG_LEVEL_INFO,"VFS Initializied\n");
 
-    VFS::Create("/head",0);
-
     USTAR::ParseAndCopy();
     Log(LOG_LEVEL_INFO,"Loaded initrd\n");
 
@@ -184,7 +182,7 @@ extern "C" void kmain() {
 
     filestat_t stat;
 
-    VFS::Stat("/usr/bin/initrd",(char*)&stat);
+    VFS::Stat("/usr/bin/initrd",(char*)&stat,1);
     
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
