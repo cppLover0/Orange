@@ -1,6 +1,10 @@
 
 GNU_MIRROR=https://mirror.dogado.de/
 
+clear_share() {
+    rm -rf "$1/share/*"
+}
+
 install_gnu() {
 
     pkg_name=$1

@@ -157,7 +157,7 @@ uint64_t buddy_alloc(uint64_t size) {
         buddy_info_t* good_buddy_split = buddy_get_and_split_if_possible(good_buddy,size);
         good_buddy_split->information.is_free = 0;
 
-        String::memset((void*)HHDM::toVirt(good_buddy_split->phys_pointer),0,LEVEL_TO_SIZE(good_buddy->information.level));
+        String::memset((void*)HHDM::toVirt(good_buddy_split->phys_pointer),0,LEVEL_TO_SIZE(good_buddy_split->information.level));
 
         if(good_buddy_split->phys_pointer == 0) {
             Log(LOG_LEVEL_ERROR,"Buddy allocator bug\n");

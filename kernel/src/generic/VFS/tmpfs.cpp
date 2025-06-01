@@ -9,6 +9,7 @@
 #include <other/log.hpp>
 #include <other/unixlike.hpp>
 #include <drivers/hpet/hpet.hpp>
+#include <arch/x86_64/interrupts/syscalls/syscall.hpp>
 #include <config.hpp>
 
 
@@ -104,6 +105,9 @@ int tmpfs_create(char* name1,int type) {
     new_data->type = type;
     new_data->name = name;
     new_data->parent = last;
+    new_data->count[0] = 0;
+    new_data->count[1] = 0;
+    new_data->mode = 0;
     last->next = new_data;
     last = new_data;
 
@@ -124,11 +128,7 @@ int tmpfs_rm(char* filename) {
     if(!tmpfs_scan_for_file(filename)) return -1;
 
     data_file_t* data = tmpfs_scan_for_file(filename);
-    while(data) {
-        if(data->type != TMPFS_TYPE_SYMLINK)
-            break;
-        data = tmpfs_scan_for_file(data->content);
-    }
+
     if(data->protection) return 8;
     data->protection = 1; // just put protection
 
@@ -178,7 +178,10 @@ int tmpfs_writefile(char* buffer,char* filename,uint64_t size,char is_symlink_pa
     tmpfs_free_file_content(file);
 
     file->size_of_content = actual_size;
-    file->content = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(actual_size));
+    if(actual_size <= 4096) 
+        file->content = (char*)PMM::VirtualAlloc();
+    else
+        file->content = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(actual_size));
     file->file_change_date = convertToUnixTime();
 
     if(!file->content)
@@ -255,6 +258,7 @@ int tmpfs_stat(char* filename,char* buffer) {
     stat.fs_prefix1 = 'T';
     stat.fs_prefix2 = 'M';
     stat.fs_prefix3 = 'P';
+    stat.mode = file->mode;
     stat.content = file->content;
     String::memcpy(buffer,&stat,sizeof(filestat_t));
     return 0;
@@ -291,6 +295,23 @@ int tmpfs_touch(char* filename) {
 
 }
 
+int tmpfs_chmod(char* filename,uint64_t mode) {
+    data_file_t* data = tmpfs_scan_for_file(filename);
+    while(data) {
+        if(data->type != TMPFS_TYPE_SYMLINK)
+            break;
+        data = tmpfs_scan_for_file(data->content);
+    }
+
+    if(!data)
+        return ENOENT;
+
+    data->mode = mode;
+
+    return 0;
+
+}
+
 void tmpfs_dump() {
     data_file_t* current = root;
     
@@ -304,6 +325,27 @@ void tmpfs_dump() {
     }
 
     NLog("\n");
+
+}
+
+int tmpfs_count(char* filename,int idx,int count) {
+
+    data_file_t* data = tmpfs_scan_for_file(filename);
+    while(data) {
+        if(data->type != TMPFS_TYPE_SYMLINK)
+            break;
+        data = tmpfs_scan_for_file(data->content);
+    }
+
+    if(!data)
+        return 0;
+
+    data->count[idx] += count;
+
+    if(data->count[1] && !data->count[0])
+        tmpfs_rm(filename);
+ 
+    return data->count[idx];
 
 }
 
@@ -326,5 +368,7 @@ void TMPFS::Init(filesystem_t* fs) {
     fs->rm = tmpfs_rm;
     fs->touch = tmpfs_touch;
     fs->stat = tmpfs_stat;
+    fs->chmod = tmpfs_chmod;
+    fs->count  = tmpfs_count;
     
 }

@@ -11,10 +11,12 @@
 #define TMPFS_TYPE_SYMLINK 2
 
 typedef struct data_file {
+    int count[2];
     char type;
     char* name;
     char* content;
     char protection;
+    uint32_t mode;
     uint32_t size_of_content;
     uint64_t file_create_date;
     uint64_t file_change_date;

@@ -15,4 +15,6 @@ make CC=x86_64-orange-gcc LD=x86_64-orange-ld generic -j$(nproc)
 cp -rf src/lua "$1/bin"
 cp -rf src/luac "$1/bin"
 
+clear_share "$1"
+
 cd ..

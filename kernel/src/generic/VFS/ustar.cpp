@@ -213,6 +213,9 @@ void USTAR::ParseAndCopy() {
     pAssert(info.initrd,"Can't continue without initrd");
 
     ustar_t* current = (ustar_t*)info.initrd->modules[0]->address;
+
+    Log(LOG_LEVEL_INFO,"Initrd address 0x%p\n",current);
+
 	limine_file* initrd = info.initrd->modules[0];
 
     pAssert(!String::strncmp(current->ustar,"ustar",5),"Invalid initrd");
@@ -234,6 +237,7 @@ void USTAR::ParseAndCopy() {
             aligned_size  = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
 
             VFS::Write((char*)((uint64_t)current + 512),filename,size,0,0);
+            VFS::Chmod(filename,(uint64_t)current->file_mode);
 
 		} else if(type == 5) {
 
@@ -263,6 +267,7 @@ void USTAR::ParseAndCopy() {
 
             VFS::Write((char*)result_path,filename,String::strlen(result_path),1,0);
         } else {
+            Log(LOG_LEVEL_DEBUG,"Unknown ustar type: %d with name \"%s\"\n",type,current->file_name);
             aligned_size = 512;
         }
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);

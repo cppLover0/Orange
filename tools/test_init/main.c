@@ -98,6 +98,14 @@ void forkandexec(const char* name) {
 
 int main() {
     
+    printf("SSE test\n");
+
+    float i = 10.25;
+    float no = 9.104;
+    float fin = i + no;
+
+    printf("SSE 10.25 + 9.104 = %.6f\n",fin);
+
     printf("Executing bash\n");
     execl("/usr/bin/bash","/usr/bin/bash",NULL);
 

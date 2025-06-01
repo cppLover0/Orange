@@ -258,6 +258,9 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->wait_pipe = 0;
     proc->sse_ctx = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(SSE::Size()));
 
+    fpu_head_t* head = (fpu_head_t*)proc->sse_ctx;
+    head->dumb5 = 0b0001111110000000;
+
     uint64_t* cr3 = (uint64_t*)PMM::VirtualAlloc();
 
     proc->ctx.cr3 = HHDM::toPhys((uint64_t)cr3);

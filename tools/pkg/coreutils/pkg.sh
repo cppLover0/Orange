@@ -20,4 +20,6 @@ cd coreutils-build
 ../coreutils-9.7/configure --host=x86_64-orange --prefix=$1 CFLAGS="-std=gnu17" 
 make install -j$(nproc)
 
+clear_share "$1"
+
 cd ..

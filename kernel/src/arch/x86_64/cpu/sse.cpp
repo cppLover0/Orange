@@ -19,6 +19,17 @@ void __sse_cr4_write(uint64_t val) {
   asm volatile("mov %0, %%cr4" : : "r"(val) : "memory");
 }
 
+uint64_t __sse_cr0_read() {
+  uint64_t val;
+  asm volatile("mov %%cr0, %0" : "=r"(val));
+  return val;
+}
+
+void __sse_cr0_write(uint64_t val) {
+  asm volatile("mov %0, %%cr0" : : "r"(val) : "memory");
+}
+
+
 void __sse_xsetbv(uint64_t val) {
     asm volatile("xsetbv" : : "a"(val), "d"(val >> 32),"c"(0) : "memory");
 }
@@ -58,7 +69,13 @@ void SSE::Init() {
     uint64_t cr4 = __sse_cr4_read();
 
     cr4 |= DEFAULT_SSE_FLAGS;
-    cr4 &= SSE_DISABLE_EMUL;
+
+    uint64_t cr0 = __sse_cr0_read();
+
+    cr0 &= ~(1 << 2);
+    cr0 |= (1 << 1);
+
+    __sse_cr0_write(cr0);
 
     uint64_t sse_control = 0;
 

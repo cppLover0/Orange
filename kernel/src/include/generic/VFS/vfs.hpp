@@ -27,6 +27,7 @@ typedef struct {
 
     char* content;
 
+    uint64_t mode;
     uint32_t size;
 
     int idx;
@@ -55,7 +56,9 @@ typedef struct {
     int (*askforpipe)(char* filename,pipe_t* pipe);
     int (*instantreadpipe)(char* filename, pipe_t* pipe);
 
+    int (*chmod)(char* filename,uint64_t mode);
 
+    int (*count)(char* filename,int idx,int count);
 
     int (*ioctl)(char* filename,unsigned long request, void *arg, int *result);
 
@@ -82,5 +85,7 @@ public:
     static int AskForPipe(char* filename,pipe_t* pipe);
     static int InstantPipeRead(char* filename,pipe_t* pipe);
     static int Iterate(char* filename,filestat_t* stat);
+    static int Chmod(char* filename,uint64_t mode);
     static int Ioctl(char* filename,unsigned long request, void *arg, int *result);
+    static int Count(char* filename,int idx,int count);
 };

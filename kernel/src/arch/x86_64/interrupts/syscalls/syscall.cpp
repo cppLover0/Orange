@@ -57,6 +57,10 @@ int syscall_exit(int_frame_t* ctx) {
     while(fd) {
         fd = fd->next;
         if(fd) {
+
+            if(fd->type == FD_FILE)
+                VFS::Count(fd->path_point,0,-1);
+
             if(fd->is_pipe_pointer && fd->type == FD_PIPE && fd->pipe_side == PIPE_SIDE_WRITE) {
                 fd->p_pipe->connected_pipes--;
                 if(fd->p_pipe->connected_pipes == 0) {
@@ -223,6 +227,7 @@ int syscall_open(int_frame_t* ctx) {
 
     //Log(LOG_LEVEL_DEBUG,"Touching %s\n",path);
 
+    VFS::Count(path,0,1);
     VFS::Touch(path);
 
     return 0;
@@ -675,7 +680,8 @@ int syscall_close(int_frame_t* ctx) {
     if(!file)
         return -2;
 
-
+    if(file->type == FD_FILE)
+        VFS::Count(file->path_point,0,-1);
 
     if(fd < 3) {
         // restore state
@@ -702,7 +708,6 @@ int syscall_close(int_frame_t* ctx) {
         file->type = FD_NONE;
     }
     
-
     return 0;
 
 }
@@ -942,7 +947,7 @@ int syscall_exec(int_frame_t* ctx) {
 
     int status = VFS::Stat(path1,(char*)&stat);
 
-    if(!status && stat.type == VFS_TYPE_FILE) {
+    if(!status && stat.type == VFS_TYPE_FILE && (stat.mode & S_IXUSR)) {
         //Log("alloc\n");
         char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
         //Log("reading %s 0x%p\n",path1,elf);
@@ -975,13 +980,11 @@ int syscall_exec(int_frame_t* ctx) {
 
             if(!status1) {
                 for(int i = 0;i < argv_length; i++) {
-
                     KHeap::Free(stack_argv[i]);
             
                 }
             
                 for(int i = 0;i < envp_length; i++) {
-            
                     KHeap::Free(stack_envp[i]);
             
                 }
@@ -1012,7 +1015,28 @@ int syscall_exec(int_frame_t* ctx) {
     for(int i = 0;i < envp_length; i++) {
 
         KHeap::Free(stack_envp[i]);
+    
 
+    }
+
+    fd_t* fd = (fd_t*)proc->start_fd;
+    while(fd) {
+        fd = fd->next;
+        if(fd) {
+
+            if(fd->type == FD_FILE)
+                VFS::Count(fd->path_point,0,-1);
+
+            if(fd->is_pipe_pointer && fd->type == FD_PIPE && fd->pipe_side == PIPE_SIDE_WRITE) {
+                fd->p_pipe->connected_pipes--;
+                if(fd->p_pipe->connected_pipes == 0) {
+                    fd->p_pipe->is_received = 0;
+                }
+            }
+                
+            String::memset(fd,0,4096);
+            PMM::VirtualFree(fd);
+        }
     }
 
     Process::Kill(proc,ENOENT);
@@ -1104,9 +1128,10 @@ int syscall_stat(int_frame_t* ctx) {
     if(st != -15) {
         out->st_size = stat.size;
         out->st_mode = stat.type == VFS_TYPE_FILE ? S_IFREG : S_IFDIR;
+        
     } else {
         out->st_size = 0;
-        out->st_mode = S_IFREG;
+        out->st_mode = S_IFREG | S_IFCHR;
     }
     
     Paging::EnableKernel();
@@ -1295,31 +1320,21 @@ int syscall_dup2(int_frame_t* ctx) {
     String::memset(new_fd1->path_point,0,2048);
     String::memcpy(new_fd1->path_point,old_fd->path_point,2048);
 
-    if(old_fd->type == FD_PIPE) {
-        new_fd1->old_type = new_fd1->type;
-        new_fd1->type = old_fd->type;
-        if(old_fd->is_pipe_pointer) {
-            old_fd->is_pipe_dup2 = 1;
-            new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
-            new_fd1->pipe.buffer = old_fd->pipe.buffer;
-            new_fd1->old_is_pipe_pointer = new_fd1->is_pipe_pointer;
-            new_fd1->is_pipe_pointer = 1;
-            new_fd1->old_p_pipe = new_fd1->p_pipe;
-            new_fd1->p_pipe = old_fd->p_pipe;
-            new_fd1->pipe_side = old_fd->pipe_side;
-        } else {
-            new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
-            new_fd1->pipe.buffer = old_fd->pipe.buffer;
-        }
+    new_fd1->old_type = new_fd1->type;
+    new_fd1->type = old_fd->type;
+    if(old_fd->is_pipe_pointer) {
+        old_fd->is_pipe_dup2 = 1;
+        new_fd1->old_is_pipe_pointer = new_fd1->is_pipe_pointer;
+        new_fd1->is_pipe_pointer = 1;
+        new_fd1->old_p_pipe = new_fd1->p_pipe;
+        new_fd1->p_pipe = old_fd->p_pipe;
+        new_fd1->pipe_side = old_fd->pipe_side;
     } else {
-        new_fd1->old_type = new_fd1->type;
-        new_fd1->type = old_fd->type;
         new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
         new_fd1->pipe.buffer = old_fd->pipe.buffer;
     }
-
     if(FD::Search(proc,new_fd)->p_pipe != old_fd->p_pipe)
-        Log(LOG_LEVEL_WARNING,"dup2 doesn't copied fds correctly\n");
+        Log(LOG_LEVEL_WARNING,"dup2 doesn't copied fds correctly (old_fd: %d, olf_fd type: %s new_fd: %d, newfd_type: %s)\n",fd,old_fd->type == FD_FILE ? "FILE" : "PIPE",new_fd,new_fd1->old_type == FD_FILE ? "FILE" : "PIPE");
 
     //Log(LOG_LEVEL_DEBUG,"new %s\n",new_fd1->path_point);
 
@@ -1461,6 +1476,83 @@ int syscall_pipe(int_frame_t* ctx) {
 
 }
 
+int syscall_fchmod(int_frame_t* ctx) {
+    int fd = ctx->rdi;
+    uint32_t mode = ctx->rsi;
+
+    process_t* proc = CpuData::Access()->current;
+
+    fd_t* fd_s = FD::Search(proc,fd);
+    if(!fd_s)
+        return ENOENT;
+
+    filestat_t stat;
+
+    int status = VFS::Stat(fd_s->path_point,(char*)&stat);
+    if(status)
+        return ENOENT;
+
+    status = VFS::Chmod(fd_s->path_point,mode);
+
+    return 0;
+}
+
+int syscall_unlink(int_frame_t* ctx) {
+
+    int fd = ctx->rdi;
+    char* path = (char*)ctx->rsi;
+    int flags = ctx->rdx;
+
+    __syscall_is_safe(path);
+
+    process_t* proc = CpuData::Access()->current;
+
+    char base[2048];
+    char dest[2048];
+
+    String::memset(base,0,2048);
+
+    if(fd == AT_FDCWD)
+        String::memcpy(base,proc->cwd,String::strlen(proc->cwd));
+    else if(fd > 0) {
+        fd_t* i = FD::Search(proc,fd);
+        if(!i)
+            return EBADF;
+        String::memcpy(base,i->path_point,String::strlen(i->path_point));
+    } else {
+        return EBADF;
+    }
+
+    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+    String::memcpy(dest,path,String::strlen(path));
+    Paging::EnableKernel();
+
+    char result[2048];
+
+    String::memset(result,0,2048);
+
+    if(base[String::strlen(dest) - 1] == '/' && String::strcmp(dest,"/"))
+        dest[String::strlen(dest) - 1] = '\0';
+
+    resolve_path(dest,base,result,1);
+
+    if(!VFS::Count(result,1,0)) {
+        VFS::Count(result,1,1);
+    }
+
+    return 0;
+
+}
+
+int syscall_poll(int_frame_t* ctx) {
+
+    void* fds = (void*)ctx->rdi;
+    uint64_t count = ctx->rsi;
+    int timeout = ctx->rdx;
+
+    return 1; // i still dont know why i need it but i leave it here
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -1493,7 +1585,10 @@ syscall_t syscall_table[] = {
     {29,syscall_fchdir},
     {30,syscall_ttyname},
     {31,syscall_uname},
-    {32,syscall_pipe}
+    {32,syscall_pipe},
+    {33,syscall_fchmod},
+    {34,syscall_unlink},
+    {35,syscall_poll}
 };
 
 syscall_t* syscall_find_table(int num) {

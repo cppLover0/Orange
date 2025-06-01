@@ -1,0 +1,195 @@
+diff -Naur fastfetch-2.44.0/CMakeLists.txt fastfetch-patched/CMakeLists.txt
+--- fastfetch-2.44.0/CMakeLists.txt	2025-05-23 11:10:12.000000000 +0300
++++ fastfetch-patched/CMakeLists.txt	2025-05-28 20:54:09.868019074 +0300
+@@ -28,6 +28,8 @@
+ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "DragonFly")
+     set(FreeBSD TRUE CACHE BOOL "..." FORCE)
+     set(DragonFly TRUE CACHE BOOL "..." FORCE)
++elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Orange")
++    set(Orange TRUE CACHE BOOL "..." FORCE)
+ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
+     set(SunOS TRUE CACHE BOOL "..." FORCE)
+ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
+@@ -1038,6 +1040,85 @@
+         src/util/binary_windows.c
+         src/util/debug_windows.c
+     )
++elseif(Orange)
++    list(APPEND LIBFASTFETCH_SRC
++	src/detection/battery/battery_nosupport.c
++	src/detection/bios/bios_nosupport.c
++	src/common/dbus.c
++	src/common/io/io_unix.c
++	src/common/netif/netif_linux.c
++	src/common/networking/networking_linux.c
++	src/common/processing_linux.c
++	src/detection/bluetooth/bluetooth_nosupport.c
++	src/detection/bluetoothradio/bluetoothradio_nosupport.c
++	src/detection/board/board_nosupport.c
++	src/detection/bootmgr/bootmgr_nosupport.c
++	src/detection/brightness/brightness_nosupport.c
++	src/detection/btrfs/btrfs_nosupport.c
++	src/detection/chassis/chassis_nosupport.c
++	src/detection/cpu/cpu_linux.c
++	src/detection/cpucache/cpucache_nosupport.c
++	src/detection/cpuusage/cpuusage_nosupport.c
++	src/detection/cursor/cursor_nosupport.c
++	src/detection/disk/disk_nosupport.c
++	src/detection/dns/dns_linux.c
++	src/detection/physicaldisk/physicaldisk_nosupport.c
++	src/detection/physicalmemory/physicalmemory_nosupport.c
++	src/detection/diskio/diskio_nosupport.c
++	src/detection/font/font_nosupport.c
++	src/detection/host/host_nosupport.c
++	src/detection/initsystem/initsystem_nosupport.c
++	src/detection/keyboard/keyboard_linux.c
++	src/detection/libc/libc_linux.c
++	src/detection/lm/lm_linux.c
++	src/detection/loadavg/loadavg_nosupport.c
++	src/detection/locale/locale_linux.c
++	src/detection/gamepad/gamepad_nosupport.c
++        src/detection/displayserver/linux/displayserver_linux.c
++        src/detection/displayserver/linux/drm.c
++        src/detection/displayserver/linux/wayland/wayland.c
++        src/detection/displayserver/linux/wayland/global-output.c
++        src/detection/displayserver/linux/wayland/zwlr-output.c
++        src/detection/displayserver/linux/wayland/kde-output.c
++        src/detection/displayserver/linux/wayland/wlr-output-management-unstable-v1-protocol.c
++        src/detection/displayserver/linux/wayland/kde-output-device-v2-protocol.c
++        src/detection/displayserver/linux/wayland/kde-output-order-v1-protocol.c
++        src/detection/displayserver/linux/wayland/xdg-output-unstable-v1-protocol.c
++        src/detection/displayserver/linux/wmde.c
++        src/detection/displayserver/linux/xcb.c
++        src/detection/displayserver/linux/xlib.c
++	src/detection/media/media_linux.c
++	src/detection/memory/memory_linux.c
++	src/detection/mouse/mouse_linux.c
++	src/detection/netio/netio_linux.c
++	src/detection/opengl/opengl_linux.c
++	src/detection/packages/packages_linux.c
++	src/detection/poweradapter/poweradapter_linux.c
++	src/detection/processes/processes_linux.c
++	src/detection/gtk_qt/qt.c
++	src/detection/sound/sound_linux.c
++	src/detection/swap/swap_linux.c
++	src/detection/terminalfont/terminalfont_linux.c
++	src/detection/terminalshell/terminalshell_linux.c
++	src/detection/terminalsize/terminalsize_linux.c
++	src/detection/theme/theme_nosupport.c
++	src/detection/tpm/tpm_linux.c
++	src/detection/uptime/uptime_linux.c
++	src/detection/users/users_nosupport.c
++	src/detection/wallpaper/wallpaper_nosupport.c
++	src/detection/wifi/wifi_nosupport.c
++	src/detection/wm/wm_nosupport.c
++	src/detection/de/de_nosupport.c
++	src/detection/wmtheme/wmtheme_nosupport.c
++	src/detection/camera/camera_linux.c
++	src/detection/zpool/zpool_linux.c
++	src/util/platform/FFPlatform_unix.c
++	src/util/binary_linux.c
++	src/detection/gpu/gpu_nosupport.c
++	src/detection/localip/localip_linux.c
++	src/detection/icons/icons_nosupport.c
++	src/detection/os/os_orange.c
++)
+ elseif(SunOS)
+     list(APPEND LIBFASTFETCH_SRC
+         src/common/dbus.c
+@@ -1306,6 +1387,8 @@
+     target_compile_definitions(libfastfetch PUBLIC __FreeBSD__)
+ elseif(SunOS)
+     target_compile_definitions(libfastfetch PUBLIC _GNU_SOURCE _XOPEN_SOURCE __STDC_WANT_LIB_EXT1__ _FILE_OFFSET_BITS=64 __EXTENSIONS__ _POSIX_C_SOURCE)
++elseif(Orange)
++    target_compile_definitions(libfastfetch PUBLIC _GNU_SOURCE)
+ elseif(NetBSD)
+     target_compile_definitions(libfastfetch PUBLIC _GNU_SOURCE)
+     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
+diff -Naur fastfetch-2.44.0/src/detection/os/os_orange.c fastfetch-patched/src/detection/os/os_orange.c
+--- fastfetch-2.44.0/src/detection/os/os_orange.c	1970-01-01 03:00:00.000000000 +0300
++++ fastfetch-patched/src/detection/os/os_orange.c	2025-05-28 20:17:06.870452695 +0300
+@@ -0,0 +1,6 @@
++#include "os.h"
++
++void ffDetectOSImpl(FFOSResult* os) {
++	ffStrbufSetStatic(&os->name,"Orange");
++	ffStrbufSet(&os->version,&instance.state.platform.sysinfo.release);
++}
+diff -Naur fastfetch-2.44.0/src/logo/ascii/orange.txt fastfetch-patched/src/logo/ascii/orange.txt
+--- fastfetch-2.44.0/src/logo/ascii/orange.txt	1970-01-01 03:00:00.000000000 +0300
++++ fastfetch-patched/src/logo/ascii/orange.txt	2025-06-01 10:39:33.356743277 +0300
+@@ -0,0 +1,23 @@
++                       $2.                     
++          $2=========  ******                  
++         $2============::::::                  
++         $2=============::::                   
++           $2=========***::$1======              
++         $1=====$2====*****:$1==========           
++       $1=============$2:::*$1============         
++      $1===============$2:=$1==============        
++     $1=================================       
++    $1===================================      
++   $1=====================================     
++   $1=====================================     
++   $1=====================================     
++   $1=====================================     
++   $1=====================================     
++   $1=====================================     
++    $1===================================      
++     $1=================================       
++       $1==============================        
++        $1===========================          
++          $1=======================            
++              $1=================               
++                                             
+diff -Naur fastfetch-2.44.0/src/logo/builtin.c fastfetch-patched/src/logo/builtin.c
+--- fastfetch-2.44.0/src/logo/builtin.c	2025-05-23 11:10:12.000000000 +0300
++++ fastfetch-patched/src/logo/builtin.c	2025-06-01 10:28:23.369453298 +0300
+@@ -3552,6 +3552,7 @@
+         .colorKeys = FF_COLOR_FG_RED,
+         .colorTitle = FF_COLOR_FG_WHITE,
+     },
++
+     // Orchid
+     {
+         .names = {"orchid"},
+@@ -3586,6 +3587,15 @@
+             FF_COLOR_FG_DEFAULT,
+         },
+     },
++    // Orange
++    {
++	.names = {"Orange","orange","OrangeOS","orangeos"},
++	.lines = FASTFETCH_DATATEXT_LOGO_ORANGE,
++	.colors = {
++		FF_COLOR_FG_RGB "255;140;0",
++            	FF_COLOR_FG_RGB "0;255;0",
++	}
++    },
+     // OS_Elbrus
+     {
+         .names = {"OS Elbrus"},
+diff -Naur fastfetch-2.44.0/src/options/general.h fastfetch-patched/src/options/general.h
+--- fastfetch-2.44.0/src/options/general.h	2025-05-23 11:10:12.000000000 +0300
++++ fastfetch-patched/src/options/general.h	2025-05-28 20:18:10.226986954 +0300
+@@ -16,7 +16,7 @@
+     bool detectVersion;
+ 
+     // Module options that cannot be put in module option structure
+-    #if defined(__linux__) || defined(__FreeBSD__) || defined(__sun) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__HAIKU__)
++    #if defined(__linux__) || defined(__orange__) || defined(__FreeBSD__) || defined(__sun) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__HAIKU__)
+     FFstrbuf playerName;
+     FFDsForceDrmType dsForceDrm;
+     #elif defined(_WIN32)
+diff -Naur fastfetch-2.44.0/src/util/platform/FFPlatform_unix.c fastfetch-patched/src/util/platform/FFPlatform_unix.c
+--- fastfetch-2.44.0/src/util/platform/FFPlatform_unix.c	2025-05-23 11:10:12.000000000 +0300
++++ fastfetch-patched/src/util/platform/FFPlatform_unix.c	2025-05-28 20:56:35.826635192 +0300
+@@ -22,7 +22,7 @@
+ static void getExePath(FFPlatform* platform)
+ {
+     char exePath[PATH_MAX + 1];
+-    #ifdef __linux__
++    #if defined(__linux__) || defined(__orange__)
+         ssize_t exePathLen = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+         if (exePathLen >= 0)
+             exePath[exePathLen] = '\0';

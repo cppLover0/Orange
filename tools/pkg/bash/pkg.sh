@@ -27,4 +27,6 @@ ln -s bash sh
 
 cd "$cz"
 
+clear_share "$1"
+
 cd ..

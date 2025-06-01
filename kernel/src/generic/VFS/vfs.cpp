@@ -207,6 +207,35 @@ int VFS::Iterate(char* filename,filestat_t* stat) {
     return status;
 }
 
+int VFS::Chmod(char* filename,uint64_t mode) {
+    if(!filename) return -1;
+    
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+    if(!fs->fs->chmod) return -15;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+    int status = fs->fs->chmod(filename_as_fs,mode);
+
+    vfs_spinlock = 0;
+
+    return status;
+}
+
+int VFS::Count(char* filename,int idx,int count) {
+    if(!filename) return -1;
+    
+    mount_location_t* fs = vfs_find_the_nearest_mount(filename);
+
+    if(!fs) return -1;
+    if(!fs->fs->count) return 0;
+
+    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+    int status = fs->fs->count(filename,idx,count);
+    return status;
+}
+
 void VFS::Init() {
     filesystem_t* tmpfs = new filesystem_t;
     mount_points[0].loc = "/";
