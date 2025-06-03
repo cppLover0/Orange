@@ -19,7 +19,7 @@ cd ..
 
 mkdir -p fastfetch-build
 cd fastfetch-build
-cmake ../fastfetch-2.44.0 -DCMAKE_TOOLCHAIN_FILE=$(realpath ../../../toolchain.cmake) -DCMAKE_INSTALL_PREFIX=$1
+cmake ../fastfetch-2.44.0 -DCMAKE_TOOLCHAIN_FILE=$(realpath ../../../toolchain.cmake) -DCMAKE_INSTALL_PREFIX="$1"
 
 make -j$(nproc)
 make install 

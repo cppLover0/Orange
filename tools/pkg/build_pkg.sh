@@ -7,7 +7,7 @@ for dir in ./dep/*; do
         echo Building $(cat info.txt)
         bash pkg.sh $1
     fi
-    cd ..
+    cd ../..
 done
 
 echo "Building orange's packages"

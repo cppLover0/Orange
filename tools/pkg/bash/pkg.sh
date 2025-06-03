@@ -17,12 +17,12 @@ diff_patch ../../diff/bash.diff
 cd ..
 
 cd bash-build
-../bash-5.2.21/configure --host=x86_64-orange --prefix=$1 --disable-readline --without-bash-malloc CFLAGS="-std=gnu17 -fPIC"
+../bash-5.2.21/configure --host=x86_64-orange --prefix="$1" --disable-readline --with-curses --without-bash-malloc CFLAGS="-std=gnu17 -fPIC"
 make install -j$(nproc)
 
 cz=$(pwd)
 
-cd $1/bin
+cd "$1/bin"
 ln -s bash sh
 
 cd "$cz"

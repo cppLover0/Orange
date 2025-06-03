@@ -43,15 +43,30 @@ for file in ../usr/lib/*.so; do
     ln -s "$file" "$(basename "$file")"
 done
 
+for file in ../usr/local/lib/*.so; do
+	echo $file "$(basename "$file")"
+    ln -s "$file" "$(basename "$file")"
+done
+
 cd ../bin
 
-echo Creating symlinks ./*.so
+echo Creating symlinks ./*
 for file in ../usr/bin/*; do
 	echo $file "$(basename "$file")"
     ln -s "$file" "$(basename "$file")"
 done
 
+for file in ../usr/local/bin/*; do
+	echo $file "$(basename "$file")"
+    ln -s "$file" "$(basename "$file")"
+done
+
+
 cd ../../
+
+rm -rf initrd/usr/local/lib/*.a
+rm -rf initrd/usr/lib/*.a
+rm -rf initrd/lib/*.a
 
 cp -rf tools/base/* initrd/
 

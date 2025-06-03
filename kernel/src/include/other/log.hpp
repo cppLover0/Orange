@@ -7,6 +7,8 @@
 #define LOG_LEVEL_DEBUG 4
 
 void Log(int level,char* format, ...);
+void SLog(int level,char* format, ...);
+void DLog(char* format, ...);
 void NLog(char* format, ...);
 void LogUnlock();
 void LogBuffer(char* buffer,uint64_t size);

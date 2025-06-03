@@ -63,8 +63,12 @@ char __ps_2_to_upper(char c) {
 }
 
 #define SHIFT_PRESSED 0x2A
- 
 #define SHIFT_RELEASED 0xAA
+#define CTRL_PRESSED 29
+#define CTRL_RELEASED 157
+#define CTRL_PRESSED_OFFSET 96
+
+char __ctrl_pressed = 0;
 
 char __ps2_read(char keycodeps2) {
 
@@ -75,12 +79,21 @@ char __ps2_read(char keycodeps2) {
  
         if(keycode == SHIFT_RELEASED)
             __shift_pressed = 0;
- 
-        if(keycode <= 0x58) {
+
+        if(keycode == CTRL_PRESSED)
+            __ctrl_pressed = 1;
+        else if(keycode == CTRL_RELEASED)
+            __ctrl_pressed = 0;
+        
+
+        if(keycode <= 0x58 && keycode != CTRL_PRESSED) {
             keycode = kmap[keycode];
  
-            if(__shift_pressed)
+            if(__shift_pressed && !__ctrl_pressed)
                 keycode = __ps_2_to_upper(keycode);
+
+            if(__ctrl_pressed)
+                keycode = keycode - CTRL_PRESSED_OFFSET;
  
         }
 
@@ -181,7 +194,12 @@ short PS2Keyboard::Get() {
 
         __last_key = keycode;
 
-        __tty_receive_ipc(__ps2_read(keycode)); // tty wants to eat too
+        
+        uint8_t vt100_keycode = __ps2_read(keycode);
+        if(vt100_keycode) {
+            __tty_receive_ipc(vt100_keycode);
+        }
+
         __kbd_send_ipc(keycode);
 
         return __last_key;

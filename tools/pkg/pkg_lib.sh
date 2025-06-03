@@ -2,7 +2,7 @@
 GNU_MIRROR=https://mirror.dogado.de/
 
 clear_share() {
-    rm -rf "$1/share/*"
+    echo no
 }
 
 install_gnu() {

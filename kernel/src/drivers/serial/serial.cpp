@@ -33,8 +33,7 @@ void __serial_process_fetch() {
     IO::IN(COM1,1);
     while(1) {
         uint8_t key = Serial::Read();
-        if(key)
-            __tty_receive_ipc(key);
+        __tty_receive_ipc(key);
     }
 }
 

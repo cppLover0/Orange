@@ -104,9 +104,9 @@ int syscall_debug_print(int_frame_t* ctx) {
         String::memcpy(ptr,src,size);
         Paging::EnableKernel();
 
-#ifdef DEBUG_PRINT
-        Log(LOG_LEVEL_DEBUG,"%s\n",ptr);
-#endif
+        ptr[String::strlen(ptr)] = '\n';
+
+        DLog(ptr);
 
         return 0;
 
@@ -198,7 +198,9 @@ int syscall_open(int_frame_t* ctx) {
     int ptr = String::strlen(first);
     String::memcpy(path1,first,ptr);
 
-    resolve_path(buffer,path1,path,1);    
+    resolve_path(buffer,path1,path,1);  
+    
+    //Log(LOG_LEVEL_DEBUG,"Opening %s\n",path);
 
     if(flags & O_CREAT)
         VFS::Touch(path);
@@ -423,46 +425,11 @@ int syscall_read(int_frame_t* ctx) {
         //proc->is_cli = 0;
         if(!file->is_pipe_pointer) {
 
-            if(file->pipe.type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point)&& (tty_termios.c_lflag & ICANON))) {
+            if(file->pipe.type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point))) {
                 proc->is_eoi = 0;
                 String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
                 syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
                 return -20;
-            }
-
-            if(file->pipe.type == PIPE_INSTANT) {
-                
-                if(!file->pipe.is_used) 
-                    VFS::AskForPipe(file->path_point,&file->pipe);
-
-                if(!file->pipe.is_received) {
-
-                    if(file->pipe.buffer_size < count)
-                        count = file->pipe.buffer_size;
-            
-                    char* pipe_buffer = file->pipe.buffer;
-            
-                    __prepare_file_content_syscall(file->pipe.buffer,count,ctx->cr3);
-
-                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-                    String::memcpy(buf,pipe_buffer,count);
-                    Paging::EnableKernel();
-
-                    file->pipe.is_received = 1;
-                    ctx->rdx = file->pipe.buffer_size;
-
-                    file->pipe.buffer_size = 0;
-            
-                    proc->is_eoi = 1;
-
-                    return 0;
-
-            
-                } else {
-                    ctx->rdx = 0;
-                    return 0;
-                }
-
             }
 
         } else {
@@ -477,45 +444,7 @@ int syscall_read(int_frame_t* ctx) {
                 return -20;
             }
 
-            if(file->p_pipe->type == PIPE_INSTANT) {
-                
-                if(!file->p_pipe->is_used) 
-                    VFS::AskForPipe(file->path_point,file->p_pipe);
-
-                if(!file->p_pipe->is_received) {
-
-                    if(file->p_pipe->buffer_size < count)
-                        count = file->p_pipe->buffer_size;
-            
-                    char* pipe_buffer = file->p_pipe->buffer;
-            
-                    __prepare_file_content_syscall(file->p_pipe->buffer,count,ctx->cr3);
-
-                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-                    String::memcpy(buf,pipe_buffer,count);
-                    Paging::EnableKernel();
-
-                    file->p_pipe->is_received = 1;
-                    ctx->rdx = file->p_pipe->buffer_size;
-
-                    file->p_pipe->buffer_size = 0;
-            
-                    proc->is_eoi = 1;
-
-                    return 0;
-
-            
-                } else {
-                    ctx->rdx = 0;
-                    return 0;
-                }
-
-            }
-
         }
-        
-        
-        
     
     }
 
@@ -694,10 +623,19 @@ int syscall_close(int_frame_t* ctx) {
 
     if(fd < 3) {
         // restore state
+        NLog("Restoring fd %d\n",fd);
         String::memset(file->path_point,0,2048);
         String::memcpy(file->path_point,"/dev/tty",String::strlen("/dev/tty"));
         file->type = file->old_type;
-        file->pipe.buffer = file->pipe.old_buffer;
+        if(file->pipe.old_buffer)
+            file->pipe.buffer = file->pipe.old_buffer;
+        file->is_pipe_pointer = 0;
+        if(file->index == 1)
+            file->type = FD_FILE;
+        else
+            file->type = FD_PIPE;
+        return 0;
+
     } else if(file->type == FD_PIPE) {
         if(file->is_pipe_pointer) {
             if(file->pipe_side == PIPE_SIDE_WRITE && !file->is_pipe_dup2) {
@@ -1326,23 +1264,29 @@ int syscall_dup2(int_frame_t* ctx) {
     String::memset(new_fd1->path_point,0,2048);
     String::memcpy(new_fd1->path_point,old_fd->path_point,2048);
 
-    new_fd1->old_type = new_fd1->type;
-    new_fd1->type = old_fd->type;
-    if(old_fd->is_pipe_pointer) {
-        old_fd->is_pipe_dup2 = 1;
-        new_fd1->old_is_pipe_pointer = new_fd1->is_pipe_pointer;
-        new_fd1->is_pipe_pointer = 1;
-        new_fd1->old_p_pipe = new_fd1->p_pipe;
-        new_fd1->p_pipe = old_fd->p_pipe;
-        new_fd1->pipe_side = old_fd->pipe_side;
+    if(new_fd1->old_type) { // detected dup2 restoring 
+        new_fd1->type = new_fd1->old_type;
+        new_fd1->is_pipe_pointer = new_fd1->old_is_pipe_pointer;
+        new_fd1->pipe.buffer = new_fd1->pipe.old_buffer;
+        new_fd1->p_pipe = new_fd1->old_p_pipe;
+        new_fd1->old_type = 0;
     } else {
-        new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
-        new_fd1->pipe.buffer = old_fd->pipe.buffer;
+        new_fd1->old_type = new_fd1->type;
+        new_fd1->type = old_fd->type;
+        if(old_fd->is_pipe_pointer) {
+            old_fd->is_pipe_dup2 = 1;
+            new_fd1->old_is_pipe_pointer = new_fd1->is_pipe_pointer;
+            new_fd1->is_pipe_pointer = 1;
+            new_fd1->old_p_pipe = new_fd1->p_pipe;
+            new_fd1->p_pipe = old_fd->p_pipe;
+            new_fd1->pipe_side = old_fd->pipe_side;
+        } else {
+            new_fd1->pipe.old_buffer = new_fd1->pipe.buffer;
+            new_fd1->pipe.buffer = old_fd->pipe.buffer;
+        }
     }
     if(FD::Search(proc,new_fd)->p_pipe != old_fd->p_pipe)
         Log(LOG_LEVEL_WARNING,"dup2 doesn't copied fds correctly (old_fd: %d, olf_fd type: %s new_fd: %d, newfd_type: %s)\n",fd,old_fd->type == FD_FILE ? "FILE" : "PIPE",new_fd,new_fd1->old_type == FD_FILE ? "FILE" : "PIPE");
-
-    //Log(LOG_LEVEL_DEBUG,"new %s\n",new_fd1->path_point);
 
     return 0;
 

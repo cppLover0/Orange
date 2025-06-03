@@ -115,7 +115,7 @@ int tty_askforpipe(pipe_t* pipe) {
     if(tty_termios.c_lflag & ICANON)
         pip->pipe->type = PIPE_WAIT;
     else
-        pip->pipe->type = PIPE_INSTANT;    
+        pip->pipe->type = PIPE_WAIT;    
     pip->pipe->is_used = 1;
 
     return 0;
@@ -131,6 +131,8 @@ int tty_write(char* buffer,uint64_t size) {
 
 int tty_ioctl(unsigned long request, void* arg, void* result) {
 
+    //Log(LOG_LEVEL_DEBUG,"Requesting ioctl 0x%p\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nn\\nn\n\n\n",request);
+
     switch(request) {
         case TCGETS:
             String::memcpy(arg,&tty_termios,sizeof(termios_t));
@@ -138,14 +140,19 @@ int tty_ioctl(unsigned long request, void* arg, void* result) {
         case TCSETS:
             String::memcpy(&tty_termios,arg,sizeof(termios_t));
             break;
-        case TIOCGWINSZ:
+        case TIOCGWINSZ: {
             winsize_t buf;
+            size_t cols = 0;
+            size_t rows = 0;
             extern flanterm_context* ft_ctx;
-            flanterm_get_dimensions(ft_ctx,(size_t*)&buf.ws_col,(size_t*)&buf.ws_row);
+            flanterm_get_dimensions(ft_ctx,&cols,&rows);
+            buf.ws_col = cols;
+            buf.ws_row = rows;
             String::memcpy(arg,&buf,sizeof(winsize_t));
             break;
+        }
         default:
-            return 38;
+            return 0;
     }
 
     return 0;
@@ -160,6 +167,30 @@ int p = 0;
 
 void __tty_receive_ipc(uint8_t keycode) {
     extern flanterm_context* ft_ctx;
+
+    uint8_t raw_keycode = keycode;
+
+    if(!(tty_termios.c_lflag & ICANON)) {
+
+        if(raw_keycode == '\n')
+            raw_keycode = 13; // nano want it :sob:
+
+        if((tty_termios.c_lflag & ECHO)) {
+            flanterm_write(ft_ctx,(char*)&keycode,1);
+            Serial::Write(keycode);
+            p++;
+        }
+        if(tty_termios.c_cc[VMIN] >= p) {
+            p = 0;
+            __tty_send_ipc(raw_keycode);
+            __tty_end_ipc();
+        } else {
+            p++;
+        }
+
+        return;
+
+    }
 
     if(keycode != 127) {
         if(keycode == 13)
@@ -178,10 +209,12 @@ void __tty_receive_ipc(uint8_t keycode) {
                 __tty_end_ipc();
                 p = 0;
             }
-        } else {
+        } else if(tty_termios.c_cc[VMIN] >= p) {
             p = 0;
-            __tty_send_ipc(keycode);
+            __tty_send_ipc(raw_keycode);
             __tty_end_ipc();
+        } else {
+            p++;
         }
     } else {
         if(p != 0) {
