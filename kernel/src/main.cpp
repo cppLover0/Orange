@@ -11,6 +11,7 @@
 #include <generic/memory/paging.hpp>
 #include <generic/memory/heap.hpp>
 #include <arch/x86_64/cpu/data.hpp>
+#include <drivers/pci/pci.hpp>
 #include <arch/x86_64/cpu/gdt.hpp>
 #include <other/assembly.hpp>
 #include <uacpi/sleep.h>
@@ -36,6 +37,7 @@
 #include <arch/x86_64/interrupts/syscalls/syscall.hpp>
 #include <arch/x86_64/cpu/sse.hpp>
 #include <generic/memory/vmm.hpp>
+#include <drivers/xhci/xhci.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -168,6 +170,11 @@ extern "C" void kmain() {
 
     Syscall::Init();
     Log(LOG_LEVEL_INFO,"Syscall initializied\n");
+
+    XHCI::Init();
+
+    PCI::Init();
+    Log(LOG_LEVEL_DEBUG,"PCI initializied\n");
 
     cpudata_t* cpu_data = CpuData::Access();
 

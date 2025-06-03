@@ -6,6 +6,8 @@
 
 char pci_spinlock = 0;
 
+pci_driver_t pci_drivers[256];
+
 uint32_t pci_read_config32(uint8_t bus, uint8_t num, uint8_t function, uint8_t offset) {
 	uint32_t address = (1 << 31) | (bus << 16) | (num << 11) | (function << 8) | (offset);
 	IO::OUT(0xCF8, address,4);
@@ -81,4 +83,56 @@ void PCI::OUT(uint8_t bus, uint8_t num, uint8_t function, uint8_t offset,uint32_
             break;
     }
     spinlock_unlock(&pci_spinlock);
+}
+
+pci_t __pci_load(uint8_t bus, uint8_t num, uint8_t function) {
+	pci_t pciData;
+	uint16_t *p = (uint16_t *)&pciData;
+	for (uint8_t i = 0; i < 32; i++) {
+		p[i] = pci_read_config16(bus, num, function, i * 2);
+	}
+	return pciData;
+}
+
+uint8_t PCI::Reg(void (*pcidrv)(pci_t, uint8_t, uint8_t, uint8_t), uint8_t _class, uint8_t subclass) {
+	for (uint16_t i = 0; i < 256; i++) {
+		if (!pci_drivers[i].used) {
+			pci_drivers[i].used = true;
+			pci_drivers[i]._class = _class;
+			pci_drivers[i].subclass = subclass;
+			pci_drivers[i].pcidrv = pcidrv;
+			return true;
+		}
+	}
+	return false;
+}
+
+void __pci_launch(pci_t pci, uint8_t bus, uint8_t device, uint8_t function) {
+	for (uint16_t i = 0; i < 256; i++) {
+		if (pci_drivers[i].used && pci_drivers[i]._class == pci._class && pci_drivers[i].subclass == pci.subclass) {
+			pci_drivers[i].pcidrv(pci, bus, device, function);
+            return;
+		}
+	}
+}
+
+void PCI::Init() {
+	pci_t c_pci;
+	for (uint16_t bus = 0; bus < 256; bus++) {
+		c_pci = __pci_load(bus, 0, 0);
+		if (c_pci.vendorID != 0xFFFF) {
+			for (uint8_t device = 0; device < 32; device++) {
+				c_pci = __pci_load(bus, device, 0);
+				if (c_pci.vendorID != 0xFFFF) {
+					__pci_launch(c_pci, bus, device, 0);
+					for (uint8_t function = 1; function < 8; function++) {
+						pci_t pci = __pci_load(bus, device, function);
+						if (pci.vendorID != 0xFFFF) {
+							__pci_launch(pci, bus, device, function);
+						}
+					}
+				}
+			}
+		}
+	}
 }

@@ -28,3 +28,4 @@ orange.hdd
 ./tools/toolchain/pack
 pack
 linux-headers
+initrd.tar
