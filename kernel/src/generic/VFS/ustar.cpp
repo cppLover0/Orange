@@ -214,12 +214,12 @@ void USTAR::ParseAndCopy() {
 
     ustar_t* current = (ustar_t*)info.initrd->modules[0]->address;
 
-    Log(LOG_LEVEL_INFO,"Initrd address 0x%p\n",current);
+    INFO("Initrd address 0x%p\n",current);
 
 	limine_file* initrd = info.initrd->modules[0];
 
     pAssert(!String::strncmp(current->ustar,"ustar",5),"Invalid initrd");
-    Log(LOG_LEVEL_INFO,"Valid initrd !\n");
+    INFO("Valid initrd !\n");
 
 	uint64_t actual_tar_ptr_end = ((uint64_t)initrd->address + initrd->size) - 1024; //substract first header and his content
 
@@ -267,7 +267,7 @@ void USTAR::ParseAndCopy() {
 
             VFS::Write((char*)result_path,filename,String::strlen(result_path),1,0);
         } else {
-            Log(LOG_LEVEL_DEBUG,"Unknown ustar type: %d with name \"%s\"\n",type,current->file_name);
+            DEBUG("Unknown ustar type: %d with name \"%s\"\n",type,current->file_name);
             aligned_size = 512;
         }
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);

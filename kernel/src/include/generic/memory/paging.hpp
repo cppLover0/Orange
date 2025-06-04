@@ -10,6 +10,7 @@
 #define PTE_RW (1ull << 1)
 #define PTE_USER (1ull << 2)
 #define PTE_WC (1ull << 3)
+#define PTE_MMIO (1ull << 4)
 
 #define ROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
 #define ALIGNPAGEUP(VALUE) (ROUNDUP(VALUE,PAGE_SIZE) * PAGE_SIZE)

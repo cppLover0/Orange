@@ -160,13 +160,13 @@ uint64_t buddy_alloc(uint64_t size) {
         String::memset((void*)HHDM::toVirt(good_buddy_split->phys_pointer),0,LEVEL_TO_SIZE(good_buddy_split->information.level));
 
         if(good_buddy_split->phys_pointer == 0) {
-            Log(LOG_LEVEL_ERROR,"Buddy allocator bug\n");
+            ERROR("Buddy allocator bug\n");
         }
 
         return good_buddy_split->phys_pointer;
     }
 
-    Log(LOG_LEVEL_ERROR,"Camt find bud with size 0x%p:(\n",size);
+    ERROR("Camt find bud with size 0x%p:(\n",size);
     return 0;
 
 }
@@ -183,7 +183,7 @@ void PMM::Init(limine_memmap_response* mem_map) {
 
     for(int i = 0;i < mem_map->entry_count;i++) {
         current = mem_map->entries[i];
-        Log(LOG_LEVEL_INFO,"Entry %d: 0x%p-0x%p (%d MB) %s\n",i,current->base, current->base + current->length,(current->length / 1024) / 1024,current->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non-Usable");
+        INFO("Entry %d: 0x%p-0x%p (%d MB) %s\n",i,current->base, current->base + current->length,(current->length / 1024) / 1024,current->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non-Usable");
     
         if(current->type == LIMINE_MEMMAP_USABLE) {
             if(current->length > top_size) {
@@ -194,15 +194,15 @@ void PMM::Init(limine_memmap_response* mem_map) {
     
     }
 
-    Log(LOG_LEVEL_INFO,"Highest usable memory: 0x%p-0x%p (%d MB)\n",top,top + top_size,(top_size / 1024) / 1024);
+    INFO("Highest usable memory: 0x%p-0x%p (%d MB)\n",top,top + top_size,(top_size / 1024) / 1024);
 
     uint64_t free_memory = top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t));
 
     buddy.mem = (buddy_info_t*)HHDM::toVirt(top);
     
-    Log(LOG_LEVEL_INFO,"Buddy allocator memory: 0x%p-0x%p ( size of buddy_info_t: %d, buddy_info_field_t: %d, buddy_t: %d, buddy_split_result_t: %d )\n",top,(uint64_t)top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)),sizeof(buddy_info_t),sizeof(buddy_info_field_t),sizeof(buddy_t),sizeof(buddy_split_result_t));
+    INFO("Buddy allocator memory: 0x%p-0x%p ( size of buddy_info_t: %d, buddy_info_field_t: %d, buddy_t: %d, buddy_split_result_t: %d )\n",top,(uint64_t)top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)),sizeof(buddy_info_t),sizeof(buddy_info_field_t),sizeof(buddy_t),sizeof(buddy_split_result_t));
 
-    Log(LOG_LEVEL_INFO,"Putting all memory to buddy allocator\n");
+    INFO("Putting all memory to buddy allocator\n");
 
     uint64_t final_size = ALIGNPAGEUP(top_size - ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)));
 

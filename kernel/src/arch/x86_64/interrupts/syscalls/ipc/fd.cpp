@@ -52,9 +52,11 @@ int FD::Create(process_t* proc,char is_pipe) {
     current->proc = proc;
     current->seek_offset = 0;
 
-    if(is_pipe)
+    if(is_pipe) {
         current->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);
-
+        String::memset(current->pipe.buffer,0,16 * 4096);
+    }
+    
     spinlock_unlock(&fd_lock);
     return current->index;
 

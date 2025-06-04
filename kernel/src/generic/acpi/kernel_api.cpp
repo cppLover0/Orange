@@ -234,7 +234,7 @@ void uacpi_kernel_log(uacpi_log_level lvl, const uacpi_char* str) {
     else if(lvl == UACPI_LOG_ERROR)
         level = LOG_LEVEL_ERROR;
 
-    Log(level,"%s",str);
+    Log(level,"uacpi(): %s",str);
 
 }
 #else

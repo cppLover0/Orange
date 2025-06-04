@@ -37,7 +37,7 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     SSE::Init();
 
     Lapic::Init();
-    Log(LOG_LEVEL_INFO,"CPU %d is online !\n",smp_info->lapic_id);
+    INFO("CPU %d is online !\n",smp_info->lapic_id);
 
     uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
     Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
@@ -64,7 +64,7 @@ void MP::Init() {
             limine_info.smp->cpus[i]->goto_address = __mp_bootstrap; // in x86 it atomic soooo
         }
     }
-    Log(LOG_LEVEL_INFO,"CPUs count: %d\n",how_much_cpus);
+    INFO("CPUs count: %d\n",how_much_cpus);
 }
 
 void MP::Sync() {

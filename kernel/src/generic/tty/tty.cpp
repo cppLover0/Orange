@@ -97,7 +97,6 @@ void __tty_end_ipc() {
                 current->is_used_anymore = 0;
 
             //Log(LOG_LEVEL_DEBUG,"Bufer size %d\n",current->pipe->buffer_size);
-
             current->pipe->is_received = 0; 
         }
         current = current->next;
@@ -175,10 +174,9 @@ void __tty_receive_ipc(uint8_t keycode) {
         if(raw_keycode == '\n')
             raw_keycode = 13; // nano want it :sob:
 
-        if((tty_termios.c_lflag & ECHO)) {
+        if((tty_termios.c_lflag & ECHO) && is_printable(raw_keycode)) {
             flanterm_write(ft_ctx,(char*)&keycode,1);
             Serial::Write(keycode);
-            p++;
         }
         if(tty_termios.c_cc[VMIN] >= p) {
             p = 0;

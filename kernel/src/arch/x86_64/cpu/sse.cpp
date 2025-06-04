@@ -56,11 +56,11 @@ void SSE::Init() {
     if(!__sse_is_initializied) {
         if(c & SSE_XSAVE_SUPPORT) {
             __cpuid(13,0,&a,&b,&c,&d);
-            Log(LOG_LEVEL_INFO,"CPU Supports SSE_XSAVE with size %d\n",c);
+            INFO("CPU Supports SSE_XSAVE with size %d\n",c);
             __sse_legacy_save = 0;
             __sse_size = c;
         } else {
-            Log(LOG_LEVEL_INFO,"CPU Doesn't supports SSE_XSAVE\n");
+            INFO("CPU Doesn't supports SSE_XSAVE\n");
             __sse_legacy_save = 1;
             __sse_size = 512;
         }

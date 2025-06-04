@@ -20,10 +20,10 @@ void ACPI::fullInit() {
     uacpi_status ret = uacpi_initialize(0);
 
     HPET::Init();
-    Log(LOG_LEVEL_INFO,"HPET Initializied\n");
+    INFO("HPET Initializied\n");
 
     IOAPIC::Init();
-    Log(LOG_LEVEL_INFO,"IOAPIC Initializied\n");
+    INFO("IOAPIC Initializied\n");
 
     ret = uacpi_namespace_load();
 

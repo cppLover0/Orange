@@ -232,6 +232,8 @@ int syscall_open(int_frame_t* ctx) {
 
     fd_s->reserved_stat.name = (char*)1;
 
+    SINFO("Opening %s\n",path);
+
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     *fdout = fd;
     Paging::EnableKernel();
@@ -338,6 +340,9 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
                 file->pipe.is_received = 1;
                 ctx->rdx = file->pipe.buffer_size;
                 file->pipe.buffer_size = 0;
+
+                String::memset(file->pipe.buffer,0,16*4096);
+
                 ctx->rax = 0;
 
                 proc->is_eoi = 1;
@@ -1285,8 +1290,8 @@ int syscall_dup2(int_frame_t* ctx) {
             new_fd1->pipe.buffer = old_fd->pipe.buffer;
         }
     }
-    if(FD::Search(proc,new_fd)->p_pipe != old_fd->p_pipe)
-        Log(LOG_LEVEL_WARNING,"dup2 doesn't copied fds correctly (old_fd: %d, olf_fd type: %s new_fd: %d, newfd_type: %s)\n",fd,old_fd->type == FD_FILE ? "FILE" : "PIPE",new_fd,new_fd1->old_type == FD_FILE ? "FILE" : "PIPE");
+    
+    SINFO("piping from %d to %d\n",old_fd->index,new_fd1->index);
 
     return 0;
 

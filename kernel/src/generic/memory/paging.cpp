@@ -32,10 +32,11 @@ uint64_t* Paging::KernelGet() {
 
 void* Paging::Map(uint64_t* cr3,uint64_t phys,uint64_t virt,uint64_t flags) {
     uint64_t aligned_virt = ALIGNPAGEDOWN(virt); 
+    uint64_t aligned_phys = ALIGNPAGEDOWN(phys);
     uint64_t* pml3 = __paging_next_level(cr3,PTE_INDEX(aligned_virt,39),flags);
     uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(aligned_virt,30),flags);
     uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(aligned_virt,21),flags);
-    pml[PTE_INDEX(aligned_virt,12)] = phys | flags;
+    pml[PTE_INDEX(aligned_virt,12)] = aligned_phys | flags;
     return (void*)virt;
 }
 
@@ -148,16 +149,17 @@ void Paging::Copy(uint64_t* dest_cr3,uint64_t* src_cr3) {
 
 void Paging::Init() {
     Pat(1,1);
+    Pat(2,0);
     kernel_cr3 = (uint64_t*)PMM::VirtualAlloc();
-    Log(LOG_LEVEL_INFO,"Mapping usable memory\n");
+    SINFO("Mapping usable memory\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_USABLE,PTE_PRESENT | PTE_RW);
-    Log(LOG_LEVEL_INFO,"Mapping framebuffer\n");
+    SINFO("Mapping framebuffer\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_PRESENT | PTE_RW | PTE_WC);
-    Log(LOG_LEVEL_INFO,"Mapping bootloader reclaimable\n");
+    SINFO("Mapping bootloader reclaimable\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE,PTE_PRESENT | PTE_RW);
-    Log(LOG_LEVEL_INFO,"Activating paging\n");
+    SINFO("Activating paging\n");
     MemoryEntry(kernel_cr3,LIMINE_MEMMAP_EXECUTABLE_AND_MODULES,PTE_PRESENT | PTE_RW);
-    Log(LOG_LEVEL_INFO,"Mapping kernel\n");
+    SINFO("Mapping kernel\n");
     Kernel(kernel_cr3);
     EnableKernel();
 }

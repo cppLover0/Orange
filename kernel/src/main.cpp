@@ -104,16 +104,16 @@ extern "C" void kmain() {
 
     LogInit((char*)ft_ctx);
 
-    Log(LOG_LEVEL_INFO,"This is info message !\n");
-    Log(LOG_LEVEL_WARNING,"This is warning message !\n");
-    Log(LOG_LEVEL_ERROR,"This is error message !\n");
+    INFO("This is info message !\n");
+    WARN("This is warning message !\n");
+    ERROR("This is error message !\n");
 
-    Log(LOG_LEVEL_INFO,"Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
-    Log(LOG_LEVEL_INFO,"RSDP: 0x%p\n",info.rsdp_address);
-    Log(LOG_LEVEL_INFO,"HHDM: 0x%p\n",info.hhdm_offset);
-    Log(LOG_LEVEL_INFO,"Kernel: Phys: 0x%p, Virt: 0x%p\n",info.ker_addr->physical_base,info.ker_addr->virtual_base);
-    Log(LOG_LEVEL_INFO,"Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
-    Log(LOG_LEVEL_INFO,"Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
+    INFO("Bootloader: %s %s\n",info.bootloader_name,info.bootloader_version);
+    INFO("RSDP: 0x%p\n",info.rsdp_address);
+    INFO("HHDM: 0x%p\n",info.hhdm_offset);
+    INFO("Kernel: Phys: 0x%p, Virt: 0x%p\n",info.ker_addr->physical_base,info.ker_addr->virtual_base);
+    INFO("Framebuffer: Addr: 0x%p, Resolution: %dx%dx%d\n",info.fb_info->address,info.fb_info->width,info.fb_info->height,info.fb_info->bpp);
+    INFO("Memmap: Start: 0x%p, Entry_count: %d\n",info.memmap->entries,info.memmap->entry_count);
 
     extern char is_ignored;
 
@@ -124,57 +124,57 @@ extern "C" void kmain() {
     HHDM::applyHHDM(info.hhdm_offset);
 
     PMM::Init(info.memmap);
-    Log(LOG_LEVEL_INFO,"PMM Initializied\n"); //it will be initializied anyway
+    INFO("PMM Initializied\n"); //it will be initializied anyway
 
     Paging::Init();
-    Log(LOG_LEVEL_INFO,"Paging Initializied\n"); //it will be initializied anyway
+    INFO("Paging Initializied\n"); //it will be initializied anyway
     KHeap::Init();
-    Log(LOG_LEVEL_INFO,"KHeap Initializied\n");
+    INFO("KHeap Initializied\n");
     
     cpudata_t* data = CpuData::Access();
-    Log(LOG_LEVEL_INFO,"BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
+    INFO("BSP CPU Data test: 1:0x%p 2:0x%p\n",data,CpuData::Access());
 
     GDT::Init();
-    Log(LOG_LEVEL_INFO,"GDT Initializied\n");
+    INFO("GDT Initializied\n");
 
     IDT::Init();
-    Log(LOG_LEVEL_INFO,"IDT Initializied\n");
+    INFO("IDT Initializied\n");
 
     ACPI::fullInit();
-    Log(LOG_LEVEL_INFO,"ACPI Initializied\n");
+    INFO("ACPI Initializied\n");
 
     Lapic::Init();
-    Log(LOG_LEVEL_INFO,"LAPIC Initializied\n");
+    INFO("LAPIC Initializied\n");
     
     MP::Init();
-    Log(LOG_LEVEL_INFO,"MP Initializied\n");
+    INFO("MP Initializied\n");
 
     PowerButton::Hook(handle_power_button);
-    Log(LOG_LEVEL_INFO,"PowerButton initializied\n");
+    INFO("PowerButton initializied\n");
 
     VFS::Init();
-    Log(LOG_LEVEL_INFO,"VFS Initializied\n");
-
-    USTAR::ParseAndCopy();
-    Log(LOG_LEVEL_INFO,"Loaded initrd\n");
+    INFO("VFS Initializied\n");
 
     //tmpfs_dump();
 
     PS2Keyboard::Init(keyStub);
 
     SSE::Init();
-    Log(LOG_LEVEL_INFO,"SSE Is enabled (or not) \n");
+    INFO("SSE Is enabled (or not) \n");
     
     Process::Init();
-    Log(LOG_LEVEL_INFO,"Scheduling initializied\n");
+    INFO("Scheduling initializied\n");
 
     Syscall::Init();
-    Log(LOG_LEVEL_INFO,"Syscall initializied\n");
+    INFO("Syscall initializied\n");
 
     XHCI::Init();
 
     PCI::Init();
-    Log(LOG_LEVEL_DEBUG,"PCI initializied\n");
+    INFO("PCI initializied\n");
+
+    USTAR::ParseAndCopy();
+    INFO("Loaded initrd\n");
 
     cpudata_t* cpu_data = CpuData::Access();
 
@@ -195,7 +195,7 @@ extern "C" void kmain() {
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
     VFS::Read(elf,"/usr/bin/initrd",0);
 
-    Log(LOG_LEVEL_INFO,"Loaded initrd !\n");
+    INFO("Loaded initrd !\n");
 
     //res.entry();
 
@@ -229,7 +229,7 @@ extern "C" void kmain() {
 
     Process::WakeUp(initrd);
 
-    Log(LOG_LEVEL_INFO,"Waiting for interrupts...\n");
+    INFO("Waiting for interrupts...\n");
 
     TTY::Init();
 
@@ -243,7 +243,7 @@ extern "C" void kmain() {
 
     res_sec += CMOS::Second() - sec;
 
-    Log(LOG_LEVEL_INFO,"Kernel is initializied for %d seconds\n",res_sec);
+    INFO("Kernel is initializied for %d seconds\n",res_sec);
 
     __sti();
 
