@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls. 
-QEMUFLAGS := -m 1G -no-reboot -serial stdio -M q35 -s -d int -smp 2 -enable-kvm -device qemu-xhci -trace usb_xhci_*
+QEMUFLAGS := -m 1G -no-reboot -serial stdio -M q35 -s -d int -smp 2 -enable-kvm -device qemu-xhci -device usb-kbd -trace usb_xhci_*
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.

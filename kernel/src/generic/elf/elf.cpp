@@ -118,6 +118,8 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
             ELFLoadResult inter_r = ELF::Load((uint8_t*)inter,cr3,flags,(uint64_t*)1,0,0,proc);
 
+            PMM::VirtualFree(inter);
+
             res.entry = inter_r.entry;
 
             is_interp = 1;

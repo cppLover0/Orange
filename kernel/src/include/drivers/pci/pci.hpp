@@ -43,6 +43,8 @@ typedef struct {
 	void (*pcidrv)(pci_t, uint8_t, uint8_t, uint8_t);
 } __attribute__((packed)) pci_driver_t;
 
+#define PCI_BAR_MASK ((1 << 0) | (1 << 1))
+
 class PCI {
 public:
     static uint32_t IN(uint8_t bus, uint8_t num, uint8_t function, uint8_t offset,uint8_t bytewidth);

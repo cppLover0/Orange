@@ -74,6 +74,7 @@ int syscall_exit(int_frame_t* ctx) {
     }
 
     Process::Kill(proc,ctx->rdi);
+    VMM::Free(proc);
 
     //Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
 
@@ -993,10 +994,10 @@ int syscall_exec(int_frame_t* ctx) {
     KHeap::Free(stack_argv);
     KHeap::Free(stack_envp);
     PMM::VirtualFree(path1);
+    VMM::Free(proc);
 
     schedulingSchedule(0);
     
-
 }
 
 int syscall_getcwd(int_frame_t* ctx) {
