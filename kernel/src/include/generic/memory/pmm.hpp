@@ -7,7 +7,7 @@
 #define SIZE_TO_PAGES(size) (((size) + 4095) / 4096)
 #define LEVEL_TO_SIZE(level) (1U << (level))
 
-#define MAX_LEVEL 27 
+#define MAX_LEVEL 26 
 
 typedef struct {
     int64_t level : 8;
@@ -16,7 +16,7 @@ typedef struct {
     int64_t is_was_splitted : 1;
     int64_t split_x : 1;
     int64_t parent_id : 48;
-} __attribute__((packed)) buddy_info_field_t;
+} buddy_info_field_t;
 
 typedef struct buddy_info {
     uint64_t phys_pointer;
@@ -34,6 +34,7 @@ typedef struct buddy_t {
     buddy_info_t* mem;
 } __attribute__((packed)) buddy_t;
 
+void buddy_dump();
 
 class PMM {
 public:

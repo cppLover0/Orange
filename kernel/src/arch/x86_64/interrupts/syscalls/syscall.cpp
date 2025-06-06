@@ -62,19 +62,22 @@ int syscall_exit(int_frame_t* ctx) {
                 VFS::Count(fd->path_point,0,-1);
 
             if(fd->is_pipe_pointer && fd->type == FD_PIPE && fd->pipe_side == PIPE_SIDE_WRITE) {
+                if(fd->p_pipe->connected_pipes <= 0) {
+                    PMM::VirtualFree(fd->p_pipe->buffer);
+                }
                 fd->p_pipe->connected_pipes--;
                 if(fd->p_pipe->connected_pipes == 0) {
                     fd->p_pipe->is_received = 0;
                 }
+            } else if(!fd->is_pipe_pointer) {
+                PMM::VirtualFree(fd->pipe.buffer);
             }
-                
-            String::memset(fd,0,4096);
             PMM::VirtualFree(fd);
         }
+        
     }
 
     Process::Kill(proc,ctx->rdi);
-    VMM::Free(proc);
 
     //Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
 
@@ -681,29 +684,8 @@ int syscall_mmap(int_frame_t* ctx) {
     process_t* proc = CpuData::Access()->current;
 
     if(!size) return -1;
-    if(fd && fd > 0) {
-
-        fd_t* file = FD::Search(proc,fd);
-
-        if(file) {
-            filestat_t stat;
-            int stat_st = VFS::Stat(file->path_point,(char*)&stat,1);
-
-            if(stat_st)
-                return ENOSYS;
-
-            uint64_t virt = (uint64_t)VMM::Map(proc,(uint64_t)stat.content,stat.size,PTE_RW | PTE_PRESENT | PTE_USER);
-            ctx->rdx = virt;
-            return 0;
-
-        } else
-            return ENOENT;
-    }
 
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
-
-    uint64_t allocated = PMM::BigAlloc(size_in_pages);
-    if(!allocated) return -2;
 
     uint64_t* cr3 = (uint64_t*)HHDM::toVirt(ctx->cr3);
     
@@ -725,13 +707,22 @@ int syscall_free(int_frame_t* ctx) {
 
     __syscall_is_safe((void*)ptr);
 
-    if(!ptr) return -1;
-    if(!size) return -2;
-    uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096;     
-    uint64_t phys = Paging::PhysFromVirt(cr3,ptr);
+    if(!ptr) return EFAULT;
+    if(!size) return EFAULT;
+    
+    process_t* proc = CpuData::Access()->current;
 
-    Paging::Unmap(cr3,ptr,size_in_pages);
-    PMM::Free(phys);
+    vmm_obj_t* vmm_o = VMM::Get(proc,ptr);
+    if(!vmm_o)
+        return EFAULT;
+
+    if(vmm_o->phys)
+        PMM::Free(vmm_o->phys);
+
+    vmm_o->phys = 0;
+
+    //DEBUG("Freeing %p %p\n",vmm_o,vmm_o->phys);
+
     return 0;
 
 }
@@ -890,8 +881,6 @@ int syscall_exec(int_frame_t* ctx) {
     resolve_path(stack_path,buf,path1,1);
 
     VMM::Free(proc);
-
-    VMM::Init(proc);
 
     filestat_t stat;
 
@@ -1631,6 +1620,11 @@ int syscall_readlink(int_frame_t* ctx) {
 
 }
 
+int syscall_dump_mem(int_frame_t* ctx) {
+    buddy_dump();
+    return 0;
+}
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -1668,7 +1662,8 @@ syscall_t syscall_table[] = {
     {34,syscall_unlink},
     {35,syscall_poll},
     {36,syscall_readdir},
-    {37,syscall_readlink}
+    {37,syscall_readlink},
+    {38,syscall_dump_mem}
 };
 
 syscall_t* syscall_find_table(int num) {

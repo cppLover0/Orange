@@ -249,7 +249,10 @@ void VMM::Free(process_t* proc) {
         if(current->base == info.hhdm_offset - PAGE_SIZE)
             next = 0;
 
-        PMM::Free(current->phys);
+        if(current->phys) {
+            PMM::Free(current->phys);
+        }
+
         KHeap::Free(current);
 
         if(!next)   
@@ -275,15 +278,17 @@ void VMM::Clone(process_t* dest_proc,process_t* src_proc) {
 
             uint64_t phys;
 
-            if(src_current->src_len <= PAGE_SIZE)
+            if(src_current->phys) {
+                if(src_current->src_len <= PAGE_SIZE)
                 phys = PMM::Alloc();
-            else if(src_current->src_len > PAGE_SIZE)
-                phys = PMM::BigAlloc(ALIGNPAGEUP(src_current->src_len) / PAGE_SIZE);
+                else if(src_current->src_len > PAGE_SIZE)
+                    phys = PMM::BigAlloc(ALIGNPAGEUP(src_current->src_len) / PAGE_SIZE);
 
-            if(src_current->phys)
-                String::memcpy((void*)HHDM::toVirt(phys),(void*)HHDM::toVirt(src_current->phys),src_current->len);
+                if(src_current->phys)
+                    String::memcpy((void*)HHDM::toVirt(phys),(void*)HHDM::toVirt(src_current->phys),src_current->len);
 
-            Mark(dest_proc,src_current->base,phys,src_current->len,src_current->flags);
+                Mark(dest_proc,src_current->base,phys,src_current->len,src_current->flags);
+            }
 
             if(src_current->base == info.hhdm_offset - PAGE_SIZE)
                 break;
@@ -382,7 +387,9 @@ void VMM::Reload(process_t* proc) {
 
     while(current) {
 
-        __vmm_map(proc->ctx.cr3,current->base,current->phys,current->flags,current->len);
+        if(current->phys) {
+            __vmm_map(proc->ctx.cr3,current->base,current->phys,current->flags,current->len);
+        }
 
         if(current->base == info.hhdm_offset - PAGE_SIZE)
             break;

@@ -59,7 +59,7 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame1) {
     }
 
 
-    if(proc){
+    if(0){
 
         VMM::Dump(proc);
 

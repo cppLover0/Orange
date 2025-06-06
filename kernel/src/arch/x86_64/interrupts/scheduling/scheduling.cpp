@@ -374,5 +374,11 @@ void Process::Kill(process_t* proc,int return_status) {
     proc->return_status = return_status;
     proc->status = PROCESS_STATUS_KILLED;
     
+    PMM::VirtualFree(proc->name);
+    PMM::VirtualFree(proc->sse_ctx);
+    PMM::VirtualFree(proc->cwd);
+    PMM::VirtualFree(proc->wait_stack);
+    PMM::VirtualFree(proc->syscall_wait_ctx);
+
     VMM::Free(proc);
 }

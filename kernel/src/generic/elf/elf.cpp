@@ -161,8 +161,6 @@ ELFLoadResult ELF::Load(uint8_t* base,uint64_t* cr3,uint64_t flags,uint64_t* sta
 
     uint8_t* allocated_elf = (uint8_t*)VMM::Get(proc,(uint64_t)elf_vmm)->phys;
 
-    //Log("Allocated elf: 0x%p\n",allocated_elf);
-
     uint64_t phys_elf = (uint64_t)allocated_elf;
 
     elf_base = (uint64_t)elf_vmm;

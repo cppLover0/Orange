@@ -191,7 +191,7 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     INFO("XHCI Initializied\n");
 
     DEBUG("Waiting 1 second !\n");
-    HPET::Sleep(3*1000*1000);
+    HPET::Sleep(1000*1000);
 
 }
 

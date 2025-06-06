@@ -11,9 +11,14 @@
 #include <other/string.hpp>
 #include <other/log.hpp>
 
+uint64_t paging_num_pages = 0;
+
 uint64_t* __paging_next_level(uint64_t* table,uint64_t index,uint64_t flags) {
-    if(!(table[index] & PTE_PRESENT))
+    if(!(table[index] & PTE_PRESENT)) {
         table[index] = (uint64_t)PMM::Alloc() | PTE_USER | flags;
+        paging_num_pages++;
+    }
+
 
     if(!(table[index] & PTE_MASK_VALUE)) {
         Log(LOG_LEVEL_ERROR,"Paging fault ! some pmm bug, halting kernel\n");

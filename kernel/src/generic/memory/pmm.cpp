@@ -7,6 +7,7 @@
 #include <config.hpp>
 #include <generic/memory/paging.hpp>
 #include <generic/locks/spinlock.hpp>
+#include <other/assembly.hpp>
 #include <other/string.hpp>
 
 buddy_t buddy;
@@ -14,6 +15,7 @@ buddy_t buddy;
 char buddy_spinlock;
 
 uint64_t __pmm_cache_offset = 0;
+uint64_t test_free = 0;
 
 buddy_info_t* buddy_put(uint64_t phys,int64_t parent,uint8_t level) {
 
@@ -37,9 +39,15 @@ buddy_info_t* buddy_find(uint64_t phys,char is_need_split) {
 }
 
 buddy_info_t* buddy_find_by_parent(uint64_t parent_id,uint8_t split_x) {
-    for(int64_t i = 0; i < buddy.hello_buddy;i++)
-        if(buddy.mem[i].information.parent_id == parent_id && buddy.mem[i].information.split_x == split_x)
-            return &buddy.mem[i];
+    if(split_x) {
+        for(int64_t i = 0; i < buddy.hello_buddy;i++)
+            if(buddy.mem[i].information.parent_id == parent_id && buddy.mem[i].information.split_x)
+                return &buddy.mem[i];
+    } else {
+        for(int64_t i = 0; i < buddy.hello_buddy;i++)
+            if(buddy.mem[i].information.parent_id == parent_id && !buddy.mem[i].information.split_x)
+                return &buddy.mem[i];
+    }
     return 0;
 }
 
@@ -66,6 +74,8 @@ buddy_split_result_t buddy_split(uint64_t phys) {
 
         hi->information.split_x = 0;
         _buddy->information.split_x = 1;
+        hi->information.is_free = 1;
+        _buddy->information.is_free = 1;
 
     } else {
         
@@ -76,6 +86,8 @@ buddy_split_result_t buddy_split(uint64_t phys) {
         _buddy->information.is_free = 1;
 
     }
+
+    test_free += 2;
 
     hi_buddy->information.is_free = 0;
     hi_buddy->information.is_splitted = 1;
@@ -93,6 +105,9 @@ void buddy_merge(uint64_t parent_id) {
     if(!hi || !_buddy)
         return;
 
+    if(!hi->information.is_free || !_buddy->information.is_free) // we can merge only if two are free
+        return;
+
     buddy_info_t* hi_buddy = &buddy.mem[parent_id];
 
     hi->information.is_free = 0;
@@ -100,6 +115,11 @@ void buddy_merge(uint64_t parent_id) {
     hi_buddy->information.is_splitted = 0;
     hi_buddy->information.is_was_splitted = 1;
     hi_buddy->information.is_free = 1;
+
+    test_free--;
+
+    if(hi_buddy->information.parent_id) 
+        buddy_merge(hi_buddy->information.parent_id); // merge again if possible
 
     return;
 
@@ -111,9 +131,11 @@ void buddy_free(uint64_t phys) {
     if(!hi_buddy)
         return;
 
-    //NLog(" F 0x%p\n ",phys);
-
     hi_buddy->information.is_free = 1;
+    test_free++;
+    if(hi_buddy->information.parent_id) {
+        buddy_merge(hi_buddy->information.parent_id);
+    }
 
 }
 
@@ -163,12 +185,58 @@ uint64_t buddy_alloc(uint64_t size) {
             ERROR("Buddy allocator bug\n");
         }
 
+        test_free--;
+
         return good_buddy_split->phys_pointer;
     }
 
     ERROR("Camt find bud with size 0x%p:(\n",size);
+    DEBUG("List all pages before hlt\n");
+    int free = 0;
+    int nonfree = 0;
+    for(uint64_t  i = 0;i < buddy.hello_buddy;i++) {
+        if(buddy.mem[i].information.is_free)
+            NLog(" 0x%p:%d ",buddy.mem[i].phys_pointer,LEVEL_TO_SIZE(buddy.mem[i].information.level));
+        if(buddy.mem[i].information.is_free)
+            free++;
+        else if(!buddy.mem[i].information.is_splitted)
+            nonfree++;
+    }
+
+    NLog("\n");
+
+    extern uint64_t paging_num_pages;
+
+    DEBUG("Free: %d, NonFree: %d, absolute free: %d, paging_pages: %d\n",free,nonfree,test_free,paging_num_pages);
+
+    __hlt();
     return 0;
 
+}
+
+void buddy_dump() {
+    int free = 0;
+    int nonfree = 0;
+    uint64_t free_mem = 0;
+    uint64_t total_mem = 0;
+    for(uint64_t  i = 0;i < buddy.hello_buddy;i++) {
+
+        if(buddy.mem[i].information.is_free)
+            free_mem += LEVEL_TO_SIZE(buddy.mem[i].information.level);
+        
+        if(!buddy.mem[i].information.is_splitted)
+            total_mem += LEVEL_TO_SIZE(buddy.mem[i].information.level);
+
+        if(buddy.mem[i].information.is_free)
+            free++;
+        else if(!buddy.mem[i].information.is_splitted)
+            nonfree++;
+    }
+
+    extern uint64_t paging_num_pages;
+
+    NLog("Free: %d, NonFree: %d, paging_pages: %d\n",free,nonfree,paging_num_pages);
+    NLog("Memory: %d/%d bytes, %d/%d KB, %d/%d MB\n",total_mem - free_mem,total_mem,(total_mem - free_mem) / 1024,total_mem / 1024,((total_mem - free_mem) / 1024) / 1024,(total_mem / 1024) / 1024);
 }
 
 void PMM::Init(limine_memmap_response* mem_map) {
