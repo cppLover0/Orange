@@ -51,38 +51,59 @@ typedef struct {
     uint32_t portsc;
     uint32_t portpmsc;
     uint32_t portli;
-} __attribute__((packed)) xhci_port_regs_t;
+} xhci_port_regs_t;
 
 typedef struct {
     uint64_t erst_segment : 3;
     uint64_t event_busy : 1;
     uint64_t event_ring_pointer : 60;
-} __attribute__((packed)) xhci_erdp_t;
+} xhci_erdp_t;
 
 typedef struct {
     uint32_t iman;   
     uint32_t imod;    
     uint32_t erstsz; 
+    uint32_t reserved0;
     uint64_t erstba;   
-    xhci_erdp_t erdp;
-} __attribute__((packed)) IR_t;
+    union {
+        xhci_erdp_t erdp;
+        uint64_t erdp_val;
+    };
+} IR_t;
 
 typedef struct {
     uint32_t mfindex;     
     uint32_t reserved1[7]; 
     IR_t int_regs[1024];
-} __attribute__((packed)) xhci_runtime_regs_t;
+} xhci_runtime_regs_t;
 
 typedef struct {
     uint64_t base; 
     uint32_t size;         
     uint32_t reserved0;
-} __attribute__((packed)) xhci_erst_t;
+} xhci_erst_t;
+
+typedef struct {
+    uint32_t cycle : 1;
+    uint32_t nexttrb : 1;
+    uint32_t interruptonshort : 1;
+    uint32_t nosnoop : 1;
+    uint32_t chain : 1;
+    uint32_t intoncompletion : 1;
+    uint32_t immediate : 1;
+    uint32_t reserved1 : 2;
+    uint32_t blockeventint : 1;
+    uint32_t type : 6;
+    uint32_t reserved2 : 16;
+} xhci_trb_info_t;
 
 typedef struct {
     uint64_t base; 
     uint32_t status;    
-    uint32_t info;
+    union {
+        xhci_trb_info_t info_s;
+        uint32_t info;
+    };
 } xhci_trb_t;
 
 typedef struct {
@@ -90,7 +111,16 @@ typedef struct {
     uint16_t trb_limit;
     uint64_t queue;
     xhci_trb_t* trb;
-} __attribute__((packed)) xhci_command_ring_ctx_t;
+} xhci_command_ring_ctx_t;
+
+typedef struct {
+    uint16_t trb_limit;
+    uint64_t queue;
+    uint8_t cycle;
+    IR_t* father;
+    xhci_trb_t* trb;
+    xhci_erst_t* table;
+} xhci_event_ring_ctx_t;
 
 typedef struct xhci_device {
     uint64_t xhci_phys_base;
@@ -101,7 +131,9 @@ typedef struct xhci_device {
     xhci_op_regs_t* op;
     xhci_port_regs_t* port;
     xhci_runtime_regs_t* runtime;
+    uint32_t* doorbell;
     xhci_command_ring_ctx_t* com_ring;
+    xhci_event_ring_ctx_t* event_ring;
     struct xhci_device* next;
 } __attribute__((packed)) xhci_device_t;
 

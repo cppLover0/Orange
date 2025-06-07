@@ -72,5 +72,6 @@ cp -rf tools/base/* initrd/
 
 echo Building initrd is done
 
+mkdir -p tools/iso/boot
 tar -cf tools/iso/boot/initrd.tar -C initrd .
 

@@ -7,6 +7,7 @@
 #include <generic/locks/spinlock.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <generic/VFS/devfs.hpp>
+#include <arch/x86_64/interrupts/irq.hpp>
 #include <drivers/io/io.hpp>
 #include <generic/tty/tty.hpp>
 
@@ -208,6 +209,10 @@ short PS2Keyboard::Get() {
 
 }
 
+void ps2_keyboard_handler(void* arg) {
+    PS2Keyboard::Get();
+}
+
 static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *node, uacpi_u32 depth)
 {
 
@@ -232,12 +237,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
             for(int v = 0; v < current_res->irq.num_irqs;v++) {
                 INFO("Found PS/2 Keyboard IRQ %d !\n",current_res->irq.irqs[v]);
 
-                uint8_t vector = IDT::AllocEntry();
-
-                idt_entry_t* entry = IDT::SetEntry(vector,(void*)keyboard_handler,0x8E);
-                IOAPIC::SetEntry(vector,current_res->irq.irqs[v],(current_res->irq.polarity ? 1 : 0 << 13),Lapic::ID());
-                entry->ist = 2;
-
+                int vector = IRQ::Create(current_res->irq.irqs[v],IRQ_TYPE_LEGACY,ps2_keyboard_handler,0,(current_res->irq.polarity ? 1 : 0 << 13));
                 INFO("Registered PS/2 Keyboard IRQ at %d\n",vector);
 
             }
