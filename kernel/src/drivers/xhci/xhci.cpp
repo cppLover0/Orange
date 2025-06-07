@@ -15,6 +15,7 @@
 #include <other/hhdm.hpp>
 #include <drivers/hpet/hpet.hpp>
 #include <config.hpp>
+#include <arch/x86_64/cpu/data.hpp>
 #include <other/string.hpp>
 
 xhci_device_t* xhci_list;
@@ -184,6 +185,21 @@ void __xhci_testings(xhci_device_t* dev) {
     HPET::Sleep(1000*1000);
 }
 
+void __xhci_process_init() {
+
+    uint16_t id = 0;
+    xhci_device_t* current = xhci_list;
+    while(current) {
+        INFO("Doorbelling xhci dev %d from proc %d\n",id++,CpuData::Access()->current->id);
+        __xhci_testings(current);
+        current = current->next;
+    }
+
+    while(1) {
+        __hlt();
+    }
+}
+
 void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     if(pci_dev.progIF != 0x30) {
         INFO("Current USB device with progIF 0x%p is not XHCI !\n",pci_dev.progIF);
@@ -245,8 +261,11 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     INFO("Starting XHCI Device\n");
     __xhci_enable(dev);
 
-    INFO("Starting XHCI Testings\n");
-    __xhci_testings(dev);
+    int xhci = Process::createProcess((uint64_t)__xhci_process_init,0,0,0,0);
+    
+    process_t* xhci_proc = Process::ByID(xhci);
+    xhci_proc->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
+    Process::WakeUp(xhci);
 
     INFO("XHCI Initializied\n");
 

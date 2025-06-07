@@ -42,6 +42,8 @@
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
 
+int initrd = 0;
+
 void _1() {
     while(1) {
         //Serial::printf(" _1 ");
@@ -190,7 +192,6 @@ extern "C" void kmain() {
     filestat_t stat;
 
     VFS::Stat("/usr/bin/initrd",(char*)&stat,1);
-    
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
     VFS::Read(elf,"/usr/bin/initrd",0);
@@ -199,7 +200,7 @@ extern "C" void kmain() {
 
     //res.entry();
 
-    int initrd = Process::createProcess(0,0,1,0,0);
+    initrd = Process::createProcess(0,0,1,0,0);
 
     for(int i = 0;i < 2;i++) {
         int proc = Process::createProcess((uint64_t)_1,0,0,0,0);
