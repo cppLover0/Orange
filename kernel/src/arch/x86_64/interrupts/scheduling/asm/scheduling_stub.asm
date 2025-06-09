@@ -9,7 +9,6 @@ schedulingScheduleStack:
 global schedulingStub
 schedulingStub:
 
-    cli
     cmp byte [rsp + 8],0x08
     jz .continue
     swapgs
@@ -36,4 +35,5 @@ schedulingStub:
     push rax
     mov rdi,rsp
     cld
+    xor rbp,rbp
     jmp schedulingSchedule

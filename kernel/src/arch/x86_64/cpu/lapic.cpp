@@ -21,6 +21,7 @@ void Lapic::Init() {
     Write(0x320,32 | (1 << 17));
     Write(0x3E0,0x3);
     Write(0x380,calibration_ticks);
+    INFO("Lapic address: 0x%p\n",__rdmsr(0x1b) & 0xfffff000);
     __lapic_init = 1;
 }
 

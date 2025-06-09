@@ -237,7 +237,7 @@ static uacpi_iteration_decision match_ps2k(void *user, uacpi_namespace_node *nod
             for(int v = 0; v < current_res->irq.num_irqs;v++) {
                 INFO("Found PS/2 Keyboard IRQ %d !\n",current_res->irq.irqs[v]);
 
-                int vector = IRQ::Create(current_res->irq.irqs[v],IRQ_TYPE_LEGACY,ps2_keyboard_handler,0,(current_res->irq.polarity ? 1 : 0 << 13));
+                int vector = IRQ::Create(current_res->irq.irqs[v],IRQ_TYPE_LEGACY,ps2_keyboard_handler,0,((current_res->irq.polarity ? 1 : 0) << 13));
                 INFO("Registered PS/2 Keyboard IRQ at %d\n",vector);
 
             }

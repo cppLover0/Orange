@@ -244,6 +244,8 @@ extern "C" void kmain() {
 
     res_sec += CMOS::Second() - sec;
 
+    //__hlt();
+
     INFO("Kernel is initializied for %d seconds\n",res_sec);
 
     __sti();

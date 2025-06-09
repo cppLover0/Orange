@@ -56,6 +56,15 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame1) {
             rbp = rbp->rbp;
         }
     
+    } else if(proc && !proc->user) {
+        stackframe_t* rbp = (stackframe_t*)frame1->rbp;
+
+        NLog("\nBack Trace\n");
+        for(unsigned int frame = 0; rbp && frame < 10; ++frame)
+        {
+            NLog("Address #%d: 0x%p\n",frame,rbp->rip);
+            rbp = rbp->rbp;
+        }
     }
 
 

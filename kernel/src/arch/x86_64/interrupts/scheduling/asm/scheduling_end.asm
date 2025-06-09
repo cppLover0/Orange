@@ -2,7 +2,7 @@
 
 global schedulingEnd
 schedulingEnd:
-    cli
+
     mov rsp,rdi
 
     mov cr3,rsi

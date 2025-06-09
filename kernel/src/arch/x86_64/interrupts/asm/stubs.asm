@@ -232,6 +232,7 @@ irqStub:
     mov rax,cr3
     push rax
     mov rdi,rsp
+    xor rbp,rbp
     call irqHandler
     pop rax
     mov cr3,rax

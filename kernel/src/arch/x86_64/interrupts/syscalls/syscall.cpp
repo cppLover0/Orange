@@ -110,6 +110,8 @@ int syscall_debug_print(int_frame_t* ctx) {
 
         ptr[String::strlen(ptr)] = '\n';
 
+        LogUnlock();
+
         DLog(ptr);
 
         return 0;
@@ -236,8 +238,6 @@ int syscall_open(int_frame_t* ctx) {
 
     fd_s->reserved_stat.name = (char*)1;
 
-    SINFO("Opening %s\n",path);
-
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     *fdout = fd;
     Paging::EnableKernel();
@@ -290,7 +290,7 @@ int syscall_seek(int_frame_t* ctx) {
             break;
 
         default:
-            Log(LOG_LEVEL_DEBUG,"Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
+            //Log(LOG_LEVEL_DEBUG,"Process %d, sys_seek, unhandled whence: %d.\n",CpuData::Access()->current->id,whence);
             return 22;
 
     }
@@ -632,7 +632,6 @@ int syscall_close(int_frame_t* ctx) {
 
     if(fd < 3) {
         // restore state
-        NLog("Restoring fd %d\n",fd);
         String::memset(file->path_point,0,2048);
         String::memcpy(file->path_point,"/dev/tty",String::strlen("/dev/tty"));
         file->type = file->old_type;
@@ -1280,8 +1279,6 @@ int syscall_dup2(int_frame_t* ctx) {
             new_fd1->pipe.buffer = old_fd->pipe.buffer;
         }
     }
-    
-    SINFO("piping from %d to %d\n",old_fd->index,new_fd1->index);
 
     return 0;
 
@@ -1625,6 +1622,8 @@ int syscall_dump_mem(int_frame_t* ctx) {
     return 0;
 }
 
+extern int __xhci_syscall_usbtest(int_frame_t* ctx);
+
 syscall_t syscall_table[] = {
     {1,syscall_exit},
     {2,syscall_debug_print},
@@ -1663,7 +1662,8 @@ syscall_t syscall_table[] = {
     {35,syscall_poll},
     {36,syscall_readdir},
     {37,syscall_readlink},
-    {38,syscall_dump_mem}
+    {38,syscall_dump_mem},
+    {39,__xhci_syscall_usbtest}
 };
 
 syscall_t* syscall_find_table(int num) {

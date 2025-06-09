@@ -36,6 +36,18 @@ typedef struct {
 	uint8_t maxLatency;
 } __attribute__((packed)) pci_t;
 
+typedef struct pci_cap {
+	uint8_t id;
+	uint8_t off;
+	uint8_t bus;
+	uint8_t num;
+	uint8_t func;
+	uint16_t venID;
+	uint16_t devID;
+	uint8_t data[32];
+	struct pci_cap* next;
+} __attribute__((packed)) pci_cap_t;
+
 typedef struct {
 	int used;
 	uint8_t _class;

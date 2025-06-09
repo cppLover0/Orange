@@ -14,6 +14,7 @@
 #include <other/assembly.hpp>
 #include <other/hhdm.hpp>
 #include <drivers/hpet/hpet.hpp>
+#include <arch/x86_64/cpu/lapic.hpp>
 #include <config.hpp>
 #include <arch/x86_64/cpu/data.hpp>
 #include <other/string.hpp>
@@ -60,7 +61,7 @@ void __xhci_reset(xhci_device_t* dev) {
 
 void __xhci_enable(xhci_device_t* dev) {
     HPET::Sleep(50*1000);
-    dev->op->usbcmd |= (1 << 0) | (1 << 2);
+    dev->op->usbcmd |= (1 << 0);
     uint16_t timeout = XHCI_RESET_TIMEOUT;
     while(dev->op->usbsts & (1 << 0)) {
         if(!timeout) {
@@ -86,8 +87,21 @@ void __xhci_reset_intr(xhci_device_t* dev, uint16_t intr) {
     dev->runtime->int_regs[intr].iman |= (1 << 0);
 }
 
+void __xhci_punch_intr(xhci_device_t* dev,uint16_t intr) {
+    dev->runtime->int_regs[intr].erdp.event_busy = 1;
+}
+
 void __xhci_update_stepfather(xhci_device_t* dev,xhci_event_ring_ctx_t* grandpa) {
     grandpa->father->erdp_val = grandpa->table[0].base + (grandpa->queue * sizeof(xhci_trb_t));
+}
+
+xhci_trb_t* __xhci_move_father(xhci_device_t* dev,xhci_event_ring_ctx_t* ctx) {
+    xhci_trb_t* trb = &ctx->trb[ctx->queue++];
+    if(ctx->queue == ctx->trb_limit) {
+        ctx->cycle = !ctx->cycle;
+        ctx->queue = 0;
+    }
+    return trb;
 }
 
 xhci_event_ring_ctx_t* __xhci_create_event_ring(xhci_device_t* dev,uint16_t trb_size,IR_t* stepfather,uint16_t sons) {
@@ -96,13 +110,15 @@ xhci_event_ring_ctx_t* __xhci_create_event_ring(xhci_device_t* dev,uint16_t trb_
     ring_info->queue = 0;
     ring_info->father = stepfather; // :pensive:
     ring_info->trb_limit = trb_size;
+    ring_info->trb = 0;
 
     ring_info->table = (xhci_erst_t*)PMM::VirtualBigAlloc(ALIGNPAGEUP(sons * sizeof(xhci_erst_t) / 4096));
 
-    for(int i = 0;i < sons;i++) {
-        ring_info->table[i].base = (uint64_t)PMM::BigAlloc(16);
-        ring_info->table[i].size = trb_size;
-    }
+    uint64_t phys_trb = PMM::BigAlloc(16);
+    ring_info->table[0].base = phys_trb;
+    ring_info->table[0].size = trb_size;
+
+    ring_info->trb = (xhci_trb_t*)HHDM::toVirt(phys_trb); 
 
     stepfather->erstsz = sons;
     __xhci_update_stepfather(dev,ring_info);
@@ -110,6 +126,19 @@ xhci_event_ring_ctx_t* __xhci_create_event_ring(xhci_device_t* dev,uint16_t trb_
 
     return ring_info;
 
+}
+
+xhci_trb_t get_trb(xhci_event_ring_ctx_t* father,uint16_t idx) {
+    return father->trb[idx];
+}
+
+int __xhci_event_receive(xhci_device_t* dev,xhci_event_ring_ctx_t* father,xhci_trb_t** out) { // it will return trb virtual addresses 
+    int len = 0;
+    while(get_trb(father,father->queue).info_s.cycle == father->cycle)
+        out[len++] = __xhci_move_father(dev,father);
+    __xhci_punch_intr(dev,0);
+    __xhci_update_stepfather(dev,father);
+    return len;
 }
 
 xhci_command_ring_ctx_t* __xhci_create_command_ring(xhci_device_t* dev,uint16_t trb_size) {
@@ -179,13 +208,43 @@ void* __xhci_helper_map(uint64_t start,uint64_t pagelen) {
 void __xhci_testings(xhci_device_t* dev) {
     xhci_trb_t trb;
     String::memset(&trb,0,sizeof(xhci_trb_t));
-    trb.info_s.type = 9;
+    trb.info_s.type = TRB_ENABLESLOTCOMMAND_TYPE;
     __xhci_command_ring_queue(dev,dev->com_ring,&trb);
+    INFO("Sending TRB_ENABLESLOTCOMMAND to XHCI Controller\n");
     __xhci_doorbell(dev,0);
     HPET::Sleep(1000*1000);
 }
 
-void __xhci_process_init() {
+const char* trb_type_to_str(int type) {
+    switch(type) {
+        case TRB_COMMANDCOMPLETIONEVENT_TYPE:
+            return "TRB_COMMAND_COMPLETION_EVENT";
+        default:
+            return "Unknown";
+    }
+}
+
+void __xhci_process_fetch(xhci_device_t* dev) {
+    xhci_event_ring_ctx_t* father = dev->event_ring;
+    xhci_trb_t* buffer[1024];
+    while(1) {
+        int count = 0;
+        String::memset(buffer,0,sizeof(xhci_trb_t*) * 1024);
+        if(get_trb(father,father->queue).info_s.cycle == father->cycle)
+            count = __xhci_event_receive(dev,father,buffer);
+
+        if(count) {
+            xhci_trb_t* current = 0;
+            for(int i = 0;i < count;i++) {
+                current = buffer[i];
+                INFO("Got TRB event %s ! (%d) \n",trb_type_to_str(current->info_s.type),current->info_s.type);
+            }
+        }
+        
+    }
+}
+
+int __xhci_syscall_usbtest(int_frame_t* ctx) {
 
     uint16_t id = 0;
     xhci_device_t* current = xhci_list;
@@ -195,9 +254,11 @@ void __xhci_process_init() {
         current = current->next;
     }
 
-    while(1) {
-        __hlt();
-    }
+    return 0;
+}
+
+void __xhci_event(void* arg) {
+    INFO("Got XHCI Event !\n");
 }
 
 void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
@@ -261,11 +322,13 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     INFO("Starting XHCI Device\n");
     __xhci_enable(dev);
 
-    int xhci = Process::createProcess((uint64_t)__xhci_process_init,0,0,0,0);
+    int xhci_fetch = Process::createProcess((uint64_t)__xhci_process_fetch,0,0,0,0);
     
-    process_t* xhci_proc = Process::ByID(xhci);
-    xhci_proc->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
-    Process::WakeUp(xhci);
+    process_t* xhci_proc1 = Process::ByID(xhci_fetch);
+    xhci_proc1->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
+    xhci_proc1->nah_cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
+    xhci_proc1->ctx.rdi = (uint64_t)dev;
+    Process::WakeUp(xhci_fetch);
 
     INFO("XHCI Initializied\n");
 
