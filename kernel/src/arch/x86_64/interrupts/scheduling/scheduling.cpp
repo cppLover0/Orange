@@ -19,6 +19,7 @@
 #include <generic/memory/vmm.hpp>
 #include <other/assembly.hpp>
 #include <arch/x86_64/cpu/sse.hpp>
+#include <other/debug.hpp>
 
 uint64_t id_ptr = 0;
 
@@ -233,7 +234,11 @@ void Process::futexWake(process_t* parent,int* lock) {
 
 }
 
+char __process_create_spinlock = 0;
+
 uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_t* cr3_parent,uint64_t parent_id) {
+
+    spinlock_lock(&__process_create_spinlock);
 
     process_t* proc = (process_t*)PMM::VirtualAlloc();
     pAssert(proc,"No memory :(");
@@ -291,13 +296,13 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         proc->syscall_wait_ctx = (int_frame_t*)PMM::VirtualAlloc();
 
         if(parent) {
-
             fd_t* fd = (fd_t*)parent->start_fd;
             
             while(fd) {
 
-
                 fd_t* fdd = (fd_t*)PMM::VirtualAlloc();
+
+                //Serial::printf("0x%p\n",fdd);
 
                 String::memcpy(fdd,fd,sizeof(fd_t));
 
@@ -320,6 +325,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         }
 
     } else {
+
         Paging::Kernel(cr3);
         Paging::alwaysMappedMap(cr3);
 
@@ -365,6 +371,8 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
 
     proc->next = 0;
     __process_load_queue(proc);
+
+    spinlock_unlock(&__process_create_spinlock);
     
     return proc->id;
 
@@ -374,11 +382,10 @@ void Process::Kill(process_t* proc,int return_status) {
     proc->return_status = return_status;
     proc->status = PROCESS_STATUS_KILLED;
     
-    PMM::VirtualFree(proc->name);
-    PMM::VirtualFree(proc->sse_ctx);
-    PMM::VirtualFree(proc->cwd);
-    PMM::VirtualFree(proc->wait_stack);
-    PMM::VirtualFree(proc->syscall_wait_ctx);
+    // PMM::VirtualFree(proc->name);
+    // PMM::VirtualFree(proc->sse_ctx);
+    // PMM::VirtualFree(proc->cwd);
+    // PMM::VirtualFree(proc->wait_stack);
 
     VMM::Free(proc);
 }

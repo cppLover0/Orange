@@ -107,6 +107,24 @@ typedef struct {
 } xhci_trb_t;
 
 typedef struct {
+    uint32_t cycle : 1;
+    uint32_t reserved1 : 9;
+    uint32_t type : 6;
+    uint32_t vfid : 8;
+    uint32_t slotid : 8;
+} xhci_slot_info_trb_t;
+
+typedef struct {
+    uint64_t base;
+    uint32_t CCP : 24;
+    uint32_t ret_code : 8;
+    union {
+        xhci_slot_info_trb_t info_s;
+        uint32_t info;
+    };
+} xhci_slot_trb_t;
+
+typedef struct {
     uint8_t cycle;
     uint16_t trb_limit;
     uint64_t queue;
@@ -125,7 +143,7 @@ typedef struct {
 typedef struct xhci_device {
     uint64_t xhci_phys_base;
     uint64_t xhci_virt_base;
-    uint64_t dcbaa; // i can read from op->dcbaap but its will return 0
+    uint32_t* dcbaa;
     uint16_t calculated_scratchpad_count;
     xhci_cap_regs_t* cap;
     xhci_op_regs_t* op;
@@ -134,6 +152,9 @@ typedef struct xhci_device {
     uint32_t* doorbell;
     xhci_command_ring_ctx_t* com_ring;
     xhci_event_ring_ctx_t* event_ring;
+
+    uint32_t max_ports; 
+
     struct xhci_device* next;
 } __attribute__((packed)) xhci_device_t;
 

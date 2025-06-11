@@ -27,7 +27,6 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     Paging::EnableKernel();
 
     GDT::Init();
-    __hlt();
     CpuData::Access()->smp_info = smp_info;
     
     IDT::Load();
@@ -37,7 +36,6 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     SSE::Init();
 
     Lapic::Init();
-    INFO("CPU %d is online !\n",smp_info->lapic_id);
 
     uint64_t stack = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
     Paging::alwaysMappedAdd(stack,TSS_STACK_IN_PAGES * PAGE_SIZE);
@@ -48,6 +46,8 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     //Log("Waiting for other CPUs...\n");
     MP::Sync();
+    //INFO("CPU %d is online !\n",smp_info->lapic_id);
+
     __sti();
     while(1) {
         __hlt();

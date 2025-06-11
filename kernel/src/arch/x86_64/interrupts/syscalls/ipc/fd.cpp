@@ -20,23 +20,21 @@ int FD::Create(process_t* proc,char is_pipe) {
 
     fd_t* current = (fd_t*)proc->start_fd;
 
-    char is_success = 0;
+    // char is_success = 0;
 
-    while(current) {
-        if(current->type == FD_NONE) {
-            is_success = 1;
-            break;
-        }
-        current = current->next;
-    }
+    // while(current) {
+    //     if(current->type == FD_NONE) {
+    //         is_success = 1;
+    //         break;
+    //     }
+    //     current = current->next;
+    // }
 
-    if(!is_success) {
-        current = (fd_t*)PMM::VirtualAlloc();
-        current->index = last->index + 1;
-        last->next = current;
-        current->parent = last;
-        proc->last_fd = (char*)current;
-    }
+    current = (fd_t*)PMM::VirtualAlloc();
+    current->index = last->index + 1;
+    last->next = current;
+    current->parent = last;
+    proc->last_fd = (char*)current;
 
     current->pipe.buffer = 0;
     current->pipe.buffer_size = 0;
@@ -63,12 +61,15 @@ int FD::Create(process_t* proc,char is_pipe) {
 }
 
 fd_t* FD::Search(process_t* proc,int index) {
+    spinlock_lock(&fd_lock);
     fd_t* current = (fd_t*)proc->start_fd;
     while(current) {
         if(current->index == index) {
+            spinlock_unlock(&fd_lock);
             return current;
         }
         current = current->next;
     }
+    spinlock_unlock(&fd_lock);
     return 0;
 }

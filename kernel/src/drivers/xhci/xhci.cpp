@@ -185,7 +185,7 @@ void __xhci_fill_dcbaa(xhci_device_t* dev) {
         dcbaa[0] = HHDM::toPhys((uint64_t)list);
     }
 
-    dev->dcbaa = HHDM::toPhys((uint64_t)dcbaa);
+    dev->dcbaa = (uint32_t*)dcbaa;
     dev->op->dcbaap = HHDM::toPhys((uint64_t)dcbaa);
     HPET::Sleep(5000);
 }
@@ -198,6 +198,10 @@ void __xhci_setup_op(xhci_device_t* dev) {
     dev->op->dnctrl = 0xFFFF;
 } 
 
+uint32_t* __xhci_portsc(xhci_device_t* dev,uint32_t portnum) {
+    return ((uint32_t*)HHDM::toVirt(dev->xhci_phys_base + 0x400 + dev->cap->caplength + (0x10 * portnum)));
+}
+
 void* __xhci_helper_map(uint64_t start,uint64_t pagelen) {
     for(uint64_t phys = start;phys < start + (PAGE_SIZE * (pagelen + 1));phys += PAGE_SIZE) {
         Paging::HHDMMap(Paging::KernelGet(),phys,PTE_PRESENT | PTE_RW | PTE_MMIO);
@@ -208,9 +212,9 @@ void* __xhci_helper_map(uint64_t start,uint64_t pagelen) {
 void __xhci_testings(xhci_device_t* dev) {
     xhci_trb_t trb;
     String::memset(&trb,0,sizeof(xhci_trb_t));
-    trb.info_s.type = TRB_ENABLESLOTCOMMAND_TYPE;
+    trb.info_s.type = TRB_NOOPCOMMAND_TYPE;
     __xhci_command_ring_queue(dev,dev->com_ring,&trb);
-    INFO("Sending TRB_ENABLESLOTCOMMAND to XHCI Controller\n");
+    INFO("Sending TRB_NOOPCOMMAND to XHCI Controller\n");
     __xhci_doorbell(dev,0);
     HPET::Sleep(1000*1000);
 }
@@ -244,6 +248,44 @@ void __xhci_process_fetch(xhci_device_t* dev) {
     }
 }
 
+xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
+    xhci_event_ring_ctx_t* father = dev->event_ring;
+    xhci_trb_t* buffer[1024];
+    int timeout = 100;
+    while(1) {
+        int count = 0;
+        String::memset(buffer,0,sizeof(xhci_trb_t*) * 1024);
+        if(get_trb(father,father->queue).info_s.cycle == father->cycle)
+            count = __xhci_event_receive(dev,father,buffer);
+
+        if(count) {
+            xhci_trb_t* current = 0;
+            for(int i = 0;i < count;i++) {
+                current = buffer[i];
+                if(current->info_s.type == type) {
+                    return *current;
+                }
+            }
+        }
+
+        if(--timeout == 0) {
+            xhci_trb_t t;
+            t.base = 0xDEAD;
+            return t;
+        }
+
+        HPET::Sleep(10000);
+        
+    }
+}
+
+void __xhci_clear_event(xhci_device_t* dev) {
+    int count = 0;
+    xhci_trb_t* buffer[1024];
+    if(get_trb(dev->event_ring,dev->event_ring->queue).info_s.cycle == dev->event_ring->cycle)
+            count = __xhci_event_receive(dev,dev->event_ring,buffer);
+}
+
 int __xhci_syscall_usbtest(int_frame_t* ctx) {
 
     uint16_t id = 0;
@@ -257,8 +299,57 @@ int __xhci_syscall_usbtest(int_frame_t* ctx) {
     return 0;
 }
 
-void __xhci_event(void* arg) {
-    INFO("Got XHCI Event !\n");
+int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
+    xhci_trb_t trb;
+
+    String::memset(&trb,0,sizeof(xhci_trb_t));
+    trb.info_s.type = TRB_ENABLESLOTCOMMAND_TYPE;
+
+    __xhci_clear_event(dev);
+
+    __xhci_command_ring_queue(dev,dev->com_ring,&trb);
+    __xhci_doorbell(dev,0);
+    HPET::Sleep(10000);
+    
+    xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
+
+    if(ret.base == 0xDEAD)
+        return 0;
+
+    xhci_slot_trb_t* slot_ret = (xhci_slot_trb_t*)&ret;
+
+    if(slot_ret->ret_code != 1)
+        return 0;
+    
+    return slot_ret->info_s.slotid;
+
+}
+
+void __xhci_init_dev(xhci_device_t* dev,int portnum) {
+    uint32_t* portsc = __xhci_portsc(dev,portnum);
+    uint32_t load_portsc = *portsc;
+    if(!(load_portsc & 1)) 
+        return; 
+    if(!(load_portsc & (1 << 1))) {
+        INFO("Device with port number %d isnt enabled, enabling it\n",portnum);
+        *portsc = load_portsc | 0x10;
+        HPET::Sleep(50000);
+    }
+    if(!(*portsc & (1 << 1))) {
+        INFO("Can't enable device with number %d, ignoring\n",portnum);
+    }
+
+    int id = __xhci_enable_slot(dev,portnum);
+    INFO("Device SlotID: %d\n",id);
+
+}
+
+void __xhci_init_ports(xhci_device_t* dev) {
+    INFO("MaxPorts count: %d\n",dev->max_ports);
+    for(int i = 0;i <= dev->max_ports;i++) {
+        uint32_t* portsc = __xhci_portsc(dev,i);
+        __xhci_init_dev(dev,i);
+    }
 }
 
 void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
@@ -282,6 +373,7 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     dev->runtime = (xhci_runtime_regs_t*)HHDM::toVirt(dev->xhci_phys_base + dev->cap->rtsoff);
     dev->doorbell = (uint32_t*)HHDM::toVirt(dev->xhci_phys_base + dev->cap->dboff);
     __xhci_helper_map(dev->xhci_phys_base + dev->cap->rtsoff,8 + 1); // spec says what length is 0x8000 so ill map 8 pages + 1 
+    __xhci_helper_map(dev->xhci_phys_base + dev->cap->caplength + 0x400,2); // 0x400-0x13FF
 
 
     Paging::HHDMMap(Paging::KernelGet(),HHDM::toPhys((uint64_t)dev->doorbell),PTE_PRESENT | PTE_RW | PTE_MMIO);
@@ -309,9 +401,12 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     __xhci_reset(dev);
 
     dev->calculated_scratchpad_count = (uint16_t)((dev->cap->hcsparams2.max_scratchpad_hi << 5) | dev->cap->hcsparams2.max_scratchpad_lo);
+    dev->max_ports = dev->cap->hcsparams1.maxports;
 
-    if(dev->cap->hcsparams1.maxports < 0x1 || dev->cap->hcsparams1.maxports > 0xFF)
-        WARN("XHCI maxports is higher 0xFF or lower than 0x1 (%d).",dev->cap->hcsparams1.maxports);
+    if(dev->max_ports < 0x1 || dev->max_ports > 0xFF)
+        WARN("XHCI maxports is higher 0xFF or lower than 0x1 (%d).",dev->max_ports);
+    else
+        INFO("XHCI maxports is good (%d)\n",dev->max_ports);
 
     INFO("Configuring XHCI OPER\n");
     __xhci_setup_op(dev); 
@@ -322,8 +417,13 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
     INFO("Starting XHCI Device\n");
     __xhci_enable(dev);
 
+    INFO("Configuring XHCI Ports\n");
+    __xhci_init_ports(dev);
+
+    INFO("Creating XHCI process\n");
     int xhci_fetch = Process::createProcess((uint64_t)__xhci_process_fetch,0,0,0,0);
     
+    INFO("Configuring XHCI process\n");
     process_t* xhci_proc1 = Process::ByID(xhci_fetch);
     xhci_proc1->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
     xhci_proc1->nah_cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  

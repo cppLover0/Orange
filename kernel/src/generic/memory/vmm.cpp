@@ -20,6 +20,10 @@ void VMM::Init(process_t* proc) {
     LimineInfo info;
     vmm_obj_t* start = new vmm_obj_t;
     vmm_obj_t* end = new vmm_obj_t;
+
+    String::memset(start,0,sizeof(vmm_obj_t));
+    String::memset(end,0,sizeof(vmm_obj_t));
+
     start->base = 0; // ill place userspace allocations here
     start->flags = 0;
     start->len = PAGE_SIZE;

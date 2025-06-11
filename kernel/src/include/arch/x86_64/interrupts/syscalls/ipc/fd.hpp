@@ -251,7 +251,7 @@ typedef struct fd_struct {
 
     char old_type;
 
-    char path_point[2048];
+    char path_point[1024];
 
 } __attribute__((packed)) fd_t;
 

@@ -38,6 +38,13 @@ buddy_info_t* buddy_find(uint64_t phys,char is_need_split) {
     return 0;
 }
 
+buddy_info_t* buddy_find_ign(uint64_t phys) {
+    for(int64_t i = 0; i < buddy.hello_buddy;i++)
+        if(buddy.mem[i].phys_pointer == phys)
+            return &buddy.mem[i];
+    return 0;
+}
+
 buddy_info_t* buddy_find_by_parent(uint64_t parent_id,uint8_t split_x) {
     if(split_x) {
         for(int64_t i = 0; i < buddy.hello_buddy;i++)
@@ -99,6 +106,7 @@ buddy_split_result_t buddy_split(uint64_t phys) {
 }
 
 void buddy_merge(uint64_t parent_id) {
+    
     buddy_info_t* hi = buddy_find_by_parent(parent_id,0);
     buddy_info_t* _buddy = buddy_find_by_parent(parent_id,1);
 
@@ -129,6 +137,9 @@ void buddy_free(uint64_t phys) {
     buddy_info_t* hi_buddy = buddy_find(phys,0);
 
     if(!hi_buddy)
+        return;
+
+    if(hi_buddy->information.is_splitted)
         return;
 
     hi_buddy->information.is_free = 1;

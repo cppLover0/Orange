@@ -18,6 +18,7 @@
 #include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <other/other.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
+#include <arch/x86_64/cpu/sse.hpp>
 #include <generic/memory/vmm.hpp>
 #include <generic/VFS/ustar.hpp>
 #include <other/assert.hpp>
@@ -231,7 +232,7 @@ int syscall_open(int_frame_t* ctx) {
 
     fd_s->flags = flags;
 
-    String::memset(fd_s->path_point,0,2048);
+    String::memset(fd_s->path_point,0,1024);
     String::memcpy(fd_s->path_point,path,String::strlen(path));
 
     String::memset(&fd_s->reserved_stat,0,sizeof(filestat_t));
@@ -632,7 +633,7 @@ int syscall_close(int_frame_t* ctx) {
 
     if(fd < 3) {
         // restore state
-        String::memset(file->path_point,0,2048);
+        String::memset(file->path_point,0,1024);
         String::memcpy(file->path_point,"/dev/tty",String::strlen("/dev/tty"));
         file->type = file->old_type;
         if(file->pipe.old_buffer)
@@ -761,19 +762,10 @@ int syscall_fork(int_frame_t* ctx) {
     new_proc->ctx.ss = 0x18 | 3;
     new_proc->ctx.cs = 0x20 | 3;
 
-    uint64_t* virt = (uint64_t*)HHDM::toVirt(new_proc->ctx.cr3);
-    Paging::alwaysMappedMap(virt);
-    Paging::Kernel(virt);
-
     VMM::Init(new_proc);
     new_proc->user_stack_start = parent->user_stack_start;
     VMM::Clone(new_proc,parent);
     new_proc->fs_base = parent->fs_base;
-
-    uint64_t new_stack = PMM::BigAlloc(PROCESS_STACK_SIZE + 1);
-    uint64_t parent_stack = HHDM::toVirt(VMM::Get(parent,parent->user_stack_start)->phys);
-
-    String::memcpy((void*)HHDM::toVirt(new_stack),(void*)parent_stack,(PROCESS_STACK_SIZE + 1) * PAGE_SIZE);
 
     VMM::Reload(new_proc);
 
@@ -782,6 +774,8 @@ int syscall_fork(int_frame_t* ctx) {
     new_proc->cwd = (char*)PMM::VirtualAlloc();
     String::memset(new_proc->cwd,0,4096);
     String::memcpy(new_proc->cwd,parent->cwd,String::strlen(parent->cwd));
+
+    String::memcpy(new_proc->sse_ctx,parent->sse_ctx,ALIGNPAGEUP(SSE::Size()));
 
     Process::WakeUp(id);
 
@@ -886,6 +880,15 @@ int syscall_exec(int_frame_t* ctx) {
     int status = VFS::Stat(path1,(char*)&stat,1);
 
     if(!status && stat.type == VFS_TYPE_FILE && (stat.mode & S_IXUSR)) {
+
+        fd_t* current_fd = (fd_t*)proc->start_fd;
+        while(current_fd) {
+
+            current_fd->seek_offset = 0;
+
+            current_fd = current_fd->next;
+        }
+
         //Log("alloc\n");
         char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
         //Log("reading %s 0x%p\n",path1,elf);
@@ -903,14 +906,6 @@ int syscall_exec(int_frame_t* ctx) {
             proc->ctx.cs = 0x20 | 3;
             proc->ctx.ss = 0x18 | 3;
             proc->ctx.rflags = (1 << 9); // setup IF
-
-            fd_t* current_fd = (fd_t*)proc->start_fd;
-            while(current_fd) {
-
-                current_fd->seek_offset = 0;
-
-                current_fd = current_fd->next;
-            }
 
             VMM::Reload(proc);
 
@@ -982,7 +977,6 @@ int syscall_exec(int_frame_t* ctx) {
     KHeap::Free(stack_argv);
     KHeap::Free(stack_envp);
     PMM::VirtualFree(path1);
-    VMM::Free(proc);
 
     schedulingSchedule(0);
     
@@ -1255,8 +1249,8 @@ int syscall_dup2(int_frame_t* ctx) {
     if(!old_fd || !new_fd1)
         return ENOENT;
 
-    String::memset(new_fd1->path_point,0,2048);
-    String::memcpy(new_fd1->path_point,old_fd->path_point,2048);
+    String::memset(new_fd1->path_point,0,1024);
+    String::memcpy(new_fd1->path_point,old_fd->path_point,1024);
 
     if(new_fd1->old_type) { // detected dup2 restoring 
         new_fd1->type = new_fd1->old_type;
@@ -1330,7 +1324,7 @@ int syscall_ttyname(int_frame_t* ctx) {
     if(!String::strcmp("/dev/tty",file->path_point)) {
         
         char sbuf[2048];
-        String::memset(sbuf,0,2048);
+        String::memset(sbuf,0,1024);
         String::memcpy(sbuf,file->path_point,String::strlen(file->path_point));
 
         if(size <= String::strlen(sbuf))
@@ -1412,8 +1406,8 @@ int syscall_pipe(int_frame_t* ctx) {
     fds[1] = second;
     Paging::EnableKernel();
 
-    String::memset(first_file->path_point,0,2048);
-    String::memset(second_file->path_point,0,2048);
+    String::memset(first_file->path_point,0,1024);
+    String::memset(second_file->path_point,0,1024);
 
     return 0;
 

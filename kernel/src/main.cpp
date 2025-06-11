@@ -236,8 +236,6 @@ extern "C" void kmain() {
 
     //__hlt();
 
-    //MP::Sync();
-
     int res_sec = 0;
     if(CMOS::Minute() - min)
         res_sec *= (CMOS::Minute() - min);
@@ -247,6 +245,8 @@ extern "C" void kmain() {
     //__hlt();
 
     INFO("Kernel is initializied for %d seconds\n",res_sec);
+
+    MP::Sync();
 
     __sti();
 

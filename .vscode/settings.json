@@ -36,6 +36,14 @@
         "typeinfo": "cpp",
         "*.inc": "cpp",
         "__locale": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "algorithm": "cpp",
+        "dynamic_bitset": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp"
     }
 }
