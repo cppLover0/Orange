@@ -40,7 +40,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     
     if(data->current) {
 
-        if(proc->status != PROCESS_STATUS_BLOCKED) {
+        if(proc->status != PROCESS_STATUS_BLOCKED && proc->status != PROCESS_STATUS_KILLED) {
             if(frame) {
                 String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
                 SSE::Save((uint8_t*)proc->sse_ctx);
@@ -382,10 +382,11 @@ void Process::Kill(process_t* proc,int return_status) {
     proc->return_status = return_status;
     proc->status = PROCESS_STATUS_KILLED;
     
-    // PMM::VirtualFree(proc->name);
-    // PMM::VirtualFree(proc->sse_ctx);
-    // PMM::VirtualFree(proc->cwd);
-    // PMM::VirtualFree(proc->wait_stack);
+    PMM::VirtualFree(proc->name);
+    PMM::VirtualFree(proc->sse_ctx);
+    proc->sse_ctx = 0;
+    PMM::VirtualFree(proc->cwd);
+    PMM::VirtualFree(proc->wait_stack);
 
     VMM::Free(proc);
 }

@@ -19,7 +19,7 @@ CXX := clang++
 AR := ar
 
 # User controllable C flags.
-CFLAGS := -g -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings -O2
+CFLAGS := -g -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings -O2 -fno-strict-aliasing
 
 LD := ld
 

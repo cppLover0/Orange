@@ -106,7 +106,7 @@ buddy_split_result_t buddy_split(uint64_t phys) {
 }
 
 void buddy_merge(uint64_t parent_id) {
-    
+    return;
     buddy_info_t* hi = buddy_find_by_parent(parent_id,0);
     buddy_info_t* _buddy = buddy_find_by_parent(parent_id,1);
 

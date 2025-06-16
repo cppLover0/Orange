@@ -107,7 +107,7 @@ int main() {
     printf("SSE 10.25 + 9.104 = %.6f\n",fin);
 
     printf("Executing bash\n");
-    execl("/usr/bin/bash","/usr/bin/bash",NULL);
+    execl("/usr/bin/bash",NULL);
 
 
 }
