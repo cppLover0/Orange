@@ -370,7 +370,7 @@ int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
 int __xhci_set_addr(xhci_device_t* dev,uint32_t id,char bsr) {
     xhci_set_addr_trb_t trb;
     trb.base = dev->dcbaa[id];
-    trb.info_s.bsr = bsr;
+    trb.info_s.bsr = 0;
     trb.info_s.type = TRB_ADDRESSDEVICECOMMAND_TYPE;
     trb.info_s.slotid = id;
 
