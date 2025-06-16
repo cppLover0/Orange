@@ -240,9 +240,7 @@ typedef struct {
     uint32_t hid : 1;
     uint32_t maxburstsize : 8;
     uint32_t maxpacketsize : 16;
-    uint32_t cycle : 1;
-    uint32_t reserved3 : 3;
-    uint64_t base : 60;
+    uint64_t base;
     uint16_t averagetrblen;
     uint16_t some_shit_with_long_name_lo;
     uint32_t align[3];
@@ -253,7 +251,7 @@ typedef struct {
     xhci_slot_ctx_t slot;
     xhci_endpoint_ctx_t ep0;
     xhci_endpoint_ctx_t ep[30];
-} __attribute__((packed)) xhci_input_ctx_t;
+} xhci_input_ctx_t;
 
 typedef struct {
     uint8_t len;
@@ -288,6 +286,7 @@ typedef struct {
 
 typedef struct {
     xhci_port_ring_ctx_t* transfer_ring;
+    xhci_usb_descriptor_t* desc;
     xhci_input_ctx_t* input_ctx;
     uint64_t phys_input_ctx;
     uint32_t slotid;

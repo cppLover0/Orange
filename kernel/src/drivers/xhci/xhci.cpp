@@ -217,6 +217,7 @@ void __xhci_testings(xhci_device_t* dev) {
     xhci_trb_t trb;
     String::memset(&trb,0,sizeof(xhci_trb_t));
     trb.info_s.type = TRB_NOOPCOMMAND_TYPE;
+    trb.info |= (1 << 5);
     __xhci_command_ring_queue(dev,dev->com_ring,&trb);
     INFO("Sending TRB_NOOPCOMMAND to XHCI Controller\n");
     __xhci_doorbell(dev,0);
@@ -268,7 +269,7 @@ xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
                 current = buffer[i];
                 if(current->info_s.type == type) {
                     return *current;
-                }
+                } 
             }
         }
 
@@ -278,7 +279,7 @@ xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
             return t;
         }
 
-        HPET::Sleep(50000);
+        HPET::Sleep(5000);
         
     }
 }
@@ -366,9 +367,9 @@ int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
 
 }
 
-void __xhci_set_addr(xhci_device_t* dev,uint32_t id,uint64_t p,char bsr) {
+int __xhci_set_addr(xhci_device_t* dev,uint32_t id,char bsr) {
     xhci_set_addr_trb_t trb;
-    trb.base = p;
+    trb.base = dev->dcbaa[id];
     trb.info_s.bsr = bsr;
     trb.info_s.type = TRB_ADDRESSDEVICECOMMAND_TYPE;
     trb.info_s.slotid = id;
@@ -384,12 +385,15 @@ void __xhci_set_addr(xhci_device_t* dev,uint32_t id,uint64_t p,char bsr) {
     if(ret.ret_code != 1)
         ERROR("Can't set XHCI port address (ret %d)\n",ret.status & 0xFF);
 
-    return;
+    return ret.ret_code;
+
 }
 
 void __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_usb_command_t usbcommand,void* out,uint64_t len) {
     void* status_buf = PMM::VirtualAlloc();
     void* desc_buf = PMM::VirtualAlloc();
+
+    String::memset(out,0,len);
 
     xhci_setupstage_trb_t setup;
     xhci_datastage_trb_t data;
@@ -418,11 +422,13 @@ void __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev
 
     event0.type = TRB_EVENTDATA_TYPE;
     event0.base = HHDM::toPhys((uint64_t)status_buf);
+    event0.intoncomp = 1;
 
     status.type = TRB_STATUSSTAGE_TYPE;
     status.chain = 1;
 
     event1.type = TRB_EVENTDATA_TYPE;
+    event1.intoncomp = 1;
 
     __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&setup);
     __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&data);
@@ -435,7 +441,7 @@ void __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev
     __xhci_doorbell_id(dev,usbdev->slotid,1);
     HPET::Sleep(10000);
 
-    xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
+    xhci_trb_t ret = __xhci_event_wait(dev,TRB_TRANSFEREVENT_TYPE);
 
     if(ret.base == 0xDEAD) {
         WARN("Timeout on port %d\n",usbdev->portnum);
@@ -530,19 +536,73 @@ void __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
  
 }
 
-char __xhci_test_port(xhci_device_t* dev,xhci_usb_device_t* usbdev) {
-    xhci_trb_t trb;
-    String::memset(&trb,0,sizeof(xhci_trb_t));
-    trb.info_s.type = TRB_NOOP_TYPE;
-    __xhci_port_ring_queue(usbdev->transfer_ring,&trb);
-    __xhci_clear_event(dev);
+void __xhci_unicode_to_ascii(uint16_t* src,char* dest) {
+    uint16_t src_ptr = 0;
+    uint16_t dest_ptr = 0;
 
-    __xhci_doorbell_id(dev,usbdev->slotid,1);
-    HPET::Sleep(50000);
+    uint16_t* ptr = (uint16_t*)src;
+    while(ptr[src_ptr]) {
+        if(ptr[src_ptr] < 128)
+            dest[dest_ptr++] = ptr[src_ptr++];
+        else
+            dest[dest_ptr++] = '?';
+    }
+    dest[dest_ptr] = '\0';
+}
 
-    xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
+void __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_string_descriptor_t* out,uint8_t index,uint8_t lang) {
+    xhci_usb_command_t usbcommand;
+    usbcommand.type = 0x80;
+    usbcommand.request = 6;
+    usbcommand.value = (3 << 8) | index;
+    usbcommand.index = lang;
+    usbcommand.len = sizeof(xhci_usb_descriptor_header);
 
-    return ret.ret_code;
+    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+
+    usbcommand.len = out->head.len;
+
+    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+}
+
+void __xhci_read_usb_lang_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_lang_descriptor_t* out) {
+    xhci_usb_command_t usbcommand;
+    usbcommand.type = 0x80;
+    usbcommand.request = 6;
+    usbcommand.value = (3 << 8);
+    usbcommand.index = 0;
+    usbcommand.len = sizeof(xhci_usb_descriptor_header);
+
+    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+
+    usbcommand.len = out->head.len;
+
+    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+}
+
+void __xhci_print_device_info(xhci_device_t* dev,xhci_usb_device_t* usb_dev) {
+    xhci_lang_descriptor_t lang;
+
+    __xhci_read_usb_lang_string(dev,usb_dev,&lang);
+    uint16_t lang0 = lang.lang[0];
+
+    xhci_string_descriptor_t product;
+    xhci_string_descriptor_t manufacter;
+
+    __xhci_read_usb_string(dev,usb_dev,&product,usb_dev->desc->product1,lang0);
+    __xhci_read_usb_string(dev,usb_dev,&manufacter,usb_dev->desc->manufacter,lang0);
+
+    char product0[256];
+    char manufacter0[256];
+
+    String::memset(product0,0,256);
+    String::memset(manufacter0,0,256);
+
+    __xhci_unicode_to_ascii(product.str,product0);
+    __xhci_unicode_to_ascii(product.str,manufacter0);
+
+    INFO("%s %s\n",product0,manufacter0);
+
 }
 
 void __xhci_init_dev(xhci_device_t* dev,int portnum) {
@@ -567,12 +627,12 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     uint16_t speed = __xhci_get_speed(dev,load_portsc);
 
     const char* speed_to_str[7] = {
-        "Null",
-        "Full Speed (12 MB/s - USB 2.0)",
-        "Low Speed (1.5 Mb/s - USB 2.0)",
-        "High Speed (480 Mb/s - USB 2.0)",
-        "Super Speed (5 Gb/s - USB3.0)",
-        "Super Speed Plus (10 Gb/s - USB 3.1)"
+        "(0 MB/s - USB ?)",
+        "(12 MB/s - USB 2.0)",
+        "(1.5 Mb/s - USB 2.0)",
+        "(480 Mb/s - USB 2.0)",
+        "(5 Gb/s - USB3.0)",
+        "(10 Gb/s - USB 3.1)"
     };
 
     xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)HHDM::toVirt(dev->dcbaa[id]);
@@ -583,35 +643,34 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     input_ctx->ep0.endpointtype = 4;
     input_ctx->ep0.cerr = 3;
     input_ctx->ep0.maxpacketsize = speed;
-    input_ctx->ep0.base = HHDM::toPhys((uint64_t)usb_dev->transfer_ring->trb);
-    input_ctx->ep0.cycle = usb_dev->transfer_ring->cycle;
+    input_ctx->ep0.base = HHDM::toPhys((uint64_t)usb_dev->transfer_ring->trb) | usb_dev->transfer_ring->cycle;
     input_ctx->ep0.averagetrblen = 8;
 
-    __xhci_set_addr(dev,id,dev->dcbaa[id],0);
-
-    int ret = __xhci_test_port(dev,usb_dev);
-    if(ret != 1) {
-        ERROR("Transfer ring is cooked, skipping (ret %d)\n",ret);
+    if(__xhci_set_addr(dev,id,0) != 1)
         return;
-    }
+
+    dev->dcbaa[id] += 64;
 
     xhci_usb_descriptor_t* descriptor = (xhci_usb_descriptor_t*)PMM::VirtualAlloc();
     __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,8);
 
     input_ctx->ep0.maxpacketsize = descriptor->maxpacketsize;
 
-    //__xhci_set_addr(dev,id,dev->dcbaa[id],0);
-
     __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,descriptor->head.len);
 
-    INFO("usb: 0x%p, deviceclass: 0x%p, devicesubclass: 0x%p, protocol: 0x%p,maxpacketsize: 0x%p\nvendor: 0x%p, product0: 0x%p, device: 0x%p\nmanufacter: 0x%p, product1: 0x%p, serialnum: 0x%p, numconfigs: 0x%p\n",descriptor->usb,descriptor->deviceclass,descriptor->devicesubclass,descriptor->protocol,descriptor->maxpacketsize,descriptor->vendor,descriptor->product0,descriptor->device,descriptor->manufacter,descriptor->product1,descriptor->serialnum,descriptor->numconfigs);
+    usb_dev->desc = descriptor;
 
-    INFO("Found USB Device %s (%d, %d) on port %d and slot %d\n",((load_portsc & 0x3C00) >> 10) < 7 ? speed_to_str[(load_portsc & 0x3C00) >> 10] : "Broken (0 MB/S - USB ?)",(load_portsc & 0x3C00) >> 10,speed,portnum,usb_dev->slotid);
 
     if(!speed) {
         ERROR("Broken USB Device/Firmware, can't continue work. skipping\n");
         return; //now i cant ignore anymore...
     }
+
+    __xhci_print_device_info(dev,usb_dev);
+
+    INFO("Found USB Device %s (%d, %d) on port %d and slot %d\n",((load_portsc & 0x3C00) >> 10) < 7 ? speed_to_str[(load_portsc & 0x3C00) >> 10] : "Broken (0 MB/S - USB ?)",(load_portsc & 0x3C00) >> 10,speed,portnum,usb_dev->slotid);
+
+    
 
 }
 
