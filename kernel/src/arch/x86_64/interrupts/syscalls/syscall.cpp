@@ -25,6 +25,8 @@
 #include <other/other.hpp>
 #include <generic/limineA/limineinfo.hpp>
 #include <other/debug.hpp>
+#include <uacpi/sleep.h>
+#include <uacpi/status.h>
 
 extern "C" void syscall_handler();
 
@@ -1093,7 +1095,44 @@ int syscall_dup(int_frame_t* ctx) {
 
 int syscall_kill(int_frame_t* ctx) {
     int pid = ctx->rdi;
-    Process::Kill(Process::ByID(pid),ctx->rsi);
+
+    if(CpuData::Access()->current->id == pid) {
+        ctx->rax = 0;
+        syscall_exit(ctx);
+    }
+
+    process_t* proc = Process::ByID(pid);
+    if(!proc)
+        return EFAULT;
+    
+    while(proc->status == PROCESS_STATUS_IN_USE) {__nop();}
+    proc->status = PROCESS_STATUS_BLOCKED;
+
+    fd_t* fd = (fd_t*)proc->start_fd;
+    while(fd) {
+        fd = fd->next;
+        if(fd) {
+
+            if(fd->type == FD_FILE)
+                VFS::Count(fd->path_point,0,-1);
+
+            if(fd->is_pipe_pointer && fd->type == FD_PIPE && fd->pipe_side == PIPE_SIDE_WRITE) {
+                if(fd->p_pipe->connected_pipes <= 0) {
+                    PMM::VirtualFree(fd->p_pipe->buffer);
+                }
+                fd->p_pipe->connected_pipes--;
+                if(fd->p_pipe->connected_pipes == 0) {
+                    fd->p_pipe->is_received = 0;
+                }
+            } else if(!fd->is_pipe_pointer) {
+                PMM::VirtualFree(fd->pipe.buffer);
+            }
+            PMM::VirtualFree(fd);
+        }
+    }
+
+    Process::Kill(proc,0);
+
     return 0;
 }
 
@@ -1616,6 +1655,22 @@ int syscall_dump_mem(int_frame_t* ctx) {
     return 0;
 }
 
+int syscall_reboot(int_frame_t* ctx) {
+    uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
+    __cli();
+    ret = uacpi_reboot();
+    __hlt();
+    return 0;
+}
+
+int syscall_shutdown(int_frame_t* ctx) {
+    uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);
+    __cli();
+    ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
+    __hlt();
+    return 0; //it can UB if i dont return int
+}
+
 extern int __xhci_syscall_usbtest(int_frame_t* ctx);
 
 syscall_t syscall_table[] = {
@@ -1657,7 +1712,9 @@ syscall_t syscall_table[] = {
     {36,syscall_readdir},
     {37,syscall_readlink},
     {38,syscall_dump_mem},
-    {39,__xhci_syscall_usbtest}
+    {39,__xhci_syscall_usbtest},
+    {40,syscall_shutdown},
+    {41,syscall_reboot}
 };
 
 syscall_t* syscall_find_table(int num) {

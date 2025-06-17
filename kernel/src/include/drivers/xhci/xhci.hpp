@@ -181,7 +181,7 @@ typedef struct {
     uint16_t trb_limit;
     uint64_t queue;
     uint8_t cycle;
-    IR_t* father;
+    volatile IR_t* father;
     xhci_trb_t* trb;
     xhci_erst_t* table;
 } xhci_event_ring_ctx_t;
@@ -205,6 +205,17 @@ typedef struct {
 } __attribute__((packed)) xhci_input_control_ctx_t;
 
 typedef struct {
+    uint32_t D;
+    uint32_t A;
+    uint32_t reserved0[5];
+    uint8_t configvalue;
+    uint8_t interfacenum;
+    uint8_t altsetting;
+    uint8_t reserved1;
+    uint32_t align[8];
+} __attribute__((packed)) xhci_input_control_ctx64_t;
+
+typedef struct {
     uint32_t routestring : 20;
     uint8_t speed : 4;
     uint8_t reserved0 : 1;
@@ -224,6 +235,28 @@ typedef struct {
     uint8_t slotstate : 5;
     uint32_t reserved3[4];
 } __attribute__((packed)) xhci_slot_ctx_t;
+
+typedef struct {
+    uint32_t routestring : 20;
+    uint8_t speed : 4;
+    uint8_t reserved0 : 1;
+    uint8_t multitt : 1;
+    uint8_t hub : 1;
+    uint8_t contextentries : 5;
+    uint16_t maxexitlat;
+    uint8_t porthubnum;
+    uint8_t numofports;
+    uint8_t parenthubslot;
+    uint8_t parentportnum;
+    uint8_t thinktime : 2;
+    uint8_t reserved1 : 4;
+    uint16_t irtarget : 10;
+    uint8_t address;
+    uint32_t reserved2 : 19;
+    uint8_t slotstate : 5;
+    uint32_t reserved3[4];
+    uint32_t align[8];
+} __attribute__((packed)) xhci_slot_ctx64_t;
 
 typedef struct {
     uint32_t state : 3;
@@ -247,11 +280,39 @@ typedef struct {
 } __attribute__((packed)) xhci_endpoint_ctx_t;
 
 typedef struct {
+    uint32_t state : 3;
+    uint32_t reserved0 : 5;
+    uint32_t mult : 2;
+    uint32_t maxprimarystreams : 5;
+    uint32_t linear : 1;
+    uint32_t interval : 8;
+    uint32_t some_shit_with_long_name : 8;
+    uint32_t reserved1 : 1;
+    uint32_t cerr : 2;
+    uint32_t endpointtype : 3;
+    uint32_t reserved2 : 1;
+    uint32_t hid : 1;
+    uint32_t maxburstsize : 8;
+    uint32_t maxpacketsize : 16;
+    uint64_t base;
+    uint16_t averagetrblen;
+    uint16_t some_shit_with_long_name_lo;
+    uint32_t align[11];
+} __attribute__((packed)) xhci_endpoint_ctx64_t;
+
+typedef struct {
     xhci_input_control_ctx_t input_ctx;
     xhci_slot_ctx_t slot;
     xhci_endpoint_ctx_t ep0;
     xhci_endpoint_ctx_t ep[30];
 } xhci_input_ctx_t;
+
+typedef struct {
+    xhci_input_control_ctx64_t input_ctx;
+    xhci_slot_ctx64_t slot;
+    xhci_endpoint_ctx64_t ep0;
+    xhci_endpoint_ctx64_t ep[30];
+} xhci_input_ctx64_t;
 
 typedef struct {
     uint8_t len;
@@ -285,23 +346,24 @@ typedef struct {
 } xhci_string_descriptor_t;
 
 typedef struct {
-    xhci_port_ring_ctx_t* transfer_ring;
-    xhci_usb_descriptor_t* desc;
-    xhci_input_ctx_t* input_ctx;
-    uint64_t phys_input_ctx;
-    uint32_t slotid;
-    uint32_t portnum;
-} xhci_usb_device_t;
+    xhci_usb_descriptor_header head;
+    uint16_t len;
+    uint8_t numinterfaces;
+    uint8_t configval;
+    uint8_t config;
+    uint8_t attributes;
+    uint8_t maxpower;
+} xhci_config_descriptor_t;
 
 typedef struct xhci_device {
     uint64_t xhci_phys_base;
     uint64_t xhci_virt_base;
     uint64_t* dcbaa;
     uint16_t calculated_scratchpad_count;
-    xhci_cap_regs_t* cap;
-    xhci_op_regs_t* op;
-    xhci_port_regs_t* port;
-    xhci_runtime_regs_t* runtime;
+    volatile xhci_cap_regs_t* cap;
+    volatile xhci_op_regs_t* op;
+    volatile xhci_port_regs_t* port;
+    volatile xhci_runtime_regs_t* runtime;
     uint32_t* doorbell;
     xhci_command_ring_ctx_t* com_ring;
     xhci_event_ring_ctx_t* event_ring;
@@ -312,6 +374,17 @@ typedef struct xhci_device {
 
     struct xhci_device* next;
 } __attribute__((packed)) xhci_device_t;
+
+typedef struct {
+    xhci_port_ring_ctx_t* transfer_ring;
+    xhci_usb_descriptor_t* desc;
+    xhci_config_descriptor_t* config;
+    xhci_device_t* dev;
+    xhci_input_ctx_t* input_ctx;
+    uint64_t phys_input_ctx;
+    uint32_t slotid;
+    uint32_t portnum;
+} xhci_usb_device_t;
 
 typedef struct {
     union {
