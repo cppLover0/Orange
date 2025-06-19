@@ -305,14 +305,14 @@ typedef struct {
     xhci_slot_ctx_t slot;
     xhci_endpoint_ctx_t ep0;
     xhci_endpoint_ctx_t ep[30];
-} xhci_input_ctx_t;
+} __attribute__((packed)) xhci_input_ctx_t;
 
 typedef struct {
     xhci_input_control_ctx64_t input_ctx;
     xhci_slot_ctx64_t slot;
     xhci_endpoint_ctx64_t ep0;
     xhci_endpoint_ctx64_t ep[30];
-} xhci_input_ctx64_t;
+} __attribute__((packed)) xhci_input_ctx64_t;
 
 typedef struct {
     uint8_t len;
@@ -353,7 +353,58 @@ typedef struct {
     uint8_t config;
     uint8_t attributes;
     uint8_t maxpower;
+    uint8_t data[1024];
 } xhci_config_descriptor_t;
+
+typedef struct {
+    uint8_t desctype;
+    uint8_t desclen;
+} xhci_hid_sub_desc;
+
+typedef struct {
+    xhci_usb_descriptor_header head;
+    uint16_t hid;
+    uint8_t country;
+    uint8_t numdesc;
+    xhci_hid_sub_desc desc[1024];
+} xhci_hid_descriptor_t;
+
+typedef struct {
+    xhci_usb_descriptor_header head;
+    uint8_t endpointaddr;
+    uint8_t attributes;
+    uint16_t maxpacketsize;
+    uint8_t interval;
+} xhci_endpoint_descriptor_t;
+
+typedef struct {
+    xhci_usb_descriptor_header head;
+    uint8_t num;
+    uint8_t altsetting;
+    uint8_t numendpoints;
+    uint8_t interclass;
+    uint8_t intersubclass;
+    uint8_t protocol;
+    uint8_t interface;
+} xhci_interface_descriptor_t;
+
+typedef struct {
+    uint32_t cycle : 1;
+    uint32_t reserved0 : 8;
+    uint32_t deconfigure : 1;
+    uint32_t type : 6;
+    uint32_t reserved1 : 8;
+    uint32_t slot : 8;
+} xhci_configure_endpoints_info_trb_t;
+
+typedef struct {
+    uint64_t base;
+    uint32_t status;
+    union {
+        xhci_configure_endpoints_info_trb_t info_s;
+        uint32_t info;
+    };
+} xhci_configure_endpoints_trb_t;
 
 typedef struct xhci_device {
     uint64_t xhci_phys_base;
@@ -375,16 +426,62 @@ typedef struct xhci_device {
     struct xhci_device* next;
 } __attribute__((packed)) xhci_device_t;
 
-typedef struct {
+typedef struct xhci_interface {
+    uint8_t type;
+    void* data;
+
+    uint64_t len;
+    void* buffer;
+    
+    xhci_interface* next;
+} xhci_interface_t;
+
+#define USB_TYPE_KEYBOARD 4
+#define USB_TYPE_MOUSE 3
+
+typedef struct xhci_usb_device {
     xhci_port_ring_ctx_t* transfer_ring;
     xhci_usb_descriptor_t* desc;
     xhci_config_descriptor_t* config;
     xhci_device_t* dev;
     xhci_input_ctx_t* input_ctx;
+    xhci_port_ring_ctx_t* ep_ctx[30];
+    uint8_t* buffers[30];
+    uint8_t main_ep;
+    uint16_t buffers_need_size[30];
+    uint8_t doorbell_values[30];
+    xhci_interface_t* interface;
+    struct xhci_usb_device* next;
     uint64_t phys_input_ctx;
     uint32_t slotid;
     uint32_t portnum;
+    uint32_t type;
+    uint8_t _is64byte;
+    uint8_t add_buffer[8];
 } xhci_usb_device_t;
+
+typedef struct {
+    uint32_t cycle : 1;
+    uint32_t reserved0 : 1;
+    uint32_t eventdata : 1;
+    uint32_t reserved1 : 7;
+    uint32_t type : 6;
+    uint32_t ep_id : 5;
+    uint32_t reserved2 : 3;
+    uint32_t slot : 8;
+} xhci_done_info_trb_t;
+
+typedef struct {
+    uint64_t base;
+    struct {
+        uint32_t seek : 24;
+        uint32_t ret_code : 8;
+    };
+    union {
+        xhci_done_info_trb_t info_s;
+        uint32_t info;
+    };
+} xhci_done_trb_t;
 
 typedef struct {
     union {
@@ -500,6 +597,63 @@ typedef struct {
     uint32_t reserved4 : 15;
 } xhci_statusstage_trb_t;
 
+typedef struct {
+    uint32_t cycle : 1;
+    uint32_t ent : 1;
+    uint32_t isp : 1;
+    uint32_t nosnoop : 1;
+    uint32_t chain : 1;
+    uint32_t ioc : 1;
+    uint32_t imdata : 1;
+    uint32_t reserved0 : 2;
+    uint32_t bei : 1;
+    uint32_t type : 6;
+    uint32_t dir : 1;
+    uint32_t reserved1 : 15;
+} xhci_normal_info_trb_t;
+
+typedef struct {
+    uint64_t base;
+    uint32_t trbtransferlen : 17;
+    uint32_t tdsize : 5;
+    uint32_t target : 10;
+    union {
+        xhci_normal_info_trb_t info_s;
+        uint32_t info;
+    };
+} xhci_normal_trb_t;
+
+typedef struct {
+    uint32_t cycle : 1;
+    uint32_t reserved0 : 9;
+    uint32_t type : 6;
+    uint32_t reserved1 : 16;
+} xhci_port_change_info_t;
+
+typedef struct {
+    struct {
+        uint32_t reserved0 : 24;
+        uint32_t port : 8;
+    };
+    uint32_t status;
+    union {
+        xhci_port_change_info_t info_s;
+        uint32_t info;
+    };
+} xhci_port_change_trb_t;
+
+typedef struct xhci_hid_driver {
+    void (*func)(xhci_usb_device_t* usbdev,xhci_done_trb_t* trb);
+    int type;
+    struct xhci_hid_driver* next;
+} xhci_hid_driver_t;
+
+#define XHCI_ENDPOINTTYPE_ISOCHRONOUS_OUT  1
+#define XHCI_ENDPOINTTYPE_BULK_OUT         2
+#define XHCI_ENDPOINTTYPE_INTERRUPT_OUT    3
+#define XHCI_ENDPOINTTYPE_ISOCHRONOUS_IN   5
+#define XHCI_ENDPOINTTYPE_BULK_IN          6
+#define XHCI_ENDPOINTTYPE_INTERRUPT_IN     7
 #define TRB_NORMAL_TYPE 1 
 #define TRB_SETUPSTAGE_TYPE 2
 #define TRB_DATASTAGE_TYPE 3
@@ -533,4 +687,5 @@ typedef struct {
 class XHCI {
 public:
     static void Init();
+    static void HIDRegister(void (*func)(xhci_usb_device_t* usbdev,xhci_done_trb_t* trb),int type);
 };

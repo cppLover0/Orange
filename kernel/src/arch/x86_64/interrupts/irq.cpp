@@ -31,7 +31,7 @@ extern "C" void irqHandler(int_frame_t* ctx) {
         ctx->cs |= 3;
         ctx->ss |= 3;
     }
-
+    
     Lapic::EOI();
 
 }

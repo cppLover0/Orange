@@ -38,6 +38,7 @@
 #include <arch/x86_64/cpu/sse.hpp>
 #include <generic/memory/vmm.hpp>
 #include <drivers/xhci/xhci.hpp>
+#include <drivers/usbkeyboard/usbkeyboard.hpp>
 
 extern void (*__init_array[])();
 extern void (*__init_array_end[])();
@@ -171,6 +172,9 @@ extern "C" void kmain() {
     INFO("Syscall initializied\n");
 
     XHCI::Init();
+
+    USBKeyboard::Init();
+    INFO("USB Keyboard initializied\n");
 
     PCI::Init();
     INFO("PCI initializied\n");

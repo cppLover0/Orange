@@ -13,6 +13,16 @@ Currenly it have bash,coreutils,lua and fastfetch ports
 ## Preview
 ![fastfetch and lua](https://github.com/cppLover0/Orange/blob/main/tools/img/work.png?raw=true)
 
+## Devices which supported by orange
+
+- [x] Serial
+- [x] CMOS
+- [x] HPET
+- [x] IOAPIC
+- [x] PS/2 Keyboard
+- [x] XHCI
+- [x] USB Keyboard
+
 # Build
 
 Build kernel
@@ -78,7 +88,7 @@ make
 - [x] PS2 Keyboard 
 - [ ] Speaker
 - [ ] AHCI
-- [ ] XHCI/HID/USB
+- [x] XHCI/HID/USB
 - [ ] NVME
 - [ ] Networking
 - [ ] Intel HDA
