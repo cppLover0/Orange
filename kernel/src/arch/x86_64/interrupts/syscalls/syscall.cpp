@@ -117,7 +117,7 @@ int syscall_debug_print(int_frame_t* ctx) {
 
         LogUnlock();
 
-        DEBUG("%s",ptr);
+        DLog(ptr);
 
         return 0;
 
