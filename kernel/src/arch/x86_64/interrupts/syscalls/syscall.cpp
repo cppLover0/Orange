@@ -22,10 +22,12 @@
 #include <generic/memory/vmm.hpp>
 #include <generic/VFS/ustar.hpp>
 #include <other/assert.hpp>
+#include <drivers/hpet/hpet.hpp>
 #include <other/other.hpp>
 #include <generic/limineA/limineinfo.hpp>
 #include <other/debug.hpp>
 #include <uacpi/sleep.h>
+#include <generic/VFS/devfs.hpp>
 #include <uacpi/status.h>
 
 extern "C" void syscall_handler();
@@ -115,7 +117,7 @@ int syscall_debug_print(int_frame_t* ctx) {
 
         LogUnlock();
 
-        DLog(ptr);
+        DEBUG("%s",ptr);
 
         return 0;
 
@@ -215,6 +217,7 @@ int syscall_open(int_frame_t* ctx) {
         VFS::Touch(path);
     
     filestat_t zx;
+    String::memset(&zx,0,sizeof(filestat_t));
     int stt = VFS::Stat(path,(char*)&zx,1); 
 
     if(stt && stt != -15)
@@ -1158,6 +1161,12 @@ int syscall_ioctl(int_frame_t* ctx) {
         case TIOCGWINSZ:
             size = sizeof(winsize_t);
             break;
+        case FBIOGET_VSCREENINFO:
+            size = sizeof(fb_var_screeninfo);
+            break;
+        case FBIOGET_FSCREENINFO:
+            size = sizeof(fb_fix_screeninfo);
+            break;
         default:
             return 38;
     }
@@ -1669,6 +1678,11 @@ int syscall_shutdown(int_frame_t* ctx) {
     ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
     __hlt();
     return 0; //it can UB if i dont return int
+}
+
+int syscall_timestamp(int_frame_t* ctx) {
+    ctx->rdx = HPET::NanoCurrent();
+    return 0;
 }
 
 extern int __xhci_syscall_usbtest(int_frame_t* ctx);

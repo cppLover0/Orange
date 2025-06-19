@@ -121,7 +121,7 @@ int tty_askforpipe(pipe_t* pipe) {
 
 }
 
-int tty_write(char* buffer,uint64_t size) {
+int tty_write(char* buffer,uint64_t size,uint64_t offset) {
     extern flanterm_context* ft_ctx;
     flanterm_write(ft_ctx,buffer,size);
     Serial::WriteArray((uint8_t*)buffer,size);

@@ -1,0 +1,23 @@
+diff -Naur grep-3.12/build-aux/config.sub grep-patched/build-aux/config.sub
+--- grep-3.12/build-aux/config.sub	2024-09-08 20:27:13.000000000 +0300
++++ grep-patched/build-aux/config.sub	2025-06-19 12:53:09.066184942 +0300
+@@ -2013,6 +2013,7 @@
+ 	| gnu* \
+ 	| go32* \
+ 	| haiku* \
++	| orange* \
+ 	| hcos* \
+ 	| hiux* \
+ 	| hms* \
+diff -Naur grep-3.12/gnulib-tests/getlocalename_l-unsafe.c grep-patched/gnulib-tests/getlocalename_l-unsafe.c
+--- grep-3.12/gnulib-tests/getlocalename_l-unsafe.c	2025-06-19 20:47:19.065503499 +0300
++++ grep-patched/gnulib-tests/getlocalename_l-unsafe.c	2025-04-03 00:47:17.000000000 +0300
+@@ -480,7 +480,7 @@
+            nl_langinfo_l (_NL_LOCALE_NAME (category), locale).  */
+         name = locale->__names[category];
+       return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#elif defined __linux__ && HAVE_LANGINFO_H && defined NL_LOCALE_NAME || defined __mlibc__ || defined __orange__
++#elif defined __linux__ && HAVE_LANGINFO_H && defined NL_LOCALE_NAME
+       /* musl libc */
+       const char *name = nl_langinfo_l (NL_LOCALE_NAME (category), locale);
+       return (struct string_with_storage) { name, STORAGE_OBJECT };

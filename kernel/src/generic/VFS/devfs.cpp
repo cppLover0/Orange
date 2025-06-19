@@ -4,6 +4,7 @@
 #include <generic/VFS/vfs.hpp>
 #include <other/log.hpp>
 #include <other/string.hpp>
+#include <generic/limineA/limineinfo.hpp>
 #include <config.hpp>
 #include <generic/memory/pmm.hpp>
 #include <generic/memory/heap.hpp>
@@ -50,7 +51,7 @@ int devfs_write(char* buffer,char* filename,uint64_t size,char is_symlink_path,u
     if(!dev) return 4;
     if(!dev->write) return 5;
 
-    return dev->write(buffer,size);
+    return dev->write(buffer,size,offset);
 
 }
 
@@ -95,7 +96,7 @@ int devfs_instantreadpipe(char* filename,pipe_t* pipe) {
     return dev->instantreadpipe(pipe);
 }
 
-void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, void* result)) {
+void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size,uint64_t offset),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, void* result)) {
 
     struct devfs_dev* dev = (devfs_dev_t*)PMM::VirtualAlloc();
     
@@ -135,12 +136,53 @@ int zero_read(char* buffer,long hint_size) {
     String::memset(buffer,0,hint_size < 0 ? hint_size * (-1) : hint_size);
 
     return 0;
+}
 
+int fbdev_write(char* buffer,uint64_t size,uint64_t offset) {
+    LimineInfo info;
+    uint64_t fb = (uint64_t)info.fb_info->address;
+    fb += offset;
+    if(size > (info.fb_info->width * info.fb_info->pitch))
+        size = (info.fb_info->width * info.fb_info->pitch);
+    String::memcpy((void*)fb,buffer,size);
+    return 0;
+}
+
+int fbdev_ioctl(unsigned long request, void *arg, void* result) {
+    LimineInfo info;
+    switch(request) {
+        case FBIOGET_VSCREENINFO: {
+            fb_var_screeninfo fb;
+            String::memset(&fb,0,sizeof(fb_var_screeninfo));
+            fb.red.length = info.fb_info->red_mask_size;
+            fb.red.offset = info.fb_info->red_mask_shift;
+            fb.blue.offset = info.fb_info->blue_mask_shift;
+            fb.blue.length = info.fb_info->blue_mask_size;
+            fb.green.length = info.fb_info->green_mask_size;
+            fb.green.offset = info.fb_info->green_mask_shift;
+            fb.xres = info.fb_info->width;
+            fb.yres = info.fb_info->height;
+            fb.bits_per_pixel = info.fb_info->bpp < 5 ? (info.fb_info->bpp * 8) : info.fb_info->bpp;
+            fb.xres_virtual = info.fb_info->width;
+            fb.yres_virtual = info.fb_info->height;
+            String::memcpy(arg,&fb,sizeof(fb_var_screeninfo));
+            break;
+        }
+        case FBIOGET_FSCREENINFO: {
+            fb_fix_screeninfo fb;
+            String::memset(&fb,0,sizeof(fb_fix_screeninfo));
+            fb.line_length = info.fb_info->pitch;
+            fb.smem_len = info.fb_info->pitch * info.fb_info->width;
+            String::memcpy(arg,&fb,sizeof(fb_fix_screeninfo));
+        }
+    }
+    return 0;
 }
 
 void devfs_init(filesystem_t* fs) {
     devfs_reg_device("/zero",0,zero_read,0,0,0);
     devfs_reg_device("/null",0,zero_read,0,0,0);
+    devfs_reg_device("/fb0",fbdev_write,0,0,0,fbdev_ioctl);
 
     fs->create = 0;
     fs->disk = 0;
