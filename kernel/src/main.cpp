@@ -195,10 +195,10 @@ extern "C" void kmain() {
 
     filestat_t stat;
 
-    VFS::Stat("/usr/bin/initrd",(char*)&stat,1);
+    VFS::Stat("/usr/bin/bash",(char*)&stat,1);
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
-    VFS::Read(elf,"/usr/bin/initrd",0);
+    VFS::Read(elf,"/usr/bin/bash",0);
 
     INFO("Loaded initrd !\n");
 
@@ -217,7 +217,7 @@ extern "C" void kmain() {
     serial_proc->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
     Process::WakeUp(serial);
 
-    const char* pa = "/usr/bin/initrd";
+    const char* pa = "/usr/bin/bash";
     const char* ea = "=";
 
     char* initrd_argv[2];
@@ -228,7 +228,7 @@ extern "C" void kmain() {
     initrd_envp[0] = (char*)ea;
     initrd_envp[1] = 0;
 
-    Process::loadELFProcess(initrd,"/usr/bin/initrd",(uint8_t*)elf,initrd_argv,initrd_envp);
+    Process::loadELFProcess(initrd,"/usr/bin/bash",(uint8_t*)elf,initrd_argv,initrd_envp);
 
     process_t* initrd_proc = Process::ByID(initrd);
 

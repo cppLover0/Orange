@@ -21,6 +21,7 @@ typedef struct process_struct {
     struct process_struct* next;
 
     char type;
+    char is_blocked;
     char status;
     char user;
     char* cwd;

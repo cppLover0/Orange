@@ -9,6 +9,7 @@ typedef struct vmm_obj {
     uint64_t phys;
     uint64_t len;
     uint64_t flags;
+    uint8_t is_mapped;
 
     uint64_t src_len;
 

@@ -191,6 +191,8 @@ int syscall_open(int_frame_t* ctx) {
     String::memcpy(buffer,name,String::strlen(name));
     Paging::EnableKernel();    
 
+    //SINFO("first %s second %s\n",buffer,proc->cwd);
+
     if(buffer[String::strlen(buffer) - 1] == '/' && String::strcmp(buffer,"/"))
         buffer[String::strlen(buffer) - 1] = '\0';
 
@@ -211,8 +213,7 @@ int syscall_open(int_frame_t* ctx) {
 
     resolve_path(buffer,path1,path,1);  
     
-    //Log(LOG_LEVEL_DEBUG,"Opening %s\n",path);
-
+    SDEBUG("Opening %s %s %s\n",buffer,path1,path);
     if(flags & O_CREAT)
         VFS::Touch(path);
     
@@ -688,6 +689,29 @@ int syscall_mmap(int_frame_t* ctx) {
 
     process_t* proc = CpuData::Access()->current;
 
+    if(fd > 0) {
+        fd_t* fd_s = FD::Search(proc,fd);
+
+        if(!fd_s)
+            return EBADF;
+
+        filestat_t stat;
+        int st = VFS::Stat(fd_s->path_point,(char*)&stat,1);
+
+        if(st)
+            return ENOENT;
+
+        INFO("MMAP phys 0x%p, len 0x%p\n");
+
+        uint64_t phys = HHDM::toPhys((uint64_t)stat.content);
+
+        hint = (uint64_t)VMM::Map(proc,phys,stat.size,PTE_RW | PTE_PRESENT | PTE_USER);
+        
+        ctx->rdx = hint;
+        return 0;
+    
+    }
+
     if(!size) return -1;
 
     uint64_t size_in_pages = ALIGNPAGEUP(size) / 4096; 
@@ -1052,6 +1076,7 @@ int syscall_stat(int_frame_t* ctx) {
     filestat_t stat;
     int st = VFS::Stat(fd_s->path_point,(char*)&stat,1);
 
+    stat_t stat0;
 
     if(fd_s->type == FD_PIPE)
         st = -15;
@@ -1059,18 +1084,21 @@ int syscall_stat(int_frame_t* ctx) {
     if(st && st != -15)
         return ENOENT;
 
+    if(st != -15) {
+        stat0.st_size = stat.size;
+        stat0.st_mode = stat.type == VFS_TYPE_FILE ? S_IFREG : S_IFDIR;
+        
+    } else {
+        stat0.st_size = 0;
+        stat0.st_mode = S_IFREG | S_IFCHR;
+    }
+
+    SDEBUG("Stating %s\n",fd_s->path_point);
+
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
 
     String::memset(out,0,sizeof(stat_t));
-    if(st != -15) {
-        out->st_size = stat.size;
-        out->st_mode = stat.type == VFS_TYPE_FILE ? S_IFREG : S_IFDIR;
-        
-    } else {
-        out->st_size = 0;
-        out->st_mode = S_IFREG | S_IFCHR;
-    }
-    
+    String::memcpy(out,&stat0,sizeof(stat_t));
     Paging::EnableKernel();
 
     return 0;
@@ -1105,11 +1133,24 @@ int syscall_kill(int_frame_t* ctx) {
     }
 
     process_t* proc = Process::ByID(pid);
+    process_t* hproc = CpuData::Access()->current;
     if(!proc)
         return EFAULT;
     
-    while(proc->status == PROCESS_STATUS_IN_USE) {__nop();}
-    proc->status = PROCESS_STATUS_BLOCKED;
+    if(proc->status == PROCESS_STATUS_KILLED)
+        return 0; // chill :)
+
+    if(proc->status == PROCESS_STATUS_IN_USE) {
+        proc->is_blocked = 1;
+        int timeout = 10000;
+        while(proc->status == PROCESS_STATUS_IN_USE) {
+            if(timeout == 0)
+                break; 
+            HPET::Sleep(1000);
+            timeout--;
+        }
+    } else
+        proc->status = PROCESS_STATUS_BLOCKED;
 
     fd_t* fd = (fd_t*)proc->start_fd;
     while(fd) {
@@ -1681,6 +1722,7 @@ int syscall_shutdown(int_frame_t* ctx) {
 }
 
 int syscall_timestamp(int_frame_t* ctx) {
+    //INFO("Timestamp\n");
     ctx->rdx = HPET::NanoCurrent();
     return 0;
 }
@@ -1728,7 +1770,8 @@ syscall_t syscall_table[] = {
     {38,syscall_dump_mem},
     {39,__xhci_syscall_usbtest},
     {40,syscall_shutdown},
-    {41,syscall_reboot}
+    {41,syscall_reboot},
+    {42,syscall_timestamp}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -1743,6 +1786,7 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
+    //SINFO("Sys %d\n",sys->num);
     CpuData::Access()->last_syscall = ctx->rax;
 
     if(sys == 0) {

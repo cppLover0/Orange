@@ -130,7 +130,9 @@ char VFS::Exists(char* filename) {
     if(!fs) return -1;
     if(!fs->fs->exists) return 0;
     
-    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+    char* filename_as_fs = filename;
+    if(String::strcmp(filename,"/"))
+        filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->exists(filename_as_fs);
     //spinlock_unlock(&vfs_spinlock);
     return status;
@@ -145,8 +147,10 @@ int VFS::Stat(char* filename, char* buffer,char follow_symlinks) {
 
     if(!fs) return -1;
     if(!fs->fs->stat) return -15;
-    
-    char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+
+    char* filename_as_fs = filename;
+    if(String::strcmp(filename,"/"))
+        filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->stat(filename_as_fs,buffer,follow_symlinks);
     //spinlock_unlock(&vfs_spinlock);
     return status;

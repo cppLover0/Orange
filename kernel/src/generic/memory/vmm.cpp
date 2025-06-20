@@ -69,6 +69,8 @@ vmm_obj_t* __vmm_alloc(vmm_obj_t* vmm_start,uint64_t length) {
                 prev->next = vmm_new;
                 vmm_new->next = current;
 
+                vmm_new->is_mapped = 0;
+
                 return vmm_new;
             }
         }
@@ -152,6 +154,7 @@ void* VMM::Map(process_t* proc,uint64_t base,uint64_t length,uint64_t flags) {
     vmm_new->flags = flags;
     vmm_new->phys = base;
     vmm_new->src_len = length;
+    vmm_new->is_mapped = 1;
 
     if(proc)
         __vmm_map(proc->ctx.cr3,vmm_new->base,base,flags,length);
@@ -253,7 +256,7 @@ void VMM::Free(process_t* proc) {
         if(current->base == info.hhdm_offset - PAGE_SIZE)
             next = 0;
 
-        if(current->phys) {
+        if(current->phys && !current->is_mapped) {
             PMM::Free(current->phys);
         }
 

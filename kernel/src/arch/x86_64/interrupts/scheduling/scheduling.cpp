@@ -65,7 +65,7 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
     while(1) {
         while(proc) {
             if(proc != head_proc) {
-                if(proc->status == PROCESS_STATUS_RUN) {
+                if(proc->status == PROCESS_STATUS_RUN && !proc->is_blocked) {
                     proc->status = PROCESS_STATUS_IN_USE;
                     CpuData::Access()->current = proc;
 
@@ -368,6 +368,7 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
 
     proc->nah_cr3 = proc->ctx.cr3;
+    proc->is_blocked = 0;
 
     proc->next = 0;
     __process_load_queue(proc);

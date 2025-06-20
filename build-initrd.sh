@@ -26,7 +26,6 @@ ln -s ../usr/lib/ld.so ld64.so.1
 cd ../../
 mkdir -p initrd/bin
 mkdir -p initrd/usr/bin
-x86_64-orange-gcc tools/test_init/main.c -o initrd/usr/bin/initrd -no-pie
 rm -rf tools/iso/boot/initrd.tar
 cd tools/pkg
 bash build_pkg.sh "$CURRENT_DIR/initrd/usr"

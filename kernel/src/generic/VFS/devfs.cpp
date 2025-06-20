@@ -36,7 +36,7 @@ int devfs_read(char* buffer,char* filename,long hint_size) {
     devfs_dev_t* dev = devfs_find_dev(filename);
 
     if(!dev) return 3;
-    if(!dev->read) return 4;
+    if(!dev->read) return -15;
 
     return dev->read(buffer,hint_size);
 }
@@ -49,7 +49,7 @@ int devfs_write(char* buffer,char* filename,uint64_t size,char is_symlink_path,u
     devfs_dev_t* dev = devfs_find_dev(filename);
 
     if(!dev) return 4;
-    if(!dev->write) return 5;
+    if(!dev->write) return -15;
 
     return dev->write(buffer,size,offset);
 
@@ -61,7 +61,7 @@ int devfs_ioctl(char* filename,unsigned long request, void *arg, int *result) {
     devfs_dev_t* dev = devfs_find_dev(filename);
 
     if(!dev) return 4;
-    if(!dev->ioctl) return 0;
+    if(!dev->ioctl) return -15;
 
     return dev->ioctl(request,arg,(void*)result);
 
@@ -77,7 +77,7 @@ int devfs_askforpipe(char* filename,pipe_t* pipe) {
     devfs_dev_t* dev = devfs_find_dev(filename);
 
     if(!dev) return 4;
-    if(!dev->askforpipe) return 5;
+    if(!dev->askforpipe) return -15;
 
     return dev->askforpipe(pipe);
 
@@ -91,9 +91,22 @@ int devfs_instantreadpipe(char* filename,pipe_t* pipe) {
     devfs_dev_t* dev = devfs_find_dev(filename);
 
     if(!dev) return 4;
-    if(!dev->instantreadpipe) return 5;
+    if(!dev->instantreadpipe) return -15;
 
     return dev->instantreadpipe(pipe);
+}
+
+int devfs_stat(char* filename,char* buffer,char follow_symlinks) {
+    if(!filename) return 1;
+
+    if(!buffer) return 2;
+
+    devfs_dev_t* dev = devfs_find_dev(filename);
+
+    if(!dev) return 4;
+    if(!dev->stat) return -15;
+
+    return dev->stat(buffer);
 }
 
 void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size,uint64_t offset),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void *arg, void* result)) {
@@ -123,6 +136,11 @@ void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size,u
 
 }
 
+void devfs_advanced_configure(const char* name,int (*stat)(char* buffer)) {
+    devfs_dev_t* dev = devfs_find_dev(name);
+    dev->stat = stat;
+}
+
 /*
 
 Some basic devfs 
@@ -143,7 +161,7 @@ int fbdev_write(char* buffer,uint64_t size,uint64_t offset) {
     uint64_t fb = (uint64_t)info.fb_info->address;
     fb += offset;
     if(size > (info.fb_info->width * info.fb_info->pitch))
-        size = (info.fb_info->width * info.fb_info->pitch);
+        size = (info.fb_info->width * info.fb_info->pitch) - offset;
     String::memcpy((void*)fb,buffer,size);
     return 0;
 }
@@ -179,10 +197,22 @@ int fbdev_ioctl(unsigned long request, void *arg, void* result) {
     return 0;
 }
 
+int fbdev_stat(char* buffer) {
+    filestat_t* stat = (filestat_t*)buffer;
+    LimineInfo info;
+    stat->content = (char*)info.fb_info->address;
+    stat->size = info.fb_info->pitch * info.fb_info->width;
+    stat->fs_prefix1 = 'D';
+    stat->fs_prefix2 = 'E';
+    stat->fs_prefix3 = 'V';
+    return 0;
+}
+
 void devfs_init(filesystem_t* fs) {
     devfs_reg_device("/zero",0,zero_read,0,0,0);
     devfs_reg_device("/null",0,zero_read,0,0,0);
     devfs_reg_device("/fb0",fbdev_write,0,0,0,fbdev_ioctl);
+    devfs_advanced_configure("/fb0",fbdev_stat);
 
     fs->create = 0;
     fs->disk = 0;
@@ -193,7 +223,7 @@ void devfs_init(filesystem_t* fs) {
     fs->askforpipe = devfs_askforpipe;
     fs->ioctl = devfs_ioctl;
     fs->touch = 0;
-    fs->stat = 0;
+    fs->stat = devfs_stat;
     fs->rm = 0;
 
 }

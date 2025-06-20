@@ -175,6 +175,9 @@ void resolve_path(const char* inter,const char* base, char *result, char spec) {
         if(!String::strcmp(buffer,"..")) {
             uint64_t mm = resolve_count(final_buffer,ptr,'/');
 
+            if(!String::strcmp(final_buffer,"/\0"))
+                continue;
+
             if(ptr < mm) {
                 final_buffer[0] = '/';
                 final_buffer[1] = '\0';
