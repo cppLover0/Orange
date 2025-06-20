@@ -212,8 +212,6 @@ int syscall_open(int_frame_t* ctx) {
     String::memcpy(path1,first,ptr);
 
     resolve_path(buffer,path1,path,1);  
-    
-    SDEBUG("Opening %s %s %s\n",buffer,path1,path);
     if(flags & O_CREAT)
         VFS::Touch(path);
     
@@ -223,6 +221,12 @@ int syscall_open(int_frame_t* ctx) {
 
     if(stt && stt != -15)
         return ENOENT;
+
+    if(stt == -15 && String::strcmp(path,"/")) {
+        int test = VFS::Exists(path);
+        if(!test)
+            return ENOENT;
+    }
 
     if(zx.type != VFS_TYPE_DIRECTORY && (flags & O_DIRECTORY))
         return ENOTDIR;
@@ -244,6 +248,7 @@ int syscall_open(int_frame_t* ctx) {
     String::memset(&fd_s->reserved_stat,0,sizeof(filestat_t));
 
     fd_s->reserved_stat.name = (char*)1;
+
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     *fdout = fd;
@@ -466,17 +471,23 @@ int syscall_read(int_frame_t* ctx) {
 
     if(VFS::Stat(file->path_point,(char*)&stat,1) == -15) {
         
+        if(file->seek_offset == -1) {
+            ctx->rdx = 0;
+            return 0;
+        }
+
         char* dest_buf = (char*)PMM::VirtualBigAlloc(SIZE_TO_PAGES(count));
 
         __prepare_file_content_syscall(dest_buf,count,ctx->cr3);
 
-        VFS::Read(file->path_point,file->path_point,count);
+        VFS::Read(dest_buf,file->path_point,count);
 
         Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
         String::memset(buf,0,count);
         String::memcpy(buf,dest_buf,count);
         Paging::EnableKernel();
 
+        file->seek_offset = -1;
         ctx->rdx = count;
         
         return 0;
@@ -1786,7 +1797,6 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
-    //SINFO("Sys %d\n",sys->num);
     CpuData::Access()->last_syscall = ctx->rax;
 
     if(sys == 0) {

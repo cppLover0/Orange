@@ -7,6 +7,7 @@
 #include <generic/locks/spinlock.hpp>
 #include <generic/VFS/tmpfs.hpp>
 #include <generic/VFS/devfs.hpp>
+#include <generic/VFS/procfs.hpp>
 
 mount_location_t mount_points[MAX_MOUNT_POINTS];
 uint16_t mount_points_ptr = 0;
@@ -242,16 +243,26 @@ int VFS::Count(char* filename,int idx,int count) {
 
 void VFS::Init() {
     filesystem_t* tmpfs = new filesystem_t;
+    String::memset(tmpfs,0,sizeof(filesystem_t));
     mount_points[0].loc = "/";
     mount_points[0].fs = tmpfs;
     TMPFS::Init(tmpfs);
     INFO("TmpFS initializied\n");
 
     filesystem_t* devfs = new filesystem_t;
+    String::memset(devfs,0,sizeof(filesystem_t));
     mount_points[1].loc = "/dev/";
     mount_points[1].fs = devfs;
     devfs_init(devfs);
-
     INFO("DevFS initializied\n");
+
+    filesystem_t* procfs = new filesystem_t;
+    String::memset(procfs,0,sizeof(filesystem_t));
+    mount_points[2].loc = "/proc/";
+    mount_points[2].fs = procfs;
+    ProcFS::Init(procfs);
+    INFO("ProcFS initializied\n");
+
+    
 
 }

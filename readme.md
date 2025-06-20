@@ -72,10 +72,15 @@ make
 
 - [x] bash
 - [x] coreutils
+- [x] grep
+- [ ] awk
+- [ ] make
 - [ ] doom2
 - [ ] nasm
 - [ ] gcc
 - [x] lua
+- [ ] x11
+- [ ] ace of penguins
 - [ ] python
 - [ ] etc. apps
 
@@ -100,7 +105,7 @@ make
 - [x] TMPFS
 - [x] USTAR
 - [x] DevFS
-- [ ] ProcFS
+- [x] ProcFS
 - [ ] ISO9660
 - [ ] FAT32
 - [ ] EXT4

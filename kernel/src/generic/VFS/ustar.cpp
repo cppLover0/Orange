@@ -5,6 +5,7 @@
 #include <generic/VFS/vfs.hpp>
 #include <other/assert.hpp>
 #include <other/string.hpp>
+#include <other/debug.hpp>
 #include <other/log.hpp>
 #include <generic/VFS/tmpfs.hpp>
 #include <generic/memory/paging.hpp> // it have align macros
@@ -175,8 +176,11 @@ void resolve_path(const char* inter,const char* base, char *result, char spec) {
         if(!String::strcmp(buffer,"..")) {
             uint64_t mm = resolve_count(final_buffer,ptr,'/');
 
-            if(!String::strcmp(final_buffer,"/\0"))
+            if(!String::strcmp(final_buffer,"/\0")) {
+                buffer = __ustar__strtok(0,"/");
                 continue;
+            }
+                
 
             if(ptr < mm) {
                 final_buffer[0] = '/';
@@ -205,6 +209,7 @@ void resolve_path(const char* inter,const char* base, char *result, char spec) {
     }
     
     String::memset(result,0,1024);
+
     normalize_path(final_buffer,result,2048);
 
     //Log("F %s\n",result);
@@ -276,7 +281,7 @@ void USTAR::ParseAndCopy() {
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);
 
     }
-
+    
     //tmpfs_dump();
 
 }
