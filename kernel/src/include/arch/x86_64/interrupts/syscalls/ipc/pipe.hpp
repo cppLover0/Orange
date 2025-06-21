@@ -34,6 +34,7 @@ typedef struct pipe {
     int is_used;
     char is_eof;
     
+    uint8_t free_block;
     char connected_pipes;
 
     uint32_t reserved;

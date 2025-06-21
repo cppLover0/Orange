@@ -95,4 +95,10 @@ syscall_waitpid_stage2_asm:
     mov rdi,rsi
     mov rsi,rdx
     jmp syscall_waitpid_stage2
-
+    
+global syscall_sleep_stage2_asm
+extern syscall_sleep_stage2
+syscall_sleep_stage2_asm:
+    mov rsp,rdi
+    mov rdi,rsi
+    jmp syscall_sleep_stage2

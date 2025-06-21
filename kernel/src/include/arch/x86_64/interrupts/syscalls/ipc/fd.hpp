@@ -212,6 +212,7 @@
 #define TIOCPKT_DOSTOP           32
 #define TIOCPKT_IOCTL            64
 #define TIOCSER_TEMT	            0x01
+#define TTY_RELEASE_IOCTL 0xFFFF0001
 
 typedef struct {
 	unsigned short ws_row;

@@ -336,9 +336,6 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
 
     //Log(LOG_LEVEL_DEBUG,"Reading from /dev/tty\n");
 
-    if(file->path_point[0])
-        VFS::AskForPipe(file->path_point,&file->pipe);
-
     process_t* proc = CpuData::Access()->current;
 
     if(!file->is_pipe_pointer) {
@@ -357,11 +354,13 @@ extern "C" int syscall_read_stage_2(int_frame_t* ctx,fd_t* file) {
                 ctx->rdx = file->pipe.buffer_size;
                 file->pipe.buffer_size = 0;
 
+                file->pipe.is_used = 0;
                 String::memset(file->pipe.buffer,0,16*4096);
 
                 ctx->rax = 0;
 
                 proc->is_eoi = 1;
+                
 
                 Lapic::EOI();
                 syscall_end(ctx);
@@ -441,16 +440,45 @@ int syscall_read(int_frame_t* ctx) {
         return EBADF;
 
     if(file->type == FD_PIPE) {
-        file->pipe.buffer_size = 0;
+        
         
         //proc->is_cli = 0;
         if(!file->is_pipe_pointer) {
+            uint64_t old = file->pipe.buffer_size;
+            file->pipe.buffer_size = 0;
+            VFS::AskForPipe(file->path_point,&file->pipe);
 
-            if(file->pipe.type == PIPE_WAIT || (!String::strcmp("/dev/tty",file->path_point))) {
+            if(file->pipe.type == PIPE_WAIT) {
                 proc->is_eoi = 0;
+                
                 String::memcpy(proc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
                 syscall_read_stage_2_asm((uint64_t)proc->wait_stack + 4096,proc->syscall_wait_ctx,file);
                 return -20;
+            } if(file->pipe.type == PIPE_INSTANT) {
+                file->pipe.buffer_size = old;
+                if(!file->pipe.is_received && file->pipe.buffer_size) {
+                    
+                    
+                    count = count > file->pipe.buffer_size ? file->pipe.buffer_size : count;
+                    char* pipe_buffer = file->pipe.buffer;
+                    __prepare_file_content_syscall(pipe_buffer,16 * 4096,ctx->cr3);
+                    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+                    String::memset(buf,0,count);
+                    String::memcpy(buf,pipe_buffer,count);
+                    Paging::EnableKernel();
+                    String::memset(file->pipe.buffer,0,16 * 4096);
+                    file->pipe.buffer_size = 0;
+                    file->pipe.is_used = 0;
+                    ctx->rdx = count;
+                    file->pipe.is_received = 1;
+                    return 0;
+                } else {
+                    file->pipe.is_used = 1;
+                    //INFO("Sending EOF\n");
+                    file->pipe.buffer_size = 0;
+                    ctx->rdx = 0;
+                    return 0;
+                }
             }
 
         } else {
@@ -495,66 +523,74 @@ int syscall_read(int_frame_t* ctx) {
 
     long seek_off = file->seek_offset;
 
+    if (file->seek_offset >= stat.size) {
+        ctx->rdx = 0;
+        return 0;
+    } 
+
+
     uint64_t actual_size = 0;
     char is_file_bigger = 0;
 
-    if(count < stat.size + seek_off) {
+
+    if (count < stat.size - seek_off) {
         actual_size = count;
         is_file_bigger = 1;
-    } else if(count > stat.size + seek_off) {
-        actual_size = stat.size;
+    } else if (count > stat.size - seek_off) {
+        actual_size = stat.size - seek_off;
         is_file_bigger = 0;
     } else {
         actual_size = count;
         is_file_bigger = 1;
     }
 
+
     char* actual_src = stat.content;
 
-    if(seek_off > 0)
+
+    if (seek_off > 0) {
         actual_src = (char*)((uint64_t)actual_src + seek_off);
-    else if(seek_off < 0){
-        actual_size += seek_off;
-        
+    } else if (seek_off < 0) {
+        actual_size += seek_off; // Adjust actual_size for negative seek_off
     }
 
-    if(stat.type == VFS_TYPE_DIRECTORY)
-        return 21;
 
-    if(stat.content) {
-        __prepare_file_content_syscall(stat.content,stat.size,ctx->cr3);
+    if (stat.type == VFS_TYPE_DIRECTORY) {
+        return 21;
+    }
+
+
+    if (stat.content) {
+        __prepare_file_content_syscall(stat.content, stat.size, ctx->cr3);
     } else {
         actual_src = "";
         actual_size = 0;
     }
 
-    if(!is_file_bigger)
+
+    if (!is_file_bigger) {
         actual_size = stat.size - seek_off;
+    }
 
-    if(!is_file_bigger)
-        file->seek_offset += actual_size;
-    else
-        file->seek_offset += count;
 
-    if(file->seek_offset > stat.size) {
+    file->seek_offset += actual_size;
+
+
+    if (file->seek_offset > stat.size) {
         ctx->rdx = 0;
         return 0;
-    }
+    } 
+
 
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-    String::memset(buf,0,count);
-    if(!is_file_bigger) {
-        String::memcpy(buf,actual_src,actual_size);
-    } else {
-        String::memcpy(buf,actual_src,count);
-    }
+    String::memset(buf, 0, count);
+    String::memcpy(buf, actual_src, actual_size);
+
+
     Paging::EnableKernel();
 
-    if(!is_file_bigger)
-        ctx->rdx = actual_size;
-    else
-        ctx->rdx = count;
 
+    ctx->rdx = actual_size;
     return 0;
 
 }
@@ -712,8 +748,6 @@ int syscall_mmap(int_frame_t* ctx) {
         if(st)
             return ENOENT;
 
-        INFO("MMAP phys 0x%p, len 0x%p\n");
-
         uint64_t phys = HHDM::toPhys((uint64_t)stat.content);
 
         hint = (uint64_t)VMM::Map(proc,phys,stat.size,PTE_RW | PTE_PRESENT | PTE_USER);
@@ -806,6 +840,7 @@ int syscall_fork(int_frame_t* ctx) {
     new_proc->user_stack_start = parent->user_stack_start;
     VMM::Clone(new_proc,parent);
     new_proc->fs_base = parent->fs_base;
+
 
     VMM::Reload(new_proc);
 
@@ -918,6 +953,8 @@ int syscall_exec(int_frame_t* ctx) {
     filestat_t stat;
 
     int status = VFS::Stat(path1,(char*)&stat,1);
+
+    SINFO("exec %s\n",path1);
 
     if(!status && stat.type == VFS_TYPE_FILE && (stat.mode & S_IXUSR)) {
 
@@ -1218,6 +1255,9 @@ int syscall_ioctl(int_frame_t* ctx) {
             break;
         case FBIOGET_FSCREENINFO:
             size = sizeof(fb_fix_screeninfo);
+            break;
+        case TTY_RELEASE_IOCTL:
+            size = 1;
             break;
         default:
             return 38;
@@ -1733,8 +1773,23 @@ int syscall_shutdown(int_frame_t* ctx) {
 }
 
 int syscall_timestamp(int_frame_t* ctx) {
-    //INFO("Timestamp\n");
     ctx->rdx = HPET::NanoCurrent();
+    return 0;
+}
+
+extern "C" void syscall_sleep_stage2(int_frame_t* ctx) {
+    HPET::Sleep(ctx->rdi / 1000);
+    __cli();
+    ctx->rax = 0;
+    syscall_end(ctx);
+}
+
+extern "C" void syscall_sleep_stage2_asm(uint64_t stack,int_frame_t* ctx);
+
+int syscall_sleep(int_frame_t* ctx) {
+    process_t* hproc = CpuData::Access()->current;
+    String::memcpy(hproc->syscall_wait_ctx,ctx,sizeof(int_frame_t));
+    syscall_sleep_stage2_asm((uint64_t)hproc->wait_stack + 4096,hproc->syscall_wait_ctx);
     return 0;
 }
 
@@ -1782,7 +1837,8 @@ syscall_t syscall_table[] = {
     {39,__xhci_syscall_usbtest},
     {40,syscall_shutdown},
     {41,syscall_reboot},
-    {42,syscall_timestamp}
+    {42,syscall_timestamp},
+    {43,syscall_sleep}
 };
 
 syscall_t* syscall_find_table(int num) {
@@ -1797,14 +1853,17 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     Paging::EnableKernel();
     syscall_t* sys = syscall_find_table(ctx->rax);
 
+    //SINFO("Syscall %d\n",sys->num);
     CpuData::Access()->last_syscall = ctx->rax;
 
     if(sys == 0) {
         ctx->rax = -1;
         return;
     }
+    
 
     ctx->rax = sys->func(ctx);
+    //SINFO("Status %d\n",ctx->rax);
 
     return;
 }

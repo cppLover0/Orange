@@ -152,6 +152,7 @@ int VFS::Stat(char* filename, char* buffer,char follow_symlinks) {
     char* filename_as_fs = filename;
     if(String::strcmp(filename,"/"))
         filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
+    String::memset(buffer,0,sizeof(filestat_t));
     int status = fs->fs->stat(filename_as_fs,buffer,follow_symlinks);
     //spinlock_unlock(&vfs_spinlock);
     return status;

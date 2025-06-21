@@ -10,7 +10,6 @@
 #include <termios.h>
 #include <signal.h>
 
-
 int fb_fd;
 struct fb_var_screeninfo vinfo;
 struct fb_fix_screeninfo finfo;
@@ -79,6 +78,24 @@ int main() {
 
     printf("Press any key to exit...\n");
     getchar();
+
+    struct termios newt;
+    tcgetattr(STDIN_FILENO, &newt);
+    newt.c_cc[VMIN] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    printf("print some info idk\n");
+    while(1) {
+        uint8_t key = 0;
+        if(read(STDIN_FILENO,&key,1)) {
+            char str[2];
+            str[0] = key;
+            str[1] = '\0';
+            puts(str);
+            if(key == 13 || key == 10)
+                break;
+        }
+    }
 
     reset_terminal();
     cleanup();

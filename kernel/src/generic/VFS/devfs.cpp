@@ -208,11 +208,26 @@ int fbdev_stat(char* buffer) {
     return 0;
 }
 
+char __zero_null = 0;
+
+int zero_stat(char* buffer) {
+    filestat_t* stat = (filestat_t*)buffer;
+    LimineInfo info;
+    stat->content = (char*)&__zero_null;
+    stat->size = 8;
+    stat->fs_prefix1 = 'D';
+    stat->fs_prefix2 = 'E';
+    stat->fs_prefix3 = 'V';
+    return 0;
+}
+
 void devfs_init(filesystem_t* fs) {
     devfs_reg_device("/zero",0,zero_read,0,0,0);
     devfs_reg_device("/null",0,zero_read,0,0,0);
     devfs_reg_device("/fb0",fbdev_write,0,0,0,fbdev_ioctl);
     devfs_advanced_configure("/fb0",fbdev_stat);
+    devfs_advanced_configure("/zero",zero_stat);
+    devfs_advanced_configure("/null",zero_stat);
 
     fs->create = 0;
     fs->disk = 0;

@@ -1164,6 +1164,13 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
         return;
     } 
 
+    //used from managarm
+    uint16_t usb3avail = PCI::IN(a,b,c,0xDC,2);
+    PCI::OUT(a,b,c,0xD8,usb3avail,2);
+
+    uint16_t usb2avail = PCI::IN(a,b,c,0xD4,2);
+    PCI::OUT(a,b,c,0xD0,usb2avail,2);
+
     xhci_device_t* dev = (xhci_device_t*)PMM::VirtualAlloc();
 
     uint64_t addr = pci_dev.bar0 & ~4; // clear upper 2 bits

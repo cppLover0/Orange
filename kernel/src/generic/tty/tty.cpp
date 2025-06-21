@@ -14,6 +14,8 @@
 
 // flanterm_context* ft_ctx;
 
+char __tty_send_release = 0;
+
 void __tty_helper_write(const char* msg) {
     extern flanterm_context* ft_ctx;
     flanterm_write(ft_ctx,(char*)msg,String::strlen((char*)msg));
@@ -22,13 +24,14 @@ void __tty_helper_write(const char* msg) {
 
 termios_t tty_termios;
 
-ps2keyboard_pipe_struct_t* head_ttypipe;
-ps2keyboard_pipe_struct_t* last_ttypipe;
+ps2keyboard_pipe_struct_t* head_ttypipe = 0;
+ps2keyboard_pipe_struct_t* last_ttypipe = 0;
 
 ps2keyboard_pipe_struct_t* __tty_allocate_pipe() {
 
     if(!head_ttypipe) {
         head_ttypipe = new ps2keyboard_pipe_struct_t;
+        String::memset(head_ttypipe,0,sizeof(ps2keyboard_pipe_struct_t));
         head_ttypipe->is_used_anymore = 0;
         last_ttypipe = head_ttypipe;
     }
@@ -42,6 +45,7 @@ ps2keyboard_pipe_struct_t* __tty_allocate_pipe() {
 
     if(!current) {
         current = new ps2keyboard_pipe_struct_t;
+        String::memset(current,0,sizeof(ps2keyboard_pipe_struct_t));
         last_ttypipe->next = current;
         last_ttypipe = current;
     }
@@ -64,6 +68,7 @@ void __tty_send_ipc(uint8_t keycode) {
         if(current->is_used_anymore && current->pipe) {
             current->pipe->buffer[current->pipe->buffer_size] = keycode;
             current->pipe->buffer_size++;
+            //INFO("sending info to ipc buf 0x%p %d\n",current,current->pipe->buffer_size);
         }
         current = current->next;
     }
@@ -95,29 +100,13 @@ void __tty_end_ipc() {
         if(current->is_used_anymore && current->pipe) {
             if(current->pipe->type == PIPE_WAIT)
                 current->is_used_anymore = 0;
+            else
+                current->is_used_anymore = 0;
 
-            //Log(LOG_LEVEL_DEBUG,"Bufer size %d\n",current->pipe->buffer_size);
             current->pipe->is_received = 0; 
         }
         current = current->next;
     }
-
-}
-
-
-int tty_askforpipe(pipe_t* pipe) {
-
-    ps2keyboard_pipe_struct_t* pip = __tty_allocate_pipe();
-
-    pip->pipe = pipe;
-    pip->is_used_anymore = 1;
-    if(tty_termios.c_lflag & ICANON)
-        pip->pipe->type = PIPE_WAIT;
-    else
-        pip->pipe->type = PIPE_WAIT;    
-    pip->pipe->is_used = 1;
-
-    return 0;
 
 }
 
@@ -150,6 +139,9 @@ int tty_ioctl(unsigned long request, void* arg, void* result) {
             String::memcpy(arg,&buf,sizeof(winsize_t));
             break;
         }
+        case TTY_RELEASE_IOCTL:
+            __tty_send_release = *(char*)arg;
+            break;
         default:
             return 0;
     }
@@ -157,6 +149,31 @@ int tty_ioctl(unsigned long request, void* arg, void* result) {
     return 0;
 
 }
+
+int tty_askforpipe(pipe_t* pipe) {
+
+    if(pipe->is_used && pipe->type == PIPE_INSTANT || pipe->type == PIPE_INSTANT && pipe->buffer_size != 0)
+        return 0;
+
+    ps2keyboard_pipe_struct_t* pip = __tty_allocate_pipe();
+
+    pip->pipe = pipe;
+    pip->is_used_anymore = 1;
+    pipe->is_received = 1;
+    if(tty_termios.c_lflag & ICANON)
+        pip->pipe->type = PIPE_WAIT;
+    else
+        pip->pipe->type = PIPE_WAIT;    
+
+    if(!(tty_termios.c_lflag & ICANON) && tty_termios.c_cc[VMIN] == 0)
+        pip->pipe->type = PIPE_INSTANT;
+
+    pip->pipe->is_used = 1;
+
+    return 0;
+
+}
+
 
 int is_printable(char c) {
     return (c >= 32 && c <= 126) || c == 10; 
@@ -167,7 +184,13 @@ int p = 0;
 void __tty_receive_ipc(uint8_t keycode) {
     extern flanterm_context* ft_ctx;
 
-    uint8_t raw_keycode = keycode;
+    uint8_t raw_keycode = keycode & ~(1 << 7);
+
+    if((keycode & (1 << 7)) && !__tty_send_release)
+        return;
+
+    if(raw_keycode == 15 && !__tty_send_release)
+        return;
 
     if(!(tty_termios.c_lflag & ICANON)) {
 
@@ -175,12 +198,13 @@ void __tty_receive_ipc(uint8_t keycode) {
             raw_keycode = 13; // nano want it :sob:
 
         if((tty_termios.c_lflag & ECHO) && is_printable(raw_keycode)) {
+            keycode &= ~(1 << 7);
             flanterm_write(ft_ctx,(char*)&keycode,1);
             Serial::Write(keycode);
         }
         if(tty_termios.c_cc[VMIN] >= p) {
             p = 0;
-            __tty_send_ipc(raw_keycode);
+            __tty_send_ipc((keycode & (1 << 7)) ? keycode : raw_keycode);
             __tty_end_ipc();
         } else {
             p++;
@@ -190,7 +214,11 @@ void __tty_receive_ipc(uint8_t keycode) {
 
     }
 
-    if(keycode != 127) {
+    if(keycode & (1 << 7))
+        return;
+
+    if(keycode != 127 && keycode != 15) {
+        
         if(keycode == 13)
             keycode = '\n';
 

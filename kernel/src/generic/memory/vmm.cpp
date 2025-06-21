@@ -291,7 +291,7 @@ void VMM::Clone(process_t* dest_proc,process_t* src_proc) {
                 else if(src_current->src_len > PAGE_SIZE)
                     phys = PMM::BigAlloc(ALIGNPAGEUP(src_current->src_len) / PAGE_SIZE);
 
-                if(src_current->phys)
+                if(src_current->phys && !src_current->is_mapped)
                     String::memcpy((void*)HHDM::toVirt(phys),(void*)HHDM::toVirt(src_current->phys),src_current->len);
 
                 Mark(dest_proc,src_current->base,phys,src_current->len,src_current->flags);

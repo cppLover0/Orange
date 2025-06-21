@@ -75,17 +75,15 @@ char __ps2_read(char keycodeps2) {
 
         unsigned char keycode = keycodeps2;
 
-        if(keycode == SHIFT_PRESSED)
-            __shift_pressed = 1;
- 
-        if(keycode == SHIFT_RELEASED)
-            __shift_pressed = 0;
-
         if(keycode == CTRL_PRESSED)
             __ctrl_pressed = 1;
         else if(keycode == CTRL_RELEASED)
             __ctrl_pressed = 0;
         
+        if(keycode == SHIFT_PRESSED)
+            __tty_receive_ipc(15);
+        else if(keycode == SHIFT_RELEASED)
+            __tty_receive_ipc(15 | (1 << 7));
 
         if(keycode <= 0x58 && keycode != CTRL_PRESSED) {
             keycode = kmap[keycode];
@@ -98,8 +96,9 @@ char __ps2_read(char keycodeps2) {
  
         }
 
-        if(keycode & (1 << 7))
-            return '\0';
+        if(keycode & (1 << 7)) {
+            return 0;
+        }
 
         return keycode;
 
@@ -187,6 +186,8 @@ short PS2Keyboard::Get() {
     if(status & 0x01) {
         uint8_t keycode = IO::IN(0x60,1);
 
+        int is_released = keycode & (1 << 7);
+
         if(keycode == SHIFT_PRESSED)
             __shift_pressed = 1;
         
@@ -194,9 +195,12 @@ short PS2Keyboard::Get() {
             __shift_pressed = 0;
 
         __last_key = keycode;
-        uint8_t vt100_keycode = __ps2_read(keycode);
+        uint8_t vt100_keycode = __ps2_read(keycode & ~(1 << 7));
         if(vt100_keycode) {
-            __tty_receive_ipc(vt100_keycode);
+            if(is_released)
+                __tty_receive_ipc(vt100_keycode | (1 << 7));
+            else 
+                __tty_receive_ipc(vt100_keycode);
         }
 
         __kbd_send_ipc(keycode);
