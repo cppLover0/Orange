@@ -814,7 +814,7 @@ int syscall_mmap(int_frame_t* ctx) {
 
         uint64_t phys = HHDM::toPhys((uint64_t)stat.content);
 
-        hint = (uint64_t)VMM::Map(proc,phys,stat.size,PTE_RW | PTE_PRESENT | PTE_USER);
+        hint = (uint64_t)VMM::Map(proc,phys,stat.size,PTE_RW | PTE_PRESENT | PTE_USER | stat.mmap_add_flags);
         
         ctx->rdx = hint;
         return 0;

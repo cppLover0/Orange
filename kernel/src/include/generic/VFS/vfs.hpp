@@ -26,6 +26,7 @@ typedef struct {
     char* name;
 
     char* content;
+    uint64_t mmap_add_flags;
 
     uint64_t mode;
     uint32_t size;

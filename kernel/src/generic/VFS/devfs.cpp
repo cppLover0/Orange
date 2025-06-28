@@ -12,6 +12,7 @@
 #include <arch/x86_64/interrupts/syscalls/syscall.hpp>
 #include <lib/flanterm/flanterm.h>
 #include <arch/x86_64/cpu/data.hpp>
+#include <generic/memory/paging.hpp>
 
 devfs_dev_t* head_dev = 0;
 devfs_dev_t* last_dev = 0;
@@ -238,6 +239,7 @@ int fbdev_stat(char* buffer) {
     stat->fs_prefix1 = 'D';
     stat->fs_prefix2 = 'E';
     stat->fs_prefix3 = 'V';
+    stat->mmap_add_flags = PTE_WC;
     return 0;
 }
 
