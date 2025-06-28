@@ -49,11 +49,12 @@ mount_location_t* vfs_find_the_nearest_mount(char* loc) {
 int VFS::Read(char* buffer,char* filename,long hint_size) {
     if(!filename) return -1;
 
-    spinlock_lock(&vfs_spinlock);
+   
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
     if(!fs) return -1;
     if(!fs->fs->readfile) return 0;
+    spinlock_lock(&vfs_spinlock);
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); // /somemount/file to /file 
     int status = fs->fs->readfile(buffer,filename_as_fs,hint_size);
@@ -64,11 +65,13 @@ int VFS::Read(char* buffer,char* filename,long hint_size) {
 int VFS::Write(char* buffer,char* filename,uint64_t size,char is_symlink_path,uint64_t offset) {
     if(!filename) return -1;
 
-    spinlock_lock(&vfs_spinlock);
+    
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
     if(!fs) return -1;
     if(!fs->fs->writefile) return 0;
+
+    spinlock_lock(&vfs_spinlock);
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
     int status = fs->fs->writefile(buffer,filename_as_fs,size,is_symlink_path,offset);
@@ -109,11 +112,13 @@ int VFS::Create(char* filename,int type) {
 int VFS::Remove(char* filename) {
     if(!filename) return -1;
 
-    spinlock_lock(&vfs_spinlock);
+    
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
     if(!fs) return -1;
     if(!fs->fs->rm) return 0;
+
+    spinlock_lock(&vfs_spinlock);
 
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1)); 
     int status = fs->fs->rm(filename_as_fs);
@@ -142,19 +147,19 @@ char VFS::Exists(char* filename) {
 int VFS::Stat(char* filename, char* buffer,char follow_symlinks) {
     if(!filename) return -1;
 
-    //spinlock_lock(&vfs_spinlock);
-    
     mount_location_t* fs = vfs_find_the_nearest_mount(filename);
 
     if(!fs) return -1;
     if(!fs->fs->stat) return -15;
 
+    spinlock_lock(&vfs_spinlock);
+    
     char* filename_as_fs = filename;
     if(String::strcmp(filename,"/"))
         filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     String::memset(buffer,0,sizeof(filestat_t));
     int status = fs->fs->stat(filename_as_fs,buffer,follow_symlinks);
-    //spinlock_unlock(&vfs_spinlock);
+    spinlock_unlock(&vfs_spinlock);
     return status;
 }
 
@@ -166,9 +171,12 @@ int VFS::AskForPipe(char* filename,pipe_t* pipe) {
     if(!fs) return -1;
 
     if(!fs->fs->askforpipe) return -15;
+
+    spinlock_lock(&vfs_spinlock);
     
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->askforpipe(filename_as_fs,pipe);
+    spinlock_unlock(&vfs_spinlock);
     return status;
 }
 
@@ -194,9 +202,11 @@ int VFS::Ioctl(char* filename,unsigned long request, void *arg, int *result) {
     if(!fs) return -1;
 
     if(!fs->fs->ioctl) return 0;
+    spinlock_lock(&vfs_spinlock);
     
     char* filename_as_fs = (char*)((uint64_t)filename + (String::strlen(fs->loc) - 1));
     int status = fs->fs->ioctl(filename_as_fs,request,arg,result);
+    spinlock_unlock(&vfs_spinlock);
     return status;
 }
 

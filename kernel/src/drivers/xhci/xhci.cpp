@@ -220,7 +220,7 @@ void __xhci_testings(xhci_device_t* dev) {
     trb.info_s.type = TRB_NOOPCOMMAND_TYPE;
     trb.info |= (1 << 5);
     __xhci_command_ring_queue(dev,dev->com_ring,&trb);
-    INFO("Sending TRB_NOOPCOMMAND to XHCI Controller\n");
+    SINFO("Sending TRB_NOOPCOMMAND to XHCI Controller\n");
     __xhci_doorbell(dev,0);
     HPET::Sleep(1000*1000);
 }
@@ -327,7 +327,7 @@ int __xhci_syscall_usbtest(int_frame_t* ctx) {
     uint16_t id = 0;
     xhci_device_t* current = xhci_list;
     while(current) {
-        INFO("Doorbelling xhci dev %d from proc %d\n",id++,CpuData::Access()->current->id);
+        SINFO("Doorbelling xhci dev %d from proc %d\n",id++,CpuData::Access()->current->id);
         __xhci_testings(current);
         current = current->next;
     }
@@ -997,7 +997,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     if(ret.ret_code != 1) {
         WARN("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
-        ep_trb.base += 32;
+        dev->dcbaa[usb_dev->slotid] += 64;
         __xhci_clear_event(dev);
 
         __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&ep_trb);
@@ -1008,7 +1008,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
         if(ret.ret_code != 1) {
             WARN("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
-            ep_trb.base += 32;
+            dev->dcbaa[usb_dev->slotid] = addr;
             __xhci_clear_event(dev);
 
             __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&ep_trb);
@@ -1016,8 +1016,10 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
             ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
-            if(ret.ret_code != 1)
+            if(ret.ret_code != 1) {
                 WARN("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
+                return;
+            }
         }
     }
     

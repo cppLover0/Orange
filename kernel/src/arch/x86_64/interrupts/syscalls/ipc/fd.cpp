@@ -41,6 +41,8 @@ int FD::Create(process_t* proc,char is_pipe) {
     current->pipe.is_received = 0;
     current->pipe.type = PIPE_WAIT;
     current->is_pipe_pointer = 0;
+    current->queue_input = 0;
+    current->cycle = 1;
 
     current->pipe.is_used = 0;
 
@@ -49,6 +51,7 @@ int FD::Create(process_t* proc,char is_pipe) {
     current->type = is_pipe ? FD_PIPE : FD_FILE;
     current->proc = proc;
     current->seek_offset = 0;
+    current->is_tty = 0;
 
     if(is_pipe) {
         current->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);
@@ -63,11 +66,15 @@ int FD::Create(process_t* proc,char is_pipe) {
 fd_t* FD::Search(process_t* proc,int index) {
     spinlock_lock(&fd_lock);
     fd_t* current = (fd_t*)proc->start_fd;
+    fd_t* last0;
+    fd_t* last = (fd_t*)proc->last_fd;
+    last->next = 0;
     while(current) {
         if(current->index == index) {
             spinlock_unlock(&fd_lock);
             return current;
         }
+        last0 = current;
         current = current->next;
     }
     spinlock_unlock(&fd_lock);

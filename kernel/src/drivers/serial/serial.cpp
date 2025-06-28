@@ -5,7 +5,6 @@
 #include <other/string.hpp>
 #include <stdint.h>
 #include <stdarg.h>
-#include <generic/tty/tty.hpp>
 #include <other/log.hpp>
 
 char serial_spinlock = 0;
@@ -34,8 +33,9 @@ void __serial_process_fetch() {
     IO::IN(COM1,1);
     while(1) {
         uint8_t key = Serial::Read();
-        if(key && key != 255) // idk why but it spamming with 255 to console 
-            __tty_receive_ipc(key);
+        if(key && key != 255) {// idk why but it spamming with 255 to console 
+
+        }
     }
 }
 

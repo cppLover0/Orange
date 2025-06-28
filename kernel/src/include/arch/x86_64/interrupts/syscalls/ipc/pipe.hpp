@@ -33,13 +33,17 @@ typedef struct pipe {
     int type;
     int is_used;
     char is_eof;
+    char is_next_eof;
     
     uint8_t free_block;
-    char connected_pipes;
+    int connected_pipes;
+    int connected_write_pipes;
 
     uint32_t reserved;
 
     termios_t termios;
+
+    char* some_info;
 
     _Atomic char is_received;
 

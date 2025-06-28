@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <generic/VFS/vfs.hpp>
+#include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 
 #pragma once
 
@@ -80,6 +81,32 @@ struct fb_fix_screeninfo {
 	__u16 reserved[2];		/* Reserved for future compatibility */
 };
 
+typedef struct {
+	union {
+		struct {
+			char cycle;
+			char reserved[3];
+		};
+		struct {
+			char reserved0[2];
+			char x;
+			char y;
+		} mousepacket;
+		struct {
+			char reserved0[1];
+			char key;
+			char reserved1[2];
+		} keyboardpacket;
+		int raw;
+	};
+} __attribute__((packed)) inputring_t;
+
+typedef struct {
+    inputring_t input[512];
+    int tail;
+	int cycle;
+} ring_buffer_t;
+
 typedef struct devfs_dev {
     
     int (*write)(char* buffer,uint64_t size,uint64_t offset);
@@ -95,6 +122,13 @@ typedef struct devfs_dev {
     
 
 } __attribute__((packed)) devfs_dev_t;
+
+typedef struct {
+	termios_t term;
+	winsize_t winsz;
+} tty_dev_t;
+
+void input_send(char byte);
 
 void devfs_reg_device(const char* name,int (*write)(char* buffer,uint64_t size,uint64_t offset),int (*read)(char* buffer,long hint_size),int (*askforpipe)(pipe_t* pipe),int (*instantreadpipe)(pipe_t* pipe),int (*ioctl)(unsigned long request, void* arg, void* result));
 void devfs_advanced_configure(const char* name,int (*stat)(char* buffer)); // i need this cuz i dont want to rewrite all code which uses devfs_reg_device

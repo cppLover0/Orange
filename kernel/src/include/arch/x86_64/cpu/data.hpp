@@ -14,6 +14,12 @@ typedef struct {
     struct LIMINE_MP(info)* smp_info;
     process_t* current;
     int_frame_t temp_frame;
+    char* current_fd; // used for advanced writings (devfs ring buffer)
+
+    char is_advanced_access;
+    uint64_t offset;
+    uint64_t* count;
+
     int last_syscall;
 } __attribute__((packed)) cpudata_t;
 

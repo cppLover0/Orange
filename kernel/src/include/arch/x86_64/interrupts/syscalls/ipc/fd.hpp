@@ -10,8 +10,8 @@
 #define FD_FILE 1
 #define FD_PIPE 2
 
-#define PIPE_WAIT 0
-#define PIPE_INSTANT 1
+#define PIPE_WAIT 1
+#define PIPE_INSTANT 2
 
 /* indices for the c_cc array in struct termios */
 #define VINTR    0
@@ -213,6 +213,7 @@
 #define TIOCPKT_IOCTL            64
 #define TIOCSER_TEMT	            0x01
 #define TTY_RELEASE_IOCTL 0xFFFF0001
+#define TTX_CREATE 0xFFFF0002
 
 typedef struct {
 	unsigned short ws_row;
@@ -245,16 +246,28 @@ typedef struct fd_struct {
     pipe_t* old_p_pipe;
     pipe_t* p_pipe;
 
+    int cycle;
+
     uint64_t flags;
+    uint64_t old_flags;
     filestat_t reserved_stat;
 
+    int queue_input;
+
+    char is_tty;
+    char old_is_tty;
+
     char is_pipe_dup2;
+    char spinlock; // used for fcntl
 
     char old_type;
 
     char path_point[1024];
+    char old_path_point[1024];
 
 } __attribute__((packed)) fd_t;
+
+static_assert(sizeof(fd_t) < 4096,"FD_T is bigger than page size !");
 
 class FD {
 public:

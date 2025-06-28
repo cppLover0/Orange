@@ -122,24 +122,6 @@ void operator delete[](void *p)
 #include <arch/x86_64/cpu/data.hpp>
 #include <generic/memory/pmm.hpp>
 
-extern "C" void keyHandler(int_frame_t* ctx) {
-    __cli();
-    LogUnlock();
-    Paging::EnableKernel();
-    char key = PS2Keyboard::Get();
-    PS2Keyboard::EOI();
-    if(ctx->cs == 0x20) {
-        ctx->cs |= 3;
-        ctx->ss |= 3;
-    }
-    
-    if(ctx->ss == 0x18) {
-        ctx->cs |= 3;
-        ctx->ss |= 3;
-    }
-
-}
-
 extern "C" uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     LogUnlock();
     Paging::EnableKernel();

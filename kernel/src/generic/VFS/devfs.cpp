@@ -4,29 +4,51 @@
 #include <generic/VFS/vfs.hpp>
 #include <other/log.hpp>
 #include <other/string.hpp>
+#include <arch/x86_64/interrupts/syscalls/ipc/fd.hpp>
 #include <generic/limineA/limineinfo.hpp>
 #include <config.hpp>
 #include <generic/memory/pmm.hpp>
 #include <generic/memory/heap.hpp>
+#include <arch/x86_64/interrupts/syscalls/syscall.hpp>
+#include <lib/flanterm/flanterm.h>
+#include <arch/x86_64/cpu/data.hpp>
 
 devfs_dev_t* head_dev = 0;
 devfs_dev_t* last_dev = 0;
 
+int dev_num = 0;
+
+bool isdigit(char ch) {
+    return ch >= '0' && ch <= '9';
+}
+
 devfs_dev_t* devfs_find_dev(const char* loc) {
-
     devfs_dev_t* dev = head_dev;
-    while(dev) {
+    char temp[256]; 
+    int len = String::strlen((char*)loc);
+    int i = len - 1;
 
-        if(!String::strcmp(loc,dev->loc)) {
+    dev_num = 0;
+
+    while (i >= 0 && isdigit(loc[i])) {
+        dev_num = dev_num * 10 + (loc[i] - '0'); 
+        i--;
+    }
+
+    String::memcpy(temp, loc, i + 1);
+    temp[i + 1] = '\0'; 
+
+    while (dev) {
+        if (!String::strcmp(temp, dev->loc)) {
             return dev;
         }
-
         dev = dev->next;
     }
 
-    return 0;
 
+    return 0;
 }
+
 
 int devfs_read(char* buffer,char* filename,long hint_size) {
 
@@ -37,7 +59,6 @@ int devfs_read(char* buffer,char* filename,long hint_size) {
 
     if(!dev) return 3;
     if(!dev->read) return -15;
-
     return dev->read(buffer,hint_size);
 }
 
@@ -157,6 +178,10 @@ int zero_read(char* buffer,long hint_size) {
 }
 
 int fbdev_write(char* buffer,uint64_t size,uint64_t offset) {
+
+    if(dev_num != 0)
+        return -1;
+
     LimineInfo info;
     uint64_t fb = (uint64_t)info.fb_info->address;
     fb += offset;
@@ -167,6 +192,10 @@ int fbdev_write(char* buffer,uint64_t size,uint64_t offset) {
 }
 
 int fbdev_ioctl(unsigned long request, void *arg, void* result) {
+
+    if(dev_num != 0)
+        return -1;
+
     LimineInfo info;
     switch(request) {
         case FBIOGET_VSCREENINFO: {
@@ -198,6 +227,10 @@ int fbdev_ioctl(unsigned long request, void *arg, void* result) {
 }
 
 int fbdev_stat(char* buffer) {
+
+    if(dev_num != 0)
+        return -1;
+
     filestat_t* stat = (filestat_t*)buffer;
     LimineInfo info;
     stat->content = (char*)info.fb_info->address;
@@ -212,7 +245,6 @@ char __zero_null = 0;
 
 int zero_stat(char* buffer) {
     filestat_t* stat = (filestat_t*)buffer;
-    LimineInfo info;
     stat->content = (char*)&__zero_null;
     stat->size = 8;
     stat->fs_prefix1 = 'D';
@@ -221,13 +253,167 @@ int zero_stat(char* buffer) {
     return 0;
 }
 
+uint8_t tty_vec[512];
+tty_dev_t tty_termios[512]; //variables to hold tty info
+
+int tty_ioctl(unsigned long request, void *arg, void* result) {
+    if(dev_num < 0 || dev_num > 512)
+        return ENOENT;
+
+    if(!tty_vec[dev_num])
+        return ENOENT;
+
+    switch(request) {
+       case TCGETS:
+            String::memcpy(arg,&tty_termios[dev_num].term,sizeof(termios_t));
+            break;
+        case TCSETS:
+            String::memcpy(&tty_termios[dev_num].term,arg,sizeof(termios_t));
+            break;
+        case TIOCGWINSZ: 
+            String::memcpy(arg,&tty_termios[dev_num].winsz,sizeof(termios_t));
+            break;
+        case TIOCSWINSZ: 
+            String::memcpy(&tty_termios[dev_num].winsz,arg,sizeof(termios_t));
+            break;
+        
+    }
+
+    return 0;
+
+}
+
+int ttx_stat(char* buffer) {
+
+    filestat_t* stat = (filestat_t*)buffer;
+    stat->content = 0;
+    stat->size = 0;
+    stat->fs_prefix1 = 'D';
+    stat->fs_prefix2 = 'E';
+    stat->fs_prefix3 = 'V';
+    return 0;
+}
+
+int ttx_ioctl(unsigned long request, void *arg, void* result) {
+    switch(request) {
+        case TTX_CREATE: {
+            int vec = 0;
+            for(int i = 0;i < 512;i++) {
+                if(!tty_vec[i]) {
+                    vec = i;
+                    break;
+                }
+            }
+            tty_vec[vec] = 1;
+            *(int*)arg = vec;
+            break;
+        }
+    }
+    return 0;
+}
+
+int tty_stat(char* buffer) {
+
+    filestat_t* stat = (filestat_t*)buffer;
+    stat->content = 0;
+    stat->size = 0;
+    stat->fs_prefix1 = 'D';
+    stat->fs_prefix2 = 'E';
+    stat->fs_prefix3 = 'V';
+    return 0;
+}
+
+int serial_write(char* buffer,uint64_t size,uint64_t offset) {
+    Serial::WriteArray((uint8_t*)buffer,size);
+    return 0;
+}
+
+int serial_stat(char* buffer) {
+    filestat_t* stat = (filestat_t*)buffer;
+    stat->content = 0;
+    stat->size = 0;
+    stat->fs_prefix1 = 'D';
+    stat->fs_prefix2 = 'E';
+    stat->fs_prefix3 = 'V';
+    return 0;
+}
+
+ring_buffer_t input0;
+
+
+void input_send(char byte) {
+    input0.input[input0.tail].cycle = input0.cycle;
+    input0.input[input0.tail].keyboardpacket.key = byte;
+    if(++input0.tail == 511) {
+        input0.tail = 0;
+        input0.cycle = !input0.cycle;
+    }
+}
+
+int last_input = 0;
+
+int input_receive(inputring_t* out, int max_len, int* cycle, int* queue) {
+    int len = 0;
+    while (input0.input[*queue].cycle == *cycle && len < max_len) {
+        out[len++] = input0.input[*queue];
+        *queue = *queue + 1;
+        if(*queue == 511) {
+            *queue = 0;
+            *cycle = !(*cycle);
+        }
+    }
+    return len;
+}
+
+
+int input_read(char* buffer, long hint_size) {
+    fd_t* file = (fd_t*)CpuData::Access()->current_fd;
+    inputring_t buffer0[hint_size + 1];
+    String::memset(buffer0, 0, sizeof(buffer0));
+
+    int len = input_receive(buffer0, hint_size, &file->cycle, &file->queue_input);
+    for (int i = 0; i < len; i++) {
+        buffer[i] = buffer0[i].keyboardpacket.key;
+    }
+
+    *CpuData::Access()->count = len;
+
+    return 0; 
+}
+
+int input_stat(char* buffer) {
+    filestat_t* stat = (filestat_t*)buffer;
+    stat->content = 0;
+    stat->size = 0;
+    stat->fs_prefix1 = 'D';
+    stat->fs_prefix2 = 'E';
+    stat->fs_prefix3 = 'V';
+    return 0;
+}
+
+
 void devfs_init(filesystem_t* fs) {
     devfs_reg_device("/zero",0,zero_read,0,0,0);
     devfs_reg_device("/null",0,zero_read,0,0,0);
-    devfs_reg_device("/fb0",fbdev_write,0,0,0,fbdev_ioctl);
-    devfs_advanced_configure("/fb0",fbdev_stat);
+    devfs_reg_device("/fb",fbdev_write,0,0,0,fbdev_ioctl);
+    devfs_reg_device("/serial",serial_write,0,0,0,0);
+    devfs_advanced_configure("/fb",fbdev_stat);
     devfs_advanced_configure("/zero",zero_stat);
     devfs_advanced_configure("/null",zero_stat);
+    devfs_advanced_configure("/serial",serial_stat);
+
+    String::memset(tty_vec,0,512);
+    devfs_reg_device("/ttx",0,0,0,0,ttx_ioctl);
+    devfs_reg_device("/tty",0,0,0,0,tty_ioctl);
+
+    devfs_advanced_configure("/ttx",ttx_stat);
+    devfs_advanced_configure("/tty",tty_stat);
+
+    devfs_reg_device("/input",0,input_read,0,0,0);
+    devfs_advanced_configure("/input",input_stat);
+
+    String::memset(&input0,0,sizeof(ring_buffer_t));
+    input0.cycle = 1;
 
     fs->create = 0;
     fs->disk = 0;

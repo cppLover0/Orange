@@ -315,7 +315,10 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
                     proc->last_fd = (char*)fdd;
                 }
 
-                if(fdd->is_pipe_pointer && fdd->pipe_side == PIPE_SIDE_WRITE && !fdd->is_pipe_dup2)
+                if(fdd->is_pipe_pointer && fdd->pipe_side == PIPE_SIDE_WRITE)
+                    fdd->p_pipe->connected_write_pipes++;
+
+                if(fdd->is_pipe_pointer)
                     fdd->p_pipe->connected_pipes++;
                 
                 fdd->next = 0;
@@ -330,18 +333,9 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
         Paging::alwaysMappedMap(cr3);
 
         fd_t* stdin = (fd_t*)PMM::VirtualAlloc(); //head fd
-        stdin->index = 0;
         stdin->pipe.buffer = (char*)PMM::VirtualBigAlloc(16);
-        stdin->pipe.buffer_size = 5;
-        stdin->pipe.is_received = 1;
-        stdin->parent = 0;
-        stdin->next = 0;
-        stdin->proc = proc;
-        stdin->pipe.type = PIPE_INSTANT;
-        stdin->type = FD_PIPE; 
-        stdin->pipe.parent = proc;
 
-        String::memcpy(stdin->path_point,"/dev/tty",sizeof("/dev/tty"));
+        String::memcpy(stdin->path_point,"/dev/tty0",sizeof("/dev/tty0"));
         String::memcpy(stdin->pipe.buffer,"how are you reading this ???\n",5);
 
         proc->start_fd = (char*)stdin;
@@ -356,12 +350,8 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
 
         int fd = FD::Create(proc,0);
         fd_t* stdout = FD::Search(proc,fd);
-        String::memcpy(stdout->path_point,"/dev/tty",sizeof("/dev/tty"));
-
         fd = FD::Create(proc,0);
         fd_t* stderr = FD::Search(proc,fd);
-        String::memcpy(stderr->path_point,"/dev/tty",sizeof("/dev/tty"));
-
     }
 
     Paging::HHDMMap(cr3,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
@@ -383,6 +373,41 @@ void Process::Kill(process_t* proc,int return_status) {
     proc->return_status = return_status;
     proc->status = PROCESS_STATUS_KILLED;
     
+    fd_t* fd = (fd_t*)proc->start_fd;
+    while(fd) {
+        fd = fd->next;
+        if(fd) {
+
+            if(fd->type == FD_FILE)
+                VFS::Count(fd->path_point,0,-1);
+
+            fd_t* file = fd;
+            if(file->is_pipe_pointer) {
+                if(file->pipe_side == PIPE_SIDE_WRITE) {
+                    file->p_pipe->connected_write_pipes--;
+                    if(file->p_pipe->connected_write_pipes <= 0) {
+                        file->p_pipe->is_received = 0;
+                        file->p_pipe->is_next_eof = 1;
+                    }
+                }
+                file->p_pipe->connected_pipes--;
+
+                if(file->p_pipe->connected_pipes <= 0) {
+                    PMM::VirtualFree(file->p_pipe->buffer);
+                    PMM::VirtualFree(file->p_pipe);
+                } 
+                
+                file->p_pipe = file->old_p_pipe;
+                file->is_pipe_pointer = file->old_is_pipe_pointer;
+            
+            } else {
+                PMM::VirtualFree(file->pipe.buffer);
+            }
+            PMM::VirtualFree(fd);
+        }
+        
+    }
+
     PMM::VirtualFree(proc->name);
     PMM::VirtualFree(proc->sse_ctx);
     proc->sse_ctx = 0;

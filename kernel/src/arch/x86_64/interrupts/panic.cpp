@@ -29,34 +29,10 @@ extern "C" void CPanic(const char* msg,int_frame_t* frame1) {
 
     if(CpuData::Access()->current) {
         process_t* proc = CpuData::Access()->current;
-        fd_t* fd = (fd_t*)proc->start_fd;
-        while(fd) {
-            fd = fd->next;
-            if(fd) {
-
-                if(fd->type == FD_FILE)
-                    VFS::Count(fd->path_point,0,-1);
-
-                if(fd->is_pipe_pointer && fd->type == FD_PIPE && fd->pipe_side == PIPE_SIDE_WRITE) {
-                    if(fd->p_pipe->connected_pipes <= 0) {
-                        PMM::VirtualFree(fd->p_pipe->buffer);
-                    }
-                    fd->p_pipe->connected_pipes--;
-                    if(fd->p_pipe->connected_pipes == 0) {
-                        fd->p_pipe->is_received = 0;
-                    }
-                } else if(!fd->is_pipe_pointer) {
-                    PMM::VirtualFree(fd->pipe.buffer);
-                }
-                PMM::VirtualFree(fd);
-            }
-            
-        }
-
         Process::Kill(proc,9);
         
-        ERROR("Got fault in process %d !\n",proc->id);
-        schedulingSchedule(frame1);
+        SERROR("Got fault in process %d (vec %d) with cr2 0x%p and rip 0x%p!\n",proc->id,frame1->vec,cr2,frame1->rip);
+        schedulingSchedule(0);
 
     }
 

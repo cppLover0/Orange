@@ -16,7 +16,7 @@ typedef struct ps2keyboard_pipe_struct {
 
 class PS2Keyboard {
 public:
-    static void Init(void (*key)());
+    static void Init();
     static void EOI();
     static short Get();
 };

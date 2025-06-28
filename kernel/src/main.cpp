@@ -18,7 +18,6 @@
 #include <uacpi/event.h>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <generic/acpi/acpi.hpp>
-#include <generic/tty/tty.hpp>
 #include <drivers/hpet/hpet.hpp>
 #include <other/log.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
@@ -160,7 +159,7 @@ extern "C" void kmain() {
 
     //tmpfs_dump();
 
-    PS2Keyboard::Init(keyStub);
+    PS2Keyboard::Init();
 
     SSE::Init();
     INFO("SSE Is enabled (or not) \n");
@@ -195,10 +194,10 @@ extern "C" void kmain() {
 
     filestat_t stat;
 
-    VFS::Stat("/usr/bin/bash",(char*)&stat,1);
+    VFS::Stat("/usr/bin/orangeinit",(char*)&stat,1);
 
     char* elf = (char*)PMM::VirtualBigAlloc(CALIGNPAGEUP(stat.size,4096) / 4096);
-    VFS::Read(elf,"/usr/bin/bash",0);
+    VFS::Read(elf,"/usr/bin/orangeinit",0);
 
     INFO("Loaded initrd !\n");
 
@@ -217,7 +216,7 @@ extern "C" void kmain() {
     serial_proc->ctx.cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());  
     Process::WakeUp(serial);
 
-    const char* pa = "/usr/bin/bash";
+    const char* pa = "/usr/bin/orangeinit";
     const char* ea = "=";
 
     char* initrd_argv[2];
@@ -228,15 +227,13 @@ extern "C" void kmain() {
     initrd_envp[0] = (char*)ea;
     initrd_envp[1] = 0;
 
-    Process::loadELFProcess(initrd,"/usr/bin/bash",(uint8_t*)elf,initrd_argv,initrd_envp);
+    Process::loadELFProcess(initrd,"/usr/bin/orangeinit",(uint8_t*)elf,initrd_argv,initrd_envp);
 
     process_t* initrd_proc = Process::ByID(initrd);
 
     Process::WakeUp(initrd);
 
     INFO("Waiting for interrupts...\n");
-
-    TTY::Init();
 
     //__hlt();
 

@@ -267,6 +267,12 @@ enum
 # define DT_WHT		DT_WHT
 };
 
+#define F_DUPFD		0	/* Duplicate file descriptor.  */
+#define F_GETFD		1	/* Get file descriptor flags.  */
+#define F_SETFD		2	/* Set file descriptor flags.  */
+#define F_GETFL		3	/* Get file status flags.  */
+#define F_SETFL		4	/* Set file status flags.  */
+
 class Syscall {
 public:
     static void Init();
