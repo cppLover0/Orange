@@ -72,7 +72,7 @@ void keyhandler(int fd,uint8_t key) {
         if((tty_termios.c_lflag & ECHO) && is_printable(layout_key))
             write(STDOUT_FILENO,&layout_key,1);
 
-        if((tty_termios.c_lflag & ICANON) && is_printable(layout_key)) {
+        if((tty_termios.c_lflag & ICANON) && (is_printable(layout_key) || layout_key == '\b')) {
             
             if(layout_key != '\b') {
                 keybuffer[key_ptr++] = layout_key;
@@ -103,6 +103,14 @@ void keyhandler(int fd,uint8_t key) {
     }
 } 
 
+extern "C" void* __flanterm_malloc(size_t size) {
+    return malloc(size);
+}
+
+extern "C" void __flanterm_free(void* ptr,size_t size) {
+    free(ptr);
+}
+
 int main() {
     main_framebuffer = new FBDev(); /* Just creating variables and calling constructors */
     cfg = new OrangeTTY_Config();
@@ -110,11 +118,11 @@ int main() {
     tty = new TTY();
     keybuffer = (char*)malloc(256);
 
-    memset(main_framebuffer->get_address(),0,main_framebuffer->get_finfo().line_length * main_framebuffer->get_vinfo().yres); /* Clearing screen */
+    memset(main_framebuffer->get_address(),0xFF,main_framebuffer->get_finfo().line_length * main_framebuffer->get_vinfo().yres); /* Clearing screen */
 
     struct flanterm_context *ft_ctx = flanterm_fb_init(
-        NULL,
-        NULL,
+        __flanterm_malloc,
+        __flanterm_free,
         (uint32_t*)main_framebuffer->get_address(), main_framebuffer->get_vinfo().xres,main_framebuffer->get_vinfo().yres,
         main_framebuffer->get_finfo().line_length,
         main_framebuffer->get_vinfo().red.length,main_framebuffer->get_vinfo().red.offset,
@@ -130,21 +138,26 @@ int main() {
         0
     );
     main_framebuffer->set_ft_ctx(ft_ctx); /* Now we can display text */
+    main_framebuffer->WriteString("Starting TTY\n");
 
     piping->Ready(); /* Initialize some variables and create pipes */
 
     main_framebuffer->CreateWinSizeInfo(); /* Create winsize information */
 
+    main_framebuffer->WriteString("Creating TTY\n");
     tty->Fetch(); /* Creating new tty */
     tty->SetTTY(STDIN_FILENO); /* Telling to OS what stdin is tty */
     tty->SetTTY(STDOUT_FILENO); /* Telling to OS what stdout is tty */
     tty->SetTTY(STDERR_FILENO); /* Telling to OS what stderr is tty */
     TTY::DisableOSHelp(); /* Now enabling isatty syscall */
 
+    main_framebuffer->WriteString("Starting Piping\n");
     piping->Start(main_framebuffer,keyhandler); /* Starting receiving events from pipes */
 
+    std::cout << "Setuping termios\n";
     tty->SetupTermios(); /* Setup tty structs */
 
+    std::cout << "Sending WinSize\n";
     main_framebuffer->SendWinSizeInfo(); /* Send winsize information to kernel */
 
     std::cout << "Executing bash\n";

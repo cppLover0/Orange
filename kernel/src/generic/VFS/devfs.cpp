@@ -346,7 +346,7 @@ ring_buffer_t input0;
 void input_send(char byte) {
     input0.input[input0.tail].cycle = input0.cycle;
     input0.input[input0.tail].keyboardpacket.key = byte;
-    if(++input0.tail == 511) {
+    if(++input0.tail == 16) {
         input0.tail = 0;
         input0.cycle = !input0.cycle;
     }
@@ -359,7 +359,7 @@ int input_receive(inputring_t* out, int max_len, int* cycle, int* queue) {
     while (input0.input[*queue].cycle == *cycle && len < max_len) {
         out[len++] = input0.input[*queue];
         *queue = *queue + 1;
-        if(*queue == 511) {
+        if(*queue == 16) {
             *queue = 0;
             *cycle = !(*cycle);
         }
