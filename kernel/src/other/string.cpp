@@ -5,6 +5,7 @@
 #include <other/string.hpp>
 #include <cstdlib>
 #include <generic/memory/heap.hpp>
+#include <stdarg.h>
 
 uint64_t String::strlen(char* str) {
     uint64_t len = 0; 
@@ -165,4 +166,59 @@ char* String::strncat(char* dest, const char* src, uint64_t n) {
   return dest;
 }
 
+int String::vsprintf(char* buffer, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char* buf_ptr = buffer;
+    const char* fmt_ptr = format;
+
+
+    while (*fmt_ptr) {
+        if (*fmt_ptr == '%') {
+            fmt_ptr++;
+            switch (*fmt_ptr) {
+                case 'd': {
+                    int value = va_arg(args, int);
+                    char num_buffer[20];
+                    itoa(value, num_buffer, 10);
+                    for (char* num_ptr = num_buffer; *num_ptr; num_ptr++) {
+                        *buf_ptr++ = *num_ptr;
+                    }
+                    break;
+                }
+                case 's': {
+                    char* str = va_arg(args, char*);
+                    while (*str) {
+                        *buf_ptr++ = *str++;
+                    }
+                    break;
+                }
+                case 'c': {
+                    char ch = (char)va_arg(args, int);
+                    *buf_ptr++ = ch;
+                    break;
+                }
+                case 'p': {
+                    void* ptr = va_arg(args, void*);
+                    char ptr_buffer[20];
+                    itoa((uintptr_t)ptr, ptr_buffer, 16);
+                    for (char* ptr_ptr = ptr_buffer; *ptr_ptr; ptr_ptr++) {
+                        *buf_ptr++ = *ptr_ptr;
+                    }
+                    break;
+                }
+                default:
+                    *buf_ptr++ = '%';
+                    *buf_ptr++ = *fmt_ptr;
+                    break;
+            }
+        } else {
+            *buf_ptr++ = *fmt_ptr;
+        }
+        fmt_ptr++;
+    }
+    va_end(args);
+    *buf_ptr = '\0'; 
+    return buf_ptr - buffer; 
+}
 // Yes, i'm lazy 

@@ -118,7 +118,7 @@ int main() {
     tty = new TTY();
     keybuffer = (char*)malloc(256);
 
-    memset(main_framebuffer->get_address(),0xFF,main_framebuffer->get_finfo().line_length * main_framebuffer->get_vinfo().yres); /* Clearing screen */
+    memset(main_framebuffer->get_address(),0,main_framebuffer->get_finfo().line_length * main_framebuffer->get_vinfo().yres); /* Clearing screen */
 
     struct flanterm_context *ft_ctx = flanterm_fb_init(
         __flanterm_malloc,
@@ -138,29 +138,23 @@ int main() {
         0
     );
     main_framebuffer->set_ft_ctx(ft_ctx); /* Now we can display text */
-    main_framebuffer->WriteString("Starting TTY\n");
-
     piping->Ready(); /* Initialize some variables and create pipes */
 
     main_framebuffer->CreateWinSizeInfo(); /* Create winsize information */
 
-    main_framebuffer->WriteString("Creating TTY\n");
     tty->Fetch(); /* Creating new tty */
     tty->SetTTY(STDIN_FILENO); /* Telling to OS what stdin is tty */
     tty->SetTTY(STDOUT_FILENO); /* Telling to OS what stdout is tty */
     tty->SetTTY(STDERR_FILENO); /* Telling to OS what stderr is tty */
     TTY::DisableOSHelp(); /* Now enabling isatty syscall */
 
-    main_framebuffer->WriteString("Starting Piping\n");
     piping->Start(main_framebuffer,keyhandler); /* Starting receiving events from pipes */
 
-    std::cout << "Setuping termios\n";
     tty->SetupTermios(); /* Setup tty structs */
 
-    std::cout << "Sending WinSize\n";
     main_framebuffer->SendWinSizeInfo(); /* Send winsize information to kernel */
 
     std::cout << "Executing bash\n";
-    execl("/usr/bin/bash",NULL);
+    execl("/usr/bin/bash",NULL); 
 
 }

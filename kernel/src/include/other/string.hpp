@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <drivers/serial/serial.hpp>
+#include <stdarg.h>
 
 class String {
 public:
@@ -32,5 +33,7 @@ public:
     static char* strncat(char* dest, const char* src, uint64_t n);
 
     static char* strdup(const char* str);
+
+    static int vsprintf(char* buffer, const char* format, ...);
 
 };

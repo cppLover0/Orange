@@ -592,6 +592,21 @@ int syscall_read(int_frame_t* ctx) {
         ctx->rdx = bw;
         return 0;
         
+    } else if(stat.fs_prefix1 == 'P' && stat.fs_prefix2 == 'R' && stat.fs_prefix3 == 'C') {
+        char buffer[1200];
+        String::memset(buffer,0,1024);
+        CpuData::Access()->is_advanced_access = 1;
+        uint64_t bw = 0;
+        CpuData::Access()->count = &bw;
+        CpuData::Access()->offset = 0;
+        int status = VFS::Read(buffer,file->path_point,ctx->rdx);
+        Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
+        String::memset(buf, 0, ctx->rdx);
+        String::memcpy(buf, buffer, bw);
+        Paging::EnableKernel();
+        CpuData::Access()->is_advanced_access = 0;
+        ctx->rdx = bw;
+        return 0;
     } else {
         if(file->seek_offset == -1) {
             ctx->rdx = 0;
