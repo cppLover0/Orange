@@ -11,6 +11,10 @@
 #include <generic/memory/paging.hpp> // it have align macros
 
 inline int oct2bin(unsigned char *str, int size) {
+
+    if(!str)
+        return 0;
+
     uint64_t n = 0;
     volatile unsigned char *c = str;
     for(int i = 0;i < size;i++) {
@@ -274,9 +278,10 @@ void USTAR::ParseAndCopy() {
             //Log("PATH: %s\n",result_path);
 
             VFS::Write((char*)result_path,filename,String::strlen(result_path),1,0);
+        } else if(type == 1) {
+            aligned_size = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
         } else {
-            DEBUG("Unknown ustar type: %d with name \"%s\"\n",type,current->file_name);
-            aligned_size = 512;
+            aligned_size = CALIGNPAGEUP(oct2bin((uint8_t*)&current->file_size,String::strlen(current->file_size)),512);
         }
         current = (ustar_t*)((uint64_t)current + aligned_size + 512);
 

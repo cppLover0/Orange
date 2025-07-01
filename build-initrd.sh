@@ -8,7 +8,8 @@ if [ ! "$(which x86_64-orange-gcc)" ]; then
     echo "If you built your cross-compiler, add it to your PATH with:"
     echo 'export PATH="$HOME/opt/cross/orange/bin:$PATH"'
     echo 'Alternatively, you can build the cross-compiler with: "make cross-compiler"'
-	exit 1
+    echo 'Also you should have host gcc with version < 14 (i am using 13.3.0)'
+    exit 1
 fi
 
 rm -rf tools/orange-mlibc
@@ -62,10 +63,6 @@ done
 
 
 cd ../../
-
-rm -rf initrd/usr/local/lib/*.a
-rm -rf initrd/usr/lib/*.a
-rm -rf initrd/lib/*.a
 
 cp -rf tools/base/* initrd/
 

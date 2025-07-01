@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls. 
-QEMUFLAGS := -m 1G -serial stdio -M q35 -s -d int -smp 1 -trace "msi*" -device qemu-xhci -enable-kvm
+QEMUFLAGS := -m 4G -serial stdio -M q35 -s -d int -smp 12 -trace "msi*" -device qemu-xhci  -enable-kvm
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
@@ -45,8 +45,12 @@ make-libc:
 	cd tools && git clone https://github.com/cpplover0/orange-mlibc --depth=1
 	cd tools/orange-mlibc && sh build_to_cross.sh "$(CURRENT_DIR)"
 
+.PHONY: linux-headers
+linux-headers:
+	cd tools && sh get-linux-headers.sh "$(CURRENT_DIR)"
+
 .PHONY: cross-compiler
-cross-compiler: make-libc
+cross-compiler: linux-headers make-libc
 	cd tools/toolchain/ && sh get.sh "$(CURRENT_DIR)"
 
 .PHONY: check-cross

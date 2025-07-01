@@ -28,10 +28,6 @@ done
 
 cd ../../
 
-rm -rf initrd/usr/local/lib/*.a
-rm -rf initrd/usr/lib/*.a
-rm -rf initrd/lib/*.a
-
 echo Building initrd is done
 
 cp -rf tools/base/* initrd/

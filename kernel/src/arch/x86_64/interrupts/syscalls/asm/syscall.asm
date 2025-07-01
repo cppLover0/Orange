@@ -4,6 +4,14 @@ extern c_syscall_handler
 global syscall_handler
 syscall_handler:
     swapgs
+    mov qword [gs:24],rax
+
+    mov rax,cr3
+    mov qword [gs:32], rax
+
+    mov rax, qword [gs:16]
+    mov cr3,rax
+    mov rax, qword [gs:24]
     mov qword [gs:0],rsp ;save stack
     mov rsp, qword [gs:8]
     push qword (0x20 | 3)
@@ -28,13 +36,12 @@ syscall_handler:
     push rcx
     push rbx
     push rax
-    mov rax,cr3
+    mov rax, qword [gs:32]
     push rax
     xor rbp,rbp
     mov rdi,rsp
     call c_syscall_handler
     pop rax
-    mov cr3,rax
     pop rax
     pop rbx
     pop rcx
@@ -51,6 +58,12 @@ syscall_handler:
     pop r14
     pop r15
     mov rsp,[gs:0] 
+    mov qword [gs:24],rax
+
+    mov rax,qword [gs:32]
+    mov cr3,rax
+    mov rax, qword [gs:24]
+
     swapgs
     o64 sysret
 

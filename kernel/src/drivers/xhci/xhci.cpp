@@ -383,7 +383,7 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
 
 }
 
-void __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_usb_command_t usbcommand,void* out,uint64_t len) {
+xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_usb_command_t usbcommand,void* out,uint64_t len) {
     void* status_buf = PMM::VirtualAlloc();
     void* desc_buf = PMM::VirtualAlloc();
 
@@ -439,10 +439,14 @@ void __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev
 
     if(ret.base == 0xDEAD) {
         WARN("Timeout on port %d\n",usbdev->portnum);
+        ret.ret_code = 0;
+        return ret;
     }
 
     if(ret.ret_code != 1) {
         WARN("Failed to request xhci device, idx: 0x%p, val: 0%p, type: 0x%p, len: 0x%p, request: %d\n",usbcommand.index,usbcommand.value,usbcommand.type,usbcommand.len,usbcommand.request);
+        ret.ret_code = 0;
+        return ret;
     }
 
     HPET::Sleep(10000);
@@ -451,6 +455,9 @@ void __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev
 
     PMM::VirtualFree(desc_buf);
     PMM::VirtualFree(status_buf);
+
+    return ret;
+
 }
 
 xhci_trb_t __xhci_send_usb_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_usb_command_t com) {
@@ -488,7 +495,7 @@ xhci_trb_t __xhci_send_usb_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,x
 
 }
 
-void __xhci_get_usb_descriptor(xhci_device_t* dev,xhci_usb_device_t* usbdev,void* out,uint64_t len) {
+int __xhci_get_usb_descriptor(xhci_device_t* dev,xhci_usb_device_t* usbdev,void* out,uint64_t len) {
     xhci_usb_command_t usbcommand;
     usbcommand.type = 0x80;
     usbcommand.request = 6;
@@ -496,7 +503,12 @@ void __xhci_get_usb_descriptor(xhci_device_t* dev,xhci_usb_device_t* usbdev,void
     usbcommand.index = 0;
     usbcommand.len = len;
 
-    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,len);
+    xhci_trb_t ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,len);
+    if(ret.ret_code != 1)
+        return 0;
+
+    return 1;
+
 }
 
 uint16_t __xhci_get_speed(xhci_device_t* dev,uint32_t portsc) {
@@ -522,7 +534,7 @@ uint16_t __xhci_get_speed(xhci_device_t* dev,uint32_t portsc) {
     }
 }
 
-void __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
+int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
     volatile uint32_t* portsc = (volatile uint32_t*)__xhci_portsc(dev,portnum);
     uint32_t load_portsc = *portsc;
 
@@ -531,7 +543,7 @@ void __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
         *portsc = load_portsc;
         HPET::Sleep(50000);
         if(!(*portsc & (1 << 9))) {
-            WARN("I am overcooked...\n");
+            return 0;
         }
     }
 
@@ -551,7 +563,7 @@ void __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
         while(*portsc & (1 << 19)) {
             if(time-- == 0) {
                 WARN("Can't reset USB 3.0 device with port %d, ignoring\n",portnum);
-                break;
+                return 0;
             }
             HPET::Sleep(50000);
         }
@@ -559,13 +571,14 @@ void __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
         while((*portsc & (1 << 1)) == old_bit) {
             if(time-- == 0) {
                 WARN("Can't reset USB 2.0 device with port %d, ignoring\n",portnum);
-                break;
+                return 0;
             }
             HPET::Sleep(50000);
         }
     }
     
     HPET::Sleep(500000);
+    return 1;
  
 }
 
@@ -583,7 +596,7 @@ void __xhci_unicode_to_ascii(uint16_t* src,char* dest) {
     dest[dest_ptr] = '\0';
 }
 
-void __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_string_descriptor_t* out,uint8_t index,uint8_t lang) {
+int __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_string_descriptor_t* out,uint8_t index,uint8_t lang) {
     xhci_usb_command_t usbcommand;
     usbcommand.type = 0x80;
     usbcommand.request = 6;
@@ -591,14 +604,23 @@ void __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_st
     usbcommand.index = lang;
     usbcommand.len = sizeof(xhci_usb_descriptor_header);
 
-    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    xhci_trb_t ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    if(ret.ret_code != 1)
+        return 0;
 
     usbcommand.len = out->head.len;
 
-    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    if(ret.ret_code != 1)
+        return 0;
+
+    return 1;
+
 }
 
-void __xhci_read_usb_lang_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_lang_descriptor_t* out) {
+
+
+int __xhci_read_usb_lang_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_lang_descriptor_t* out) {
     xhci_usb_command_t usbcommand;
     usbcommand.type = 0x80;
     usbcommand.request = 6;
@@ -606,30 +628,49 @@ void __xhci_read_usb_lang_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xh
     usbcommand.index = 0;
     usbcommand.len = sizeof(xhci_usb_descriptor_header);
 
-    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    xhci_trb_t ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    if(ret.ret_code != 1)
+        return 0;
 
     usbcommand.len = out->head.len;
 
-    __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    if(ret.ret_code != 1)
+        return 0;
+
+    return 1;
+
 }
 
-void __xhci_print_device_info(xhci_device_t* dev,xhci_usb_device_t* usb_dev,char* product0,char* manufacter0) {
+int __xhci_print_device_info(xhci_device_t* dev,xhci_usb_device_t* usb_dev,char* product0,char* manufacter0) {
     xhci_lang_descriptor_t lang;
 
-    __xhci_read_usb_lang_string(dev,usb_dev,&lang);
+    int status = __xhci_read_usb_lang_string(dev,usb_dev,&lang);
+    if(!status)
+        return 0;
+
     uint16_t lang0 = lang.lang[0];
 
     xhci_string_descriptor_t product;
     xhci_string_descriptor_t manufacter;
 
-    __xhci_read_usb_string(dev,usb_dev,&product,usb_dev->desc->product1,lang0);
-    __xhci_read_usb_string(dev,usb_dev,&manufacter,usb_dev->desc->manufacter,lang0);
+    status = __xhci_read_usb_string(dev,usb_dev,&product,usb_dev->desc->product1,lang0);
+
+    if(!status)
+        return 0;
+
+    status = __xhci_read_usb_string(dev,usb_dev,&manufacter,usb_dev->desc->manufacter,lang0);
+
+    if(!status)
+        return 0;
 
     String::memset(product0,0,256);
     String::memset(manufacter0,0,256);
 
     __xhci_unicode_to_ascii(product.str,product0);
     __xhci_unicode_to_ascii(manufacter.str,manufacter0);
+
+    return 1;
 
 }
 
@@ -733,7 +774,9 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     //INFO("Trying to configure %s device on port %d (is_64_byte_context: %d)\n",dev->usb3ports[portnum] == 1 ? "USB3.0" : "USB2.0",portnum,dev->cap->hccparams1.contextsize);
 
-    __xhci_reset_dev(dev,portnum);
+    int status = __xhci_reset_dev(dev,portnum);
+    if(!status)
+        return;
 
     int id = __xhci_enable_slot(dev,portnum);
 
@@ -809,12 +852,16 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         return;
 
     xhci_usb_descriptor_t* descriptor = (xhci_usb_descriptor_t*)PMM::VirtualAlloc();
-    __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,8);
+    int status2 = __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,8);
+
+    if(!status2)
+        return;
 
     ((xhci_input_ctx_t*)HHDM::toVirt(dev->dcbaa[id]))->ep0.maxpacketsize = descriptor->maxpacketsize;
 
-    __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,descriptor->head.len);
-
+    status2 = __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,descriptor->head.len);
+    if(!status2)
+        return;
     usb_dev->desc = descriptor;
 
     usb_dev->type = 0;
@@ -827,7 +874,9 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     char product[256];
     char manufacter[256];
 
-    __xhci_print_device_info(dev,usb_dev,product,manufacter);
+    int status4 = __xhci_print_device_info(dev,usb_dev,product,manufacter);
+    if(!status4)
+        return;
 
     xhci_config_descriptor_t* cfg = (xhci_config_descriptor_t*)PMM::VirtualAlloc();
     usb_dev->config = cfg;
@@ -997,30 +1046,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     if(ret.ret_code != 1) {
         WARN("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
-        dev->dcbaa[usb_dev->slotid] += 64;
-        __xhci_clear_event(dev);
-
-        __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&ep_trb);
-        __xhci_doorbell(dev,0);
-        HPET::Sleep(10000);
-
-        ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
-
-        if(ret.ret_code != 1) {
-            WARN("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
-            dev->dcbaa[usb_dev->slotid] = addr;
-            __xhci_clear_event(dev);
-
-            __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&ep_trb);
-            __xhci_doorbell(dev,0);
-
-            ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
-
-            if(ret.ret_code != 1) {
-                WARN("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
-                return;
-            }
-        }
+        return;
     }
     
     __xhci_ask_for_help_hid(dev,usb_dev);
@@ -1166,13 +1192,6 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
         return;
     } 
 
-    //used from managarm
-    uint16_t usb3avail = PCI::IN(a,b,c,0xDC,2);
-    PCI::OUT(a,b,c,0xD8,usb3avail,2);
-
-    uint16_t usb2avail = PCI::IN(a,b,c,0xD4,2);
-    PCI::OUT(a,b,c,0xD0,usb2avail,2);
-
     xhci_device_t* dev = (xhci_device_t*)PMM::VirtualAlloc();
 
     uint64_t addr = pci_dev.bar0 & ~4; // clear upper 2 bits
@@ -1204,7 +1223,7 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
             __nop();
             if(!timeout) {
                 WARN("Can't disable XHCI. Ignoring\n");
-                break;
+                return;
             }
             HPET::Sleep(20 * 1000);
             timeout = timeout - 1;

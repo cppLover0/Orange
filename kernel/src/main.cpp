@@ -164,6 +164,15 @@ extern "C" void kmain() {
     SSE::Init();
     INFO("SSE Is enabled (or not) \n");
     
+    cpudata_t* cpu_data = CpuData::Access();
+
+    uint64_t stack_5 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
+    Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
+    cpu_data->kernel_stack = stack_5 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
+    cpu_data->user_stack = 0;
+
+    MP::Sync(0); // i should wait other cpus before scheduling init
+
     Process::Init();
     INFO("Scheduling initializied\n");
 
@@ -180,13 +189,6 @@ extern "C" void kmain() {
 
     USTAR::ParseAndCopy();
     INFO("Loaded initrd\n");
-
-    cpudata_t* cpu_data = CpuData::Access();
-
-    uint64_t stack_5 = (uint64_t)PMM::VirtualBigAlloc(TSS_STACK_IN_PAGES); // for syscall
-    Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
-    cpu_data->kernel_stack = stack_5 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
-    cpu_data->user_stack = 0;
 
     VMM::Init(0);
     //VMM::Alloc(0,0,0);
@@ -247,7 +249,9 @@ extern "C" void kmain() {
 
     INFO("Kernel is initializied for %d seconds\n",res_sec);
 
-    MP::Sync();
+    CpuData::Access()->kernel_cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());
+
+    MP::Sync(1);
 
     __sti();
 

@@ -19,9 +19,9 @@ cd ..
 mkdir zlib-build
 cd zlib-build
 
-CC=x86_64-orange-gcc LD=x86_64-orange-ld ../zlib-1.3.1/configure 
+CC=x86_64-orange-gcc LD=x86_64-orange-ld ../zlib-1.3.1/configure  --prefix=/usr --enable-shared
 
 make -j$(nproc)
-make install -j$(nproc) DESTDIR="$1" 
+make install -j$(nproc) DESTDIR="$(realpath $1/..)" 
 
 cd ../..

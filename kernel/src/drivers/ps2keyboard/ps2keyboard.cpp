@@ -17,8 +17,6 @@ short PS2Keyboard::Get() {
     if(status & 0x01) {
         uint8_t keycode = IO::IN(0x60,1);
         input_send(keycode);
-        return 0;
-
     }
 
     return 0;

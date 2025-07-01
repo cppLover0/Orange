@@ -10,6 +10,9 @@
 typedef struct {
     uint64_t user_stack;
     uint64_t kernel_stack;
+    uint64_t kernel_cr3;
+    uint64_t reserved;
+    uint64_t user_cr3;
     GDT gdt;
     struct LIMINE_MP(info)* smp_info;
     process_t* current;

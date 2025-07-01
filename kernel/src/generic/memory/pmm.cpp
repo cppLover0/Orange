@@ -178,6 +178,9 @@ uint64_t buddy_alloc(uint64_t size) {
     uint64_t top = UINT64_MAX;
     buddy_info_t* good_buddy = 0;
 
+    if(size < 4096)
+        size = 4096;
+
     // find a available buddy info which i need
     for(uint64_t i = 0;i < buddy.hello_buddy;i++) {
         if(LEVEL_TO_SIZE(buddy.mem[i].information.level) >= size && LEVEL_TO_SIZE(buddy.mem[i].information.level) < top && buddy.mem[i].information.is_free) {
@@ -274,24 +277,29 @@ void PMM::Init(limine_memmap_response* mem_map) {
     }
 
     INFO("Highest usable memory: 0x%p-0x%p (%d MB)\n",top,top + top_size,(top_size / 1024) / 1024);
+    String::memset(&buddy,0,sizeof(buddy_t));
 
     uint64_t free_memory = top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t));
 
     buddy.mem = (buddy_info_t*)HHDM::toVirt(top);
-    
+    String::memset(buddy.mem,0,((top_size / PAGE_SIZE) * sizeof(buddy_info_t)));
+
     INFO("Buddy allocator memory: 0x%p-0x%p ( size of buddy_info_t: %d, buddy_info_field_t: %d, buddy_t: %d, buddy_split_result_t: %d )\n",top,(uint64_t)top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)),sizeof(buddy_info_t),sizeof(buddy_info_field_t),sizeof(buddy_t),sizeof(buddy_split_result_t));
 
     INFO("Putting all memory to buddy allocator\n");
 
-    uint64_t final_size = ALIGNPAGEUP(top_size - ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)));
+    uint64_t final_size = top_size - ((top_size / PAGE_SIZE) * sizeof(buddy_info_t));
 
     free_memory = ALIGNPAGEUP(free_memory);
 
     uint64_t max_level_align = LEVEL_TO_SIZE(MAX_LEVEL);
-    for(uint64_t i = 0; i < (CALIGNPAGEDOWN(top_size,max_level_align));i += max_level_align) {
+    uint64_t i = 0;
+    while(1) {
         buddy_put(free_memory + i,0,MAX_LEVEL);
+        i += max_level_align;
+        if(i >= final_size)
+            break;
     }
-
 
 }
 

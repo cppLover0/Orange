@@ -11,7 +11,7 @@ install_gnu() {
     name=$2
     version=$3
 
-    wget -nc "$GNU_MIRROR/gnu/$pkg_name/$name-$version.tar.gz"
+    curl -O "$GNU_MIRROR/gnu/$pkg_name/$name-$version.tar.gz"
 	tar -xvf "$name-$version.tar.gz"
 
     rm -rf "$name-$version.tar.gz"

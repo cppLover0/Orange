@@ -5,6 +5,6 @@ class MP {
 public:
     static void Init();
 
-    static void Sync();
+    static void Sync(int id);
 
 };

@@ -1,0 +1,92 @@
+diff -Naur gcc-11.4.0/gcc/common/config/i386/cpuinfo.h gcc-patched/gcc/common/config/i386/cpuinfo.h
+--- gcc-11.4.0/gcc/common/config/i386/cpuinfo.h	2023-05-29 11:46:29.000000000 +0300
++++ gcc-patched/gcc/common/config/i386/cpuinfo.h	2025-07-01 15:44:10.739172540 +0300
+@@ -655,8 +655,8 @@
+ 	set_feature (FEATURE_CLFLUSHOPT);
+       if (ebx & bit_CLWB)
+ 	set_feature (FEATURE_CLWB);
+-      if (ecx & bit_PREFETCHWT1)
+-	set_feature (FEATURE_PREFETCHWT1);
++ //      if (ecx & bit_PREFETCHI)
++	// set_feature (FEATURE_PREFETCHWT1);
+       /* NB: bit_OSPKE indicates that OS supports PKU.  */
+       if (ecx & bit_OSPKE)
+ 	set_feature (FEATURE_PKU);
+@@ -709,10 +709,10 @@
+ 	    set_feature (FEATURE_AVX512DQ);
+ 	  if (ebx & bit_AVX512CD)
+ 	    set_feature (FEATURE_AVX512CD);
+-	  if (ebx & bit_AVX512PF)
+-	    set_feature (FEATURE_AVX512PF);
+-	  if (ebx & bit_AVX512ER)
+-	    set_feature (FEATURE_AVX512ER);
++	  // if (ebx & bit_AVX512PF)
++	  //   set_feature (FEATURE_AVX512PF);
++	  // if (ebx & bit_AVX512ER)
++	  //   set_feature (FEATURE_AVX512ER);
+ 	  if (ebx & bit_AVX512IFMA)
+ 	    set_feature (FEATURE_AVX512IFMA);
+ 	  if (ecx & bit_AVX512VBMI)
+@@ -725,10 +725,10 @@
+ 	    set_feature (FEATURE_AVX512BITALG);
+ 	  if (ecx & bit_AVX512VPOPCNTDQ)
+ 	    set_feature (FEATURE_AVX512VPOPCNTDQ);
+-	  if (edx & bit_AVX5124VNNIW)
+-	    set_feature (FEATURE_AVX5124VNNIW);
+-	  if (edx & bit_AVX5124FMAPS)
+-	    set_feature (FEATURE_AVX5124FMAPS);
++	  // if (edx & bit_AVX5124VNNIW)
++	  //   set_feature (FEATURE_AVX5124VNNIW);
++	  // if (edx & bit_AVX5124FMAPS)
++	  //   set_feature (FEATURE_AVX5124FMAPS);
+ 	  if (edx & bit_AVX512VP2INTERSECT)
+ 	    set_feature (FEATURE_AVX512VP2INTERSECT);
+ 	}
+diff -Naur gcc-11.4.0/gmp/configfsf.sub gcc-patched/gmp/configfsf.sub
+--- gcc-11.4.0/gmp/configfsf.sub	2015-11-01 18:19:48.000000000 +0300
++++ gcc-patched/gmp/configfsf.sub	2025-06-30 21:20:00.751885499 +0300
+@@ -1399,7 +1399,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -Naur gcc-11.4.0/isl/config.sub gcc-patched/isl/config.sub
+--- gcc-11.4.0/isl/config.sub	2016-01-24 23:50:53.000000000 +0300
++++ gcc-patched/isl/config.sub	2025-06-30 21:20:21.620657388 +0300
+@@ -1385,7 +1385,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -Naur gcc-11.4.0/mpc/config.sub gcc-patched/mpc/config.sub
+--- gcc-11.4.0/mpc/config.sub	2015-02-16 15:28:25.000000000 +0300
++++ gcc-patched/mpc/config.sub	2025-06-30 21:21:18.604127316 +0300
+@@ -1393,7 +1393,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -Naur gcc-11.4.0/mpfr/config.sub gcc-patched/mpfr/config.sub
+--- gcc-11.4.0/mpfr/config.sub	2017-09-07 14:47:07.000000000 +0300
++++ gcc-patched/mpfr/config.sub	2025-06-30 21:20:47.099243837 +0300
+@@ -1408,7 +1408,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
++	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
+ 	      | -onefs* | -tirtos* | -phoenix* | -fuchsia*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
