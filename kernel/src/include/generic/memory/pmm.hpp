@@ -7,7 +7,7 @@
 #define SIZE_TO_PAGES(size) (((size) + 4095) / 4096)
 #define LEVEL_TO_SIZE(level) (1U << (level))
 
-#define MAX_LEVEL 27
+#define MAX_LEVEL 28
 
 typedef struct {
     int64_t level : 8;
