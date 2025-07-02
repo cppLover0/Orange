@@ -72,7 +72,7 @@ void keyhandler(int fd,uint8_t key) {
         if((tty_termios.c_lflag & ECHO) && is_printable(layout_key))
             write(STDOUT_FILENO,&layout_key,1);
 
-        if((tty_termios.c_lflag & ICANON) && (is_printable(layout_key) || layout_key == '\b')) {
+        if((tty_termios.c_lflag & ICANON) && (is_printable(layout_key) || layout_key == '\b') && layout_key != 0) {
             
             if(layout_key != '\b') {
                 keybuffer[key_ptr++] = layout_key;

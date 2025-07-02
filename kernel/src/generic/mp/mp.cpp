@@ -19,8 +19,8 @@
 #include <other/hhdm.hpp>
 #include <other/string.hpp>
 
-uint64_t how_much_cpus = 0;
-uint64_t temp_how_much_cpus[12];
+_Atomic uint64_t how_much_cpus = 0;
+_Atomic uint64_t temp_how_much_cpus[12];
 
 
 char mp_spinlock = 0;
@@ -56,8 +56,9 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
     spinlock_unlock(&mp_spinlock);
     MP::Sync(0);
     MP::Sync(1);
-    //INFO("CPU %d is online !\n",smp_info->lapic_id);
 
+    INFO("CPU %d is online !\n",smp_info->lapic_id);
+    MP::Sync(2);
     __sti();
     while(1) {
         __hlt();
@@ -68,7 +69,7 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 void MP::Init() {
     LimineInfo limine_info;
     how_much_cpus = limine_info.smp->cpu_count;
-    String::memset(temp_how_much_cpus,0,sizeof(temp_how_much_cpus));
+    String::memset(temp_how_much_cpus,0,12 * 8);
     for(uint64_t i = 0;i < limine_info.smp->cpu_count;i++) {
         if(i != limine_info.smp->bsp_lapic_id) {
             limine_info.smp->cpus[i]->goto_address = __mp_bootstrap; // in x86 it atomic soooo
@@ -80,6 +81,6 @@ void MP::Init() {
 void MP::Sync(int id) {
     temp_how_much_cpus[id]++;
     while(how_much_cpus != temp_how_much_cpus[id]) {__nop();}
-    HPET::Sleep(500000); // perform 500 ms sleep to sync
+    HPET::Sleep(50000); // perform 500 ms sleep to sync
     temp_how_much_cpus[id] = 0;
 }

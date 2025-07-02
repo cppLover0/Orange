@@ -1,92 +1,177 @@
-diff -Naur gcc-11.4.0/gcc/common/config/i386/cpuinfo.h gcc-patched/gcc/common/config/i386/cpuinfo.h
---- gcc-11.4.0/gcc/common/config/i386/cpuinfo.h	2023-05-29 11:46:29.000000000 +0300
-+++ gcc-patched/gcc/common/config/i386/cpuinfo.h	2025-07-01 15:44:10.739172540 +0300
-@@ -655,8 +655,8 @@
- 	set_feature (FEATURE_CLFLUSHOPT);
-       if (ebx & bit_CLWB)
- 	set_feature (FEATURE_CLWB);
--      if (ecx & bit_PREFETCHWT1)
--	set_feature (FEATURE_PREFETCHWT1);
-+ //      if (ecx & bit_PREFETCHI)
-+	// set_feature (FEATURE_PREFETCHWT1);
-       /* NB: bit_OSPKE indicates that OS supports PKU.  */
-       if (ecx & bit_OSPKE)
- 	set_feature (FEATURE_PKU);
-@@ -709,10 +709,10 @@
- 	    set_feature (FEATURE_AVX512DQ);
- 	  if (ebx & bit_AVX512CD)
- 	    set_feature (FEATURE_AVX512CD);
--	  if (ebx & bit_AVX512PF)
--	    set_feature (FEATURE_AVX512PF);
--	  if (ebx & bit_AVX512ER)
--	    set_feature (FEATURE_AVX512ER);
-+	  // if (ebx & bit_AVX512PF)
-+	  //   set_feature (FEATURE_AVX512PF);
-+	  // if (ebx & bit_AVX512ER)
-+	  //   set_feature (FEATURE_AVX512ER);
- 	  if (ebx & bit_AVX512IFMA)
- 	    set_feature (FEATURE_AVX512IFMA);
- 	  if (ecx & bit_AVX512VBMI)
-@@ -725,10 +725,10 @@
- 	    set_feature (FEATURE_AVX512BITALG);
- 	  if (ecx & bit_AVX512VPOPCNTDQ)
- 	    set_feature (FEATURE_AVX512VPOPCNTDQ);
--	  if (edx & bit_AVX5124VNNIW)
--	    set_feature (FEATURE_AVX5124VNNIW);
--	  if (edx & bit_AVX5124FMAPS)
--	    set_feature (FEATURE_AVX5124FMAPS);
-+	  // if (edx & bit_AVX5124VNNIW)
-+	  //   set_feature (FEATURE_AVX5124VNNIW);
-+	  // if (edx & bit_AVX5124FMAPS)
-+	  //   set_feature (FEATURE_AVX5124FMAPS);
- 	  if (edx & bit_AVX512VP2INTERSECT)
- 	    set_feature (FEATURE_AVX512VP2INTERSECT);
- 	}
-diff -Naur gcc-11.4.0/gmp/configfsf.sub gcc-patched/gmp/configfsf.sub
---- gcc-11.4.0/gmp/configfsf.sub	2015-11-01 18:19:48.000000000 +0300
-+++ gcc-patched/gmp/configfsf.sub	2025-06-30 21:20:00.751885499 +0300
-@@ -1399,7 +1399,7 @@
- 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
- 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
- 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
--	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
-+	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
- 	# Remember, each alternative MUST END IN *, to match a version number.
- 		;;
- 	-qnx*)
-diff -Naur gcc-11.4.0/isl/config.sub gcc-patched/isl/config.sub
---- gcc-11.4.0/isl/config.sub	2016-01-24 23:50:53.000000000 +0300
-+++ gcc-patched/isl/config.sub	2025-06-30 21:20:21.620657388 +0300
-@@ -1385,7 +1385,7 @@
- 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
- 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
- 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
--	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
-+	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
- 	# Remember, each alternative MUST END IN *, to match a version number.
- 		;;
- 	-qnx*)
-diff -Naur gcc-11.4.0/mpc/config.sub gcc-patched/mpc/config.sub
---- gcc-11.4.0/mpc/config.sub	2015-02-16 15:28:25.000000000 +0300
-+++ gcc-patched/mpc/config.sub	2025-06-30 21:21:18.604127316 +0300
-@@ -1393,7 +1393,7 @@
- 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
- 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
- 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
--	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
-+	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
- 	# Remember, each alternative MUST END IN *, to match a version number.
- 		;;
- 	-qnx*)
-diff -Naur gcc-11.4.0/mpfr/config.sub gcc-patched/mpfr/config.sub
---- gcc-11.4.0/mpfr/config.sub	2017-09-07 14:47:07.000000000 +0300
-+++ gcc-patched/mpfr/config.sub	2025-06-30 21:20:47.099243837 +0300
-@@ -1408,7 +1408,7 @@
- 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
- 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
- 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
--	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
-+	      | -skyos* | -orange* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
- 	      | -onefs* | -tirtos* | -phoenix* | -fuchsia*)
- 	# Remember, each alternative MUST END IN *, to match a version number.
- 		;;
+diff -Naur gcc-15.1.0/config.sub gcc-patched/config.sub
+--- gcc-15.1.0/config.sub	2025-04-25 11:17:59.000000000 +0300
++++ gcc-patched/config.sub	2025-07-02 10:24:40.192094746 +0300
+@@ -1745,7 +1745,7 @@
+ 	     | os2* | vos* | palmos* | uclinux* | nucleus* | morphos* \
+ 	     | scout* | superux* | sysv* | rtmk* | tpf* | windiss* \
+ 	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
+-	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
++	     | skyos* | orange* | haiku* | rdos* | toppers* | drops* | es* \
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
+diff -Naur gcc-15.1.0/fixincludes/mkfixinc.sh gcc-patched/fixincludes/mkfixinc.sh
+--- gcc-15.1.0/fixincludes/mkfixinc.sh	2025-04-25 11:17:59.000000000 +0300
++++ gcc-patched/fixincludes/mkfixinc.sh	2025-07-02 10:35:57.862910098 +0300
+@@ -13,6 +13,8 @@
+ case $machine in
+     i?86-*-cygwin* | \
+     *-mingw32* | \
++    *-orange* | \
++    *-*-orange* | \
+     powerpc-*-eabisim* | \
+     powerpc-*-eabi*    | \
+     powerpc-*-rtems*   | \
+diff -Naur gcc-15.1.0/gcc/config/gnu-user.h gcc-patched/gcc/config/gnu-user.h
+--- gcc-15.1.0/gcc/config/gnu-user.h	2025-04-25 11:18:00.000000000 +0300
++++ gcc-patched/gcc/config/gnu-user.h	2025-07-02 10:33:34.665748172 +0300
+@@ -51,13 +51,12 @@
+ #define GNU_USER_TARGET_STARTFILE_SPEC \
+   "%{shared:; \
+      pg|p|profile:%{static-pie:grcrt1.o%s;:gcrt1.o%s}; \
+-     static:crt1.o%s; \
+-     static-pie:rcrt1.o%s; \
++     static|static-pie:%{" PIE_SPEC ":rcrt1.o%s;:crt1.o%s}; \
+      " PIE_SPEC ":Scrt1.o%s; \
+      :crt1.o%s} " \
+    GNU_USER_TARGET_CRTI " \
+-   %{static:crtbeginT.o%s; \
+-     shared|static-pie|" PIE_SPEC ":crtbeginS.o%s; \
++   %{shared|" PIE_SPEC ":crtbeginS.o%s; \
++     static:crtbeginT.o%s; \
+      :crtbegin.o%s} \
+    %{fvtable-verify=none:%s; \
+      fvtable-verify=preinit:vtv_start_preinit.o%s; \
+@@ -73,11 +72,11 @@
+    GNU userspace "finalizer" file, `crtn.o'.  */
+ 
+ #define GNU_USER_TARGET_ENDFILE_SPEC \
+-  "%{!static:%{fvtable-verify=none:%s; \
++  "%{static|static-pie:; \
++     fvtable-verify=none:%s; \
+      fvtable-verify=preinit:vtv_end_preinit.o%s; \
+-     fvtable-verify=std:vtv_end.o%s}} \
+-   %{static:crtend.o%s; \
+-     shared|static-pie|" PIE_SPEC ":crtendS.o%s; \
++     fvtable-verify=std:vtv_end.o%s} \
++  %{shared|" PIE_SPEC ":crtendS.o%s; \
+      :crtend.o%s} " \
+    GNU_USER_TARGET_CRTN " " \
+    CRTOFFLOADEND
+@@ -106,7 +105,7 @@
+ #define LIB_SPEC GNU_USER_TARGET_LIB_SPEC
+ 
+ #if defined(HAVE_LD_EH_FRAME_HDR)
+-#define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
++#define LINK_EH_SPEC "%{!static|" PIE_SPEC ":--eh-frame-hdr} "
+ #endif
+ 
+ #define GNU_USER_TARGET_LINK_GCC_C_SEQUENCE_SPEC \
+diff -Naur gcc-15.1.0/gcc/config/orange.h gcc-patched/gcc/config/orange.h
+--- gcc-15.1.0/gcc/config/orange.h	1970-01-01 03:00:00.000000000 +0300
++++ gcc-patched/gcc/config/orange.h	2025-07-02 10:33:09.155580118 +0300
+@@ -0,0 +1,31 @@
++/* Useful if you wish to make target-specific GCC changes. */
++#undef TARGET_ORANGE
++#define TARGET_ORANGE 1
++
++#undef LINK_SPEC
++#define LINK_SPEC "%{shared:-shared} %{static:-static} %{!shared: %{!static: %{rdynamic:-export-dynamic}}}"
++
++/* Default arguments you want when running your
++   i686-myos-gcc/x86_64-myos-gcc toolchain */
++#undef LIB_SPEC
++#define LIB_SPEC "-lc" /* link against C standard library */
++
++/* Files that are linked before user code.
++   The %s tells GCC to look for these files in the library directory. */
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared|static-pie|pie|!no-pie:crtbeginS.o%s;:crtbegin.o%s}"
++
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared|static-pie|pie|!no-pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* Additional predefined macros. */
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()      \
++  do {                                \
++    builtin_define ("__orange__");      \
++    builtin_define ("__unix__");      \
++    builtin_assert ("system=orange");   \
++    builtin_assert ("system=unix");   \
++    builtin_assert ("system=posix");   \
++  } while(0);
+diff -Naur gcc-15.1.0/gcc/config.gcc gcc-patched/gcc/config.gcc
+--- gcc-15.1.0/gcc/config.gcc	2025-04-25 11:18:00.000000000 +0300
++++ gcc-patched/gcc/config.gcc	2025-07-02 10:27:14.624497805 +0300
+@@ -826,6 +826,13 @@
+   rust_target_objs="${rust_target_objs} dragonfly-rust.o"
+   target_has_targetrustm=yes
+   ;;
++*-*-orange*)
++  extra_options="$extra_options gnu-user.opt"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=provide
++  ;;
+ *-*-freebsd*)
+   # This is the generic ELF configuration of FreeBSD.  Later
+   # machine-specific sections may refine and add to this
+@@ -1661,6 +1668,7 @@
+ 	extra_gcc_objs="driver-avr.o avr-devices.o"
+ 	extra_objs="avr-devices.o avr-log.o avr-passes.o"
+ 	;;
++
+ bfin*-elf*)
+ 	tm_file="${tm_file} elfos.h newlib-stdint.h bfin/elf.h"
+ 	tmake_file=bfin/t-bfin-elf
+@@ -1986,6 +1994,13 @@
+ x86_64-*-freebsd*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h ${fbsd_tm_file} i386/x86-64.h i386/freebsd.h i386/freebsd64.h"
+ 	;;
++i[34567]86-*-orange*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h orange.h"
++    ;;
++x86_64-*-orange*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h orange.h"
++    ;;
++
+ i[34567]86-*-netbsdelf*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h ${nbsd_tm_file} i386/netbsd-elf.h"
+ 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
+diff -Naur gcc-15.1.0/libgcc/config.host gcc-patched/libgcc/config.host
+--- gcc-15.1.0/libgcc/config.host	2025-04-25 11:18:04.000000000 +0300
++++ gcc-patched/libgcc/config.host	2025-07-02 10:35:21.302915722 +0300
+@@ -775,6 +775,14 @@
+ 	tmake_file="${tmake_file} i386/t-dragonfly i386/t-crtstuff"
+ 	md_unwind_header=i386/dragonfly-unwind.h
+ 	;;
++i[34567]86-*-orange*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
++x86_64-*-orange*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
+ i[34567]86-*-freebsd*)
+ 	tmake_file="${tmake_file} i386/t-freebsd i386/t-crtstuff"
+ 	md_unwind_header=i386/freebsd-unwind.h
+diff -Naur gcc-15.1.0/libstdc++-v3/crossconfig.m4 gcc-patched/libstdc++-v3/crossconfig.m4
+--- gcc-15.1.0/libstdc++-v3/crossconfig.m4	2025-04-25 11:18:05.000000000 +0300
++++ gcc-patched/libstdc++-v3/crossconfig.m4	2025-07-02 10:34:30.009251134 +0300
+@@ -136,6 +136,12 @@
+     AC_CHECK_FUNCS(uselocale)
+     ;;
+ 
++  *-orange*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
+   *-fuchsia*)
+     SECTION_FLAGS='-ffunction-sections -fdata-sections'
+     AC_SUBST(SECTION_FLAGS)

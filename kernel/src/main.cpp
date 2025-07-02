@@ -150,6 +150,7 @@ extern "C" void kmain() {
     
     MP::Init();
     INFO("MP Initializied\n");
+    MP::Sync(0); // i should wait other cpus
 
     PowerButton::Hook(handle_power_button);
     INFO("PowerButton initializied\n");
@@ -170,8 +171,6 @@ extern "C" void kmain() {
     Paging::alwaysMappedAdd(stack_5,TSS_STACK_IN_PAGES * PAGE_SIZE);
     cpu_data->kernel_stack = stack_5 + (TSS_STACK_IN_PAGES * PAGE_SIZE);
     cpu_data->user_stack = 0;
-
-    MP::Sync(0); // i should wait other cpus before scheduling init
 
     Process::Init();
     INFO("Scheduling initializied\n");
@@ -252,6 +251,7 @@ extern "C" void kmain() {
     CpuData::Access()->kernel_cr3 = HHDM::toPhys((uint64_t)Paging::KernelGet());
 
     MP::Sync(1);
+    MP::Sync(2);
 
     __sti();
 
