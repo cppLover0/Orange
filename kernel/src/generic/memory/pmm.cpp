@@ -106,7 +106,6 @@ buddy_split_result_t buddy_split(uint64_t phys) {
 }
 
 void buddy_merge(uint64_t parent_id) {
-    return;
     buddy_info_t* hi = buddy_find_by_parent(parent_id,0);
     buddy_info_t* _buddy = buddy_find_by_parent(parent_id,1);
 
@@ -253,6 +252,14 @@ void buddy_dump() {
     NLog("Memory: %d/%d bytes, %d/%d KB, %d/%d MB\n",total_mem - free_mem,total_mem,(total_mem - free_mem) / 1024,total_mem / 1024,((total_mem - free_mem) / 1024) / 1024,(total_mem / 1024) / 1024);
 }
 
+int __buddy_align_power(int number) {
+    int power = 0;
+    while (number >>= 1) { 
+        power++;
+    }
+    return power;
+}
+
 void PMM::Init(limine_memmap_response* mem_map) {
 
     limine_memmap_entry* current = mem_map->entries[0]; 
@@ -263,11 +270,14 @@ void PMM::Init(limine_memmap_response* mem_map) {
     LimineInfo info;
     __pmm_cache_offset = info.hhdm_offset;
 
+    uint64_t total_pages = 0;
+
     for(int i = 0;i < mem_map->entry_count;i++) {
         current = mem_map->entries[i];
         INFO("Entry %d: 0x%p-0x%p (%d MB) %s\n",i,current->base, current->base + current->length,(current->length / 1024) / 1024,current->type == LIMINE_MEMMAP_USABLE ? "Usable" : "Non-Usable");
     
         if(current->type == LIMINE_MEMMAP_USABLE) {
+            total_pages += ALIGNPAGEDOWN(current->length) / PAGE_SIZE;
             if(current->length > top_size) {
                 top = current->base;
                 top_size = current->length;
@@ -279,26 +289,38 @@ void PMM::Init(limine_memmap_response* mem_map) {
     INFO("Highest usable memory: 0x%p-0x%p (%d MB)\n",top,top + top_size,(top_size / 1024) / 1024);
     String::memset(&buddy,0,sizeof(buddy_t));
 
-    uint64_t free_memory = top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t));
+    uint64_t free_memory = top + (total_pages * sizeof(buddy_info_t));
 
     buddy.mem = (buddy_info_t*)HHDM::toVirt(top);
-    String::memset(buddy.mem,0,((top_size / PAGE_SIZE) * sizeof(buddy_info_t)));
+    String::memset(buddy.mem,0,(total_pages * sizeof(buddy_info_t)));
 
     INFO("Buddy allocator memory: 0x%p-0x%p ( size of buddy_info_t: %d, buddy_info_field_t: %d, buddy_t: %d, buddy_split_result_t: %d )\n",top,(uint64_t)top + ((top_size / PAGE_SIZE) * sizeof(buddy_info_t)),sizeof(buddy_info_t),sizeof(buddy_info_field_t),sizeof(buddy_t),sizeof(buddy_split_result_t));
 
     INFO("Putting all memory to buddy allocator\n");
 
-    uint64_t final_size = top_size - ((top_size / PAGE_SIZE) * sizeof(buddy_info_t));
+    uint64_t final_size = top_size - (total_pages * sizeof(buddy_info_t));
 
     free_memory = ALIGNPAGEUP(free_memory);
 
     uint64_t max_level_align = LEVEL_TO_SIZE(MAX_LEVEL);
-    uint64_t i = 0;
-    while(1) {
-        buddy_put(free_memory + i,0,MAX_LEVEL);
-        i += max_level_align;
-        if(i >= final_size)
-            break;
+    for(int i = 0;i < mem_map->entry_count;i++) {
+        current = mem_map->entries[i];
+        if(current->type == LIMINE_MEMMAP_USABLE) {
+            uint64_t calc_len = current->length;
+            uint64_t calc_base = current->base;
+            if(current->base == top) {
+                calc_base = free_memory;
+                calc_len = final_size;
+            }
+            while(1) {
+                if(calc_len > 4096) {
+                    buddy_put(calc_base,0,__buddy_align_power(calc_len));
+                    calc_base += LEVEL_TO_SIZE(__buddy_align_power(calc_len));
+                    calc_len -= LEVEL_TO_SIZE(__buddy_align_power(calc_len));
+                } else
+                    break;
+            }
+        }
     }
 
 }

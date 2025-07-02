@@ -2041,6 +2041,32 @@ int syscall_fcntl(int_frame_t* ctx) {
 
 }
 
+int syscall_memstat(int_frame_t* ctx) {
+    int free = 0;
+    int nonfree = 0;
+    uint64_t free_mem = 0;
+    uint64_t total_mem = 0;
+    extern buddy_t buddy;
+    for(uint64_t  i = 0;i < buddy.hello_buddy;i++) {
+
+        if(buddy.mem[i].information.is_free)
+            free_mem += LEVEL_TO_SIZE(buddy.mem[i].information.level);
+        
+        if(!buddy.mem[i].information.is_splitted)
+            total_mem += LEVEL_TO_SIZE(buddy.mem[i].information.level);
+
+        if(buddy.mem[i].information.is_free)
+            free++;
+        else if(!buddy.mem[i].information.is_splitted)
+            nonfree++;
+    }
+
+    extern uint64_t paging_num_pages;
+
+    ctx->rdx = free_mem;
+    return total_mem;
+}
+
 extern int __xhci_syscall_usbtest(int_frame_t* ctx);
 
 syscall_t syscall_table[] = {
@@ -2088,7 +2114,8 @@ syscall_t syscall_table[] = {
     {42,syscall_timestamp},
     {43,syscall_fcntl},
     {44,syscall_settty},
-    {45,syscall_disable_tty_help}
+    {45,syscall_disable_tty_help},
+    {46,syscall_memstat}
 };
 
 syscall_t* syscall_find_table(int num) {
