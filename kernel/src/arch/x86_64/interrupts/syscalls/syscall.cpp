@@ -195,10 +195,9 @@ int syscall_open(int_frame_t* ctx) {
     String::memset(&zx,0,sizeof(filestat_t));
     int stt = VFS::Stat(path,(char*)&zx,1); 
 
-    if(stt && stt != -15) {
-        SINFO("Failed to open %s\n",path);
+    if(stt && stt != -15) 
         return ENOENT;
-    }
+    
 
     if(stt == -15 && String::strcmp(path,"/")) {
         int test = VFS::Exists(path);
