@@ -154,7 +154,10 @@ int main() {
 
     main_framebuffer->SendWinSizeInfo(); /* Send winsize information to kernel */
 
+    char buffer[2048];
+
+    printf("Current directory %s\n",getcwd(buffer,2048));
     std::cout << "Executing bash\n";
-    execl("/usr/bin/bash",NULL); 
+    execl("/usr/bin/bash","/usr/bin/bash",NULL); 
 
 }

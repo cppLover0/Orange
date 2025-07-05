@@ -29,6 +29,7 @@
 #include <uacpi/sleep.h>
 #include <generic/VFS/devfs.hpp>
 #include <uacpi/status.h>
+#include <generic/locks/modern_spinlock.hpp>
 
 extern "C" void syscall_handler();
 
@@ -62,7 +63,7 @@ int syscall_exit(int_frame_t* ctx) {
 
     //Log(LOG_LEVEL_DEBUG,"Process %d is died with code %d !\n",proc->id,proc->return_status);
 
-    schedulingSchedule(ctx);
+    schedulingSchedule(0);
     
 }
 
@@ -144,19 +145,19 @@ int syscall_tcb_set(int_frame_t* ctx) {
 
 }
 
-int syscall_open(int_frame_t* ctx) {
+/* openat */
+int syscall_openat(int_frame_t* ctx) {
 
     char* name = (char*)ctx->rdi;
-    int* fdout = (int*)ctx->rsi;
-
+    int fddir = ctx->rsi & 0xFFFFFFFF;
+    
     __syscall_is_safe(name);
-    __syscall_is_safe(fdout);
 
     int flags = ctx->rdx;
 
     process_t* proc = CpuData::Access()->current;
 
-    if(!name && !fdout)
+    if(!name)
         return -2;
 
     char buffer[4096];
@@ -167,14 +168,21 @@ int syscall_open(int_frame_t* ctx) {
     String::memcpy(buffer,name,String::strlen(name));
     Paging::EnableKernel();    
 
-    //SINFO("first %s second %s\n",buffer,proc->cwd);
-
     if(buffer[String::strlen(buffer) - 1] == '/' && String::strcmp(buffer,"/"))
         buffer[String::strlen(buffer) - 1] = '\0';
 
     char* first = proc->cwd;
     if(!first)
         first = "/";
+
+    if(fddir != -100) {
+        fd_t* dir = FD::Search(proc,fddir);
+        if(!dir)
+            first = proc->cwd;
+        else {
+            first = dir->path_point;
+        }
+    }
 
     char buf[1024];
     char* path = (char*)buf;
@@ -195,7 +203,7 @@ int syscall_open(int_frame_t* ctx) {
     String::memset(&zx,0,sizeof(filestat_t));
     int stt = VFS::Stat(path,(char*)&zx,1); 
 
-    if(stt && stt != -15) 
+    if(stt && stt != -15 && String::strcmp(path,"/")) 
         return ENOENT;
     
 
@@ -226,16 +234,12 @@ int syscall_open(int_frame_t* ctx) {
 
     fd_s->reserved_stat.name = (char*)1;
 
-
-    Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
-    *fdout = fd;
-    Paging::EnableKernel();
-
-    //Log(LOG_LEVEL_DEBUG,"Touching %s\n",path);
-
     VFS::Count(path,0,1);
     VFS::Touch(path);
 
+    SINFO("Opening %s\n",path);
+
+    ctx->rdx = fd;
     return 0;
 
 }
@@ -891,8 +895,6 @@ int syscall_isatty(int_frame_t* ctx) {
 
     fd_t* file = FD::Search(proc,fd);
 
-    SINFO("isatty %s (%d): %d\n",file->path_point,file->index,file->is_tty);
-
     if(file->is_tty || help_tty_mode || !String::strncmp(file->path_point,"/dev/tty",8))
         return 0;
     
@@ -920,7 +922,6 @@ int syscall_fork(int_frame_t* ctx) {
     new_proc->user_stack_start = parent->user_stack_start;
     VMM::Clone(new_proc,parent);
     new_proc->fs_base = parent->fs_base;
-
 
     VMM::Reload(new_proc);
 
@@ -1172,8 +1173,6 @@ int syscall_getcwd(int_frame_t* ctx) {
     if(size < String::strlen(cwd))
         return ERANGE;
 
-   
-
     Paging::EnablePaging((uint64_t*)HHDM::toVirt(ctx->cr3));
     String::memcpy(buf,cwd,String::strlen(cwd));
     Paging::EnableKernel();
@@ -1289,23 +1288,36 @@ int syscall_kill(int_frame_t* ctx) {
     process_t* hproc = CpuData::Access()->current;
     if(!proc)
         return EFAULT;
+
+    return EFAULT;
     
+    extern Spinlock* process_lock;
+
+    //process_lock->lock();
     if(proc->status == PROCESS_STATUS_KILLED)
         return 0; // chill :)
 
+    process_lock->lock();
     if(proc->status == PROCESS_STATUS_IN_USE) {
         proc->is_blocked = 1;
         int timeout = 10000;
+        SINFO("Waiting for proc\n");
         while(proc->status == PROCESS_STATUS_IN_USE) {
+            process_lock->unlock();
             if(timeout == 0)
                 break; 
             HPET::Sleep(1000);
             timeout--;
+            process_lock->lock();
         }
-    } else
+    } else {
+        SINFO("Process is already blocked\n");
         proc->status = PROCESS_STATUS_BLOCKED;
+        process_lock->unlock();
+    }
 
     Process::Kill(proc,0);
+    //process_lock->unlock();
 
     return 0;
 }
@@ -1769,9 +1781,10 @@ int syscall_readdir(int_frame_t* ctx) {
     if(!dir)
         return EBADF;
 
-
-    if(!(dir->flags & O_DIRECTORY))
-        return ENOTDIR;
+    if(!(dir->flags & O_DIRECTORY)) {
+        return ENOENT;
+    }
+        
 
 again:
     int status = VFS::Iterate(dir->path_point,&dir->reserved_stat);
@@ -1796,8 +1809,8 @@ again:
     }
 
     if(status == 1) {
-        dir->reserved_stat.name = (char*)1;
-        return -1;
+        ctx->rdx = 0;
+        return 0;
     }
 
     for(int i = 0;i < String::strlen((char*)buffer);i++) {
@@ -1833,6 +1846,8 @@ again:
     String::memset(out_buffer,0,sizeof(dirent_t));
     String::memcpy(out_buffer,&ent,sizeof(dirent_t));
     Paging::EnableKernel();
+
+    ctx->rdx = ent.d_reclen;
 
     return 0;
 
@@ -1986,7 +2001,7 @@ int syscall_fcntl(int_frame_t* ctx) {
     fd_t* fd_s = FD::Search(proc,fd);
 
     if(!fd_s)
-        return EBADF;
+        return 0;
 
     switch(request) {
         case F_DUPFD: {
@@ -2064,7 +2079,8 @@ int syscall_memstat(int_frame_t* ctx) {
     extern uint64_t paging_num_pages;
 
     ctx->rdx = free_mem;
-    return total_mem;
+    ctx->rsi = total_mem;
+    return 0;
 }
 
 extern int __xhci_syscall_usbtest(int_frame_t* ctx);
@@ -2076,7 +2092,7 @@ syscall_t syscall_table[] = {
     {4,syscall_futex_wake},
     {5,syscall_tcb_set},
     {6,syscall_dump_tmpfs},
-    {7,syscall_open},
+    {7,syscall_openat},
     {8,syscall_seek},
     {9,syscall_read},
     {10,syscall_write},
@@ -2141,7 +2157,11 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
         ctx->rax = ENOSYS;
         return;
     }
+
     ctx->rax = sys->func(ctx);
+
+    if(ctx->rax != 0)
+        SWARN("Error syscall %d status %d\n",sys->num,ctx->rax);
 
     return;
 }

@@ -4,6 +4,7 @@
 #include <generic/memory/heap.hpp>
 #include <other/other.hpp>
 #include <other/string.hpp>
+#include <generic/memory/paging.hpp>
 
 extern "C" {
 
@@ -91,6 +92,8 @@ extern "C" {
     void *__dso_handle;
 }
 
+#include <new> 
+
 void *operator new(size_t size)
 {
     return KHeap::Malloc(size);
@@ -99,6 +102,16 @@ void *operator new(size_t size)
 void *operator new[](size_t size)
 {
     return KHeap::Malloc(size);
+}
+
+void* operator new(size_t size, std::align_val_t alignment) {
+    void* ptr = KHeap::Malloc(CALIGNPAGEUP(size,64));
+    return ptr;
+}
+
+
+void* operator new[](size_t size, std::align_val_t alignment) {
+    return operator new(size, alignment);  
 }
 
 void operator delete(void *p)

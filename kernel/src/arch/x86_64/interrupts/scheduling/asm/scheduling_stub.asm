@@ -36,5 +36,5 @@ schedulingStub:
     push rax
     mov rdi,rsp
     cld
-    xor rbp,rbp
+    mov rbp,0
     jmp schedulingSchedule

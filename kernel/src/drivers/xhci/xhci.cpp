@@ -790,10 +790,10 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     uint64_t addr = PMM::Alloc();
     __xhci_create_dcbaa(dev,usb_dev->slotid,addr);
 
-    if(!dev->cap->hccparams1.contextsize)
-        dev->dcbaa[id] += 64;
-    else
-        dev->dcbaa[id] += 128; 
+    // if(!dev->cap->hccparams1.contextsize)
+    //     dev->dcbaa[id] += 64;
+    // else
+    //     dev->dcbaa[id] += 128; 
 
     if(!dev->cap->hccparams1.contextsize)
         usb_dev->_is64byte = 0;

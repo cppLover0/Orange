@@ -6,7 +6,7 @@
 #include <generic/memory/paging.hpp>
 #include <generic/memory/pmm.hpp>
 #include <generic/memory/heap.hpp>
-#include <generic/locks/spinlock.hpp>
+#include <generic/locks/modern_spinlock.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <generic/elf/elf.hpp>
 #include <other/assert.hpp>
@@ -19,6 +19,7 @@
 #include <generic/memory/vmm.hpp>
 #include <other/assembly.hpp>
 #include <arch/x86_64/cpu/sse.hpp>
+#include <arch/x86_64/cpu/cache.hpp>
 #include <other/debug.hpp>
 
 uint64_t id_ptr = 0;
@@ -26,52 +27,48 @@ uint64_t id_ptr = 0;
 process_t* head_proc = 0;
 process_t* last_proc = 0;
 
-char proc_spinlock;
-char proc_spinlock2;
-char proc_spinlock3;
+Spinlock* process_lock;
 
 extern "C" void schedulingSchedule(int_frame_t* frame) {
-
     Paging::EnableKernel();
 
     cpudata_t* data = CpuData::Access();
     int_frame_t* frame1 = &data->temp_frame;
     process_t* proc = data->current;
-    
+
+    process_lock->lock();
     if(data->current) {
 
-        if(proc->status != PROCESS_STATUS_BLOCKED && proc->status != PROCESS_STATUS_KILLED) {
+        if(proc->status != PROCESS_STATUS_KILLED) {
+            
             if(frame) {
-                String::memcpy(&proc->ctx,frame,sizeof(int_frame_t));
+                String::memcpy(&proc->ctx, frame, sizeof(int_frame_t));
                 SSE::Save((uint8_t*)proc->sse_ctx);
                 proc->fs_base = __rdmsr(0xC0000100);
             }
 
-            if(proc->status == PROCESS_STATUS_IN_USE)
-                data->current->status = PROCESS_STATUS_RUN;
+            if(proc->status == PROCESS_STATUS_IN_USE) {
+                proc->status = PROCESS_STATUS_RUN;
+            }
+            
         }
-
         data->current = 0;
-
         proc = proc->next;
-
-    } else
+    } else {
         proc = head_proc;
-
-    spinlock_lock(&proc_spinlock); // three level spinlock !!!!
-    spinlock_lock(&proc_spinlock2);
-    spinlock_lock(&proc_spinlock3);
+    }
+    process_lock->unlock();
 
     while(1) {
         while(proc) {
             if(proc != head_proc) {
-                if(proc->status == PROCESS_STATUS_RUN && !proc->is_blocked) {
+                process_lock->lock();
+                if(proc->status == PROCESS_STATUS_RUN) {
                     proc->status = PROCESS_STATUS_IN_USE;
-                    CpuData::Access()->current = proc;
+                    data->current = proc;
 
-                    String::memcpy(frame1,&proc->ctx,sizeof(int_frame_t));
-                    __wrmsr(0xC0000100,proc->fs_base);
-
+                    String::memcpy(frame1, &proc->ctx, sizeof(int_frame_t));
+                    __wrmsr(0xC0000100, proc->fs_base);
                     SSE::Load((uint8_t*)proc->sse_ctx);
 
                     if(proc->is_cli) 
@@ -90,37 +87,31 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                         frame1->ss |= 3;
 
                     if(proc->is_eoi)
-                        Lapic::EOI(); // for kernel mode proc-s
+                        Lapic::EOI();
 
-                    // Log("0x%p 0x%p 0x%p\n",frame1->cs,frame->ss,frame->rip);
-
-                    //Log("sc 0x%p 0x%p\n",proc->ctx.rsp,proc->user_stack_start);
-
-                    spinlock_unlock(&proc_spinlock);
-                    spinlock_unlock(&proc_spinlock2);
-                    spinlock_unlock(&proc_spinlock3);
-                    schedulingEnd(frame1,(uint64_t*)frame1->cr3);
+                    process_lock->unlock();
+                    schedulingEnd(frame1, (uint64_t*)frame1->cr3);
+                    __builtin_unreachable();
                 }
+                process_lock->unlock();
             }
+            process_lock->lock();
             proc = proc->next;
+            process_lock->unlock();
         }
         proc = head_proc;
+        
     }
-
 }
 
 void __process_load_queue(process_t* proc) {
-    spinlock_lock(&proc_spinlock);
     if(!head_proc) {
         head_proc = proc;
         last_proc = head_proc;
-        proc->status = PROCESS_STATUS_KILLED;
     } else {
         last_proc->next = proc;
         last_proc = proc;
     }
-    
-    spinlock_unlock(&proc_spinlock);
 }
 
 process_t* get_head_proc() {
@@ -128,6 +119,7 @@ process_t* get_head_proc() {
 }
 
 void Process::Init() {
+    process_lock = new Spinlock();
     createProcess(0,0,0,0,0); // just load 0 as rip 
     idt_entry_t* entry = IDT::SetEntry(32,(void*)schedulingStub,0x8E);
     entry->ist = 2;
@@ -175,11 +167,14 @@ process_t* Process::ByID(uint64_t id) {
 }
 
 void Process::WakeUp(uint64_t id) {
+    process_lock->lock();
     process_t* proc = ByID(id);
     proc->status = PROCESS_STATUS_RUN;
+    process_lock->unlock();
 }
 
 uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
+    process_lock->lock();
     process_t* parent_proc = ByID(parent);
     uint64_t i = createProcess(rip,1,parent_proc->user,(uint64_t*)HHDM::toVirt(parent_proc->ctx.cr3),parent_proc->id);
     process_t* proc = ByID(i);
@@ -191,11 +186,14 @@ uint64_t Process::createThread(uint64_t rip,uint64_t parent) {
     proc->parent_process = parent_proc->id;
 
     //VMM::Init(proc);
+    process_lock->unlock();
 
     return i;
 }
 
 void Process::futexWait(process_t* proc, int* lock,int val) {
+
+    process_lock->lock();
 
     int st = proc->status;
     proc->status = PROCESS_STATUS_BLOCKED;
@@ -210,11 +208,16 @@ void Process::futexWait(process_t* proc, int* lock,int val) {
         if(lock_value == val) {
             proc->futex = lock;
             proc->status = PROCESS_STATUS_BLOCKED;
+            proc->is_blocked = 1;
+            process_lock->unlock();
+
             return;
         }
     }
 
     proc->status = st; // restore
+
+    process_lock->unlock();
 
 }
 
@@ -224,8 +227,11 @@ void Process::futexWake(process_t* parent,int* lock) {
     while(proc) {
         
         if(proc->futex == lock && parent->id == proc->parent_process) {
+            process_lock->lock();
             proc->futex = 0;
             proc->status = PROCESS_STATUS_RUN;
+            proc->is_blocked = 0;
+            process_lock->unlock();
             return;
         }
 
@@ -237,8 +243,6 @@ void Process::futexWake(process_t* parent,int* lock) {
 char __process_create_spinlock = 0;
 
 uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_t* cr3_parent,uint64_t parent_id) {
-
-    spinlock_lock(&__process_create_spinlock);
 
     process_t* proc = (process_t*)PMM::VirtualAlloc();
     pAssert(proc,"No memory :(");
@@ -363,13 +367,14 @@ uint64_t Process::createProcess(uint64_t rip,char is_thread,char is_user,uint64_
     proc->next = 0;
     __process_load_queue(proc);
 
-    spinlock_unlock(&__process_create_spinlock);
-    
+    proc->target_cpu = 0xDEAD;
+
     return proc->id;
 
 }
 
 void Process::Kill(process_t* proc,int return_status) {
+    process_lock->lock();
     proc->return_status = return_status;
     proc->status = PROCESS_STATUS_KILLED;
     
@@ -415,4 +420,5 @@ void Process::Kill(process_t* proc,int return_status) {
     PMM::VirtualFree(proc->wait_stack);
 
     VMM::Free(proc);
+    process_lock->unlock();
 }

@@ -252,12 +252,16 @@ void buddy_dump() {
     NLog("Memory: %d/%d bytes, %d/%d KB, %d/%d MB\n",total_mem - free_mem,total_mem,(total_mem - free_mem) / 1024,total_mem / 1024,((total_mem - free_mem) / 1024) / 1024,(total_mem / 1024) / 1024);
 }
 
-int __buddy_align_power(int number) {
-    int power = 0;
-    while (number >>= 1) { 
+int __buddy_align_power(uint64_t number) {
+    if (number == 0) return 0; 
+
+    uint64_t power = 12; 
+
+    while (LEVEL_TO_SIZE(power) <= number && power < MAX_LEVEL) {
         power++;
     }
-    return power;
+
+    return power - 1; 
 }
 
 void PMM::Init(limine_memmap_response* mem_map) {
@@ -306,19 +310,17 @@ void PMM::Init(limine_memmap_response* mem_map) {
     for(int i = 0;i < mem_map->entry_count;i++) {
         current = mem_map->entries[i];
         if(current->type == LIMINE_MEMMAP_USABLE) {
-            uint64_t calc_len = current->length;
+            int64_t calc_len = current->length;
             uint64_t calc_base = current->base;
             if(current->base == top) {
                 calc_base = free_memory;
                 calc_len = final_size;
             }
-            while(1) {
-                if(calc_len > 4096) {
-                    buddy_put(calc_base,0,__buddy_align_power(calc_len));
-                    calc_base += LEVEL_TO_SIZE(__buddy_align_power(calc_len));
-                    calc_len -= LEVEL_TO_SIZE(__buddy_align_power(calc_len));
-                } else
-                    break;
+            while(calc_len > 4096) {
+                buddy_put(calc_base,0,__buddy_align_power(calc_len));
+                calc_base += LEVEL_TO_SIZE(__buddy_align_power(calc_len));
+                calc_len -= LEVEL_TO_SIZE(__buddy_align_power(calc_len));
+                
             }
         }
     }

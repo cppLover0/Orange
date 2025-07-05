@@ -20,9 +20,9 @@ typedef struct process_struct {
 
     struct process_struct* next;
 
-    char type;
+    _Atomic char type;
     char is_blocked;
-    char status;
+    _Atomic char status;
     char user;
     char* cwd;
     char* name;
@@ -51,6 +51,8 @@ typedef struct process_struct {
     uint8_t cs;
     uint8_t ss;
 
+    uint16_t target_cpu;
+
     char* wait_pipe;
     
     char is_eoi;
@@ -62,7 +64,7 @@ typedef struct process_struct {
 
     int_frame_t ctx;
     char* sse_ctx;
-} __attribute__((packed)) process_t;
+} process_t;
 
 extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);
 extern "C" void schedulingStub();
