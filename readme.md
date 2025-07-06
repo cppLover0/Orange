@@ -75,9 +75,9 @@ make
 - [x] grep
 - [ ] awk
 - [ ] make
-- [ ] doom2
+- [x] doom2
 - [ ] nasm
-- [ ] gcc
+- [x] gcc
 - [x] lua
 - [ ] x11
 - [ ] ace of penguins
