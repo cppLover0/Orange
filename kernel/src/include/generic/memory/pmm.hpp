@@ -19,6 +19,7 @@ typedef struct {
 } buddy_info_field_t;
 
 typedef struct buddy_info {
+    int proc;
     uint64_t phys_pointer;
     buddy_info_field_t information;
 } __attribute__((packed)) buddy_info_t;
@@ -35,6 +36,7 @@ typedef struct buddy_t {
 } __attribute__((packed)) buddy_t;
 
 void buddy_dump();
+void buddy_full_dealloc(int proc);
 
 class PMM {
 public:

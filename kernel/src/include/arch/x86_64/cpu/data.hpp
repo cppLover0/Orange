@@ -20,6 +20,8 @@ typedef struct {
     int_frame_t temp_frame;
     char* current_fd; // used for advanced writings (devfs ring buffer)
 
+    int target_cpu_for_dealloc;
+
     char is_advanced_access;
     uint64_t offset;
     uint64_t* count;

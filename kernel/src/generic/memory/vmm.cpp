@@ -11,6 +11,7 @@
 #include <generic/memory/pmm.hpp>
 #include <other/assembly.hpp>
 #include <other/debug.hpp>
+#include <arch/x86_64/cpu/data.hpp>
 
 vmm_obj_t* vmm_main = 0;
 vmm_obj_t* vmm_last = 0;
@@ -127,16 +128,18 @@ vmm_obj_t* __vmm_find(vmm_obj_t* vmm_start,uint64_t base,uint64_t length) {
 
 }
 
-void __vmm_map(uint64_t cr3_phys,uint64_t virt,uint64_t phys,uint64_t flags,uint64_t length) {
+void __vmm_map(uint64_t cr3_phys,uint64_t virt,uint64_t phys,uint64_t flags,uint64_t length,process_t* proc) {
     uint64_t* cr3 = (uint64_t*)HHDM::toVirt(cr3_phys);
 
     //Serial::printf("cr3: 0x%p trying to map 0x%p with len 0x%p to 0x%p\n",cr3_phys,phys,length,virt);
 
+    extern int target_process_for_pmm;
+    target_process_for_pmm = proc->id;
     for(uint64_t i = 0; i <= length;i += PAGE_SIZE) {
         Paging::Map(cr3,phys + i,virt + i,flags);
         //__invlpg(virt + i);
     }
-
+    target_process_for_pmm = 0;
     
 
 
@@ -157,7 +160,7 @@ void* VMM::Map(process_t* proc,uint64_t base,uint64_t length,uint64_t flags) {
     vmm_new->is_mapped = 1;
 
     if(proc)
-        __vmm_map(proc->ctx.cr3,vmm_new->base,base,flags,length);
+        __vmm_map(proc->ctx.cr3,vmm_new->base,base,flags,length,proc);
 
     return (void*)vmm_new->base;
 
@@ -185,7 +188,7 @@ void* VMM::Alloc(process_t* proc,uint64_t length,uint64_t flags) {
     vmm_new->phys = phys;
         
     if(proc)
-        __vmm_map(proc->nah_cr3,vmm_new->base,phys,flags,length);
+        __vmm_map(proc->nah_cr3,vmm_new->base,phys,flags,length,proc);
 
     return (void*)vmm_new->base;
 
@@ -225,7 +228,7 @@ void VMM::Modify(process_t* proc,uint64_t dest_base,uint64_t new_phys) {
 
             current->phys = new_phys;
             //Log("Found ! 0x%p 0x%p\n",current->phys,new_phys);
-            __vmm_map(proc->ctx.cr3,current->base,current->phys,current->flags,current->len);
+            __vmm_map(proc->ctx.cr3,current->base,current->phys,current->flags,current->len,proc);
 
             return;
 
@@ -266,6 +269,7 @@ void VMM::Free(process_t* proc) {
     current = new vmm_obj_t;
 
     VMM::Init(proc);
+    buddy_full_dealloc(proc->id);
 }
 
 void VMM::Clone(process_t* dest_proc,process_t* src_proc) {
@@ -366,7 +370,7 @@ void* VMM::CustomAlloc(process_t* proc,uint64_t virt,uint64_t length,uint64_t fl
     //Log("0x%p\n",phys);
 
     Mark(proc,virt,phys,length,flags);
-    __vmm_map(proc->ctx.cr3,virt,phys,flags,length);
+    __vmm_map(proc->ctx.cr3,virt,phys,flags,length,proc);
 
     return (void*)virt;
 
@@ -384,16 +388,19 @@ void VMM::Reload(process_t* proc) {
 
     uint64_t* virt = (uint64_t*)HHDM::toVirt(proc->ctx.cr3);
 
+    extern int target_process_for_pmm;
+    target_process_for_pmm = proc->id;
     Paging::Kernel(virt);
     Paging::alwaysMappedMap(virt);
 
     Paging::HHDMMap(virt,HHDM::toPhys((uint64_t)proc->syscall_wait_ctx),PTE_PRESENT | PTE_RW);
     Paging::HHDMMap(virt,HHDM::toPhys((uint64_t)proc->wait_stack),PTE_PRESENT | PTE_RW);
+    target_process_for_pmm = 0;
 
     while(current) {
 
         if(current->phys) {
-            __vmm_map(proc->ctx.cr3,current->base,current->phys,current->flags,current->len);
+            __vmm_map(proc->ctx.cr3,current->base,current->phys,current->flags,current->len,proc);
         }
 
         if(current->base == info.hhdm_offset - PAGE_SIZE)

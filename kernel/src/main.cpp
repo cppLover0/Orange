@@ -99,6 +99,8 @@ extern "C" void kmain() {
         0
     );
 
+    __wrmsr(0xC0000101,0);
+
     //ft_ctx->set_text_fg_bright(ft_ctx,0xFFFFFFFF);
     //ft_ctx->set_text_fg_rgb(ft_ctx,0xFFFFFFFF);
     ft_ctx->cursor_enabled = 0;

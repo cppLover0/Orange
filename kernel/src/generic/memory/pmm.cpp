@@ -9,6 +9,8 @@
 #include <generic/locks/spinlock.hpp>
 #include <other/assembly.hpp>
 #include <other/string.hpp>
+#include <arch/x86_64/cpu/data.hpp>
+#include <other/assembly.hpp>
 
 buddy_t buddy;
 
@@ -163,6 +165,8 @@ buddy_info_t* buddy_get_and_split_if_possible(buddy_info_t* buddy,uint64_t need_
 
     //Log("0x%p 0x%p 0x%p 0x%p\n",need_size,buddy_size,next_buddy_size);
 
+    buddy->proc = 0;
+
     if((need_size <= buddy_size && next_buddy_size < need_size) || buddy_size == PAGE_SIZE)
         return buddy;
 
@@ -171,6 +175,8 @@ buddy_info_t* buddy_get_and_split_if_possible(buddy_info_t* buddy,uint64_t need_
         return buddy_get_and_split_if_possible(buddy_split(buddy->phys_pointer).first_buddy,need_size);
 
 }
+
+int target_process_for_pmm = 0;
 
 uint64_t buddy_alloc(uint64_t size) {
 
@@ -199,6 +205,11 @@ uint64_t buddy_alloc(uint64_t size) {
         }
 
         test_free--;
+
+        cpudata_t* data = (cpudata_t*)__rdmsr(0xC0000101);
+
+        good_buddy_split->proc = target_process_for_pmm;
+
 
         return good_buddy_split->phys_pointer;
     }
@@ -359,4 +370,17 @@ void PMM::Free(uint64_t phys) {
     
 void PMM::VirtualFree(void* ptr) {
     Free(HHDM::toPhys((uint64_t)ptr));
+}
+
+void buddy_full_dealloc(int proc) {
+    if(proc == 0)
+        return;
+
+    spinlock_lock(&pmm_spinlock);
+    for(int64_t i = 0; i < buddy.hello_buddy;i++) {
+        if(buddy.mem[i].proc == proc) {
+            buddy.mem[i].information.is_free = 1;
+        }
+    }
+    spinlock_unlock(&pmm_spinlock);
 }

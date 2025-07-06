@@ -9,6 +9,7 @@
 
 char heap_lock = 0;
 uint64_t kmalloc_base;
+char is_heap_init = 0;
 
 void KHeap::Init() {
     kernel_heap_block_t* head = (kernel_heap_block_t*)PMM::VirtualBigAlloc(SIZE_KHEAP_IN_PAGES);
@@ -17,6 +18,7 @@ void KHeap::Init() {
     head->next = nullptr;
     kmalloc_base = (uint64_t)head;
     Paging::alwaysMappedAdd((uint64_t)head,PAGE_SIZE * SIZE_KHEAP_IN_PAGES);
+    is_heap_init = 1;
 }
 
 kernel_heap_block_t* current = 0;

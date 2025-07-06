@@ -2058,7 +2058,7 @@ int syscall_memstat(int_frame_t* ctx) {
     extern buddy_t buddy;
     for(uint64_t  i = 0;i < buddy.hello_buddy;i++) {
 
-        if(buddy.mem[i].information.is_free)
+        if(buddy.mem[i].information.is_free && !buddy.mem[i].information.is_splitted)
             free_mem += LEVEL_TO_SIZE(buddy.mem[i].information.level);
         
         if(!buddy.mem[i].information.is_splitted)
@@ -2073,7 +2073,7 @@ int syscall_memstat(int_frame_t* ctx) {
     extern uint64_t paging_num_pages;
 
     ctx->rdx = free_mem;
-    ctx->rsi = total_mem;
+    ctx->rbx = total_mem;
     return 0;
 }
 
