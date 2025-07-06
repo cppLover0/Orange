@@ -1305,13 +1305,13 @@ int syscall_kill(int_frame_t* ctx) {
             timeout--;
             process_lock->lock();
         }
+        process_lock->unlock();
     } else {
         proc->status = PROCESS_STATUS_BLOCKED;
         process_lock->unlock();
     }
 
     Process::Kill(proc,0);
-    //process_lock->unlock();
 
     return 0;
 }

@@ -15,7 +15,7 @@
 #define PROCESS_STATUS_WAITING 4
 
 typedef struct process_struct {
-    uint64_t id;
+    uint32_t id;
     int return_status;
 
     struct process_struct* next;
