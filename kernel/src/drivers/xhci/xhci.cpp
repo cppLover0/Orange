@@ -790,10 +790,10 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     uint64_t addr = PMM::Alloc();
     __xhci_create_dcbaa(dev,usb_dev->slotid,addr);
 
-    // if(!dev->cap->hccparams1.contextsize)
-    //     dev->dcbaa[id] += 64;
-    // else
-    //     dev->dcbaa[id] += 128; 
+    if(!dev->cap->hccparams1.contextsize)
+         dev->dcbaa[id] += 64;
+    else
+         dev->dcbaa[id] += 128; 
 
     if(!dev->cap->hccparams1.contextsize)
         usb_dev->_is64byte = 0;
@@ -848,8 +848,14 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     }
 
-    if(__xhci_set_addr(dev,addr,id,0) != 1)
-        return;
+    if(__xhci_set_addr(dev,addr,id,0) != 1) {
+        WARN("Failed to configure endpoints, trying to fix offsets\n");
+        dev->dcbaa[id] = addr;
+        if(__xhci_set_addr(dev,addr,id,0) != 1) {
+            ERROR("Failed to setup USB device, ignoring\n");
+            return;
+        }
+    }
 
     xhci_usb_descriptor_t* descriptor = (xhci_usb_descriptor_t*)PMM::VirtualAlloc();
     int status2 = __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,8);
@@ -1191,6 +1197,13 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
         //INFO("Current USB device with progIF 0x%p is not XHCI !\n",pci_dev.progIF);
         return;
     } 
+
+    //used from managarm
+    uint16_t usb3avail = PCI::IN(a,b,c,0xDC,2);
+    PCI::OUT(a,b,c,0xD8,usb3avail,2);
+
+    uint16_t usb2avail = PCI::IN(a,b,c,0xD4,2);
+    PCI::OUT(a,b,c,0xD0,usb2avail,2);
 
     xhci_device_t* dev = (xhci_device_t*)PMM::VirtualAlloc();
 

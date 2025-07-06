@@ -19,6 +19,7 @@ typedef struct process_struct {
     int return_status;
 
     struct process_struct* next;
+    struct process_struct* parent;
 
     _Atomic char type;
     char is_blocked;
@@ -65,6 +66,12 @@ typedef struct process_struct {
     int_frame_t ctx;
     char* sse_ctx;
 } process_t;
+
+typedef struct process_queue_run_list {
+    struct process_queue_run_list* next;
+    process_t* proc;
+    char is_used;
+} process_queue_run_list_t;
 
 extern "C" void schedulingEnd(int_frame_t* ctx,uint64_t* cr3);
 extern "C" void schedulingStub();

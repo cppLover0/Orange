@@ -237,8 +237,6 @@ int syscall_openat(int_frame_t* ctx) {
     VFS::Count(path,0,1);
     VFS::Touch(path);
 
-    SINFO("Opening %s\n",path);
-
     ctx->rdx = fd;
     return 0;
 
@@ -1288,8 +1286,6 @@ int syscall_kill(int_frame_t* ctx) {
     process_t* hproc = CpuData::Access()->current;
     if(!proc)
         return EFAULT;
-
-    return EFAULT;
     
     extern Spinlock* process_lock;
 
@@ -1301,7 +1297,6 @@ int syscall_kill(int_frame_t* ctx) {
     if(proc->status == PROCESS_STATUS_IN_USE) {
         proc->is_blocked = 1;
         int timeout = 10000;
-        SINFO("Waiting for proc\n");
         while(proc->status == PROCESS_STATUS_IN_USE) {
             process_lock->unlock();
             if(timeout == 0)
@@ -1311,7 +1306,6 @@ int syscall_kill(int_frame_t* ctx) {
             process_lock->lock();
         }
     } else {
-        SINFO("Process is already blocked\n");
         proc->status = PROCESS_STATUS_BLOCKED;
         process_lock->unlock();
     }
@@ -2159,9 +2153,6 @@ extern "C" void c_syscall_handler(int_frame_t* ctx) {
     }
 
     ctx->rax = sys->func(ctx);
-
-    if(ctx->rax != 0)
-        SWARN("Error syscall %d status %d\n",sys->num,ctx->rax);
 
     return;
 }

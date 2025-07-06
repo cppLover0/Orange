@@ -16,6 +16,7 @@ typedef struct {
     GDT gdt;
     struct LIMINE_MP(info)* smp_info;
     process_t* current;
+    process_queue_run_list_t* next;
     int_frame_t temp_frame;
     char* current_fd; // used for advanced writings (devfs ring buffer)
 

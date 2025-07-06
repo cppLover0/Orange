@@ -21,13 +21,86 @@
 #include <arch/x86_64/cpu/sse.hpp>
 #include <arch/x86_64/cpu/cache.hpp>
 #include <other/debug.hpp>
+#include <drivers/hpet/hpet.hpp>
 
 uint64_t id_ptr = 0;
 
 process_t* head_proc = 0;
-process_t* last_proc = 0;
+process_queue_run_list_t* running_proc_list = 0;
 
 Spinlock* process_lock;
+
+void __process_load_queue(process_t* proc) {
+    if(!head_proc) {
+        head_proc = proc;
+    } else {
+        proc->next = head_proc;
+        head_proc = proc;
+    }
+}
+
+void __process_run_load_queue(process_t* proc) {
+    process_queue_run_list_t* current = running_proc_list;
+    int success = 0;
+
+    if(!running_proc_list) {
+        running_proc_list = new process_queue_run_list_t;
+        running_proc_list->proc = 0;
+        running_proc_list->is_used = 0;
+        running_proc_list->next = 0;
+    }
+
+    while(current) {
+        if(!current->is_used) {
+            success = 1;
+            break;
+        }
+        current = current->next;
+    }
+
+    if(!success){
+        current = new process_queue_run_list_t;
+        String::memset(current,0,sizeof(process_queue_run_list_t));
+        current->next = running_proc_list;
+        running_proc_list = current;
+    }
+
+    current->proc = proc;
+    current->is_used = 1;
+
+}
+
+void __process_run_remove_queue(process_queue_run_list_t* proc) {
+    process_lock->lock();
+    proc->is_used = 0;
+    process_lock->unlock();
+}
+
+void __process_run_remove_queue_proc(process_t* proc) {
+    process_lock->lock();
+    process_queue_run_list_t* current = running_proc_list;
+    while(current) {
+        if(current->proc == proc) {
+            current->is_used = 0;
+            current->proc = 0;
+        }
+        current = current->next;
+    }
+    process_lock->unlock();
+}
+
+void __process_run_remove_queue_proc_nolock(process_t* proc) {
+    process_queue_run_list_t* current = running_proc_list;
+    if(running_proc_list) {
+        while(current) {
+            if(current->proc == proc) {
+                current->is_used = 0;
+                current->proc = 0;
+            }
+            current = current->next;
+        }
+    }
+}
 
 extern "C" void schedulingSchedule(int_frame_t* frame) {
     Paging::EnableKernel();
@@ -49,23 +122,24 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
 
             if(proc->status == PROCESS_STATUS_IN_USE) {
                 proc->status = PROCESS_STATUS_RUN;
+                __process_run_load_queue(proc);
             }
             
         }
         data->current = 0;
-        proc = proc->next;
-    } else {
-        proc = head_proc;
-    }
-    process_lock->unlock();
+    } 
 
+    process_queue_run_list_t* queue = data->next;
     while(1) {
-        while(proc) {
-            if(proc != head_proc) {
-                process_lock->lock();
-                if(proc->status == PROCESS_STATUS_RUN) {
+        while(queue) {
+            if(queue->is_used) {
+                //SINFO("creating proc %d\n",queue->proc->id);
+                if(queue->proc->status == PROCESS_STATUS_RUN && !queue->proc->is_blocked) {
+                    data->current = queue->proc;
+                    data->next = queue->next;
+                    proc = queue->proc;
+                    __process_run_remove_queue_proc_nolock(proc);
                     proc->status = PROCESS_STATUS_IN_USE;
-                    data->current = proc;
 
                     String::memcpy(frame1, &proc->ctx, sizeof(int_frame_t));
                     __wrmsr(0xC0000100, proc->fs_base);
@@ -93,24 +167,13 @@ extern "C" void schedulingSchedule(int_frame_t* frame) {
                     schedulingEnd(frame1, (uint64_t*)frame1->cr3);
                     __builtin_unreachable();
                 }
-                process_lock->unlock();
             }
-            process_lock->lock();
-            proc = proc->next;
-            process_lock->unlock();
+            queue = queue->next;
         }
-        proc = head_proc;
-        
-    }
-}
-
-void __process_load_queue(process_t* proc) {
-    if(!head_proc) {
-        head_proc = proc;
-        last_proc = head_proc;
-    } else {
-        last_proc->next = proc;
-        last_proc = proc;
+        process_lock->unlock();
+        asm volatile("pause");
+        process_lock->lock();
+        queue = running_proc_list;
     }
 }
 
@@ -170,6 +233,7 @@ void Process::WakeUp(uint64_t id) {
     process_lock->lock();
     process_t* proc = ByID(id);
     proc->status = PROCESS_STATUS_RUN;
+    __process_run_load_queue(proc);
     process_lock->unlock();
 }
 
@@ -209,6 +273,7 @@ void Process::futexWait(process_t* proc, int* lock,int val) {
             proc->futex = lock;
             proc->status = PROCESS_STATUS_BLOCKED;
             proc->is_blocked = 1;
+            __process_run_remove_queue_proc(proc);
             process_lock->unlock();
 
             return;
@@ -231,6 +296,7 @@ void Process::futexWake(process_t* parent,int* lock) {
             proc->futex = 0;
             proc->status = PROCESS_STATUS_RUN;
             proc->is_blocked = 0;
+            __process_run_load_queue(proc);
             process_lock->unlock();
             return;
         }
@@ -377,6 +443,7 @@ void Process::Kill(process_t* proc,int return_status) {
     process_lock->lock();
     proc->return_status = return_status;
     proc->status = PROCESS_STATUS_KILLED;
+    __process_run_remove_queue_proc_nolock(proc);
     
     fd_t* fd = (fd_t*)proc->start_fd;
     while(fd) {

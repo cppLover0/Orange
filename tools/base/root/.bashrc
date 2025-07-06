@@ -6,3 +6,4 @@ export PATH="/usr/bin"
 # gcc defaults to /usr/local/include so i'll set include to /usr
 export C_INCLUDE_PATH="/usr/include"
 
+clear

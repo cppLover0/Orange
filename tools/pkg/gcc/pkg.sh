@@ -22,7 +22,7 @@ diff_patch "$current/diff/gcc.diff"
 
 echo "$current/diff/gcc.diff"
 
-./configure --host=x86_64-orange --with-sysroot="/" --prefix="/usr" --with-build-sysroot="$(realpath $1/..)" --enable-languages=c --disable-bootstrap --enable-default-pie --enable-default-ssp --disable-multilib --disable-lto --disable-libssp --disable-threads --disable-libatomic --disable-libffi --disable-libgomp --disable-libitm --disable-libsanitizer --disable-bootstrap --enable-shared --enable-host-shared CFLAGS="-Os"
+./configure --host=x86_64-orange --with-sysroot="/" --prefix="/usr" --with-build-sysroot="$(realpath $1/..)" --enable-languages=c,go --disable-bootstrap --enable-default-pie --enable-default-ssp --disable-multilib --disable-lto --disable-libssp --disable-threads --disable-libatomic --disable-libffi --disable-libgomp --disable-libitm --disable-libsanitizer --disable-bootstrap --enable-shared --enable-host-shared CFLAGS="-Os"
 
 make clean
 make -j$(nproc)
