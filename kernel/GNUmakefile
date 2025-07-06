@@ -10,22 +10,16 @@ override OUTPUT := kernel
 PREFIX := /usr/local
 
 # User controllable C compiler command.
-CC := clang
+CC := cc
 
 # User controllable C++ compiler command.
-CXX := clang++
+CXX := c++
 
-# User controllable archiver command.
-AR := ar
-
-# User controllable C flags.
-CFLAGS := -g -pipe -I ./src/include -I ./src/lib/uACPI/include -Wno-writable-strings -O2 -fno-strict-aliasing
-
+# User controllable linker command.
 LD := ld
 
-ifeq ($(shell uname), Darwin)
-    LD = ld.lld
-endif
+# User controllable C flags.
+CFLAGS := -g -O2 -pipe -Iinclude
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)
@@ -41,7 +35,7 @@ LDFLAGS :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d freestnd-cxx-hdrs || ! test -d cc-runtime ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d freestnd-cxx-hdrs || ! test -d cc-runtime || ! test -f src/limine.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
 endif
@@ -72,6 +66,7 @@ override SHARED_FLAGS := \
     -ffreestanding \
     -fno-stack-protector \
     -fno-stack-check \
+    -fno-lto \
     -fno-PIC \
     -ffunction-sections \
     -fdata-sections \
@@ -89,7 +84,7 @@ override CPPFLAGS_C := \
     -I src \
     -isystem freestnd-c-hdrs/x86_64/include \
     $(CPPFLAGS) \
-    -DLIMINE_API_REVISION=2 \
+    -DLIMINE_API_REVISION=3 \
     -MMD \
     -MP
 
@@ -99,7 +94,7 @@ override CPPFLAGS_CXX := \
     -isystem freestnd-c-hdrs/x86_64/include \
     -isystem freestnd-cxx-hdrs/x86_64/include \
     $(CPPFLAGS) \
-    -DLIMINE_API_REVISION=2 \
+    -DLIMINE_API_REVISION=3 \
     -MMD \
     -MP
 
@@ -123,16 +118,15 @@ override NASMFLAGS += \
 # Internal linker flags that should not be changed by the user.
 override LDFLAGS += \
     -m elf_x86_64 \
-    --build-id=none \
     -nostdlib \
     -static \
     -z max-page-size=0x1000 \
-    --gc-sections \
+    -gc-sections \
     -T linker.ld
 
 # Use "find" to glob all *.c, *.cpp, *.S, and *.asm files in the tree and obtain the
 # object and header dependency file names.
-override SRCFILES := $(shell cd src && find -L * -type f | LC_ALL=C sort)
+override SRCFILES := $(shell find -L src cc-runtime/src -type f | LC_ALL=C sort)
 override CFILES := $(filter %.c,$(SRCFILES))
 override CXXFILES := $(filter %.cpp,$(SRCFILES))
 override ASFILES := $(filter %.S,$(SRCFILES))
@@ -147,45 +141,35 @@ all: bin/$(OUTPUT)
 # Include header dependencies.
 -include $(HEADER_DEPS)
 
-# Link rules for building the C compiler runtime.
-cc-runtime-x86_64/cc-runtime.a: GNUmakefile cc-runtime/*
-	rm -rf cc-runtime-x86_64
-	cp -r cc-runtime cc-runtime-x86_64
-	$(MAKE) -C cc-runtime-x86_64 -f cc-runtime.mk \
-		CC="$(CC)" \
-		AR="$(AR)" \
-		CFLAGS="$(CFLAGS)" \
-		CPPFLAGS='-isystem ../freestnd-c-hdrs/x86_64/include -DCC_RUNTIME_NO_FLOAT'
-
 # Link rules for the final executable.
-bin/$(OUTPUT): GNUmakefile linker.ld $(OBJ) cc-runtime-x86_64/cc-runtime.a
+bin/$(OUTPUT): GNUmakefile linker.ld $(OBJ)
 	mkdir -p "$$(dirname $@)"
-	$(LD) $(LDFLAGS) $(OBJ) cc-runtime-x86_64/cc-runtime.a -o $@
+	$(LD) $(OBJ) $(LDFLAGS) -o $@
 
 # Compilation rules for *.c files.
-obj/%.c.o: src/%.c GNUmakefile
+obj/%.c.o: %.c GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS_C) -c $< -o $@
 
 # Compilation rules for *.cpp files.
-obj/%.cpp.o: src/%.cpp GNUmakefile
+obj/%.cpp.o: %.cpp GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS_CXX) -c $< -o $@
 
 # Compilation rules for *.S files.
-obj/%.S.o: src/%.S GNUmakefile
+obj/%.S.o: %.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS_C) -c $< -o $@
 
 # Compilation rules for *.asm (nasm) files.
-obj/%.asm.o: src/%.asm GNUmakefile
+obj/%.asm.o: %.asm GNUmakefile
 	mkdir -p "$$(dirname $@)"
 	nasm $(NASMFLAGS) $< -o $@
 
 # Remove object files and the final executable.
 .PHONY: clean
 clean:
-	rm -rf bin obj cc-runtime-x86_64
+	rm -rf bin obj
 
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean

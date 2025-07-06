@@ -6,7 +6,7 @@ trash
 .code
 serial_output.txt
 kernel-deps
-limine
+/limine
 initrd/usr/include
 kernel/bin
 kernel/cc-runtime

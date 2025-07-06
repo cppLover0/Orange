@@ -2,66 +2,17 @@
 MAKEFLAGS += -rR
 .SUFFIXES:
 
-# Default user QEMU flags. These are appended to the QEMU command calls. 
-QEMUFLAGS := -m 1G -serial stdio -M q35 -s -d int -smp 1 -trace "msi*" -device qemu-xhci  -enable-kvm
+# Default user QEMU flags. These are appended to the QEMU command calls.
+QEMUFLAGS := -m 2G
+
 override IMAGE_NAME := orange
 
 # Toolchain for building the 'limine' executable for the host.
 HOST_CC := cc
-HOST_CFLAGS := -g -pipe 
+HOST_CFLAGS := -g -O2 -pipe
 HOST_CPPFLAGS :=
 HOST_LDFLAGS :=
 HOST_LIBS :=
-
-HOST_LD := ld
-HOST_TAR := tar
-
-CURRENT_DIR := $(shell realpath .)
-
-ifeq ($(shell uname), Darwin)
-    HOST_LD = ld.lld
-	HOST_TAR = gtar
-endif
-
-.PHONY: run-build
-run-build:all run
-
-.PHONY: uefi-run-build
-uefi-run-build: all run-uefi
-
-.PHONY: headers
-headers:
-	rm -rf orange-cross-compiler-headers
-	git clone https://github.com/cpplover0/orange-cross-compiler-headers
-	mkdir -p initrd/usr/include
-	rm -rf initrd/usr/include/*
-	mkdir -p orange-cross-compiler-headers/include
-	cp -rf orange-cross-compiler-headers/include initrd/usr
-	rm -rf orange-cross-compiler-headers
-
-.PHONY: make-libc
-make-libc:
-	rm -rf tools/orange-mlibc
-	cd tools && git clone https://github.com/cpplover0/orange-mlibc --depth=1
-	cd tools/orange-mlibc && sh build_to_cross.sh "$(CURRENT_DIR)"
-
-.PHONY: linux-headers
-linux-headers:
-	cd tools && sh get-linux-headers.sh "$(CURRENT_DIR)"
-
-.PHONY: cross-compiler
-cross-compiler: linux-headers make-libc
-	cd tools/toolchain/ && sh get.sh "$(CURRENT_DIR)"
-
-.PHONY: check-cross
-check-cross:
-    ifeq (, $(shell which x86_64-orange-gcc))
-		echo "It looks like you don't have cross-compiler, or you didn't add them to your PATH."; \
-		echo "If you built your cross compiler, add them to PATH with: "; \
-		echo 'export PATH="$$HOME/opt/cross/orange/bin:$$PATH"'; \
-		echo 'or build cross compiler with "make cross-compiler"'; \
-		exit 1; 
-    endif
 
 .PHONY: all
 all: $(IMAGE_NAME).iso
@@ -107,7 +58,7 @@ ovmf/ovmf-code-x86_64.fd:
 
 limine/limine:
 	rm -rf limine
-	git clone https://github.com/limine-bootloader/limine.git --branch=v8.x-binary --depth=1
+	git clone https://github.com/limine-bootloader/limine.git --branch=v9.x-binary --depth=1
 	$(MAKE) -C limine \
 		CC="$(HOST_CC)" \
 		CFLAGS="$(HOST_CFLAGS)" \
@@ -121,16 +72,15 @@ kernel-deps:
 
 .PHONY: kernel
 kernel: kernel-deps
-	rm -rf kernel/src/lib/uACPI/tests
 	$(MAKE) -C kernel
 
 $(IMAGE_NAME).iso: limine/limine kernel
 	rm -rf iso_root
 	mkdir -p iso_root/boot
+	cp -rf tools/base/* iso_root
 	cp -v kernel/bin/kernel iso_root/boot/
 	mkdir -p iso_root/boot/limine
 	cp -v tools/limine.conf limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
-	cp -rf tools/iso/* iso_root/
 	mkdir -p iso_root/EFI/BOOT
 	cp -v limine/BOOTX64.EFI iso_root/EFI/BOOT/
 	cp -v limine/BOOTIA32.EFI iso_root/EFI/BOOT/
@@ -145,7 +95,7 @@ $(IMAGE_NAME).iso: limine/limine kernel
 $(IMAGE_NAME).hdd: limine/limine kernel
 	rm -f $(IMAGE_NAME).hdd
 	dd if=/dev/zero bs=1M count=0 seek=64 of=$(IMAGE_NAME).hdd
-	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00
+	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00 -m 1
 	./limine/limine bios-install $(IMAGE_NAME).hdd
 	mformat -i $(IMAGE_NAME).hdd@@1M
 	mmd -i $(IMAGE_NAME).hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine
