@@ -19,7 +19,7 @@ CXX := c++
 LD := ld
 
 # User controllable C flags.
-CFLAGS := -g -O2 -pipe -Iinclude
+CFLAGS := -g -O2 -pipe -Iinclude -Isrc/lib/flanterm/src
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)
@@ -35,7 +35,7 @@ LDFLAGS :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
-    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d freestnd-cxx-hdrs || ! test -d cc-runtime || ! test -f src/limine.h ); echo $$?),0)
+    ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d freestnd-cxx-hdrs || ! test -d cc-runtime ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif
 endif
@@ -118,10 +118,6 @@ override NASMFLAGS += \
 # Internal linker flags that should not be changed by the user.
 override LDFLAGS += \
     -m elf_x86_64 \
-    -nostdlib \
-    -static \
-    -z max-page-size=0x1000 \
-    -gc-sections \
     -T linker.ld
 
 # Use "find" to glob all *.c, *.cpp, *.S, and *.asm files in the tree and obtain the
