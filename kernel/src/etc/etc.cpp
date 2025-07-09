@@ -72,3 +72,26 @@ extern "C" {
     void __cxa_pure_virtual() { asm volatile("hlt"); }
     void *__dso_handle;
 }
+
+#include <generic/mm/heap.hpp>
+
+
+void *operator new(size_t size)
+{
+    return memory::heap::malloc(size);
+}
+
+void *operator new[](size_t size)
+{
+    return memory::heap::malloc(size);
+}
+
+void operator delete(void *p)
+{
+    memory::heap::free(p);
+}
+
+void operator delete[](void *p)
+{
+    memory::heap::free(p);
+}

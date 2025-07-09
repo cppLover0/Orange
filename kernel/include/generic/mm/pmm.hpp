@@ -57,5 +57,9 @@ namespace memory {
             static void free(void* virt);
             static void* alloc(std::size_t size);
         };
+        class helper {
+        public:
+            static std::uint64_t alloc_kernel_stack(std::size_t size);
+        };
     };
 };

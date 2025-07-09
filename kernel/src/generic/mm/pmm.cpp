@@ -135,16 +135,11 @@ void memory::buddy::init() {
         }
     }
 
-    Log::Display(LEVEL_MESSAGE_INFO,"Total available memory: %d MB\n",(((total_pages * 4096) / 1024) / 1024));
-
     std::uint64_t buddy_size = (total_pages * sizeof(buddy_info_t));
-    Log::Display(LEVEL_MESSAGE_INFO,"Buddy structs size %d\n",buddy_size);
 
     memset(&mem,0,sizeof(buddy_t));
     mem.mem = (buddy_info_t*)Other::toVirt(top);
     memset(mem.mem,0,buddy_size);
-
-    Log::Display(LEVEL_MESSAGE_INFO,"Zeroed memory\n");
 
     for(int i = 0;i < mmap->entry_count; i++) {
         current = mmap->entries[i];
@@ -193,7 +188,7 @@ std::int64_t memory::buddy::alloc(std::size_t size) {
     if(nearest_buddy) {
         auto blud = split_maximum(nearest_buddy,size);
         blud->is_free = 0;
-        memset(Other::toVirt(blud->phys),0,LEVEL_TO_SIZE(blud->level) - 1);
+        memset(Other::toVirt(blud->phys),0,LEVEL_TO_SIZE(blud->level));
         return blud->phys;
     }
 
@@ -226,4 +221,14 @@ void memory::pmm::_virtual::free(void* virt) {
 
 void* memory::pmm::_virtual::alloc(std::size_t size) {
     return Other::toVirt(memory::pmm::_physical::alloc(size));
+}
+
+/* some helper functions */
+
+#include <generic/mm/paging.hpp>
+
+std::uint64_t memory::pmm::helper::alloc_kernel_stack(std::size_t size) {
+    std::uint64_t stack = memory::pmm::_physical::alloc(size + 4096); /* extra page */
+    memory::paging::alwaysmappedadd(stack,size + 4096);
+    return (std::uint64_t)Other::toVirt(stack);
 }

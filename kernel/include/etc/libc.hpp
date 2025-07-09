@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <generic/mm/heap.hpp>
 
 inline void *memcpy(void *__restrict dest, const void *__restrict src, size_t n) {
     uint8_t *__restrict pdest = static_cast<uint8_t *__restrict>(dest);
@@ -62,4 +63,12 @@ inline int strlen(const char* str) {
     while(str[idx])
         idx++;
     return idx;
+}
+
+inline void* malloc(size_t size) {
+    return memory::heap::malloc(size);
+}
+
+inline void free(void* p) {
+    memory::heap::free(p);
 }

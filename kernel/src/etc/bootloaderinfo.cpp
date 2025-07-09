@@ -36,6 +36,14 @@ volatile limine_memmap_request memmap_request = {
     .response = nullptr
 };
 
+__attribute__((used, section(".limine_requests")))
+volatile limine_executable_address_request keraddr_request = {
+    .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST,
+    .revision = 0,
+    .response = nullptr
+};
+
+
 }
 
 namespace {
@@ -58,4 +66,8 @@ std::uint64_t BootloaderInfo::AccessHHDM() {
 
 struct limine_memmap_response* BootloaderInfo::AccessMemoryMap() {
     return memmap_request.response;
+}
+
+struct limine_executable_address_response* BootloaderInfo::AccessKernel() {
+    return keraddr_request.response;
 }

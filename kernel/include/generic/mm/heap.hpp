@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstddef>
 
+#pragma once
+
 typedef struct heap_block {
     std::uint32_t size;
     std::uint8_t is_free;
