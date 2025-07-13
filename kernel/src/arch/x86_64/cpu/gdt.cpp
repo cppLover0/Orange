@@ -28,9 +28,9 @@ void arch::x86_64::cpu::gdt::init() {
     memcpy(&new_gdt->gdt_obj,&original_gdt,sizeof(gdt_t));
 
     tss->rsp[0] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE);
-    tss->ist[1] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* Exceptions */
-    tss->ist[2] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* Timer */
-    tss->ist[3] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* IRQ Layout */
+    tss->ist[0] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* Exceptions */
+    tss->ist[1] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* Timer */
+    tss->ist[2] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* IRQ Layout */
 
     tss->iopb_offsset = sizeof(tss_t);
     new_gdt->gdt_obj.tss.baselow16 = (std::uint64_t)tss & 0xFFFF;

@@ -37,6 +37,13 @@ volatile limine_memmap_request memmap_request = {
 };
 
 __attribute__((used, section(".limine_requests")))
+volatile limine_rsdp_request rsdp_request = {
+    .id = LIMINE_RSDP_REQUEST,
+    .revision = 0,
+    .response = nullptr
+};
+
+__attribute__((used, section(".limine_requests")))
 volatile limine_executable_address_request keraddr_request = {
     .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST,
     .revision = 0,
@@ -54,6 +61,10 @@ volatile LIMINE_REQUESTS_START_MARKER;
 __attribute__((used, section(".limine_requests_end")))
 volatile LIMINE_REQUESTS_END_MARKER;
 
+}
+
+std::uint64_t BootloaderInfo::AccessRSDP() {
+    return rsdp_request.response->address;
 }
 
 struct limine_framebuffer* BootloaderInfo::AccessFramebuffer() {

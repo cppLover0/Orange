@@ -19,7 +19,7 @@ CXX := c++
 LD := ld
 
 # User controllable C flags.
-CFLAGS := -g -O2 -pipe -Iinclude -Isrc/lib/flanterm/src
+CFLAGS := -g -O3 -pipe -Iinclude -Isrc/lib/flanterm/src -Isrc/lib/uACPI/include
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)

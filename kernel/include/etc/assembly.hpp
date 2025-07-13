@@ -43,3 +43,10 @@ inline int __cpuid_string(int code, std::uint32_t where[4]) {
     __asm__ volatile("cpuid":"=a"(*where),"=b"(*(where+1)),"=c"(*(where+2)),"=d"(*(where+3)):"a"(code));
     return (int)where[0];
 }
+
+inline std::uint64_t __rdtsc() {
+    unsigned int hi, lo;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t)hi << 32) | lo;
+
+}

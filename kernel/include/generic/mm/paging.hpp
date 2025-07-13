@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <etc/assembly.hpp>
 
+#pragma once
+
 #define PTE_MASK_VALUE 0x000ffffffffff000
 
 #define PTE_PRESENT (1 << 0)
