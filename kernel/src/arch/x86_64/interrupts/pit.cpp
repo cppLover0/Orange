@@ -9,9 +9,8 @@ using namespace arch::x86_64::interrupts;
 
 std::uint64_t pit_counter = 0;
 
-int __pit_int_handler(void *arg) {
+void __pit_int_handler(void *arg) {
     pit_counter++;
-    return 0;
 }
 
 void arch::x86_64::interrupts::pit::init() {

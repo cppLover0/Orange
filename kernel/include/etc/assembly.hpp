@@ -48,5 +48,4 @@ inline std::uint64_t __rdtsc() {
     unsigned int hi, lo;
     __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t)hi << 32) | lo;
-
 }

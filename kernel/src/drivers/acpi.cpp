@@ -485,7 +485,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler base, uacpi_handle ctx,
     uacpi_handle *out_irq_handle
 ) {
-    std::uint8_t vec = arch::x86_64::interrupts::irq::create(irq,IRQ_TYPE_LEGACY,(std::int32_t (*)(void*))base,0,0);
+    std::uint8_t vec = arch::x86_64::interrupts::irq::create(irq,IRQ_TYPE_LEGACY,(void (*)(void*))base,0,0);
     *out_irq_handle = (uacpi_handle)vec;
     return UACPI_STATUS_OK;
 }

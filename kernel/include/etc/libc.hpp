@@ -72,3 +72,70 @@ inline void* malloc(size_t size) {
 inline void free(void* p) {
     memory::heap::free(p);
 }
+
+inline int strcmp(const char *s1, const char *s2) {
+    while (*s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+    }
+    return (unsigned char)*s1 - (unsigned char)*s2;
+}
+
+inline int strncmp(const char *s1, const char *s2, size_t n) {
+    size_t i = 0;
+    while (i < n && s1[i] && (s1[i] == s2[i])) {
+        i++;
+    }
+    if (i == n) return 0;
+    return (unsigned char)s1[i] - (unsigned char)s2[i];
+}
+
+inline char *strchr(const char *s, int c) {
+    while (*s) {
+        if (*s == (char)c) return (char *)s;
+        s++;
+    }
+    return NULL;
+}
+
+inline static char *strtok(char *str, const char *delim) {
+    static char *next = NULL;
+    if (str) next = str;
+    if (!next) return NULL;
+
+    char *start = next;
+    while (*start && strchr(delim, *start)) {
+        start++;
+    }
+    if (!*start) {
+        next = NULL;
+        return NULL;
+    }
+
+    char *end = start;
+    while (*end && !strchr(delim, *end)) {
+        end++;
+    }
+
+    if (*end) {
+        *end = '\0';
+        next = end + 1;
+    } else {
+        next = NULL;
+    }
+
+    return start;
+}
+
+inline char* strdup(const char *s) {
+    size_t len = 0;
+    while (s[len]) len++;
+
+    char *copy = (char *)malloc(len + 1);
+    if (!copy) return NULL;
+
+    for (size_t i = 0; i <= len; i++) {
+        copy[i] = s[i];
+    }
+    return copy;
+}

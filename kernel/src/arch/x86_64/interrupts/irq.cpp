@@ -20,16 +20,14 @@ extern "C" void* irqTable[];
 extern "C" void irqHandler(int_frame_t* ctx) {
 
     memory::paging::enablekernel();
-    
-    Log::Display(LEVEL_MESSAGE_INFO,"Got IRQ !\n");
 
-    irq_table[ctx->vec].func(irq_table[ctx->vec].arg);
-    Log::Display(LEVEL_MESSAGE_INFO,"END IRQ !\n");
+    irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
     if(is_legacy_pic) {
         arch::x86_64::interrupts::pic::eoi(ctx->vec);
     } else {
         arch::x86_64::cpu::lapic::eoi();
     }
+
 }
 
 void arch::x86_64::interrupts::irq::reset() {
@@ -37,7 +35,7 @@ void arch::x86_64::interrupts::irq::reset() {
     memset(irq_table,0,sizeof(irq_table));
 }
 
-std::uint8_t arch::x86_64::interrupts::irq::create(std::uint16_t irq,std::uint8_t type,std::int32_t (*func)(void* arg),void* arg,std::uint64_t flags) {
+std::uint8_t arch::x86_64::interrupts::irq::create(std::uint16_t irq,std::uint8_t type,void (*func)(void* arg),void* arg,std::uint64_t flags) {
     uint8_t entry = 0;
     if(!is_legacy_pic) {
         entry = arch::x86_64::interrupts::idt::alloc();

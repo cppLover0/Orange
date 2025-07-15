@@ -41,13 +41,11 @@ void drivers::ioapic::init() {
                 struct acpi_madt_ioapic* cur_ioapic = (acpi_madt_ioapic*)current;
                 memory::paging::kernelmap(0,cur_ioapic->address);
                 apics[apic_ent++] = *cur_ioapic;
-                Log::Display(LEVEL_MESSAGE_INFO,"Found APIC %d with address 0x%p\n",apic_ent - 1,cur_ioapic->address);
                 break;
             }
             case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE: {
                 struct acpi_madt_interrupt_source_override* cur_iso = (struct acpi_madt_interrupt_source_override*)current;
                 iso[iso_ent++] = *cur_iso;
-                Log::Display(LEVEL_MESSAGE_INFO,"Found ISO %d with address 0x%p\n",iso_ent - 1,cur_iso);
                 break;
             }
         }

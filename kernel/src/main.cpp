@@ -7,6 +7,7 @@
 #include <arch/x86_64/cpu/gdt.hpp>
 #include <generic/mm/paging.hpp>
 #include <drivers/kvmtimer.hpp>
+#include <generic/vfs/vfs.hpp>
 #include <generic/mm/heap.hpp>
 #include <generic/mm/pmm.hpp>
 #include <drivers/serial.hpp>
@@ -17,9 +18,16 @@
 #include <etc/logging.hpp>
 #include <etc/etc.hpp>
 
+#include <uacpi/event.h>
+
 #include <limine.h>
 
 std::uint16_t KERNEL_GOOD_TIMER = 0;
+
+static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
+    Log::Display(LEVEL_MESSAGE_OK,"Got uacpi power_button !\n");
+    return UACPI_INTERRUPT_HANDLED;
+}
 
 extern "C" void kmain() {
     
@@ -54,13 +62,17 @@ extern "C" void kmain() {
     drivers::acpi::init();
     Log::Display(LEVEL_MESSAGE_OK,"ACPI initializied\n");
 
-    while(1) {
-        Log::Display(LEVEL_MESSAGE_INFO,"Waiting with TSC 500ms... current seconds: %d\n",drivers::cmos::second());
-        drivers::tsc::sleep(500 * 1000);
-    }
+    vfs::vfs::init();
+    Log::Display(LEVEL_MESSAGE_OK,"VFS initializied\n");
 
     Log::Display(LEVEL_MESSAGE_OK,"Everything is works !\n");
-    
+
+    uacpi_status ret = uacpi_install_fixed_event_handler(
+        UACPI_FIXED_EVENT_POWER_BUTTON,
+	    handle_power_button, UACPI_NULL
+    );
+
+    asm volatile("sti");
     while(1) {
         asm volatile("hlt");
     }
