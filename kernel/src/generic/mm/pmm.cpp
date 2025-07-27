@@ -72,6 +72,9 @@ void memory::buddy::merge(uint64_t parent_id) {
     blud->is_splitted = 0;
     blud->is_was_splitted = 1;
     blud->is_free = 1;
+    blud->id = 0;
+    bl->id = 0;
+    ud->id = 0;
     if(blud->parent_id)
         merge(blud->parent_id);
     return;
@@ -167,6 +170,7 @@ void memory::buddy::free(std::uint64_t phys) {
     if(!blud || blud->is_splitted)
         return;
     blud->is_free = 1;
+    blud->id = 0;
     if(blud->parent_id)
         merge(blud->parent_id);
 }
@@ -196,6 +200,39 @@ std::int64_t memory::buddy::alloc(std::size_t size) {
 
 }
 
+std::int64_t memory::buddy::allocid(std::size_t size,std::uint32_t id0) {
+    std::uint64_t top_size = UINT64_MAX;
+    buddy_info_t* nearest_buddy = 0;
+
+    if(size < 4096)
+        size = 4096;
+
+    for(std::uint64_t i = 0;i < mem.buddy_queue; i++) {
+        if(LEVEL_TO_SIZE(mem.mem[i].level) >= size && LEVEL_TO_SIZE(mem.mem[i].level) < top_size && mem.mem[i].is_free) {
+            top_size = LEVEL_TO_SIZE(mem.mem[i].level);
+            nearest_buddy = &mem.mem[i];
+        }
+    }
+
+    if(nearest_buddy) {
+        auto blud = split_maximum(nearest_buddy,size);
+        blud->is_free = 0;
+        blud->id = id0;
+        memset(Other::toVirt(blud->phys),0,LEVEL_TO_SIZE(blud->level));
+        return blud->phys;
+    }
+
+    return 0;
+}
+
+void memory::buddy::fullfree(std::uint32_t id) {
+    for(std::uint64_t i = 0;i < mem.buddy_queue; i++) {
+        if(mem.mem[i].id == id) {
+            free(mem.mem[i].phys);
+        }
+    }
+}
+
 /* pmm wrapper */
 
 void memory::pmm::_physical::init() {
@@ -208,9 +245,20 @@ void memory::pmm::_physical::free(std::uint64_t phys) {
     pmm_lock.unlock();
 }
 
+void memory::pmm::_physical::fullfree(std::uint32_t id) {
+    memory::buddy::fullfree(id);
+}
+
 std::int64_t memory::pmm::_physical::alloc(std::size_t size) {
     pmm_lock.lock();
     std::int64_t p = memory::buddy::alloc(size);
+    pmm_lock.unlock();
+    return p;
+}
+
+std::int64_t memory::pmm::_physical::allocid(std::size_t size, std::uint32_t id) {
+    pmm_lock.lock();
+    std::int64_t p = memory::buddy::allocid(size,id);
     pmm_lock.unlock();
     return p;
 }
@@ -228,7 +276,7 @@ void* memory::pmm::_virtual::alloc(std::size_t size) {
 #include <generic/mm/paging.hpp>
 
 std::uint64_t memory::pmm::helper::alloc_kernel_stack(std::size_t size) {
-    std::uint64_t stack = memory::pmm::_physical::alloc(size + 4096); /* extra page */
-    memory::paging::alwaysmappedadd(stack,size + 4096);
-    return (std::uint64_t)Other::toVirt(stack);
+    std::uint64_t stack = memory::pmm::_physical::alloc(size); /* extra page */
+    memory::paging::alwaysmappedadd(stack,size);
+    return (std::uint64_t)Other::toVirt(stack) + size;
 }

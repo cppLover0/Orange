@@ -7,7 +7,7 @@
 namespace locks {
     class spinlock {
     private:
-        std::atomic_flag flag = ATOMIC_FLAG_INIT;
+        volatile std::atomic_flag flag = ATOMIC_FLAG_INIT;
     public:
         spinlock() {
 
@@ -18,12 +18,20 @@ namespace locks {
                 __builtin_ia32_pause();
         }
 
+        std::uint8_t test_and_set() {
+            return flag.test_and_set(std::memory_order_acquire);
+        }
+
+        void nowaitlock() {
+            flag.test_and_set(std::memory_order_acquire);
+        }
+
         void unlock() {
             flag.clear(std::memory_order_release);
         }
 
         std::uint8_t test() {
-            return flag.test(std::memory_order_acquire);
+            return flag.test();
         }
 
     };

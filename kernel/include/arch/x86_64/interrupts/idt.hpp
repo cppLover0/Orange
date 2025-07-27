@@ -42,7 +42,9 @@ typedef struct {
     std::uint64_t rflags;
     std::uint64_t rsp;
     std::uint64_t ss;
-} __attribute__((packed)) int_frame_t;
+} int_frame_t;
+
+extern "C" void ignoreStub();
 
 namespace arch {
     namespace x86_64 {

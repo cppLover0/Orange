@@ -4,8 +4,13 @@
 
 #include <generic/mm/heap.hpp>
 #include <generic/mm/pmm.hpp>
+#include <generic/mm/paging.hpp>
+
+#include <etc/logging.hpp>
 
 #include <config.hpp>
+
+#include <etc/etc.hpp>
 
 std::uint8_t* heap_pool;
 heap_block_t* heap_end;
@@ -18,6 +23,9 @@ void memory::heap::init() {
     block->next = 0;
     current = (heap_block_t*)heap_pool;
     heap_end = block;
+    
+    Log::Display(LEVEL_MESSAGE_OK,"heap_pool: 0x%p\n",heap_pool);
+    memory::paging::alwaysmappedadd(Other::toPhys(heap_pool),KHEAP_SIZE);
 }
 
 void memory::heap::free(void* ptr) {

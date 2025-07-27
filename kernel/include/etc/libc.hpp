@@ -28,6 +28,8 @@ inline void *memset(void *s, int c, size_t n) {
     return s;
 }
 
+#define zeromem(x) memset(x,0,sizeof(*x))
+
 inline void *memmove(void *dest, const void *src, size_t n) {
     uint8_t *pdest = static_cast<uint8_t *>(dest);
     const uint8_t *psrc = static_cast<const uint8_t *>(src);
@@ -98,34 +100,7 @@ inline char *strchr(const char *s, int c) {
     return NULL;
 }
 
-inline static char *strtok(char *str, const char *delim) {
-    static char *next = NULL;
-    if (str) next = str;
-    if (!next) return NULL;
-
-    char *start = next;
-    while (*start && strchr(delim, *start)) {
-        start++;
-    }
-    if (!*start) {
-        next = NULL;
-        return NULL;
-    }
-
-    char *end = start;
-    while (*end && !strchr(delim, *end)) {
-        end++;
-    }
-
-    if (*end) {
-        *end = '\0';
-        next = end + 1;
-    } else {
-        next = NULL;
-    }
-
-    return start;
-}
+char *strtok(char *str, const char *delim);
 
 inline char* strdup(const char *s) {
     size_t len = 0;
@@ -138,4 +113,17 @@ inline char* strdup(const char *s) {
         copy[i] = s[i];
     }
     return copy;
+}
+
+inline char* strrchr(const char* str, int ch) {
+    char* last_occurrence = 0;
+
+    while (*str) {
+        if (*str == ch) {
+            last_occurrence = (char*)str; 
+        }
+        str++;
+    }
+
+    return last_occurrence;
 }

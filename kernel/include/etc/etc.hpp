@@ -21,4 +21,9 @@ public:
         return (void*)(phys + hhdm);
     }
 
+    static inline std::uint64_t toPhys(std::uint64_t addr) {
+        uint64_t hhdm = BootloaderInfo::AccessHHDM();
+        return (uint64_t)addr - hhdm;
+    }
+
 };

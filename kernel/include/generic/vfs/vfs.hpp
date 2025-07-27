@@ -126,9 +126,11 @@ namespace vfs {
             this->lock.unlock();
         }
 
-        void create() {
+        void create(std::uint8_t side) {
             this->lock.lock();
             this->connected_to_pipe++;
+            if(side == PIPE_SIDE_WRITE)
+                this->connected_to_pipe_write++;
             this->lock.unlock();
         }
 
@@ -231,15 +233,20 @@ typedef struct {
     vfs::pipe* pipe;
 } userspace_old_fd_t;
 
-typedef struct {
+typedef struct userspace_fd {
     std::uint64_t offset;
     std::int32_t index;
     std::uint8_t state;
     std::uint8_t pipe_side;
+
+    std::uint32_t queue;
+    std::uint8_t cycle;
+
     vfs::pipe* pipe;
     char path[2048];
 
     userspace_old_fd_t old_state;
+    struct userspace_fd* next; /* Should be changed in fork() */
 
 } userspace_fd_t;
 
@@ -267,7 +274,159 @@ namespace vfs {
 #define AT_NO_AUTOMOUNT 0x800
 #define AT_EMPTY_PATH 0x1000
 
+#define S_IFMT 0x0F000
+#define S_IFBLK 0x06000
+#define S_IFCHR 0x02000
+#define S_IFIFO 0x01000
+#define S_IFREG 0x08000
+#define S_IFDIR 0x04000
+#define S_IFLNK 0x0A000
+#define S_IFSOCK 0x0C000
+
+#define TMPFS_VAR_CHMOD 0
+#define TMPFS_VAR_UNLINK 1
+
 namespace vfs {
+
+    static inline std::uint64_t resolve_count(char* str,std::uint64_t sptr,char delim) {
+        char* current = str;
+        std::uint16_t att = 0;
+        std::uint64_t ptr = sptr;
+        std::uint64_t ptr_count = 0;
+        while(current[ptr] != delim) {
+            if(att > 1024)
+                return 0;
+            att++;
+
+            if(ptr != 0) {
+                ptr_count++;
+                ptr--;
+            }
+        }
+        return ptr;
+    }
+
+
+    static inline int normalize_path(const char* src, char* dest, std::uint64_t dest_size) {
+        if (!src ||!dest || dest_size < 2) return -1;
+        std::uint64_t j = 0;
+        int prev_slash = 0;
+        for (std::uint64_t i = 0; src[i] && j < dest_size - 1; i++) {
+            if (src[i] == '/') {
+                if (!prev_slash) {
+                    dest[j++] = '/';
+                    prev_slash = 1;
+                }
+            } else {
+                dest[j++] = src[i];
+                prev_slash = 0;
+            }
+        }
+
+        if (j > 1 && dest[j-1] == '/') j--;
+        if (j >= dest_size) {
+            dest[0] = '\0';
+            return -1;
+        }
+        dest[j] = '\0';
+        return 0;
+    }
+
+    /* I'll use path resolver from my old kernel */
+    static inline void resolve_path(const char* inter0,const char* base, char *result, char spec, char is_follow_symlinks) {
+        char buffer_in_stack[2048];
+        char buffer2_in_stack[2048];
+        char inter[2048];
+        char* buffer = (char*)buffer_in_stack;
+        char* final_buffer = (char*)buffer2_in_stack;
+        std::uint64_t ptr = strlen((char*)base);
+        char is_first = 1;
+        char is_full = 0;
+
+        memset(inter,0,2048);
+        memset(buffer_in_stack,0,2048);
+        memset(buffer2_in_stack,0,2048);
+
+        memcpy(inter,inter0,strlen(inter0));
+        memcpy(final_buffer,base,strlen((char*)base));
+
+        if(strlen((char*)inter) == 1 && inter[0] == '.') {
+            memset(result,0,2048);
+            memcpy(result,base,strlen((char*)base));
+            return;
+        }
+
+        if(!strcmp(inter,"/")) {
+            memset(result,0,2048);
+            memcpy(result,inter,strlen((char*)inter));
+            return;
+        }
+
+        if(inter[0] == '/') {
+            ptr = 0;
+            memset(final_buffer,0,2048);
+            is_full = 1;
+        }
+
+        if(spec)
+            is_first = 0;
+
+        buffer = strtok((char*)inter,"/");
+        while(buffer) {
+
+            if(is_first && !is_full) {
+                std::uint64_t mm = resolve_count(final_buffer,ptr,'/');
+
+                if(ptr < mm) {
+                    final_buffer[0] = '/';
+                    final_buffer[1] = '\0';
+                    ptr = 1;
+                    continue;
+                } 
+
+                ptr = mm;
+                final_buffer[ptr] = '\0';
+                is_first = 0;
+            }
+
+            if(!strcmp(buffer,"..")) {
+                std::uint64_t mm = resolve_count(final_buffer,ptr,'/');
+
+                if(!strcmp(final_buffer,"/\0")) {
+                    buffer = strtok(0,"/");
+                    continue;
+                }
+                    
+
+                if(ptr < mm) {
+                    final_buffer[0] = '/';
+                    final_buffer[1] = '\0';
+                    ptr = 1;
+                    continue;
+                } 
+
+                ptr = mm;
+                final_buffer[ptr] = '\0';
+                
+
+
+            } else if(strcmp(buffer,"./") && strcmp(buffer,".")) {
+
+                final_buffer[ptr] = '/';
+                ptr++;
+
+                std::uint64_t mm = 0;
+                mm = strlen(buffer);
+                memcpy((char*)((std::uint64_t)final_buffer + ptr),buffer,mm);
+                ptr += mm;
+                final_buffer[ptr] = '\0';
+            } 
+            
+            buffer = strtok(0,"/");
+        }
+        memset(result,0,2048);
+        normalize_path(final_buffer,result,2048);
+    }
 
     typedef struct {
         __MLIBC_DIRENT_BODY;
@@ -298,7 +457,8 @@ namespace vfs {
         std::int32_t (*var)    (userspace_fd_t* fd, char* path, std::uint64_t value, std::uint8_t request );
         std::int32_t (*ls)     (userspace_fd_t* fd, char* path, dirent_t* out                             ); 
         std::int32_t (*remove) (userspace_fd_t* fd, char* path                                            );
-        std::int32_t (*chmod)  (userspace_fd_t* fd, char* path                                            );
+        std::int32_t (*ioctl)  (userspace_fd_t* fd, char* path, unsigned long req, void *arg, int *res    );
+        std::int32_t (*mmap)   (userspace_fd_t* fd, char* path, std::uint64_t* outp, std::uint64_t* outsz );
         std::int32_t (*create) (char* path, std::uint8_t type                                             );
         std::int32_t (*touch)  (char* path                                                                );
 
@@ -315,7 +475,8 @@ namespace vfs {
         static std::int32_t var    (userspace_fd_t* fd, std::uint64_t value, std::uint8_t request );
         static std::int32_t ls     (userspace_fd_t* fd, dirent_t* out                             ); 
         static std::int32_t remove (userspace_fd_t* fd                                            );
-        static std::int32_t chmod  (userspace_fd_t* fd                                            );
+        static std::int64_t ioctl  (userspace_fd_t* fd, unsigned long req, void *arg, int *res    );
+        static std::int32_t mmap   (userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz );
 
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );

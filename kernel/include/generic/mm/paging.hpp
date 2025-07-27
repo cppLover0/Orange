@@ -33,14 +33,16 @@ namespace memory {
     public:
         static void init();
         static void map(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t flags);
+        static void mapid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t flags,std::uint32_t id);
         static void maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags);
+        static void maprangeid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags, std::uint32_t id);
         static void mapentry(std::uint64_t cr3,std::uint8_t type,std::uint64_t add_flags);
-        static void mapkernel(std::uint64_t cr3);
+        static void mapkernel(std::uint64_t cr3,std::uint32_t id);
         static void* kernelmap(std::uint64_t cr3,std::uint64_t phys);
         static void enablekernel();
         static void enablepaging(std::uint64_t cr3);
         static void alwaysmappedadd(std::uint64_t phys, std::uint64_t len);
-        static void alwaysmappedmap(std::uint64_t cr3);
+        static void alwaysmappedmap(std::uint64_t cr3,std::uint32_t id);
     };
 
 };

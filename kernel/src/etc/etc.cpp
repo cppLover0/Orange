@@ -91,6 +91,11 @@ void operator delete(void *p)
     memory::heap::free(p);
 }
 
+void operator delete(void *p,unsigned long sz)
+{
+    memory::heap::free(p);
+}
+
 void operator delete[](void *p)
 {
     memory::heap::free(p);

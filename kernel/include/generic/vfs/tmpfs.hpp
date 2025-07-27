@@ -13,7 +13,7 @@ namespace vfs {
 
     typedef struct tmpfs_node {
         std::uint64_t size;
-        std::uint64_t chmod;
+        std::uint64_t vars[8];
         std::uint8_t type;
         std::uint8_t* content;
         struct tmpfs_node* next;

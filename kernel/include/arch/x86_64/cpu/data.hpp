@@ -6,12 +6,22 @@
 #include <etc/assembly.hpp>
 #include <etc/libc.hpp>
 
+#include <arch/x86_64/interrupts/idt.hpp>
+#include <arch/x86_64/scheduling.hpp>
+
 typedef struct {
-    std::uint64_t kernel_stack;
     std::uint64_t user_stack;
-    struct smp {
-        std::uint8_t cpu_id;
-    };
+    std::uint64_t kernel_stack;
+    struct {
+        std::uint16_t cpu_id;
+    } smp;
+    struct {
+        std::uint64_t freq;
+    } tsc;
+    struct {
+        int_frame_t temp_ctx;
+        arch::x86_64::process_t* proc;
+    } temp;
 } cpudata_t;
 
 namespace arch {

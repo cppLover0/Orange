@@ -50,6 +50,19 @@ volatile limine_executable_address_request keraddr_request = {
     .response = nullptr
 };
 
+__attribute__((used, section(".limine_requests")))
+volatile limine_module_request initrd_request = {
+    .id = LIMINE_MODULE_REQUEST,
+    .revision = 0,
+    .response = nullptr
+};
+
+__attribute__((used, section(".limine_requests")))
+volatile LIMINE_MP(request) smp_request = {
+    .id = LIMINE_MP_REQUEST,
+    .revision = 0,
+    .response = nullptr
+};
 
 }
 
@@ -81,4 +94,12 @@ struct limine_memmap_response* BootloaderInfo::AccessMemoryMap() {
 
 struct limine_executable_address_response* BootloaderInfo::AccessKernel() {
     return keraddr_request.response;
+}
+
+struct LIMINE_MP(response)* BootloaderInfo::AccessMP() {
+    return smp_request.response;
+}
+
+struct limine_module_response* BootloaderInfo::AccessInitrd() {
+    return initrd_request.response;
 }

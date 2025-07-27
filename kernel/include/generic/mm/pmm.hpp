@@ -19,6 +19,7 @@ typedef struct buddy_info {
         };
         std::uint64_t buddy_info_raw;
     };
+    std::uint32_t id;
     std::uint64_t phys;
 } __attribute__((packed)) buddy_info_t;
 
@@ -43,14 +44,18 @@ namespace memory {
     public:
         static void init();
         static void free(std::uint64_t phys);
+        static void fullfree(std::uint32_t id);
         static std::int64_t alloc(std::size_t size);
+        static std::int64_t allocid(std::size_t size, std::uint32_t id);
     };
     namespace pmm {
         class _physical {
         public:
             static void init();
             static void free(std::uint64_t phys);
+            static void fullfree(std::uint32_t id);
             static std::int64_t alloc(std::size_t size);
+            static std::int64_t allocid(std::size_t size, std::uint32_t id);
         };
         class _virtual {
         public:

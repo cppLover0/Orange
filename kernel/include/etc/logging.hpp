@@ -9,6 +9,12 @@
 #include <flanterm.h>
 #include <flanterm_backends/fb.h>
 
+#include <cstdarg>
+
+int __snprintf(char *buffer, size_t bufsz, char const *fmt, va_list vlist);
+int __printfbuf(char* buffer, size_t bufsf, char const* fmt, ...);
+
+
 class Log {
 private:
     struct flanterm_context* ft_ctx0;

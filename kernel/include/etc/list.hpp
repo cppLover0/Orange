@@ -105,4 +105,64 @@ namespace Lists {
             list_lock = new locks::spinlock();
         }
     };
+
+    typedef struct {
+        std::uint32_t value0;
+        std::uint32_t cycle;
+        std::uint64_t value1;
+        
+    } ring_obj_t;
+
+    typedef struct {
+        ring_obj_t* objs;
+        int tail;
+        int size;
+        int cycle;
+    } ring_buffer_t;
+
+
+    class Ring {
+    private:
+        ring_buffer_t ring;
+    public:
+
+        void send(std::uint64_t id, std::uint64_t value1) {
+            ring.objs[ring.tail].cycle = ring.cycle;
+            ring.objs[ring.tail].value0 = id;
+            ring.objs[ring.tail].value1 = value1;
+
+            if(++ring.tail == ring.size) {
+                ring.tail = 0;
+                ring.cycle = !ring.cycle;
+            }
+        }
+
+        int receive(ring_obj_t* out, int id, int max, std::uint8_t* cycle, std::uint32_t* queue) {
+            int len = 0;
+            while(ring.objs[*queue].cycle == *cycle && len < ALIGNDOWN(max,sizeof(ring_obj_t)) / sizeof(ring_obj_t)) {
+                if(ring.objs[*queue].value0 == id)
+                    out[len++] = ring.objs[*queue];
+                *queue++;
+                if(*queue == ring.size) {
+                    *queue = 0;
+                    *cycle = !(*cycle);
+                }
+            }
+            return len;
+        }
+
+        Ring(std::size_t size_elements) {
+            ring.objs = new ring_obj_t[size_elements + 1];
+            ring.size = size_elements;
+            ring.tail = 0;
+            ring.cycle = 1;
+            memset(ring.objs,0,sizeof(ring_obj_t) * (size_elements + 1));
+        }
+
+        ~Ring() {
+            delete ring.objs;
+        }
+
+    };
+
 };

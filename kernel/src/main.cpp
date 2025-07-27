@@ -1,11 +1,16 @@
 
+#include <arch/x86_64/syscalls/syscalls.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/interrupts/irq.hpp>
 #include <arch/x86_64/interrupts/pic.hpp>
 #include <arch/x86_64/interrupts/pit.hpp>
+#include <arch/x86_64/scheduling.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <arch/x86_64/cpu/gdt.hpp>
+#include <arch/x86_64/cpu/smp.hpp>
+#include <arch/x86_64/cpu/sse.hpp>
 #include <generic/mm/paging.hpp>
+#include <generic/vfs/ustar.hpp>
 #include <drivers/kvmtimer.hpp>
 #include <generic/vfs/vfs.hpp>
 #include <generic/mm/heap.hpp>
@@ -13,13 +18,11 @@
 #include <drivers/serial.hpp>
 #include <drivers/cmos.hpp>
 #include <drivers/acpi.hpp>
-#include <drivers/tsc.hpp>
 #include <etc/assembly.hpp>
+#include <drivers/tsc.hpp>
 #include <etc/logging.hpp>
-#include <etc/etc.hpp>
-
 #include <uacpi/event.h>
-
+#include <etc/etc.hpp>
 #include <limine.h>
 
 std::uint16_t KERNEL_GOOD_TIMER = 0;
@@ -29,7 +32,7 @@ static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     return UACPI_INTERRUPT_HANDLED;
 }
 
-extern "C" void kmain() {
+extern "C" void main() {
     
     Other::ConstructorsInit();
     asm volatile("cli");
@@ -65,15 +68,41 @@ extern "C" void kmain() {
     vfs::vfs::init();
     Log::Display(LEVEL_MESSAGE_OK,"VFS initializied\n");
 
-    Log::Display(LEVEL_MESSAGE_OK,"Everything is works !\n");
+    vfs::ustar::copy();
+    Log::Display(LEVEL_MESSAGE_OK,"USTAR parsed\n");
+
+    arch::x86_64::cpu::sse::init();
+    Log::Display(LEVEL_MESSAGE_OK,"SSE initializied\n");
+
+    arch::x86_64::cpu::mp::init();
+    arch::x86_64::cpu::mp::sync(0);
+    Log::Display(LEVEL_MESSAGE_OK,"SMP initializied\n");
+
+    arch::x86_64::scheduling::init();
+    Log::Display(LEVEL_MESSAGE_OK,"Scheduling initializied\n");
+
+    arch::x86_64::syscall::init();
+    Log::Display(LEVEL_MESSAGE_OK,"Syscalls initializied\n");
 
     uacpi_status ret = uacpi_install_fixed_event_handler(
         UACPI_FIXED_EVENT_POWER_BUTTON,
 	    handle_power_button, UACPI_NULL
     );
 
+    char* argv[] = {0};
+    char* envp[] = {"TERM=linux",0};
+
+    arch::x86_64::process_t* init = arch::x86_64::scheduling::create();
+    arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp);
+    arch::x86_64::scheduling::wakeup(init);
+
+    Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
+
+    arch::x86_64::cpu::mp::sync(1);
+
     asm volatile("sti");
     while(1) {
+        
         asm volatile("hlt");
     }
 

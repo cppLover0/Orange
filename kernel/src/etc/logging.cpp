@@ -16,6 +16,8 @@
 
 #include <drivers/serial.hpp>
 
+#include <generic/locks/spinlock.hpp>
+
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -27,6 +29,8 @@ int __snprintf(char *buffer, size_t bufsz, char const *fmt, va_list vlist) {
 Log LogObject;
 uint32_t default_fg = 0xEEEEEEEE;
 uint32_t default_fg_bright = 0xFFFFFFFF;
+
+locks::spinlock log_lock;
 
 void Log::Init() {
     struct limine_framebuffer* fb0 = BootloaderInfo::AccessFramebuffer();
@@ -56,6 +60,13 @@ const char* level_messages[] = {
     [LEVEL_MESSAGE_INFO] = "[  \x1b[38;2;0;191;255mINFO\033[0m  ] "
 };
 
+int __printfbuf(char* buffer, size_t bufsf, char const* fmt, ...) {
+    va_list val;
+    va_start(val, fmt);
+    return __snprintf(buffer,bufsf,fmt,val);
+    va_end(val);
+}
+
 void Log::SerialDisplay(int level,char* msg,...) {
     va_list val;
     va_start(val, msg);
@@ -75,6 +86,7 @@ void Log::Display(int level,char* msg,...) {
     va_start(val, msg);
     char buffer[512];
     memset(buffer,0,512);
+    log_lock.lock();
     LogObject.Write((char*)level_messages[level],strlen(level_messages[level]));
     int len = __snprintf(buffer,512,msg,val);
     LogObject.Write(buffer,len);
@@ -84,5 +96,6 @@ void Log::Display(int level,char* msg,...) {
     serial.write((uint8_t*)level_messages[level],strlen(level_messages[level]));
     serial.write((uint8_t*)buffer,len);
 
+    log_lock.unlock();
     va_end(val);
 }
