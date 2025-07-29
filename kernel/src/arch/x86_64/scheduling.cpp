@@ -346,8 +346,8 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
     memory::paging::enablekernel();
 
     arch::x86_64::process_t* current = arch::x86_64::cpu::data()->temp.proc;    
-    
-    process_lock->lock();
+
+    /* Actually context saving doesn't need some locking cuz there's already lock in process struct */
 
     if(ctx) {
         if(current) {
@@ -358,13 +358,15 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
             arch::x86_64::cpu::data()->kernel_stack = 0;
             arch::x86_64::cpu::data()->temp.proc = 0;
             current->lock.unlock();
+            process_lock->lock();
+            current = current->next; /* DANGER !!! */
+            process_lock->unlock();
         }
     }
 
-    while (true) {
-        
-        current = head_proc;
+    process_lock->lock();
 
+    while (true) {
         while (current) {
             if (!current->kill_lock.test() && !current->lock.test_and_set() && current->id != 0) {
                 memcpy(ctx, &current->ctx, sizeof(int_frame_t));
@@ -398,6 +400,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
         process_lock->unlock();
         asm volatile("pause");
         process_lock->lock();
+        current = head_proc;
     }
 }
     
@@ -406,5 +409,6 @@ void arch::x86_64::scheduling::init() {
     process_lock = new locks::spinlock;
     process_t* main_proc = create();
     main_proc->kill_lock.nowaitlock();
+    process_lock->unlock();
     arch::x86_64::interrupts::idt::set_entry((std::uint64_t)schedulingEnter,32,0x8E,2);
 }

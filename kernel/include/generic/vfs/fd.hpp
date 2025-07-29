@@ -25,13 +25,7 @@ namespace vfs {
                 proc->fd = current;
             }
 
-            std::uint32_t old_index = current->index;
-            userspace_fd_t* old_next = current->next;
-            zeromem(current);
-
             current->state = USERSPACE_FD_STATE_FILE;
-            current->index = old_index;
-            current->next = old_next;
 
             return current->index;
 

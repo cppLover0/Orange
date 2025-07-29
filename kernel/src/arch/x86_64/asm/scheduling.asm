@@ -9,7 +9,8 @@ schedulingEnter:
     jz .cont
     swapgs
 .cont:
-    sub rsp,16
+    push qword 0
+    push qword 0
     push r15
     push r14
     push r13

@@ -5,6 +5,10 @@
 #include <etc/assembly.hpp>
 #include <etc/logging.hpp>
 
+#include <generic/locks/spinlock.hpp>
+
+#include <arch/x86_64/cpu/data.hpp>
+
 arch::x86_64::syscall_item_t sys_table[] = {
     {1,(void*)sys_futex_wake},
     {2,(void*)sys_futex_wait},
@@ -30,6 +34,7 @@ arch::x86_64::syscall_item_t* __syscall_find(int rax) {
 
 extern "C" void syscall_handler_c(int_frame_t* ctx) {
     memory::paging::enablekernel();
+
     arch::x86_64::syscall_item_t* item = __syscall_find(ctx->rax);
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
     syscall_ret_t ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
@@ -37,15 +42,13 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
         ctx->rdx = ret.ret_val;
     }
    
-
     ctx->rax = ret.ret;
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys %d\n",ctx->rax);
     return;
 } 
 
 void arch::x86_64::syscall::init() {
     __wrmsr(STAR_MSR,(0x08ull << 32) | (0x10ull << 48));
     __wrmsr(LSTAR,(uint64_t)syscall_handler);
-    __wrmsr(STAR_MASK,0); // syscalls will support interrupts
+    __wrmsr(STAR_MASK,(1 << 9)); // syscalls will support interrupts
     __wrmsr(EFER,__rdmsr(EFER) | 1);
 }

@@ -45,7 +45,6 @@ namespace Lists {
 
         locks::spinlock* list_lock;
 
-        Lists::list_object_t* list;
         std::uint8_t is_lock_possible;
         
         static std::uint64_t normalize(std::uint64_t value) {
@@ -67,19 +66,29 @@ namespace Lists {
         }
 
     public:
+        Lists::list_object_t* list;
+
+        void lock() {
+            list_lock->lock();
+        }
+
+        void unlock() {
+            list_lock->unlock();
+        }
 
         void insert(std::uint64_t value) {
             list_lock->lock();
 
             Lists::list_object_t* new_list = find_free();
 
-            if(!new_list)
+            if(!new_list) {
                 new_list = new Lists::list_object_t;
-
+                new_list->next_list_object = (std::uint64_t)list;
+                list = new_list;
+            }
+                
             new_list->is_used = 1;
             new_list->value = value;
-            new_list->next_list_object = (std::uint64_t)list;
-            list = new_list;
 
             list_lock->unlock();
         }
@@ -142,6 +151,20 @@ namespace Lists {
             while(ring.objs[*queue].cycle == *cycle && len < ALIGNDOWN(max,sizeof(ring_obj_t)) / sizeof(ring_obj_t)) {
                 if(ring.objs[*queue].value0 == id)
                     out[len++] = ring.objs[*queue];
+                *queue++;
+                if(*queue == ring.size) {
+                    *queue = 0;
+                    *cycle = !(*cycle);
+                }
+            }
+            return len;
+        }
+
+        int receivevals(std::uint64_t* out, int id, int max, std::uint8_t* cycle, std::uint32_t* queue) {
+            int len = 0;
+            while(ring.objs[*queue].cycle == *cycle && len < ALIGNDOWN(max,sizeof(std::uint64_t)) / sizeof(std::uint64_t)) {
+                if(ring.objs[*queue].value0 == id)
+                    out[len++] = ring.objs[*queue].value1;
                 *queue++;
                 if(*queue == ring.size) {
                     *queue = 0;

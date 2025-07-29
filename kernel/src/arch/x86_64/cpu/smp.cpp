@@ -26,18 +26,22 @@
 
 #include <limine.h>
 
+#include <atomic>
+
 using namespace arch::x86_64::cpu;
 
-std::uint64_t how_much_cpus = 0;
-std::uint64_t temp_how_much_cpus[12];
+std::atomic<int> how_much_cpus;
+std::atomic<int> temp_how_much_cpus[12];
 
 locks::spinlock mp_lock;
 
 void mp::sync(std::uint8_t id) {
-    temp_how_much_cpus[id]++;
-    while(how_much_cpus != temp_how_much_cpus[id]) {asm volatile("pause");}
-    time::sleep(500000); // perform 500 ms sleep to sync
-    temp_how_much_cpus[id] = 0;
+    temp_how_much_cpus[id].fetch_add(1, std::memory_order_acq_rel);
+    while (how_much_cpus != temp_how_much_cpus[id].load(std::memory_order_acquire)) {
+        asm volatile("pause");
+    }
+    time::sleep(5000); // perform 50 ms sleep to sync
+    temp_how_much_cpus[id].store(0, std::memory_order_release);
 } 
 
 void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
@@ -63,7 +67,7 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 void mp::init() {
     struct LIMINE_MP(response)* mp_info = BootloaderInfo::AccessMP();
     how_much_cpus = mp_info->cpu_count;
-    memset(temp_how_much_cpus,0,8*12);
+    memset(temp_how_much_cpus,0,4*12);
     for(std::uint16_t i = 0;i < mp_info->cpu_count;i++) {
         if(mp_info->bsp_lapic_id != i) {
             mp_info->cpus[i]->goto_address = __mp_bootstrap;

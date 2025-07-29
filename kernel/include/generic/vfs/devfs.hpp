@@ -15,6 +15,7 @@
 #define DEVFS_PACKET_IOCTL 8
 #define DEVFS_ENABLE_PIPE 9
 #define DEVFS_SETUP_MMAP 10
+#define DEVFS_NONBLOCK_PIPE_OFFSET_IN_IOCTL 11
 
 namespace vfs {
 
@@ -67,7 +68,7 @@ namespace vfs {
         devfs_pipe_p_t open_flags;
         Lists::Ring* readring;
         Lists::Ring* writering;
-        devfs_ioctl_packet_t ioctls[64];
+        devfs_ioctl_packet_t ioctls[32];
         std::uint64_t pipes[32];
         std::uint64_t mmap_base;
         std::uint64_t mmap_size;

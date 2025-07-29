@@ -18,7 +18,6 @@
 syscall_ret_t sys_tcb_set(std::uint64_t fs) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     __wrmsr(0xC0000100,fs);
-    proc->fs_base = fs;
     return {0,0,0};
 }
 

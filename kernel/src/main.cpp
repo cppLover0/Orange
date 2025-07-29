@@ -96,9 +96,16 @@ extern "C" void main() {
     arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp);
     arch::x86_64::scheduling::wakeup(init);
 
+    arch::x86_64::process_t* init2 = arch::x86_64::scheduling::create();
+    arch::x86_64::scheduling::loadelf(init2,"/usr/bin/init",argv,envp);
+    arch::x86_64::scheduling::wakeup(init2);
+
     Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
 
+    Log::Display(LEVEL_MESSAGE_INFO,"Trying to sync cpus...\n");
     arch::x86_64::cpu::mp::sync(1);
+
+    Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
 
     asm volatile("sti");
     while(1) {

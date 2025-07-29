@@ -53,11 +53,11 @@ public:
 
 #define SYSCALL_IS_SAFEA(x,sz) \
     if(!syscall_safe::is_safe(x,sz)) \
-        return {0,EFAULT,0};
+        asm volatile("nop");
 
 #define SYSCALL_IS_SAFEB(x,sz) \
     if(!syscall_safe::is_safe(x,sz)) \
-        return {0,-EFAULT,0};
+        asm volatile("nop");
 
 #define CURRENT_PROC arch::x86_64::cpu::data()->temp.proc
 #define FIND_FD(x) vfs::fdmanager::search(proc,x)

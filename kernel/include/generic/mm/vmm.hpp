@@ -125,6 +125,7 @@ namespace memory {
             new_vmm->flags = flags;
             new_vmm->phys = base;
             new_vmm->src_len = length;
+            new_vmm->is_mapped = 1;
             paging::maprangeid(proc->original_cr3,base,new_vmm->base,length,flags,proc->id);
             return (void*)new_vmm->base;
         }
@@ -133,9 +134,10 @@ namespace memory {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             vmm_obj_t* new_vmm = v_find(current,base,length);
             new_vmm->flags = flags;
-            new_vmm->phys = base;
+            new_vmm->phys = phys;
             new_vmm->src_len = length;
             new_vmm->base = base;
+            new_vmm->is_mapped = 0;
             new_vmm->len = ALIGNUP(length,4096);
             return (void*)new_vmm->base;
         }
@@ -192,7 +194,7 @@ namespace memory {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             if(proc->ctx.cr3 && proc->original_cr3) { /* We should free all paging memory */
                 memory::pmm::_physical::fullfree(proc->id);
-                //memory::pmm::_physical::free(proc->original_cr3);
+                memory::pmm::_physical::free(proc->original_cr3);
             }
             proc->ctx.cr3 = memory::pmm::_physical::alloc(4096);
             proc->original_cr3 = proc->ctx.cr3;
@@ -264,13 +266,14 @@ namespace memory {
             vmm_obj_t* new_vmm = v_alloc(current,len);
             new_vmm->flags = flags;
             new_vmm->src_len = len;
+            new_vmm->is_mapped = 0;
             std::uint64_t phys;
             if(len < 4096)
                 phys = memory::pmm::_physical::alloc(4096);
             else if(len > 4096)
                 phys = memory::pmm::_physical::alloc(len);
             new_vmm->phys = phys;
-            paging::maprangeid(proc->original_cr3,new_vmm->base,new_vmm->base,len,flags,proc->id);
+            paging::maprangeid(proc->original_cr3,new_vmm->phys,new_vmm->base,new_vmm->len,flags,proc->id);
             return (void*)new_vmm->base;
         }
 
@@ -282,7 +285,7 @@ namespace memory {
             else if(len > 4096)
                 phys = memory::pmm::_physical::alloc(len);
             void* new_virt = mark(proc,virt,phys,len,flags);
-            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,len,flags,proc->id);
+            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,ALIGNUP(len,4096),flags,proc->id);
             return (void*)virt;
         } 
 

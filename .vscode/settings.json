@@ -118,6 +118,7 @@
         "variant": "cpp",
         "*.def": "cpp",
         "*.inc": "cpp",
-        "*.rh": "cpp"
+        "*.rh": "cpp",
+        "Wmemset-transposed-args-1.C": "cpp"
     }
 }

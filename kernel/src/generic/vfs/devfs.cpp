@@ -50,8 +50,9 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
     if(node->open_flags.is_pipe) {
         if(dev_num >= 32)
             return EFAULT;
-        fd->pipe = (vfs::pipe*)node->pipes[dev_num];
+        fd->pipe = (vfs::pipe*)(node->pipes[dev_num] | ((uint64_t)node->pipes[dev_num] & (1 << 62)));
         fd->state = USERSPACE_FD_STATE_PIPE;
+        fd->pipe_side = (node->pipes[dev_num] & (1 << 63)) == 1 ? PIPE_SIDE_WRITE : PIPE_SIDE_READ;
     }
     return 0;    
 }
@@ -111,14 +112,14 @@ std::int32_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
         }
 
         case DEVFS_PACKET_READ_READRING: 
-            return node->readring->receive((Lists::ring_obj_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+            return node->readring->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
 
         case DEVFS_PACKET_WRITE_READRING: 
             node->readring->send(dev_num,packet->value);
             return 0;
 
         case DEVFS_PACKET_READ_WRITERING:
-            return node->writering->receive((Lists::ring_obj_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+            return node->writering->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
 
         case DEVFS_PACKET_WRITE_WRITERING:
             node->writering->send(dev_num,packet->value);

@@ -171,8 +171,8 @@ void memory::buddy::free(std::uint64_t phys) {
         return;
     blud->is_free = 1;
     blud->id = 0;
-    if(blud->parent_id)
-        merge(blud->parent_id);
+    // if(blud->parent_id)
+    //     merge(blud->parent_id);
 }
 
 std::int64_t memory::buddy::alloc(std::size_t size) {

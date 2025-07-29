@@ -45,13 +45,13 @@ void memory::paging::mapid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t vi
 }
 
 void memory::paging::maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags) {
-    for(std::uint64_t i = 0; i < len; i += 4096) {
+    for(std::uint64_t i = 0; i <= len; i += 4096) {
         map(cr3,phys + i,virt + i,flags);
     }
 }
 
 void memory::paging::maprangeid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags, std::uint32_t id) {
-    for(std::uint64_t i = 0; i < len; i += 4096) {
+    for(std::uint64_t i = 0; i <= len; i += 4096) {
         mapid(cr3,phys + i,virt + i,flags,id);
     }
 }
