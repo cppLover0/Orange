@@ -252,15 +252,24 @@ void arch::x86_64::scheduling::wakeup(process_t* proc) {
     proc->lock.unlock(); /* Just clear */
 }
 
-arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc) {
+arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_frame_t* ctx) {
     process_t* nproc = create();
     memory::vmm::clone(nproc,proc);
     memory::vmm::reload(nproc);
-    memcpy(&nproc->ctx,&proc->ctx,sizeof(int_frame_t));
+
     nproc->parent_id = proc->id;
+    nproc->fs_base = proc->fs_base;
+
+    memset(nproc->cwd,0,4096);
+    memset(nproc->name,0,4096);
+    memcpy(nproc->cwd,proc->cwd,strlen(proc->cwd));
+    memcpy(nproc->name,proc->name,strlen(proc->name));
+
+    memcpy(nproc->sse_ctx,proc->sse_ctx,arch::x86_64::cpu::sse::size());
+
+    nproc->fd_ptr = proc->fd_ptr;
+
     userspace_fd_t* fd = proc->fd;
-    memcpy(nproc->fd,proc->fd,sizeof(userspace_fd_t));
-    nproc->fd = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
     while(fd) {
         userspace_fd_t* newfd = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
         memcpy(newfd,fd,sizeof(userspace_fd_t));
@@ -273,6 +282,10 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc) {
         nproc->fd = newfd;
         fd = fd->next;
     }
+
+    memcpy(&nproc->ctx,ctx,sizeof(int_frame_t));
+    nproc->ctx.cr3 = nproc->original_cr3;
+
     return nproc;
 }
 
@@ -358,9 +371,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
             arch::x86_64::cpu::data()->kernel_stack = 0;
             arch::x86_64::cpu::data()->temp.proc = 0;
             current->lock.unlock();
-            process_lock->lock();
-            current = current->next; /* DANGER !!! */
-            process_lock->unlock();
+            current = current->next; 
         }
     }
 

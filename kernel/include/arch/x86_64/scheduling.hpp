@@ -154,7 +154,7 @@ namespace arch {
         public:
             static void init();
             static process_t* create();
-            static process_t* fork(process_t* proc);
+            static process_t* fork(process_t* proc,int_frame_t* ctx);
             static void kill(process_t* proc);
             static void wakeup(process_t* proc);
             static void futexwake(process_t* proc, int* lock);

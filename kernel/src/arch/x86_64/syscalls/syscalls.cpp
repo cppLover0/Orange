@@ -22,7 +22,9 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {10,(void*)sys_exit},
     {11,(void*)sys_mmap},
     {12,(void*)sys_free},
-    {13,(void*)sys_stat}
+    {13,(void*)sys_stat},
+    {14,(void*)sys_pipe},
+    {15,(void*)sys_fork}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -35,6 +37,8 @@ arch::x86_64::syscall_item_t* __syscall_find(int rax) {
 extern "C" void syscall_handler_c(int_frame_t* ctx) {
     memory::paging::enablekernel();
 
+    //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys %d\n",ctx->rax);
+
     arch::x86_64::syscall_item_t* item = __syscall_find(ctx->rax);
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
     syscall_ret_t ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
@@ -42,6 +46,8 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
         ctx->rdx = ret.ret_val;
     }
    
+    //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"ret %d\n",ret.ret);
+
     ctx->rax = ret.ret;
     return;
 } 
@@ -49,6 +55,6 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
 void arch::x86_64::syscall::init() {
     __wrmsr(STAR_MSR,(0x08ull << 32) | (0x10ull << 48));
     __wrmsr(LSTAR,(uint64_t)syscall_handler);
-    __wrmsr(STAR_MASK,(1 << 9)); // syscalls will support interrupts
+    __wrmsr(STAR_MASK,0); // syscalls will support interrupts
     __wrmsr(EFER,__rdmsr(EFER) | 1);
 }

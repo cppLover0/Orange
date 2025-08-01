@@ -1,20 +1,33 @@
+
 echo "Building orange's packages"
 
 max_depth=0
-for dir in $(find . -type d | sed 's|^\./||' | grep -v '^$'); do
-    depth=$(echo "$dir" | awk -F'/' '{print NF}')
-    if (( depth > max_depth )); then
-        max_depth=$depth
+while IFS= read -r -d '' dir; do
+    dir="${dir#./}"
+    if [[ -z "$dir" ]]; then
+        depth=0
+    else
+        depth=$(( $(grep -o "/" <<< "$dir" | wc -l) + 1 ))
     fi
-done
+    (( depth > max_depth )) && max_depth=$depth
+done < <(find . -type d -print0)
 
-for ((level=1; level<=max_depth; level++)); do
-    for dir in $(find . -mindepth $level -maxdepth $level -type d | sed 's|^\./||'); do
-        cd "$dir" || continue
-        if [ -f "pkg.sh" ]; then
-            echo Building $(cat info.txt)
-            bash pkg.sh $1
+if [[ $max_depth -lt 0 ]]; then
+    max_depth=0
+fi
+
+for (( level=0; level<=max_depth; level++ )); do
+    mapfile -d '' dirs < <(find . -mindepth $level -maxdepth $level -type d -print0 | sort -z)
+    for dir in "${dirs[@]}"; do
+        display_dir="${dir#./}"
+        if [[ -f "$dir/pkg.sh" ]]; then
+            if [[ -f "$dir/info.txt" ]]; then
+                info=$(<"$dir/info.txt")
+            else
+                info="(no info.txt)"
+            fi
+            echo "Building $info in directory: $display_dir"
+            (cd "$dir" && bash pkg.sh "$1")
         fi
-        cd - > /dev/null
     done
 done

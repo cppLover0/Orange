@@ -33,6 +33,7 @@ syscall_ret_t sys_exit(int status) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     proc->exit_code = status;
     arch::x86_64::scheduling::kill(proc);
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"Process %d exited with code %d\n",proc->id,proc->exit_code);
     schedulingSchedule(0);
     __builtin_unreachable();
 }
@@ -70,4 +71,17 @@ syscall_ret_t sys_free(void *pointer, size_t size) {
         memory::pmm::_physical::free(phys);
     memory::vmm::get(proc,(std::uint64_t)pointer)->phys = 0;
     return {0,0,0};
+}
+
+syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
+    __cli();
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::fork(proc,ctx);
+    new_proc->ctx.rsp = arch::x86_64::cpu::data()->user_stack;
+    new_proc->ctx.rax = 0;
+    new_proc->ctx.rdx = 0;
+    arch::x86_64::scheduling::wakeup(new_proc);
+    
+    __sti();
+    return {1,0,new_proc->id};
 }

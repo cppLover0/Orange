@@ -174,11 +174,12 @@ namespace memory {
                         else if(src_current->is_mapped)
                             phys = src_current->phys;
 
-                        if(src_current->phys && !src_current->is_mapped)
+                        if(!src_current->is_mapped)
                             memcpy((void*)Other::toVirt(phys),(void*)Other::toVirt(src_current->phys),src_current->len);
 
-                        mark(dest_proc,src_current->base,phys,src_current->len,src_current->flags);
+                        mark(dest_proc,src_current->base,phys,src_current->src_len,src_current->flags);
                         get(dest_proc,src_current->base)->is_mapped = src_current->is_mapped;
+
                     }
 
                     if(src_current->base == (std::uint64_t)Other::toVirt(0) - 4096)

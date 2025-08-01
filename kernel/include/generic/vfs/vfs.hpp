@@ -134,87 +134,72 @@ namespace vfs {
             this->lock.unlock();
         }
 
-        std::uint64_t force_write(char* buffer,std::uint64_t count) {
-            char* temp_buffer = this->buffer;
-            temp_buffer += size;
-            memcpy(temp_buffer,buffer,count);
+        std::uint64_t force_write(const char* src_buffer, std::uint64_t count) {
+            memcpy(this->buffer + this->size, src_buffer, count);
             this->size += count;
             return count;
         }
 
-        std::uint64_t write(char* buffer,std::uint64_t count) {
-            this->lock.lock();
-            if(count >= (total_size - size)) {
-                // wait until pipe can be free
-                std::int64_t temp_size = count;
-                while(temp_size > 0) {
-                    std::uint64_t block_size = temp_size > total_size ? total_size : temp_size;
+        std::uint64_t write(const char* src_buffer, std::uint64_t count) {
+            std::uint64_t written = 0;
+            while (written < count) {
+                this->lock.lock();
+
+                std::uint64_t space_left = total_size - size;
+                if (space_left == 0) {
                     this->lock.unlock();
                     asm volatile("pause");
-                    this->lock.lock();
-                    if(this->is_received.test()) {
-                        char* poop = buffer;
-                        poop += (temp_size - count);
-                        force_write(poop,block_size);
-                        this->is_received.clear();
-                    }
-                    temp_size -= block_size;
+                    continue;
                 }
-                return count;
+
+                std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
+                force_write(src_buffer + written, to_write);
+                written += to_write;
+
+                this->is_received.clear();
+
+                this->lock.unlock();
             }
-            force_write(this->buffer + this->size,count);
-            return count;
-            this->lock.unlock();
+            return written;
         }
 
-        std::uint64_t read(char* buffer,std::uint64_t count) {
-            if(this->is_closed.test()) {
-                this->lock.unlock();
-                return 0;
-            }
+        std::uint64_t read(char* dest_buffer, std::uint64_t count) {
+            std::uint64_t read_bytes = 0;
 
-            if(flags & O_NONBLOCK) {
-                if(this->is_received.test()) {
-                    this->lock.unlock();
-                    return 0;
-                }
-            } else {
-                while(this->is_received.test()) {
+            while (true) {
+                this->lock.lock();
+
+                if (this->size == 0) {
+                    if (this->is_closed.test()) {
+                        this->lock.unlock();
+                        return 0;
+                    }
+
+                    if (flags & O_NONBLOCK) {
+                        this->lock.unlock();
+                        return 0;
+                    }
+
                     this->lock.unlock();
                     asm volatile("pause");
-                    this->lock.lock();
+                    continue;
                 }
-            }
 
-            if(this->size == 0) {
-                this->is_received.test_and_set();
-                this->lock.unlock();
-                return 0;
-            }
+                read_bytes = (count < this->size) ? count : this->size;
+                memcpy(dest_buffer, this->buffer, read_bytes);
 
-            if(count >= this->size) {
-                memcpy(buffer, this->buffer, this->size);
-                std::uint64_t temp_size = this->size;
-                this->size = 0;
-                if(this->is_n_closed.test()) {
-                    this->is_closed.test_and_set();
+                if (read_bytes < this->size) {
+                    memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
                 }
+                this->size -= read_bytes;
+
                 this->is_received.test_and_set();
+
                 this->lock.unlock();
-                return temp_size;
+                break;
             }
 
-            if(count < this->size) {
-                std::uint64_t block_size = count;
-                memcpy(buffer, this->buffer, block_size);
-                memcpy(this->buffer, this->buffer + block_size, this->size - block_size);
-                this->size -= block_size;
-                this->lock.unlock();
-                return block_size;
-            }
-
-            this->lock.unlock();
-            return 0;
+            return read_bytes;
         }
 
         ~pipe() {
@@ -224,6 +209,9 @@ namespace vfs {
     };
 
 };
+
+#define USERSPACE_FD_OTHERSTATE_MASTER 1
+#define USERSPACE_FD_OTHERSTATE_SLAVE  2
 
 /* It should be restored in dup2 syscall when oldfd is 0 */
 typedef struct {
@@ -239,13 +227,15 @@ typedef struct userspace_fd {
     std::uint8_t state;
     std::uint8_t pipe_side;
 
+    std::uint8_t other_state;
+
     std::uint32_t queue;
     std::uint8_t cycle;
 
     vfs::pipe* pipe;
     char path[2048];
 
-    userspace_old_fd_t old_state;
+    struct userspace_fd* old_state;
     struct userspace_fd* next; /* Should be changed in fork() */
 
 } userspace_fd_t;

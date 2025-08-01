@@ -14,6 +14,7 @@
 vfs::devfs_node_t* __devfs_head;
 
 int dev_num = 0;
+int is_slave = 0;
 
 bool isdigit(char ch) {
     return ch >= '0' && ch <= '9';
@@ -36,7 +37,11 @@ vfs::devfs_node_t* devfs_find_dev(const char* loc) {
     temp[i + 1] = '\0'; 
 
     while (dev) {
-        if (!strcmp(temp, dev->path)) {
+        if (!strcmp(temp, dev->slavepath) && dev_num == dev->dev_num) {
+            is_slave = 1;
+            return dev;
+        } else if(!strcmp(temp,dev->masterpath) && dev_num == dev->dev_num) {
+            is_slave = 0;
             return dev;
         }
         dev = dev->next;
@@ -48,18 +53,17 @@ vfs::devfs_node_t* devfs_find_dev(const char* loc) {
 std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
     vfs::devfs_node_t* node = devfs_find_dev(path);
     if(node->open_flags.is_pipe) {
-        if(dev_num >= 32)
-            return EFAULT;
-        fd->pipe = (vfs::pipe*)(node->pipes[dev_num] | ((uint64_t)node->pipes[dev_num] & (1 << 62)));
+        fd->pipe = (vfs::pipe*)(node->pipe0 | (((uint64_t)node->pipe0 & (1 << 62)) << 63));
         fd->state = USERSPACE_FD_STATE_PIPE;
-        fd->pipe_side = (node->pipes[dev_num] & (1 << 63)) == 1 ? PIPE_SIDE_WRITE : PIPE_SIDE_READ;
-    }
+        fd->pipe_side = (node->pipe0 & (1 << 63)) == 1 ? PIPE_SIDE_WRITE : PIPE_SIDE_READ;
+    } 
+    fd->other_state = USERSPACE_FD_OTHERSTATE_SLAVE; 
     return 0;    
 }
 
 std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t size) {
     vfs::devfs_packet_t packet;
-    packet.request = DEVFS_PACKET_WRITE_WRITERING;
+    packet.request = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? DEVFS_PACKET_WRITE_READRING : DEVFS_PACKET_WRITE_WRITERING;
     packet.cycle = &fd->cycle;
     packet.queue = &fd->queue;
     packet.size = size;
@@ -69,7 +73,7 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
 
 std::int64_t __devfs__read(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t count) {
     vfs::devfs_packet_t packet;
-    packet.request = DEVFS_PACKET_READ_READRING;
+    packet.request = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? DEVFS_PACKET_READ_WRITERING : DEVFS_PACKET_READ_READRING;
     packet.cycle = &fd->cycle;
     packet.queue = &fd->queue;
     packet.size = count;
@@ -98,32 +102,75 @@ std::int32_t __devfs__mmap(userspace_fd_t* fd, char* path, std::uint64_t* outp, 
     return 0;
 }
 
-std::int32_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
+extern locks::spinlock* vfs_lock;
+
+std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
     devfs_node_t* node = devfs_find_dev(path);
-    if(dev_num >= 32)
-        return -EFAULT;
     switch(packet->request) {
         case DEVFS_PACKET_CREATE_DEV: {
             devfs_node_t* new_node = (devfs_node_t*)memory::pmm::_virtual::alloc(4096);
-            memcpy(new_node->path,path,strlen(path));
+            memcpy(new_node->slavepath,path,strlen(path)); 
+            memcpy(new_node->masterpath,(char*)packet->value,strlen((const char*)packet->value)); /* Actually path is slavepath and pcket.value is masterpath when driver creates new device */
             new_node->readring = new Lists::Ring(128);
             new_node->writering = new Lists::Ring(128);
+            new_node->dev_num = packet->size;
+            new_node->next = __devfs_head;
+            __devfs_head = new_node;
             return 0;
         }
 
-        case DEVFS_PACKET_READ_READRING: 
-            return node->readring->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+        case DEVFS_PACKET_CREATE_PIPE_DEV: {
+            devfs_node_t* new_node = (devfs_node_t*)memory::pmm::_virtual::alloc(4096);
+            memcpy(new_node->slavepath,path,strlen(path)); 
+            memcpy(new_node->masterpath,(char*)packet->value,strlen((const char*)packet->value));
+            new_node->readpipe = new pipe(0);
+            new_node->writepipe = new pipe(0);
+            new_node->readpipe->create(PIPE_SIDE_READ);
+            new_node->readpipe->create(PIPE_SIDE_WRITE);
+            new_node->writepipe->create(PIPE_SIDE_READ);
+            new_node->writepipe->create(PIPE_SIDE_WRITE);
+            new_node->dev_num = packet->size;
+            new_node->open_flags.is_pipe_rw = 1;
+            new_node->next = __devfs_head;
+            __devfs_head = new_node;
+            return 0;
+        }
+
+        case DEVFS_PACKET_READ_READRING: {
+            if(!node->open_flags.is_pipe_rw) {
+                std::int32_t count = node->readring->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+                return count;
+            } else {
+                vfs_lock->unlock();
+                std::int32_t count = node->readpipe->read((char*)packet->value,packet->size);
+                return count | (1 << 63);
+            }
+        }
 
         case DEVFS_PACKET_WRITE_READRING: 
-            node->readring->send(dev_num,packet->value);
-            return 0;
+            if(!node->open_flags.is_pipe_rw)
+                node->readring->send(dev_num,packet->value);
+            else 
+                return node->readpipe->write((char*)packet->value,packet->size);
+            return 8;
 
-        case DEVFS_PACKET_READ_WRITERING:
-            return node->writering->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+        case DEVFS_PACKET_READ_WRITERING: {
+            if(!node->open_flags.is_pipe_rw) {
+                std::int32_t count = node->writering->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+                return count;
+            } else {
+                vfs_lock->unlock();
+                std::int32_t count = node->writepipe->read((char*)packet->value,packet->size);
+                return count | (1 << 63);
+            }
+        }
 
         case DEVFS_PACKET_WRITE_WRITERING:
-            node->writering->send(dev_num,packet->value);
-            return 0;
+            if(!node->open_flags.is_pipe_rw)
+                node->writering->send(dev_num,packet->value);
+            else 
+                return node->writepipe->write((char*)packet->value,packet->size);
+            return 8;
 
         case DEVFS_PACKET_IOCTL: {
             for(int i = 0;i < 128;i++) {
@@ -160,7 +207,7 @@ std::int32_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
             }
         }
         case DEVFS_ENABLE_PIPE: {
-            node->pipes[packet->enable_pipe.pipe_target] = packet->enable_pipe.pipe_pointer;
+            node->pipe0 = packet->enable_pipe.pipe_pointer;
             node->open_flags.is_pipe = 1;
             return 0;
         }
@@ -185,4 +232,5 @@ void vfs::devfs::mount(vfs_node_t* node) {
     node->write = __devfs__write;
     node->ioctl = __devfs__ioctl;
     node->mmap = __devfs__mmap;
+
 }

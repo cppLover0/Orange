@@ -69,10 +69,7 @@ std::int32_t vfs::vfs::create(char* path, std::uint8_t type) {
         return ENOSYS;
 
     std::int32_t status = node->create(path,type);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 }
 
@@ -87,10 +84,7 @@ std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64
         return ENOSYS;
 
     std::int32_t status = node->mmap(fd,fs_love_name,outp,outsz);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 }
 
@@ -105,10 +99,7 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
         return ENOSYS;
 
     std::int32_t status = node->open(fd,fs_love_name);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 }
 
@@ -123,10 +114,7 @@ std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
         return ENOSYS;
 
     std::int32_t status = node->remove(fd,fs_love_name);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 }
 
@@ -141,10 +129,7 @@ std::int32_t vfs::vfs::ls(userspace_fd_t* fd, dirent_t* out) {
         return ENOSYS;
 
     std::int32_t status = node->ls(fd,fs_love_name,out);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 } 
 
@@ -159,10 +144,7 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
         return ENOSYS;
 
     std::int32_t status = node->var(fd,fs_love_name,value,request);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 }
 
@@ -177,10 +159,7 @@ std::int32_t vfs::vfs::touch(char* path) {
         return ENOSYS;
 
     std::int32_t status = node->touch(fs_love_name);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 }
 
@@ -195,10 +174,7 @@ std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
         return ENOSYS;
 
     std::int32_t status = node->stat(fd,fs_love_name,out);
-    if(!(status & (1 << 31)))
-        vfs_lock->unlock();
-    else if(status & (1 << 31))
-        status &= ~(1 << 31);
+    vfs_lock->unlock();
     return status;
 } 
 
@@ -206,6 +182,7 @@ void vfs::vfs::init() {
     memset(vfs_nodes,0,sizeof(vfs_nodes));
 
     vfs_lock = new locks::spinlock;
+    vfs_lock->unlock();
     
     tmpfs::mount(&vfs_nodes[0]);
     memcpy(vfs_nodes[0].path,"/",1);

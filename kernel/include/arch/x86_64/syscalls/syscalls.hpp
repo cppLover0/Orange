@@ -53,11 +53,11 @@ public:
 
 #define SYSCALL_IS_SAFEA(x,sz) \
     if(!syscall_safe::is_safe(x,sz)) \
-        asm volatile("nop");
+        return {0,EFAULT,0};
 
 #define SYSCALL_IS_SAFEB(x,sz) \
     if(!syscall_safe::is_safe(x,sz)) \
-        asm volatile("nop");
+        return {0,EFAULT,0};
 
 #define CURRENT_PROC arch::x86_64::cpu::data()->temp.proc
 #define FIND_FD(x) vfs::fdmanager::search(proc,x)
@@ -89,6 +89,7 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count);
 syscall_ret_t sys_read(int fd, void *buf, size_t count);
 syscall_ret_t sys_seek(int fd, long offset, int whence);
 syscall_ret_t sys_stat(int fd, void* out);
+syscall_ret_t sys_pipe(int flags);
 syscall_ret_t sys_close(int fd);
 
 /* Process */
@@ -97,6 +98,8 @@ syscall_ret_t sys_free(void *pointer, size_t size);
 syscall_ret_t sys_libc_log(const char* msg);
 syscall_ret_t sys_tcb_set(std::uint64_t fs);
 syscall_ret_t sys_exit(int status);
+
+syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx);
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);

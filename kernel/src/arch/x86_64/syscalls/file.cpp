@@ -37,6 +37,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
     vfs::resolve_path(kpath,first_path,result,1,0);
     
     int new_fd = vfs::fdmanager::create(proc);
+
     userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
     memcpy(new_fd_s->path,result,strlen(result));
 
@@ -60,9 +61,9 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     std::int64_t bytes_read;
     if(fd_s->state == USERSPACE_FD_STATE_FILE) 
         bytes_read = vfs::vfs::read(fd_s,temp_buffer,count);
-    else if(fd_s->state == USERSPACE_FD_STATE_PIPE && fd_s->pipe)
+    else if(fd_s->state == USERSPACE_FD_STATE_PIPE && fd_s->pipe) {
         bytes_read = fd_s->pipe->read(temp_buffer,count);
-    else
+    } else
         return {1,EBADF,0};
 
     copy_in_userspace(proc,buf,temp_buffer,bytes_read);
@@ -85,9 +86,9 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
         bytes_written = vfs::vfs::write(fd_s,temp_buffer,count);
-    else if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+    else if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
         bytes_written = fd_s->pipe->write(temp_buffer,count);
-    else
+    } else
         return {1,EBADF,0};
 
     memory::pmm::_virtual::free(temp_buffer);
@@ -163,4 +164,25 @@ syscall_ret_t sys_stat(int fd, void* out) {
         return {0,ENOENT,0};
     }
     return {0,0,0};
+}
+
+syscall_ret_t sys_pipe(int flags) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    int read_fd = vfs::fdmanager::create(proc);
+    int write_fd = vfs::fdmanager::create(proc);
+    userspace_fd_t* fd1 = vfs::fdmanager::search(proc,read_fd);
+    userspace_fd_t* fd2 = vfs::fdmanager::search(proc,write_fd);
+
+    vfs::pipe* new_pipe = new vfs::pipe(flags);
+    fd1->pipe_side = PIPE_SIDE_READ;
+    fd2->pipe_side = PIPE_SIDE_WRITE;
+
+    fd1->pipe = new_pipe;
+    fd2->pipe = new_pipe;
+
+    fd1->state = USERSPACE_FD_STATE_PIPE;
+    fd2->state = USERSPACE_FD_STATE_PIPE;
+
+    return {1,read_fd,write_fd};
+
 }

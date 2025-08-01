@@ -15,12 +15,13 @@
 #define DEVFS_PACKET_IOCTL 8
 #define DEVFS_ENABLE_PIPE 9
 #define DEVFS_SETUP_MMAP 10
-#define DEVFS_NONBLOCK_PIPE_OFFSET_IN_IOCTL 11
+#define DEVFS_PACKET_CREATE_PIPE_DEV 11
 
 namespace vfs {
 
     typedef struct {
         std::uint64_t is_pipe : 1;
+        std::uint64_t is_pipe_rw : 1;
     } __attribute__((packed)) devfs_pipe_p_t;
 
     typedef struct {
@@ -66,14 +67,24 @@ namespace vfs {
 
     typedef struct devfs_node {
         devfs_pipe_p_t open_flags;
-        Lists::Ring* readring;
-        Lists::Ring* writering;
+        union {
+            struct {
+                Lists::Ring* readring;
+                Lists::Ring* writering;
+            };
+            struct {
+                pipe* readpipe;
+                pipe* writepipe;
+            };
+        };
         devfs_ioctl_packet_t ioctls[32];
-        std::uint64_t pipes[32];
+        std::uint64_t pipe0;
         std::uint64_t mmap_base;
         std::uint64_t mmap_size;
+        std::int32_t dev_num;
         struct devfs_node* next;
-        char path[512];
+        char masterpath[256];
+        char slavepath[256];
     } devfs_node_t;
 
     static_assert(sizeof(devfs_node_t) < 4096,"devfs_node_t is higher than fucking page size");
@@ -81,6 +92,6 @@ namespace vfs {
     class devfs {
     public:
         static void mount(vfs_node_t* node);
-        static std::int32_t send_packet(char* path,devfs_packet_t* packet);
+        static std::int64_t send_packet(char* path,devfs_packet_t* packet);
     };
 };

@@ -92,13 +92,17 @@ extern "C" void main() {
     char* argv[] = {0};
     char* envp[] = {"TERM=linux",0};
 
+    extern std::atomic<int> how_much_cpus;
+
     arch::x86_64::process_t* init = arch::x86_64::scheduling::create();
     arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp);
     arch::x86_64::scheduling::wakeup(init);
 
-    arch::x86_64::process_t* init2 = arch::x86_64::scheduling::create();
-    arch::x86_64::scheduling::loadelf(init2,"/usr/bin/init",argv,envp);
-    arch::x86_64::scheduling::wakeup(init2);
+    for(int i = 0;i < how_much_cpus; i++) {
+        arch::x86_64::process_t* nop = arch::x86_64::scheduling::create();
+        arch::x86_64::scheduling::loadelf(nop,"/usr/bin/nop",argv,envp);
+        arch::x86_64::scheduling::wakeup(nop);
+    }
 
     Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
 

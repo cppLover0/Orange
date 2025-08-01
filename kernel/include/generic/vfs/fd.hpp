@@ -23,6 +23,7 @@ namespace vfs {
                 zeromem(current);
                 current->next = proc->fd;
                 proc->fd = current;
+                current->index = proc->fd_ptr++;
             }
 
             current->state = USERSPACE_FD_STATE_FILE;

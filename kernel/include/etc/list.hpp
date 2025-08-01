@@ -171,7 +171,7 @@ namespace Lists {
                     *cycle = !(*cycle);
                 }
             }
-            return len;
+            return len * 8;
         }
 
         Ring(std::size_t size_elements) {
