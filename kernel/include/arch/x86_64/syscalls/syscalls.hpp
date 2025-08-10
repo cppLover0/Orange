@@ -84,13 +84,25 @@ typedef struct {
 extern "C" void syscall_handler();
 
 /* File,Pipes and etc. */
+syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg);
 syscall_ret_t sys_openat(int dirfd, const char* path, int flags);
 syscall_ret_t sys_write(int fd, const void *buf, size_t count);
 syscall_ret_t sys_read(int fd, void *buf, size_t count);
 syscall_ret_t sys_seek(int fd, long offset, int whence);
+syscall_ret_t sys_dup2(int fd, int flags, int newfd);
 syscall_ret_t sys_stat(int fd, void* out);
+syscall_ret_t sys_dup(int fd, int flags);
 syscall_ret_t sys_pipe(int flags);
 syscall_ret_t sys_close(int fd);
+
+syscall_ret_t sys_create_dev(std::uint64_t requestandnum, char* slave_path, char* master_path);
+syscall_ret_t sys_create_ioctl(char* path, std::uint64_t write_and_read_req, std::uint32_t size);
+syscall_ret_t sys_setupmmap(char* path, std::uint64_t addr, std::uint64_t size, int_frame_t* ctx);
+
+syscall_ret_t sys_setup_tty(char* path);
+syscall_ret_t sys_isatty(int fd);
+
+syscall_ret_t sys_ptsname(int fd, void* out, int max_size);
 
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
@@ -99,7 +111,11 @@ syscall_ret_t sys_libc_log(const char* msg);
 syscall_ret_t sys_tcb_set(std::uint64_t fs);
 syscall_ret_t sys_exit(int status);
 
+syscall_ret_t sys_iopl(int a, int b ,int c , int_frame_t* ctx);
+
 syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx);
+
+syscall_ret_t sys_access_framebuffer(void* out);
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);

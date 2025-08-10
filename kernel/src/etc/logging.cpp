@@ -99,3 +99,20 @@ void Log::Display(int level,char* msg,...) {
     log_lock.unlock();
     va_end(val);
 }
+
+void Log::Raw(char* msg,...) {
+    va_list val;
+    va_start(val, msg);
+    char buffer[4096];
+    memset(buffer,0,4096);
+    log_lock.lock();
+    int len = __snprintf(buffer,4096,msg,val);
+    LogObject.Write(buffer,len);
+
+    drivers::serial serial(DEFAULT_SERIAL_PORT);
+
+    serial.write((uint8_t*)buffer,len);
+
+    log_lock.unlock();
+    va_end(val);
+}

@@ -24,7 +24,18 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {12,(void*)sys_free},
     {13,(void*)sys_stat},
     {14,(void*)sys_pipe},
-    {15,(void*)sys_fork}
+    {15,(void*)sys_fork},
+    {16,(void*)sys_dup},
+    {17,(void*)sys_dup2},
+    {18,(void*)sys_create_dev},
+    {19,(void*)sys_iopl},
+    {20,(void*)sys_ioctl},
+    {21,(void*)sys_create_ioctl},
+    {22,(void*)sys_setup_tty},
+    {23,(void*)sys_isatty},
+    {24,(void*)sys_setupmmap},
+    {25,(void*)sys_access_framebuffer},
+    {26,(void*)sys_ptsname}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -37,16 +48,19 @@ arch::x86_64::syscall_item_t* __syscall_find(int rax) {
 extern "C" void syscall_handler_c(int_frame_t* ctx) {
     memory::paging::enablekernel();
 
-    //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys %d\n",ctx->rax);
-
     arch::x86_64::syscall_item_t* item = __syscall_find(ctx->rax);
+
+    if(!item) {
+        return;
+    } else if(!item->syscall_func) {
+        return;
+    }
+
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
     syscall_ret_t ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
     if(ret.is_rdx_ret) {
         ctx->rdx = ret.ret_val;
     }
-   
-    //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"ret %d\n",ret.ret);
 
     ctx->rax = ret.ret;
     return;

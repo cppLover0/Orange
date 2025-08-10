@@ -94,7 +94,7 @@ void memory::paging::enablepaging(std::uint64_t cr3) {
 }
 
 void __map_range_id(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags,std::uint32_t id) {
-    for(std::uint64_t i = 0; i <= len; i += 4096) {
+    for(std::uint64_t i = 0; i < len; i += 4096) {
         memory::paging::map(cr3,phys + i,virt + i,flags);
     }
 }

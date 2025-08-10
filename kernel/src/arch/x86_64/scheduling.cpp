@@ -27,6 +27,7 @@ arch::x86_64::process_t* head_proc;
 std::uint32_t id_ptr = 0;
 
 locks::spinlock* process_lock;
+locks::spinlock* process_in_use_lock;
 
 #define PUT_STACK(dest,value) *--dest = value;
 #define PUT_STACK_STRING(dest,string) memcpy(dest,string,strlen(string)); 
@@ -299,7 +300,6 @@ void arch::x86_64::scheduling::kill(process_t* proc) {
 }
 
 arch::x86_64::process_t* arch::x86_64::scheduling::create() {
-    process_lock->lock();
     process_t* proc = (process_t*)memory::pmm::_virtual::alloc(4096);
 
     proc->cwd = (char*)memory::pmm::_virtual::alloc(4096);
@@ -328,7 +328,6 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     memory::vmm::initproc(proc);
     memory::vmm::reload(proc);
 
-    process_lock->unlock();
     return proc;
 }
 

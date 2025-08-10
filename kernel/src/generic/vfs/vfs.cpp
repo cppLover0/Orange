@@ -14,76 +14,72 @@ vfs::vfs_node_t vfs_nodes[512];
 locks::spinlock* vfs_lock;
 
 vfs::vfs_node_t* find_node(char* path) {
+    std::uint64_t r = 0;
+    vfs::vfs_node_t* match;
     for(int i = 0;i < 512;i++) {
         if(!strncmp(path,vfs_nodes[i].path,strlen(vfs_nodes[i].path))) {
-            return &vfs_nodes[i];
+            if(strlen(vfs_nodes[i].path) > r) {
+                match = &vfs_nodes[i];
+            }
         }
     }
-    return 0;
+    return match;
 }
 
 std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return -ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return -ENOENT; }
 
     char* fs_love_name = &fd->path[0] + strlen(node->path) - 1;
-    if(!node->write)
-        return -ENOSYS;
+    if(!node->write) { vfs::vfs::unlock();
+        return -ENOSYS; }
 
     std::int64_t status = node->write(fd,fs_love_name,buffer,size);
-    if(!(status & (1 << 63)))
-        vfs_lock->unlock();
-    else if(status & (1 << 63))
-        status &= ~(1 << 63);
     return status;
 }
 
 std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t count) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return -ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return -ENOENT; }
 
     char* fs_love_name = fd->path + strlen(node->path) - 1;
     if(!node->read)
         return -ENOSYS;
 
     std::int64_t status = node->read(fd,fs_love_name,buffer,count);
-    if(!(status & (1 << 63)))
-        vfs_lock->unlock();
-    else if(status & (1 << 63))
-        status &= ~(1 << 63);
     return status;
 }
 
 std::int32_t vfs::vfs::create(char* path, std::uint8_t type) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
 
     char* fs_love_name = path + strlen(node->path) - 1;
-    if(!node->create)
-        return ENOSYS;
+    if(!node->create) { vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->create(path,type);
     vfs_lock->unlock();
     return status;
 }
 
-std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz ) {
+std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
 
     char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->mmap)
-        return ENOSYS;
+    if(!node->mmap) { vfs::vfs::unlock();
+        return ENOSYS; }
 
-    std::int32_t status = node->mmap(fd,fs_love_name,outp,outsz);
+    std::int32_t status = node->mmap(fd,fs_love_name,outp,outsz,outflags);
     vfs_lock->unlock();
     return status;
 }
@@ -91,12 +87,12 @@ std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64
 std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
     
     char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->open)
-        return ENOSYS;
+    if(!node->open) { vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->open(fd,fs_love_name);
     vfs_lock->unlock();
@@ -106,8 +102,8 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
 std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
     
     char* fs_love_name = fd->path + strlen(node->path) - 1;
     if(!node->remove)
@@ -121,12 +117,12 @@ std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
 std::int32_t vfs::vfs::ls(userspace_fd_t* fd, dirent_t* out) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
 
     char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->ls)
-        return ENOSYS;
+    if(!node->ls) { vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->ls(fd,fs_love_name,out);
     vfs_lock->unlock();
@@ -136,12 +132,12 @@ std::int32_t vfs::vfs::ls(userspace_fd_t* fd, dirent_t* out) {
 std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t request) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
 
     char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->var)
-        return ENOSYS;
+    if(!node->var) { vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->var(fd,fs_love_name,value,request);
     vfs_lock->unlock();
@@ -151,12 +147,12 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
 std::int32_t vfs::vfs::touch(char* path) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
 
     char* fs_love_name = path + strlen(node->path) - 1;
-    if(!node->touch)
-        return ENOSYS;
+    if(!node->touch) { vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->touch(fs_love_name);
     vfs_lock->unlock();
@@ -166,17 +162,36 @@ std::int32_t vfs::vfs::touch(char* path) {
 std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
-    if(!node)
-        return ENOENT;
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
 
     char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->stat)
-        return ENOSYS;
+    if(!node->stat) { vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->stat(fd,fs_love_name,out);
     vfs_lock->unlock();
     return status;
 } 
+
+std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, int *res) {
+    vfs_lock->lock();
+    vfs_node_t* node = find_node(fd->path);
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
+
+    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    if(!node->ioctl) { vfs::vfs::unlock();
+        return ENOSYS; }
+
+    std::int64_t status = node->ioctl(fd,fs_love_name,req,arg,res);
+    vfs_lock->unlock();
+    return status;
+}
+
+void vfs::vfs::unlock() {
+    vfs_lock->unlock();
+}
 
 void vfs::vfs::init() {
     memset(vfs_nodes,0,sizeof(vfs_nodes));

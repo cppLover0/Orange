@@ -28,6 +28,7 @@ public:
         flanterm_write(ft_ctx0,buffer,len);
     }
 
+    static void Raw(char* msg,...);
     static void Init();
     static void Display(int level,char* msg,...);
     static void SerialDisplay(int level,char* msg,...);

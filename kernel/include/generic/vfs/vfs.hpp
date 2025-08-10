@@ -91,8 +91,9 @@ namespace vfs {
         char* buffer;
         std::uint32_t connected_to_pipe = 0;
         std::uint32_t connected_to_pipe_write = 0;
-        std::uint64_t size = 0;
+        std::int64_t size = 0;
         std::uint64_t total_size = 0;
+        std::uint64_t read_ptr = 0;
         std::uint64_t flags = 0;
         locks::spinlock lock;
         std::atomic_flag is_received = ATOMIC_FLAG_INIT;
@@ -103,6 +104,7 @@ namespace vfs {
         pipe(std::uint64_t flags) {
             this->buffer = (char*)memory::pmm::_virtual::alloc(USERSPACE_PIPE_SIZE);
             this->total_size = USERSPACE_PIPE_SIZE;
+            this->size = 0;
             this->connected_to_pipe = 2; /* Syscall which creates pipe should create 2 fds too */ 
             this->connected_to_pipe_write = 1;
             this->flags = flags;
@@ -116,7 +118,7 @@ namespace vfs {
                 this->connected_to_pipe_write--;
                 if(this->connected_to_pipe_write == 0) {
                     this->is_received.clear();
-                    this->is_n_closed.test_and_set();
+                    this->is_closed.test_and_set();
                 }
             }
 
@@ -152,7 +154,7 @@ namespace vfs {
                     continue;
                 }
 
-                std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
+                std::uint64_t to_write = count > space_left ? space_left : count;
                 force_write(src_buffer + written, to_write);
                 written += to_write;
 
@@ -185,15 +187,16 @@ namespace vfs {
                     continue;
                 }
 
-                read_bytes = (count < this->size) ? count : this->size;
-                memcpy(dest_buffer, this->buffer, read_bytes);
+                read_bytes = count > this->size ? this->size : count;
+                memcpy(dest_buffer, this->buffer + this->read_ptr, read_bytes);
 
-                if (read_bytes < this->size) {
-                    memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
-                }
+                this->read_ptr += read_bytes;
                 this->size -= read_bytes;
 
-                this->is_received.test_and_set();
+                if(this->size <= 0) {
+                    this->read_ptr = 0;
+                    this->is_received.test_and_set();
+                }
 
                 this->lock.unlock();
                 break;
@@ -275,6 +278,7 @@ namespace vfs {
 
 #define TMPFS_VAR_CHMOD 0
 #define TMPFS_VAR_UNLINK 1
+#define DEVFS_VAR_ISATTY 2
 
 namespace vfs {
 
@@ -448,7 +452,7 @@ namespace vfs {
         std::int32_t (*ls)     (userspace_fd_t* fd, char* path, dirent_t* out                             ); 
         std::int32_t (*remove) (userspace_fd_t* fd, char* path                                            );
         std::int32_t (*ioctl)  (userspace_fd_t* fd, char* path, unsigned long req, void *arg, int *res    );
-        std::int32_t (*mmap)   (userspace_fd_t* fd, char* path, std::uint64_t* outp, std::uint64_t* outsz );
+        std::int32_t (*mmap)   (userspace_fd_t* fd, char* path, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags );
         std::int32_t (*create) (char* path, std::uint8_t type                                             );
         std::int32_t (*touch)  (char* path                                                                );
 
@@ -466,10 +470,13 @@ namespace vfs {
         static std::int32_t ls     (userspace_fd_t* fd, dirent_t* out                             ); 
         static std::int32_t remove (userspace_fd_t* fd                                            );
         static std::int64_t ioctl  (userspace_fd_t* fd, unsigned long req, void *arg, int *res    );
-        static std::int32_t mmap   (userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz );
+        static std::int32_t mmap   (userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags);
 
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );
+
+        static void unlock();
+
     };
 
 };

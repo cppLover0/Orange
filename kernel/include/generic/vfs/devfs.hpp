@@ -7,8 +7,8 @@
 
 #define DEVFS_PACKET_CREATE_DEV 1
 #define DEVFS_PACKET_READ_READRING 2
-#define DEVFS_PACKET_WRITE_READRING 3 /* Will be used from some syscall (non posix) */
-#define DEVFS_PACKET_READ_WRITERING 4 /* Will be used from some syscall (non posix) */
+#define DEVFS_PACKET_WRITE_READRING 3 
+#define DEVFS_PACKET_READ_WRITERING 4 
 #define DEVFS_PACKET_WRITE_WRITERING 5
 #define DEVFS_PACKET_CREATE_IOCTL 6 
 #define DEVFS_PACKET_SIZE_IOCTL 7
@@ -16,6 +16,40 @@
 #define DEVFS_ENABLE_PIPE 9
 #define DEVFS_SETUP_MMAP 10
 #define DEVFS_PACKET_CREATE_PIPE_DEV 11
+#define DEVFS_PACKET_ISATTY 12 
+#define DEVFS_PACKET_SETUPTTY 13
+#define DEVFS_GETSLAVE_BY_MASTER 14
+
+struct	winsize {
+ 	unsigned short	 	ws_row;	 
+ 	unsigned short	 	ws_col;	 
+ 	unsigned short	 	ws_xpixel;	
+/* unused */
+ 	unsigned short	 	ws_ypixel;	
+/* unused */
+};
+
+#define TCGETS                   0x5401
+#define TCSETS                   0x5402
+#define TIOCGWINSZ               0x5413
+#define TIOCSWINSZ               0x5414
+
+typedef unsigned char cc_t;
+typedef unsigned int speed_t;
+typedef unsigned int tcflag_t;
+
+#define NCCS     32
+
+typedef struct {
+	tcflag_t c_iflag;
+	tcflag_t c_oflag;
+	tcflag_t c_cflag;
+	tcflag_t c_lflag;
+	cc_t c_line;
+	cc_t c_cc[NCCS];
+	speed_t ibaud;
+	speed_t obaud;
+} __attribute__((packed)) termios_t;
 
 namespace vfs {
 
@@ -54,6 +88,7 @@ namespace vfs {
                 std::uint8_t request;
                 std::uint64_t dma_addr;
                 std::uint64_t size;
+                std::uint64_t flags;
             } setup_mmap;
         };
     } __attribute__((packed)) devfs_packet_t; /* User-Kernel interaction packet */
@@ -81,7 +116,15 @@ namespace vfs {
         std::uint64_t pipe0;
         std::uint64_t mmap_base;
         std::uint64_t mmap_size;
+        std::uint64_t mmap_flags;
         std::int32_t dev_num;
+        std::int8_t is_tty;
+
+        std::int64_t (*read)(userspace_fd_t* fd, void* buffer, std::uint64_t count);
+        std::int64_t (*write)(userspace_fd_t* fd, void* buffer, std::uint64_t size);
+        std::int32_t (*ioctl)(userspace_fd_t* fd, unsigned long req, void *arg, int *res);
+        std::int32_t (*open)(userspace_fd_t* fd, char* path);
+
         struct devfs_node* next;
         char masterpath[256];
         char slavepath[256];

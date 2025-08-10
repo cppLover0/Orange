@@ -9,6 +9,8 @@
 
 #include <generic/vfs/fd.hpp>
 
+#include <generic/vfs/devfs.hpp>
+
 #include <etc/etc.hpp>
 #include <etc/errno.hpp>
 
@@ -22,26 +24,34 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
     char first_path[2048];
-    zeromem(first_path);
+    memset(first_path,0,2048);
     if(dirfd >= 0)
         memcpy(first_path,vfs::fdmanager::search(proc,dirfd)->path,strlen(vfs::fdmanager::search(proc,dirfd)->path));
     else if(dirfd == AT_FDCWD)
         memcpy(first_path,proc->cwd,strlen(proc->cwd));
 
     char kpath[2048];
-    zeromem(kpath);
+    memset(kpath,0,2048);
     copy_in_userspace_string(proc,kpath,(void*)path,2048);
 
     char result[2048];
-    zeromem(result);
+    memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
-    
+
     int new_fd = vfs::fdmanager::create(proc);
 
     userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
+    memset(new_fd_s->path,0,2048);
     memcpy(new_fd_s->path,result,strlen(result));
 
+    new_fd_s->offset = 0;
+    new_fd_s->queue = 0;
+    new_fd_s->pipe = 0;
+    new_fd_s->pipe_side = 0;
+    new_fd_s->cycle = 0;
+
     std::int32_t status = vfs::vfs::open(new_fd_s);
+
     if(status != 0)
         new_fd_s->state = USERSPACE_FD_STATE_UNUSED;
     
@@ -83,6 +93,7 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     memory::paging::maprangeid(proc->original_cr3,Other::toPhys(temp_buffer),(std::uint64_t)temp_buffer,count,PTE_PRESENT | PTE_RW,proc->id);
     copy_in_userspace(proc,temp_buffer,(void*)buf,count);
 
+
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
         bytes_written = vfs::vfs::write(fd_s,temp_buffer,count);
@@ -92,6 +103,7 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
         return {1,EBADF,0};
 
     memory::pmm::_virtual::free(temp_buffer);
+
     return {1,bytes_written >= 0 ? 0 : (int)(+bytes_written), bytes_written};
 }
 
@@ -184,5 +196,188 @@ syscall_ret_t sys_pipe(int flags) {
     fd2->state = USERSPACE_FD_STATE_PIPE;
 
     return {1,read_fd,write_fd};
+}
 
+syscall_ret_t sys_dup(int fd, int flags) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+    
+    int new_fd = vfs::fdmanager::create(proc);
+    userspace_fd_t* nfd_s = vfs::fdmanager::search(proc,new_fd);
+
+    nfd_s->cycle = fd_s->cycle;
+    nfd_s->offset = fd_s->offset;
+    nfd_s->state = fd_s->state;
+    nfd_s->other_state = fd_s->other_state;
+    nfd_s->pipe = fd_s->pipe;
+    nfd_s->pipe_side = fd_s->pipe_side;
+    nfd_s->queue = fd_s->queue;
+    memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
+
+    return {1,0,new_fd};
+}
+
+syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    userspace_fd_t* nfd_s = vfs::fdmanager::search(proc,newfd);
+    if(!nfd_s) {
+        int t = vfs::fdmanager::create(proc);
+        nfd_s = vfs::fdmanager::search(proc,t);
+    }
+
+    nfd_s->index = newfd;
+    nfd_s->cycle = fd_s->cycle;
+    nfd_s->offset = fd_s->offset;
+    nfd_s->state = fd_s->state;
+    nfd_s->other_state = fd_s->other_state;
+    nfd_s->pipe = fd_s->pipe;
+    nfd_s->pipe_side = fd_s->pipe_side;
+    nfd_s->queue = fd_s->queue;
+    memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
+
+    return {0,0,0};
+}
+
+syscall_ret_t sys_create_dev(std::uint64_t requestandnum, char* slave_path, char* master_path) {
+    char slave[256];
+    char master[256];
+    memset(slave,0,sizeof(slave));
+    memset(master,0,sizeof(master));
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    copy_in_userspace_string(proc,slave,slave_path,256);
+    copy_in_userspace_string(proc,master,master_path,256);
+
+    vfs::devfs_packet_t packet;
+    packet.size = requestandnum & 0xFFFFFFFF;
+    packet.request = (uint32_t)(requestandnum >> 32);
+    packet.value = (std::uint64_t)&master[0];
+
+    vfs::devfs::send_packet(slave,&packet);
+    return {0,0,0};
+}
+
+syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    int res = 0;
+    std::int64_t ioctl_size = vfs::vfs::ioctl(fd_s,request,0,&res);
+    
+    if(ioctl_size < 0)
+        return {0,(int)ioctl_size,0};
+
+    SYSCALL_IS_SAFEA((void*)arg,ioctl_size);
+
+    char ioctl_item[ioctl_size]; /* Actually i can just allocate this in stack */
+    copy_in_userspace(proc,ioctl_item,arg,ioctl_size);
+ 
+    std::int64_t ret = vfs::vfs::ioctl(fd_s,request,ioctl_item,&res);
+    copy_in_userspace(proc,arg,ioctl_item,ioctl_size);
+
+    return {0,(int)ret,0};
+}
+
+syscall_ret_t sys_create_ioctl(char* path, std::uint64_t write_and_read_req, std::uint32_t size) {
+    
+    std::int32_t read_req = write_and_read_req & 0xFFFFFFFF;
+    std::int32_t write_req = (uint32_t)(write_and_read_req >> 32);
+
+    char path0[256];
+    memset(path0,0,256);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    copy_in_userspace_string(proc,path0,path,256);
+
+    vfs::devfs_packet_t packet;
+    packet.create_ioctl.readreg = read_req;
+    packet.create_ioctl.writereg = write_req;
+    packet.create_ioctl.request = DEVFS_PACKET_CREATE_IOCTL;
+    packet.create_ioctl.size = size;
+    packet.create_ioctl.pointer = (std::uint64_t)memory::pmm::_virtual::alloc(size);
+    vfs::devfs::send_packet(path0,&packet);
+
+    return {0,0,0};
+}
+
+syscall_ret_t sys_setup_tty(char* path) {
+
+    char path0[256];
+    memset(path0,0,256);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    copy_in_userspace_string(proc,path0,path,256);
+
+    vfs::devfs_packet_t packet;
+    packet.request = DEVFS_PACKET_SETUPTTY;
+    vfs::devfs::send_packet(path0,&packet);
+
+    return {0,0,0};
+}
+
+syscall_ret_t sys_isatty(int fd) {
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
+
+    return {0,ret != 0 ? ENOTTY : 0,0};
+}
+
+syscall_ret_t sys_setupmmap(char* path, std::uint64_t addr, std::uint64_t size, int_frame_t* ctx) {
+    std::uint64_t flags = ctx->r8;
+
+    char path0[256];
+    memset(path0,0,256);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    copy_in_userspace_string(proc,path0,path,256);
+
+    vfs::devfs_packet_t packet;
+    packet.request = DEVFS_SETUP_MMAP;
+    packet.setup_mmap.dma_addr = addr;
+    packet.setup_mmap.size = size;
+    packet.setup_mmap.flags = flags;
+    vfs::devfs::send_packet(path0,&packet);
+
+    return {0,0,0};
+
+}
+
+syscall_ret_t sys_ptsname(int fd, void* out, int max_size) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    char buffer[256];
+    memset(buffer,0,256);
+
+    vfs::devfs_packet_t packet;
+    packet.value = (std::uint64_t)buffer;
+    packet.request = DEVFS_GETSLAVE_BY_MASTER;
+    vfs::devfs::send_packet(fd_s->path + 4,&packet);
+    
+    if(strlen(buffer) >= max_size)
+        return {0,ERANGE,0};
+    
+    char buffer2[256];
+    memset(buffer2,0,256);
+
+    __printfbuf(buffer2,256,"/dev%s",buffer);
+    copy_in_userspace(proc,out,buffer2,strlen(buffer2));
+
+    return {0,0,0};
 }

@@ -147,21 +147,21 @@ void __tmpfs__dealloc(vfs::tmpfs_node_t* node){
 }
 
 std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t size) {
-    if (!path || !buffer || !size)
-        return -EBADF;
+    if (!path || !buffer || !size) { vfs::vfs::unlock();
+        return -EBADF; }
 
-    if (!__tmpfs__exists(path))
-        return -ENOENT;  
+    if (!__tmpfs__exists(path)) { vfs::vfs::unlock();
+        return -ENOENT;  }
 
     vfs::tmpfs_node_t* node = __tmpfs__find(path);
-    if (!node)
-        return -ENOENT;
+    if (!node) { vfs::vfs::unlock();
+        return -ENOENT; }
 
     if(node->content)
         node = __tmpfs__symfind(path);
 
-    if (node->type == TMPFS_TYPE_DIRECTORY)
-        return -EISDIR;
+    if (node->type == TMPFS_TYPE_DIRECTORY) { vfs::vfs::unlock();
+        return -EISDIR; }
 
     if (!fd) {
         __tmpfs__dealloc(node);
@@ -187,26 +187,28 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
         fd->offset += size;
     }
 
+    vfs::vfs::unlock();
     return size; 
 }
 
 std::int64_t __tmpfs__read(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t count) {
-    if (!path || !buffer || !count)
-        return -EBADF;
+    if (!path || !buffer || !count) { vfs::vfs::unlock();
+        return -EBADF; }
 
-    if (!__tmpfs__exists(path))
-        return -ENOENT;
+    if (!__tmpfs__exists(path)) { vfs::vfs::unlock();
+        return -ENOENT; }
 
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
-    if (!node)
-        return -ENOENT;
+    if (!node) { vfs::vfs::unlock();
+        return -ENOENT; }
 
-    if (node->type == TMPFS_TYPE_DIRECTORY)
-        return -EISDIR;
+    if (node->type == TMPFS_TYPE_DIRECTORY) { vfs::vfs::unlock();
+        return -EISDIR; }
 
     if (!fd) {
         std::uint64_t to_read = (count >= node->size) ? node->size : count;
         memcpy(buffer, node->content, to_read);
+        vfs::vfs::unlock();
         return to_read;
     } else {
         std::uint64_t offset = fd->offset;
@@ -219,7 +221,7 @@ std::int64_t __tmpfs__read(userspace_fd_t* fd, char* path, void* buffer, std::ui
         memcpy(buffer, node->content + offset, to_read);
         fd->offset += to_read;
         
-
+        vfs::vfs::unlock();
         return to_read;
     }
 }

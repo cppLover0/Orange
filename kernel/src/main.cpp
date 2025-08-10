@@ -64,7 +64,7 @@ extern "C" void main() {
 
     drivers::acpi::init();
     Log::Display(LEVEL_MESSAGE_OK,"ACPI initializied\n");
-
+    
     vfs::vfs::init();
     Log::Display(LEVEL_MESSAGE_OK,"VFS initializied\n");
 
@@ -91,7 +91,6 @@ extern "C" void main() {
 
     char* argv[] = {0};
     char* envp[] = {"TERM=linux",0};
-
     extern std::atomic<int> how_much_cpus;
 
     arch::x86_64::process_t* init = arch::x86_64::scheduling::create();
