@@ -47,8 +47,8 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
         return -ENOENT; }
 
     char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->read)
-        return -ENOSYS;
+    if(!node->read) { vfs::vfs::unlock();
+        return -ENOSYS; }
 
     std::int64_t status = node->read(fd,fs_love_name,buffer,count);
     return status;
@@ -87,6 +87,7 @@ std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64
 std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
+
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
     
@@ -174,6 +175,19 @@ std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
     return status;
 } 
 
+std::int32_t vfs::vfs::nlstat(userspace_fd_t* fd, stat_t* out) {
+    vfs_node_t* node = find_node(fd->path);
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
+
+    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    if(!node->stat) { vfs::vfs::unlock();
+        return ENOSYS; }
+
+    std::int32_t status = node->stat(fd,fs_love_name,out);
+    return status;
+} 
+
 std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, int *res) {
     vfs_lock->lock();
     vfs_node_t* node = find_node(fd->path);
@@ -191,6 +205,10 @@ std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, i
 
 void vfs::vfs::unlock() {
     vfs_lock->unlock();
+}
+
+void vfs::vfs::lock() {
+    vfs_lock->lock();
 }
 
 void vfs::vfs::init() {

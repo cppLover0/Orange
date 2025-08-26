@@ -35,7 +35,7 @@ void memory::paging::mapid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t vi
     std::uint64_t align_phys = ALIGNDOWN(phys,4096);
     std::uint64_t align_virt = ALIGNDOWN(virt,4096);
     std::uint64_t* cr30 = (std::uint64_t*)Other::toVirt(cr3);
-    std::uint64_t new_flags = flags;
+    std::uint64_t new_flags = PTE_PRESENT | PTE_RW;
     if(PTE_INDEX(align_virt,39) < 256)
         new_flags |= PTE_USER;
     uint64_t* pml3 = __paging_next_level(cr30,PTE_INDEX(align_virt,39),new_flags,id);

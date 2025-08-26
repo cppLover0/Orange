@@ -34,6 +34,8 @@ namespace memory {
         inline static void initproc(arch::x86_64::process_t* proc) {
             vmm_obj_t* start = new vmm_obj_t;
             vmm_obj_t* end = new vmm_obj_t;
+            start->is_mapped = 1;
+            end->is_mapped = 1;
             zeromem(start);
             zeromem(end);
             start->len = 4096;
@@ -234,18 +236,19 @@ namespace memory {
             }
         }
 
-        inline void free(arch::x86_64::process_t* proc) {
+        inline static void free(arch::x86_64::process_t* proc) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             vmm_obj_t* next = current->next;
 
             while (current)
             {
                 next = current->next;
+                current->next = 0;
 
                 if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     next = 0;
 
-                if(current->phys && !current->is_mapped) {
+                if(!current->is_mapped) {
                     memory::pmm::_physical::free(current->phys);
                 }
 
@@ -257,9 +260,10 @@ namespace memory {
                 current = next;
             }
 
-            current = new vmm_obj_t;
-
             memory::pmm::_physical::fullfree(proc->id);
+
+            proc->vmm_start = 0;
+    
         }
 
         inline static void* alloc(arch::x86_64::process_t* proc, std::uint64_t len, std::uint64_t flags) {
@@ -268,11 +272,7 @@ namespace memory {
             new_vmm->flags = flags;
             new_vmm->src_len = len;
             new_vmm->is_mapped = 0;
-            std::uint64_t phys;
-            if(len < 4096)
-                phys = memory::pmm::_physical::alloc(4096);
-            else if(len > 4096)
-                phys = memory::pmm::_physical::alloc(len);
+            std::uint64_t phys = memory::pmm::_physical::alloc(len);
             new_vmm->phys = phys;
             paging::maprangeid(proc->original_cr3,new_vmm->phys,new_vmm->base,new_vmm->len,flags,proc->id);
             return (void*)new_vmm->base;
@@ -280,13 +280,10 @@ namespace memory {
 
         inline static void* customalloc(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t len, std::uint64_t flags) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
-            std::uint64_t phys;
-            if(len < 4096)
-                phys = memory::pmm::_physical::alloc(4096);
-            else if(len > 4096)
-                phys = memory::pmm::_physical::alloc(len);
+            std::uint64_t phys = memory::pmm::_physical::alloc(len);
             void* new_virt = mark(proc,virt,phys,len,flags);
-            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,ALIGNUP(len,4096),flags,proc->id);
+            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,len,flags,proc->id);
+
             return (void*)virt;
         } 
 

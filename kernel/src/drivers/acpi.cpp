@@ -37,6 +37,8 @@
 
 extern std::uint64_t __hpet_counter();
 
+extern int how_much_cpus;
+
 void drivers::acpi::init() {
     uacpi_status ret = uacpi_initialize(0);
 
@@ -49,8 +51,16 @@ void drivers::acpi::init() {
     drivers::ioapic::init();
     Log::Display(LEVEL_MESSAGE_OK,"IOAPIC initializied\n");
 
-    arch::x86_64::cpu::lapic::init(1000);
-    Log::Display(LEVEL_MESSAGE_OK,"LAPIC initializied\n");
+    std::uint64_t start = drivers::tsc::currentnano();
+    for(int i = 0; i < 1000; i++) {
+        asm volatile("pause");
+    }
+    std::uint64_t end = drivers::tsc::currentnano();
+
+    std::uint64_t delta = (end - start) / 1000; 
+
+    arch::x86_64::cpu::lapic::init(delta);
+    Log::Display(LEVEL_MESSAGE_OK,"LAPIC timer initializied (frequency: %d)\n",delta);
 
     ret = uacpi_namespace_load();
 

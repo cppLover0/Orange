@@ -119,6 +119,10 @@
         "*.def": "cpp",
         "*.inc": "cpp",
         "*.rh": "cpp",
-        "Wmemset-transposed-args-1.C": "cpp"
+        "Wmemset-transposed-args-1.C": "cpp",
+        "template9.C": "cpp",
+        "*.x": "cpp",
+        "local_atomic": "cpp",
+        "unistd.h": "c"
     }
 }

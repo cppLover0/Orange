@@ -19,6 +19,7 @@
 #define DEVFS_PACKET_ISATTY 12 
 #define DEVFS_PACKET_SETUPTTY 13
 #define DEVFS_GETSLAVE_BY_MASTER 14
+#define DEVFS_PACKET_SETUP_RING_SIZE 15
 
 struct	winsize {
  	unsigned short	 	ws_row;	 

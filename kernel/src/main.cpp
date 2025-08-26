@@ -97,12 +97,6 @@ extern "C" void main() {
     arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp);
     arch::x86_64::scheduling::wakeup(init);
 
-    for(int i = 0;i < how_much_cpus; i++) {
-        arch::x86_64::process_t* nop = arch::x86_64::scheduling::create();
-        arch::x86_64::scheduling::loadelf(nop,"/usr/bin/nop",argv,envp);
-        arch::x86_64::scheduling::wakeup(nop);
-    }
-
     Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
 
     Log::Display(LEVEL_MESSAGE_INFO,"Trying to sync cpus...\n");

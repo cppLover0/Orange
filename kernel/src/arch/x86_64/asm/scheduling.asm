@@ -31,6 +31,12 @@ schedulingEnter:
     mov rdi,rsp
     jmp schedulingSchedule
 
+global schedulingScheduleAndChangeStack
+schedulingScheduleAndChangeStack:
+    mov rsp,rdi
+    mov rdi,rsi
+    jmp schedulingSchedule
+
 schedulingEnd:
     mov rsp,rdi
     pop rax

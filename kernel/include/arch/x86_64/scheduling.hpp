@@ -14,9 +14,6 @@
 #define PROCESS_STATE_KILLED  1
 #define PROCESS_STATE_RUNNING 2
 
-#define WAITPID_STATE_NONE 0
-#define WAITPID_STATE_WAIT 1
-
 #define MIN2(a, b) ((a) < (b) ? (a) : (b))
 #define MAX2(a, b) ((a) > (b) ? (a) : (b))
 
@@ -123,6 +120,8 @@ namespace arch {
             std::uint64_t original_cr3;
             int_frame_t ctx;
 
+            std::atomic<int> target_cpu;
+
             std::uint64_t fs_base;
 
             locks::spinlock lock;
@@ -149,6 +148,12 @@ namespace arch {
             struct process* next;
 
         } process_t;
+
+        typedef struct process_queue_run_list {
+            struct process_queue_run_list* next;
+            process_t* proc;
+            char is_used;
+        } process_queue_run_list_t;
         
         class scheduling {
         public:
@@ -163,3 +168,5 @@ namespace arch {
         };
     }
 }
+
+extern "C" void schedulingScheduleAndChangeStack(std::uint64_t stack, int_frame_t* ctx);

@@ -33,6 +33,7 @@ buddy_info_t* buddy_find_by_phys(std::uint64_t phys) {
             if(mem.mem[i].phys == phys)
                 return &mem.mem[i];
     }
+    return 0;
 }
 
 buddy_info_t* buddy_find_by_phys_without_split(std::uint64_t phys) {
@@ -40,6 +41,7 @@ buddy_info_t* buddy_find_by_phys_without_split(std::uint64_t phys) {
             if(mem.mem[i].phys == phys && !mem.mem[i].is_splitted)
                 return &mem.mem[i];
     }
+    return 0;
 }
 
 buddy_info_t* memory::buddy::put(std::uint64_t phys, std::uint8_t level) {
@@ -144,6 +146,10 @@ void memory::buddy::init() {
     mem.mem = (buddy_info_t*)Other::toVirt(top);
     memset(mem.mem,0,buddy_size);
 
+    mem.buddy_queue = 0;
+
+    Log::Display(LEVEL_MESSAGE_INFO,"buddy_struct 0x%p-0x%p, max_blocks: %d\n",mem.mem,mem.mem + buddy_size,total_pages);
+
     for(int i = 0;i < mmap->entry_count; i++) {
         current = mmap->entries[i];
         if(current->type == LIMINE_MEMMAP_USABLE) {
@@ -171,8 +177,8 @@ void memory::buddy::free(std::uint64_t phys) {
         return;
     blud->is_free = 1;
     blud->id = 0;
-    // if(blud->parent_id)
-    //     merge(blud->parent_id);
+    if(blud->parent_id)
+        merge(blud->parent_id);
 }
 
 std::int64_t memory::buddy::alloc(std::size_t size) {
@@ -261,6 +267,14 @@ std::int64_t memory::pmm::_physical::allocid(std::size_t size, std::uint32_t id)
     std::int64_t p = memory::buddy::allocid(size,id);
     pmm_lock.unlock();
     return p;
+}
+
+void memory::pmm::_physical::lock() {
+    pmm_lock.lock();
+}
+
+void memory::pmm::_physical::unlock() {
+    pmm_lock.unlock();
 }
 
 void memory::pmm::_virtual::free(void* virt) {

@@ -299,6 +299,20 @@ void arch::x86_64::scheduling::kill(process_t* proc) {
     memory::pmm::_virtual::free(proc->sse_ctx);
 }
 
+void __scheduling_balance_cpus() {
+    int cpu_ptr = 0;
+    arch::x86_64::process_t* proc = head_proc;
+    extern int how_much_cpus;
+    while(proc) {
+        if(!proc->kill_lock.test()) {
+            proc->target_cpu.store(cpu_ptr++,std::memory_order_release);
+            if(cpu_ptr == how_much_cpus) 
+                cpu_ptr = 0;
+        }
+        proc = proc->next;
+    }
+}
+
 arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     process_t* proc = (process_t*)memory::pmm::_virtual::alloc(4096);
 
@@ -328,6 +342,8 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     memory::vmm::initproc(proc);
     memory::vmm::reload(proc);
 
+    __scheduling_balance_cpus();
+
     return proc;
 }
 
@@ -354,12 +370,12 @@ void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val) {
     process_lock->unlock();
 }
 
+int l = 0;
+
 extern "C" void schedulingSchedule(int_frame_t* ctx) {
     memory::paging::enablekernel();
 
     arch::x86_64::process_t* current = arch::x86_64::cpu::data()->temp.proc;    
-
-    /* Actually context saving doesn't need some locking cuz there's already lock in process struct */
 
     if(ctx) {
         if(current) {
@@ -367,49 +383,55 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
             current->fs_base = __rdmsr(0xC0000100);
             arch::x86_64::cpu::sse::save((std::uint8_t*)current->sse_ctx);
             current->user_stack = arch::x86_64::cpu::data()->user_stack; /* Only user stack should be saved */
-            arch::x86_64::cpu::data()->kernel_stack = 0;
-            arch::x86_64::cpu::data()->temp.proc = 0;
-            current->lock.unlock();
-            current = current->next; 
         }
     }
 
-    process_lock->lock();
+    if(current) { 
+        current->lock.unlock();
+        current = current->next; 
+    } 
+
+    int current_cpu = arch::x86_64::cpu::data()->smp.cpu_id;
 
     while (true) {
         while (current) {
-            if (!current->kill_lock.test() && !current->lock.test_and_set() && current->id != 0) {
-                memcpy(ctx, &current->ctx, sizeof(int_frame_t));
 
-                __wrmsr(0xC0000100, current->fs_base);
-                arch::x86_64::cpu::sse::load((std::uint8_t*)current->sse_ctx);
+            if (!current->kill_lock.test() && current->id != 0 && current_cpu == current->target_cpu) {
+                if(!current->lock.test_and_set()) {
 
-                if(ctx->cs & 3)
-                    ctx->ss |= 3;
-                    
-                if(ctx->ss & 3)
-                    ctx->cs |= 3;
+                    if(!ctx) {
+                        int_frame_t temp_ctx;
+                        ctx = &temp_ctx;
+                    }
 
-                if(ctx->cs == 0x20)
-                    ctx->cs |= 3;
-                    
-                if(ctx->ss == 0x18)
-                    ctx->ss |= 3;
+                    memcpy(ctx, &current->ctx, sizeof(int_frame_t));
 
-                arch::x86_64::cpu::data()->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
-                arch::x86_64::cpu::data()->user_stack = current->user_stack;
-                arch::x86_64::cpu::data()->temp.proc = current;
+                    __wrmsr(0xC0000100, current->fs_base);
+                    arch::x86_64::cpu::sse::load((std::uint8_t*)current->sse_ctx);
 
-                arch::x86_64::cpu::lapic::eoi();
-                process_lock->unlock();
-                schedulingEnd(ctx);
-                __builtin_unreachable();
+                    if(ctx->cs & 3)
+                        ctx->ss |= 3;
+                        
+                    if(ctx->ss & 3)
+                        ctx->cs |= 3;
+
+                    if(ctx->cs == 0x20)
+                        ctx->cs |= 3;
+                        
+                    if(ctx->ss == 0x18)
+                        ctx->ss |= 3;
+
+                    arch::x86_64::cpu::data()->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
+                    arch::x86_64::cpu::data()->user_stack = current->user_stack;
+                    arch::x86_64::cpu::data()->temp.proc = current;
+
+                    arch::x86_64::cpu::lapic::eoi();
+                    process_lock->unlock();
+                    schedulingEnd(ctx);
+                }
             }
             current = current->next;
         }
-        process_lock->unlock();
-        asm volatile("pause");
-        process_lock->lock();
         current = head_proc;
     }
 }

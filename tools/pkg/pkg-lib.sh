@@ -10,7 +10,7 @@ cachedownload() {
 installgnu() {
     cachedownload ../cached/$2-$3.tar.gz "$GNU_MIRROR/gnu/$1/$2-$3.tar.gz"
     rm -rf ./*
-    cp -rf ../cached/$2-$2.tar.gz .
+    cp -rf ../cached/$2-$3.tar.gz .
     tar -xvf $2-$3.tar.gz
 }
 

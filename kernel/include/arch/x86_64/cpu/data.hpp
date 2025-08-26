@@ -12,6 +12,7 @@
 typedef struct {
     std::uint64_t user_stack;
     std::uint64_t kernel_stack;
+    std::uint64_t timer_ist_stack;
     struct {
         std::uint16_t cpu_id;
     } smp;
@@ -21,6 +22,7 @@ typedef struct {
     struct {
         int_frame_t temp_ctx;
         arch::x86_64::process_t* proc;
+        arch::x86_64::process_queue_run_list_t* next;
     } temp;
 } cpudata_t;
 

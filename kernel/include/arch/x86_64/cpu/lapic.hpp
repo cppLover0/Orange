@@ -6,6 +6,8 @@
 #include <generic/mm/paging.hpp>
 #include <drivers/tsc.hpp>
 
+#include <drivers/hpet.hpp>
+
 #include <etc/assembly.hpp>
 #include <etc/etc.hpp>
 
@@ -40,13 +42,13 @@ namespace arch {
                     __wrmsr(0x1B,__rdmsr(0x1B));
                     memory::paging::kernelmap(0,__rdmsr(0x1B) & 0xFFFFF000);
                     write(0xf0,0xff | 0x100);
-                    write(0x3e0,0x3);
+                    write(0x3e0,1);
                     write(0x320,32 | (1 << 16));
                     write(0x380,0xFFFFFFFF);
-                    drivers::tsc::sleep(us);
+                    drivers::hpet::sleep(us);
                     std::uint64_t ticks = 0xFFFFFFFF - read(0x390);
                     write(0x320, 32 | (1 << 17));
-                    write(0x3e0,0x3);
+                    write(0x3e0,1);
                     write(0x380,ticks);
                 }
             };

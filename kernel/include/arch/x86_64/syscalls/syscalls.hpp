@@ -22,6 +22,12 @@ inline void copy_in_userspace_string(arch::x86_64::process_t* proc,void* dest, v
     memory::paging::enablekernel();
 }
 
+inline void zero_in_userspace(arch::x86_64::process_t* proc,void* buf, std::uint64_t size) {
+    memory::paging::enablepaging(proc->original_cr3);
+    memset(buf,0,size);
+    memory::paging::enablekernel();
+}
+
 class syscall_safe {
 public:
 
@@ -104,6 +110,9 @@ syscall_ret_t sys_isatty(int fd);
 
 syscall_ret_t sys_ptsname(int fd, void* out, int max_size);
 
+syscall_ret_t sys_setup_ring_bytelen(char* path, int bytelen);
+syscall_ret_t sys_read_dir(int fd, void* buffer);
+
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
 syscall_ret_t sys_free(void *pointer, size_t size);
@@ -116,6 +125,16 @@ syscall_ret_t sys_iopl(int a, int b ,int c , int_frame_t* ctx);
 syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx);
 
 syscall_ret_t sys_access_framebuffer(void* out);
+
+syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx);
+
+syscall_ret_t sys_getpid();
+syscall_ret_t sys_getppid();
+
+syscall_ret_t sys_gethostname(void* buffer, std::uint64_t bufsize);
+syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize);
+
+syscall_ret_t sys_waitpid(int pid);
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);

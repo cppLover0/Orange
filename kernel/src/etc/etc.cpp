@@ -75,7 +75,6 @@ extern "C" {
 
 #include <generic/mm/heap.hpp>
 
-
 void *operator new(size_t size)
 {
     return memory::heap::malloc(size);

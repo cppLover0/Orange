@@ -5,6 +5,7 @@
 #include <arch/x86_64/scheduling.hpp>
 
 syscall_ret_t sys_futex_wait(int* pointer, int excepted) {
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys_futex_wait\n");
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc; 
     int copied_pointer_val = 0;
     copy_in_userspace(proc,&copied_pointer_val,pointer,sizeof(int));

@@ -35,7 +35,15 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {23,(void*)sys_isatty},
     {24,(void*)sys_setupmmap},
     {25,(void*)sys_access_framebuffer},
-    {26,(void*)sys_ptsname}
+    {26,(void*)sys_ptsname},
+    {27,(void*)sys_setup_ring_bytelen},
+    {28,(void*)sys_read_dir},
+    {29,(void*)sys_exec},
+    {30,(void*)sys_getpid},
+    {31,(void*)sys_getppid},
+    {32,(void*)sys_gethostname},
+    {33,(void*)sys_getcwd},
+    {34,(void*)sys_waitpid}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -62,6 +70,9 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
         ctx->rdx = ret.ret_val;
     }
 
+    if(ret.ret != 0)
+        Log::Raw("non zero ret %d from sys %d\n",ret.ret,item->syscall_num);
+
     ctx->rax = ret.ret;
     return;
 } 
@@ -69,6 +80,6 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
 void arch::x86_64::syscall::init() {
     __wrmsr(STAR_MSR,(0x08ull << 32) | (0x10ull << 48));
     __wrmsr(LSTAR,(uint64_t)syscall_handler);
-    __wrmsr(STAR_MASK,0); // syscalls will support interrupts
+    __wrmsr(STAR_MASK,(1 << 9)); // syscalls will enable interrupts when gs is swapped + stack is saved
     __wrmsr(EFER,__rdmsr(EFER) | 1);
 }

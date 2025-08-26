@@ -15,7 +15,7 @@ namespace locks {
 
         void lock() {
             while(flag.test_and_set(std::memory_order_acquire))
-                __builtin_ia32_pause();
+                asm volatile("nop");
         }
 
         std::uint8_t test_and_set() {

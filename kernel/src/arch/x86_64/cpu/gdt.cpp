@@ -47,6 +47,6 @@ void arch::x86_64::cpu::gdt::init() {
 
     /* Also i want to init cpu data too */
     auto cpudata = arch::x86_64::cpu::data();
-    cpudata->kernel_stack = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE);
+    cpudata->timer_ist_stack = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); 
 
 }

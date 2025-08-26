@@ -38,6 +38,11 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
     memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
 
+    if(result[0] == '\0') {
+        result[0] = '/';
+        result[1] = '\0';
+    }
+
     int new_fd = vfs::fdmanager::create(proc);
 
     userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
@@ -52,9 +57,25 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
 
     std::int32_t status = vfs::vfs::open(new_fd_s);
 
+    vfs::stat_t stat;
+    std::int32_t stat_status = vfs::vfs::stat(new_fd_s,&stat);
+
+    if(stat_status == 0) 
+        if(flags & __O_DIRECTORY) 
+            if(!(stat.st_mode & S_IFDIR))
+                return {0,ENOTDIR,0};
+
+    if(flags & O_APPEND)
+        vfs::vfs::touch(new_fd_s->path);
+
+    if(flags & O_TRUNC) 
+        vfs::vfs::write(new_fd_s,(void*)"\0",1);
+
     if(status != 0)
         new_fd_s->state = USERSPACE_FD_STATE_UNUSED;
     
+    new_fd_s->offset = 0;
+
     return {1,status,status == 0 ? new_fd : -1};
 }
 
@@ -77,6 +98,7 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
         return {1,EBADF,0};
 
     copy_in_userspace(proc,buf,temp_buffer,bytes_read);
+    
     memory::pmm::_virtual::free(temp_buffer);
 
     return {1,bytes_read >= 0 ? 0 : (int)(+bytes_read), bytes_read};
@@ -154,7 +176,11 @@ syscall_ret_t sys_close(int fd) {
     if(fd_s->state == USERSPACE_FD_STATE_PIPE)
         fd_s->pipe->close(fd_s->pipe_side);
 
-    fd_s->state = USERSPACE_FD_STATE_UNUSED;
+    int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
+
+    // Ban tty closing
+    if(ret != 0)
+        fd_s->state = USERSPACE_FD_STATE_UNUSED;
 
     return {0,0,0};
 }
@@ -229,6 +255,9 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     if(!nfd_s) {
         int t = vfs::fdmanager::create(proc);
         nfd_s = vfs::fdmanager::search(proc,t);
+    } else {
+        if(nfd_s->state == USERSPACE_FD_STATE_PIPE) 
+            nfd_s->pipe->close(nfd_s->pipe_side);
     }
 
     nfd_s->index = newfd;
@@ -239,6 +268,10 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     nfd_s->pipe = fd_s->pipe;
     nfd_s->pipe_side = fd_s->pipe_side;
     nfd_s->queue = fd_s->queue;
+
+    if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
+        nfd_s->pipe->create(nfd_s->pipe_side);
+
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
 
     return {0,0,0};
@@ -274,7 +307,7 @@ syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg) {
     std::int64_t ioctl_size = vfs::vfs::ioctl(fd_s,request,0,&res);
     
     if(ioctl_size < 0)
-        return {0,(int)ioctl_size,0};
+        return {0,0,0};
 
     SYSCALL_IS_SAFEA((void*)arg,ioctl_size);
 
@@ -380,4 +413,36 @@ syscall_ret_t sys_ptsname(int fd, void* out, int max_size) {
     copy_in_userspace(proc,out,buffer2,strlen(buffer2));
 
     return {0,0,0};
+}
+
+syscall_ret_t sys_setup_ring_bytelen(char* path, int bytelen) {
+    char path0[256];
+    memset(path0,0,256);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    copy_in_userspace_string(proc,path0,path,256);
+
+    vfs::devfs_packet_t packet;
+    packet.request = DEVFS_PACKET_SETUP_RING_SIZE;
+    packet.size = bytelen;
+    vfs::devfs::send_packet(path0,&packet);
+
+    return {0,0,0};
+}
+
+syscall_ret_t sys_read_dir(int fd, void* buffer) {
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    vfs::dirent_t dirent;
+    copy_in_userspace(proc,&dirent,buffer,sizeof(vfs::dirent_t));
+
+    int status = vfs::vfs::ls(fd_s,&dirent);
+
+    copy_in_userspace(proc,buffer,&dirent,sizeof(vfs::dirent_t));
+    return {1,status,dirent.d_reclen};
+    
 }

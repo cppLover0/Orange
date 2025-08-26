@@ -4,6 +4,8 @@
 #include <etc/libc.hpp>
 #include <etc/etc.hpp>
 
+#include <etc/logging.hpp>
+
 #pragma once
 
 namespace Lists {
@@ -116,7 +118,6 @@ namespace Lists {
     };
 
     typedef struct {
-        std::uint32_t value0;
         std::uint32_t cycle;
         std::uint64_t value1;
         
@@ -124,6 +125,7 @@ namespace Lists {
 
     typedef struct {
         ring_obj_t* objs;
+        int bytelen;
         int tail;
         int size;
         int cycle;
@@ -132,58 +134,64 @@ namespace Lists {
 
     class Ring {
     private:
-        ring_buffer_t ring;
     public:
+        ring_buffer_t ring;
 
-        void send(std::uint64_t id, std::uint64_t value1) {
+        locks::spinlock ring_lock;
+
+        void send(std::uint64_t value1) {
+            ring_lock.lock();
             ring.objs[ring.tail].cycle = ring.cycle;
-            ring.objs[ring.tail].value0 = id;
             ring.objs[ring.tail].value1 = value1;
 
-            if(++ring.tail == ring.size) {
+            if (++ring.tail == ring.size) {
                 ring.tail = 0;
                 ring.cycle = !ring.cycle;
             }
+            ring_lock.unlock();
         }
 
-        int receive(ring_obj_t* out, int id, int max, std::uint8_t* cycle, std::uint32_t* queue) {
-            int len = 0;
-            while(ring.objs[*queue].cycle == *cycle && len < ALIGNDOWN(max,sizeof(ring_obj_t)) / sizeof(ring_obj_t)) {
-                if(ring.objs[*queue].value0 == id)
-                    out[len++] = ring.objs[*queue];
-                *queue++;
-                if(*queue == ring.size) {
-                    *queue = 0;
-                    *cycle = !(*cycle);
-                }
-            }
+        int setup_bytelen(int len) {
+            ring.bytelen = len;
             return len;
         }
 
-        int receivevals(std::uint64_t* out, int id, int max, std::uint8_t* cycle, std::uint32_t* queue) {
+        int receivevals(void* out, int id, int max, std::uint8_t* cycle, std::uint32_t* queue) {
+            ring_lock.lock();
             int len = 0;
-            while(ring.objs[*queue].cycle == *cycle && len < ALIGNDOWN(max,sizeof(std::uint64_t)) / sizeof(std::uint64_t)) {
-                if(ring.objs[*queue].value0 == id)
-                    out[len++] = ring.objs[*queue].value1;
-                *queue++;
-                if(*queue == ring.size) {
+            while (ring.objs[*queue].cycle == *cycle && len * ring.bytelen < max) {
+                if (ring.bytelen == 1) {
+                    ((char*)out)[len] = ring.objs[*queue].value1 & 0xFF;
+                } else if (ring.bytelen == 2) {
+                    ((short*)out)[len] = ring.objs[*queue].value1 & 0xFFFF;
+                } else if (ring.bytelen == 4) {
+                    ((int*)out)[len] = ring.objs[*queue].value1 & 0xFFFFFFFF;
+                } else if (ring.bytelen == 8) {
+                    ((long long*)out)[len] = ring.objs[*queue].value1;
+                }
+                (*queue)++;
+                if (*queue == ring.size) {
                     *queue = 0;
                     *cycle = !(*cycle);
                 }
+                len++;
             }
-            return len * 8;
+            ring_lock.unlock();
+            return len * ring.bytelen;
         }
 
         Ring(std::size_t size_elements) {
-            ring.objs = new ring_obj_t[size_elements + 1];
+            ring.objs = new ring_obj_t[size_elements];
             ring.size = size_elements;
             ring.tail = 0;
             ring.cycle = 1;
-            memset(ring.objs,0,sizeof(ring_obj_t) * (size_elements + 1));
+            ring.bytelen = 0;
+            ring_lock.unlock();
+            memset(ring.objs, 0, sizeof(ring_obj_t) * size_elements);
         }
 
         ~Ring() {
-            delete ring.objs;
+            delete[] ring.objs;
         }
 
     };

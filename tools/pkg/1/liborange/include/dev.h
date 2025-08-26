@@ -19,6 +19,9 @@
 #define DEVFS_PACKET_CREATE_PIPE_DEV 11
 #define DEVFS_PACKET_ISATTY 12
 
+#define DEVFS_GETSLAVE_BY_MASTER 14
+#define DEVFS_PACKET_SETUP_RING_SIZE 15
+
 typedef struct {
     union {
         struct {
@@ -96,7 +99,7 @@ inline void liborange_create_dev(unsigned long long request, char* slave_path, c
     asm volatile("syscall" : : "a"(18), "D"(request), "S"(slave_path), "d"(master_path) : "rcx","r11");
 }
 
-inline void liborange_setup_iopl_3() {
+inline static void liborange_setup_iopl_3() {
     asm volatile("syscall" : : "a"(19) : "rcx","r11");
 }
 
@@ -116,6 +119,10 @@ inline void liborange_setup_mmap(char* path, uint64_t addr, uint64_t size, uint6
 
 inline void liborange_access_framebuffer(struct limine_framebuffer* out) {
     asm volatile("syscall" : : "a"(25), "D"(out) : "rcx", "r11");
+}
+
+inline void liborange_setup_ring_bytelen(char* path, int bytelen) {
+    asm volatile("syscall" : : "a"(27), "D"(path), "S"(bytelen) : "rcx","r11");
 }
 
 uint64_t liborange_alloc_dma(uint64_t dma_size);

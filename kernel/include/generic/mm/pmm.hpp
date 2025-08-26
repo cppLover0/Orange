@@ -56,6 +56,10 @@ namespace memory {
             static void fullfree(std::uint32_t id);
             static std::int64_t alloc(std::size_t size);
             static std::int64_t allocid(std::size_t size, std::uint32_t id);
+
+            static void lock();
+            static void unlock();
+
         };
         class _virtual {
         public:

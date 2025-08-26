@@ -16,5 +16,8 @@ namespace memory {
             static void init();
             static void free(void* ptr);
             static void* malloc(std::uint32_t size);
+
+            static void lock();
+            static void unlock();
     };
 };

@@ -1,6 +1,8 @@
 
 #include <cstdint>
 
+#pragma once
+
 namespace drivers {
     class hpet {
     public:

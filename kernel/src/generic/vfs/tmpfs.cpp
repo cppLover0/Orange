@@ -213,6 +213,7 @@ std::int64_t __tmpfs__read(userspace_fd_t* fd, char* path, void* buffer, std::ui
     } else {
         std::uint64_t offset = fd->offset;
         if (offset >= node->size) {
+            vfs::vfs::unlock();
             return 0;
         }
         std::uint64_t available = node->size - offset;
@@ -244,6 +245,9 @@ std::int32_t __tmpfs__var(userspace_fd_t* fd, char* path, std::uint64_t value, s
     
     if(!__tmpfs__exists(path))
         return ENOENT;
+
+    if(request == DEVFS_VAR_ISATTY)
+        return ENOTTY;
 
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
     if(request & (1 << 7))
@@ -318,13 +322,19 @@ std::int32_t __tmpfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
         return EFAULT;
 
     if(!__tmpfs__exists(path))
-        return __tmpfs__create(path,VFS_TYPE_FILE);
+        return ENOENT;
 
-    zeromem(out);
+    if(!out)
+        return EINVAL;
 
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
+        return ENOENT;
+
     out->st_size = node->type == TMPFS_TYPE_DIRECTORY ? 0 : node->size;
     out->st_mode = node->type == TMPFS_TYPE_DIRECTORY ? S_IFDIR : S_IFCHR;
+    out->st_mode |= node->vars[0];
     return 0;
 }
 

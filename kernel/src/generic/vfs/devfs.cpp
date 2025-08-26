@@ -63,7 +63,10 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
         fd->pipe = (vfs::pipe*)(node->pipe0 | (((uint64_t)node->pipe0 & (1 << 62)) << 63));
         fd->state = USERSPACE_FD_STATE_PIPE;
         fd->pipe_side = (node->pipe0 & (1 << 63)) == 1 ? PIPE_SIDE_WRITE : PIPE_SIDE_READ;
-    } 
+    } else {
+        fd->queue = is_slave == 1 ? node->readring->ring.tail : node->writering->ring.tail;
+        fd->cycle = is_slave == 1 ? node->readring->ring.cycle : node->writering->ring.cycle;
+    }
     fd->other_state = is_slave == 1 ? USERSPACE_FD_OTHERSTATE_SLAVE : USERSPACE_FD_OTHERSTATE_MASTER;
     return 0;    
 }
@@ -71,6 +74,7 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
 std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t size) {
 
     vfs::devfs_node_t* node = devfs_find_dev(path);
+
     if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
@@ -78,31 +82,35 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
         return node->write(fd,buffer,size);
 
     vfs::devfs_packet_t packet;
-    packet.request = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? DEVFS_PACKET_WRITE_READRING : DEVFS_PACKET_WRITE_WRITERING;
+    packet.request = !is_slave ? DEVFS_PACKET_WRITE_READRING : DEVFS_PACKET_WRITE_WRITERING;
     packet.cycle = &fd->cycle;
     packet.queue = &fd->queue;
     packet.size = size;
     packet.value = (std::uint64_t)buffer;
+
     return vfs::devfs::send_packet(path,&packet);
 }
 
 std::int64_t __devfs__read(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t count) {
 
     vfs::devfs_node_t* node = devfs_find_dev(path);
-    if(!node)
-        return -ENOENT;
+
+    if(!node) { vfs::vfs::unlock();
+        return -ENOENT; }
 
     if(node->read)
         return node->read(fd,buffer,count);
 
-
     vfs::devfs_packet_t packet;
-    packet.request = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? DEVFS_PACKET_READ_WRITERING : DEVFS_PACKET_READ_READRING;
+    packet.request = !is_slave ? DEVFS_PACKET_READ_WRITERING : DEVFS_PACKET_READ_READRING;
     packet.cycle = &fd->cycle;
     packet.queue = &fd->queue;
     packet.size = count;
     packet.value = (std::uint64_t)buffer;
-    return vfs::devfs::send_packet(path,&packet);
+
+    std::int64_t status = vfs::devfs::send_packet(path,&packet);
+
+    return status;
 }
 
 std::int32_t __devfs__ioctl(userspace_fd_t* fd, char* path, unsigned long req, void *arg, int *res) {
@@ -156,6 +164,7 @@ extern locks::spinlock* vfs_lock;
 
 std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
     devfs_node_t* node = devfs_find_dev(path);
+
     switch(packet->request) {
         case DEVFS_PACKET_CREATE_DEV: {
             devfs_node_t* new_node = (devfs_node_t*)memory::pmm::_virtual::alloc(4096);
@@ -188,14 +197,16 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
 
         case DEVFS_PACKET_READ_READRING: {
 
-            if(!node)
-                return -ENOENT;
-                
-            vfs::unlock();
+            if(!node) { vfs::vfs::unlock();
+                return -ENOENT; }
+
             if(!node->open_flags.is_pipe_rw) {
+                
                 std::uint64_t count = node->readring->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+                vfs::unlock();
                 return count;
             } else {
+                vfs::unlock();
                 std::uint64_t count = node->readpipe->read((char*)packet->value,packet->size);
                 return count;
             }
@@ -203,11 +214,19 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
 
         case DEVFS_PACKET_WRITE_READRING: 
 
-            if(!node)
-                return -ENOENT;
+            if(!node) { vfs::vfs::unlock();
+                return -ENOENT; }
                 
             if(!node->open_flags.is_pipe_rw) {
-                node->readring->send(dev_num,packet->value);
+                if(node->readring->ring.bytelen == 1) {
+                    node->readring->send(*(char*)packet->value);
+                } else if(node->readring->ring.bytelen == 2) {
+                    node->readring->send(*(short*)packet->value);
+                } else if(node->readring->ring.bytelen == 4) {
+                    node->readring->send(*(int*)packet->value);
+                } else if(node->readring->ring.bytelen == 8) {
+                    node->readring->send(*(long long*)packet->value);
+                }
                 vfs::vfs::unlock();
             } else { 
                 vfs::vfs::unlock();
@@ -218,14 +237,15 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
 
         case DEVFS_PACKET_READ_WRITERING: {
 
-            if(!node)
-                return -ENOENT;
+            if(!node) { vfs::vfs::unlock();
+                return -ENOENT; }
                 
-            vfs::unlock();
             if(!node->open_flags.is_pipe_rw) {
                 std::int32_t count = node->writering->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
+                vfs::unlock();
                 return count;
             } else {
+                vfs::unlock();
                 std::int64_t count = node->writepipe->read((char*)packet->value,packet->size);
                 return count;
             }
@@ -233,12 +253,19 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
 
         case DEVFS_PACKET_WRITE_WRITERING:
 
-            if(!node)
-                return -ENOENT;
+            if(!node) { vfs::vfs::unlock();
+                return -ENOENT; }
                 
-            vfs::unlock();
             if(!node->open_flags.is_pipe_rw) {
-                node->writering->send(dev_num,packet->value);
+                if(node->writering->ring.bytelen == 1) {
+                    node->writering->send(*(char*)packet->value);
+                } else if(node->writering->ring.bytelen == 2) {
+                    node->writering->send(*(short*)packet->value);
+                } else if(node->writering->ring.bytelen == 4) {
+                    node->writering->send(*(int*)packet->value);
+                } else if(node->writering->ring.bytelen == 8) {
+                    node->writering->send(*(long long*)packet->value);
+                }
                 vfs::vfs::unlock();
             } else {
                 vfs::vfs::unlock();
@@ -340,10 +367,21 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
 
             return 0;
 
-        default:
-            return EINVAL;
+        case DEVFS_PACKET_SETUP_RING_SIZE:
+            
+            if(!node)
+                return ENOENT;
+
+            if(!node->open_flags.is_pipe) {
+                node->readring->setup_bytelen(packet->size);
+                node->writering->setup_bytelen(packet->size);
+            }
+
+            return 0;
+
     }
 
+    vfs::vfs::unlock();
     return 0;
 }
 

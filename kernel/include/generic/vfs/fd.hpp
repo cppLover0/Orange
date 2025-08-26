@@ -33,6 +33,10 @@ namespace vfs {
         }
 
         inline static userspace_fd_t* search(arch::x86_64::process_t* proc,std::uint32_t idx) {
+
+            if(!proc)
+                return 0;
+
             userspace_fd_t* current = proc->fd;
             while(current) {
                 if(current->index == idx && current->state != USERSPACE_FD_STATE_UNUSED) 

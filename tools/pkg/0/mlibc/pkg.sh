@@ -28,6 +28,8 @@ mkdir -p "$1/usr/include"
 cp -rf linux-headers/* "$1/usr/include"
 
 cd pack
+ 
+export CFLAGS="-std=gnu11"
 
 # mlibc doesn't need to be cached
 git clone https://github.com/cpplover0/orange-mlibc --depth=1

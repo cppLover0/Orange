@@ -3,7 +3,7 @@ rm -rf pack
 mkdir -p pack/lib
 
 cd pack/lib/
-git clone https://codeberg.org/mintsuki/flanterm.git
+git clone https://github.com/mintsuki/flanterm.git
 cd ../../
 
 x86_64-orange-g++ -c src/main.cpp -o "pack/init.o" -Ipack/lib/flanterm/src -Isrc/include 

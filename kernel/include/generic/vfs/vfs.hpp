@@ -10,6 +10,8 @@
 #include <generic/locks/spinlock.hpp>
 #include <etc/libc.hpp>
 
+#include <etc/logging.hpp>
+
 #define USERSPACE_FD_STATE_UNUSED 0
 #define USERSPACE_FD_STATE_FILE 1
 #define USERSPACE_FD_STATE_PIPE 2
@@ -18,6 +20,22 @@
 #define VFS_TYPE_FILE 1
 #define VFS_TYPE_DIRECTORY 2
 #define VFS_TYPE_SYMLINK 3
+
+#define S_IRWXU 0700
+#define S_IRUSR 0400
+#define S_IWUSR 0200
+#define S_IXUSR 0100
+#define S_IRWXG 070
+#define S_IRGRP 040
+#define S_IWGRP 020
+#define S_IXGRP 010
+#define S_IRWXO 07
+#define S_IROTH 04
+#define S_IWOTH 02
+#define S_IXOTH 01
+#define S_ISUID 04000
+#define S_ISGID 02000
+#define S_ISVTX 01000
 
 /* open/fcntl.  */
 #define O_ACCMODE	   0003
@@ -145,63 +163,41 @@ namespace vfs {
         std::uint64_t write(const char* src_buffer, std::uint64_t count) {
             std::uint64_t written = 0;
             while (written < count) {
-                this->lock.lock();
-
                 std::uint64_t space_left = total_size - size;
                 if (space_left == 0) {
-                    this->lock.unlock();
-                    asm volatile("pause");
                     continue;
                 }
-
-                std::uint64_t to_write = count > space_left ? space_left : count;
+                std::uint64_t to_write = (count - written < space_left) ? (count - written) : space_left;
                 force_write(src_buffer + written, to_write);
                 written += to_write;
-
                 this->is_received.clear();
-
-                this->lock.unlock();
             }
             return written;
         }
 
         std::uint64_t read(char* dest_buffer, std::uint64_t count) {
             std::uint64_t read_bytes = 0;
-
             while (true) {
-                this->lock.lock();
-
-                if (this->size == 0) {
+                if (this->size == 0 || this->read_ptr >= this->size) {
                     if (this->is_closed.test()) {
-                        this->lock.unlock();
                         return 0;
                     }
-
                     if (flags & O_NONBLOCK) {
-                        this->lock.unlock();
                         return 0;
                     }
-
-                    this->lock.unlock();
-                    asm volatile("pause");
                     continue;
                 }
-
-                read_bytes = count > this->size ? this->size : count;
+                std::int64_t size0 = this->size - this->read_ptr;
+                read_bytes = (count < static_cast<std::uint64_t>(size0)) ? count : static_cast<std::uint64_t>(size0);
                 memcpy(dest_buffer, this->buffer + this->read_ptr, read_bytes);
-
                 this->read_ptr += read_bytes;
-                this->size -= read_bytes;
-
-                if(this->size <= 0) {
+                if (this->read_ptr >= this->size) {
                     this->read_ptr = 0;
+                    this->size = 0;
                     this->is_received.test_and_set();
                 }
-
-                this->lock.unlock();
                 break;
             }
-
             return read_bytes;
         }
 
@@ -475,7 +471,10 @@ namespace vfs {
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );
 
+        static std::int32_t nlstat (userspace_fd_t* fd, stat_t* out                               );
+
         static void unlock();
+        static void lock();
 
     };
 

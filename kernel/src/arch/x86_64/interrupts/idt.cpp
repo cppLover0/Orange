@@ -54,7 +54,6 @@ void arch::x86_64::interrupts::idt::set_entry(std::uint64_t base,std::uint8_t ve
     descriptor->mid = ((std::uint64_t)base >> 16) & 0xFFFF;
     descriptor->high = ((std::uint64_t)base >> 32) & 0xFFFFFFFF;
     descriptor->reserved0 = 0;
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"SETUP IST TO IDT %d %d\n",vec,ist);
 
     idt_bitmap->set(vec);
 
