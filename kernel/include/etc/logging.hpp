@@ -34,4 +34,4 @@ public:
     static void SerialDisplay(int level,char* msg,...);
 };
 
-#define BREAKPOINT() Log::SerialDisplay(LEVEL_MESSAGE_INFO,"breakpoint %s:%d\n ",__FILE__,__LINE__)
+#define BREAKPOINT() Log::Display(LEVEL_MESSAGE_INFO,"breakpoint %s:%d\n ",__FILE__,__LINE__)

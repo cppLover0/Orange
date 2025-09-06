@@ -54,6 +54,10 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
     new_fd_s->pipe = 0;
     new_fd_s->pipe_side = 0;
     new_fd_s->cycle = 0;
+    new_fd_s->is_a_tty = 0;
+
+    if(flags & O_CREAT)
+        vfs::vfs::touch(new_fd_s->path);
 
     std::int32_t status = vfs::vfs::open(new_fd_s);
 
@@ -65,11 +69,11 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
             if(!(stat.st_mode & S_IFDIR))
                 return {0,ENOTDIR,0};
 
-    if(flags & O_APPEND)
-        vfs::vfs::touch(new_fd_s->path);
-
     if(flags & O_TRUNC) 
         vfs::vfs::write(new_fd_s,(void*)"\0",1);
+
+    if(flags & O_APPEND)
+        new_fd_s->offset = stat.st_size;
 
     if(status != 0)
         new_fd_s->state = USERSPACE_FD_STATE_UNUSED;
@@ -81,7 +85,9 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
 
 syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     SYSCALL_IS_SAFEA(buf,count);
+    
     arch::x86_64::process_t* proc = CURRENT_PROC;
+
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
     if(!fd_s)
         return {1,EBADF,0};
@@ -93,7 +99,9 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     if(fd_s->state == USERSPACE_FD_STATE_FILE) 
         bytes_read = vfs::vfs::read(fd_s,temp_buffer,count);
     else if(fd_s->state == USERSPACE_FD_STATE_PIPE && fd_s->pipe) {
+        SYSCALL_ENABLE_PREEMPT();
         bytes_read = fd_s->pipe->read(temp_buffer,count);
+        SYSCALL_DISABLE_PREEMPT();
     } else
         return {1,EBADF,0};
 
@@ -106,6 +114,7 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
 
 syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     SYSCALL_IS_SAFEA((void*)buf,count);
+
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
     if(!fd_s)
@@ -115,12 +124,13 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     memory::paging::maprangeid(proc->original_cr3,Other::toPhys(temp_buffer),(std::uint64_t)temp_buffer,count,PTE_PRESENT | PTE_RW,proc->id);
     copy_in_userspace(proc,temp_buffer,(void*)buf,count);
 
-
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
         bytes_written = vfs::vfs::write(fd_s,temp_buffer,count);
     else if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
+        SYSCALL_ENABLE_PREEMPT();
         bytes_written = fd_s->pipe->write(temp_buffer,count);
+        SYSCALL_DISABLE_PREEMPT();
     } else
         return {1,EBADF,0};
 
@@ -135,11 +145,11 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
 
 syscall_ret_t sys_seek(int fd, long offset, int whence) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
+    
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
     if(!fd_s) 
         return {1,EBADF,0};
-
 
     vfs::stat_t stat;
     vfs::vfs::stat(fd_s,&stat);
@@ -176,10 +186,7 @@ syscall_ret_t sys_close(int fd) {
     if(fd_s->state == USERSPACE_FD_STATE_PIPE)
         fd_s->pipe->close(fd_s->pipe_side);
 
-    int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
-
-    // Ban tty closing
-    if(ret != 0)
+    if(!fd_s->is_a_tty && fd_s->index > 2)
         fd_s->state = USERSPACE_FD_STATE_UNUSED;
 
     return {0,0,0};
@@ -227,6 +234,7 @@ syscall_ret_t sys_pipe(int flags) {
 syscall_ret_t sys_dup(int fd, int flags) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    
     if(!fd_s)
         return {0,EBADF,0};
     
@@ -240,6 +248,7 @@ syscall_ret_t sys_dup(int fd, int flags) {
     nfd_s->pipe = fd_s->pipe;
     nfd_s->pipe_side = fd_s->pipe_side;
     nfd_s->queue = fd_s->queue;
+    nfd_s->is_a_tty = fd_s->is_a_tty;
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
 
     return {1,0,new_fd};
@@ -247,7 +256,11 @@ syscall_ret_t sys_dup(int fd, int flags) {
 
 syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
+
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"dup2 from %d to %d\n",fd,newfd);
+
     if(!fd_s)
         return {0,EBADF,0};
 
@@ -268,6 +281,7 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     nfd_s->pipe = fd_s->pipe;
     nfd_s->pipe_side = fd_s->pipe_side;
     nfd_s->queue = fd_s->queue;
+    nfd_s->is_a_tty = fd_s->is_a_tty;
 
     if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
         nfd_s->pipe->create(nfd_s->pipe_side);
@@ -300,6 +314,7 @@ syscall_ret_t sys_create_dev(std::uint64_t requestandnum, char* slave_path, char
 syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+
     if(!fd_s)
         return {0,EBADF,0};
 
@@ -366,6 +381,8 @@ syscall_ret_t sys_isatty(int fd) {
 
     int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
 
+    fd_s->is_a_tty = ret == 0 ? 1 : 0;
+
     return {0,ret != 0 ? ENOTTY : 0,0};
 }
 
@@ -383,6 +400,7 @@ syscall_ret_t sys_setupmmap(char* path, std::uint64_t addr, std::uint64_t size, 
     packet.setup_mmap.dma_addr = addr;
     packet.setup_mmap.size = size;
     packet.setup_mmap.flags = flags;
+
     vfs::devfs::send_packet(path0,&packet);
 
     return {0,0,0};
@@ -401,6 +419,7 @@ syscall_ret_t sys_ptsname(int fd, void* out, int max_size) {
     vfs::devfs_packet_t packet;
     packet.value = (std::uint64_t)buffer;
     packet.request = DEVFS_GETSLAVE_BY_MASTER;
+
     vfs::devfs::send_packet(fd_s->path + 4,&packet);
     
     if(strlen(buffer) >= max_size)
@@ -425,6 +444,7 @@ syscall_ret_t sys_setup_ring_bytelen(char* path, int bytelen) {
     vfs::devfs_packet_t packet;
     packet.request = DEVFS_PACKET_SETUP_RING_SIZE;
     packet.size = bytelen;
+
     vfs::devfs::send_packet(path0,&packet);
 
     return {0,0,0};
@@ -445,4 +465,17 @@ syscall_ret_t sys_read_dir(int fd, void* buffer) {
     copy_in_userspace(proc,buffer,&dirent,sizeof(vfs::dirent_t));
     return {1,status,dirent.d_reclen};
     
+}
+
+syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
+    switch(request) {
+        case F_DUPFD: {
+            return sys_dup(fd,arg);
+        }
+
+        default: {
+            return {0,ENOSYS,0};
+        }
+    }
+    return {0,ENOSYS,0};
 }

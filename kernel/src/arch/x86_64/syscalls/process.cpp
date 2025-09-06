@@ -15,6 +15,8 @@
 
 #include <etc/errno.hpp>
 
+#include <generic/time.hpp>
+
 #include <generic/vfs/vfs.hpp>
 
 #include <etc/bootloaderinfo.hpp>
@@ -83,10 +85,13 @@ syscall_ret_t sys_free(void *pointer, size_t size) {
 syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
+
     arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::fork(proc,ctx);
     new_proc->ctx.rax = 0;
     new_proc->ctx.rdx = 0;
+    
     arch::x86_64::scheduling::wakeup(new_proc);
+
 
     return {1,0,new_proc->id};
 }
@@ -119,7 +124,6 @@ std::uint64_t __elf_get_length2(char** arr) {
 }
 
 syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
-    arch::x86_64::process_t* proc = CURRENT_PROC;
 
     if(!path || !argv || !envp)
         return {0,EINVAL,0};
@@ -136,6 +140,8 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::lock();
 
     __cli();
+
+    arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
 
     memory::heap::unlock();
     memory::pmm::_physical::unlock();
@@ -203,12 +209,6 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     if(status == 0) {
         if(stat.st_mode & S_IXUSR && stat.st_mode & S_IFCHR) {
 
-            userspace_fd_t* fd0 = proc->fd;
-            while(fd0) {
-                fd0->offset = 0;
-                fd0 = fd0->next;
-            }
-
             proc->fs_base = 0;
 
             memset(&proc->ctx,0,sizeof(int_frame_t));
@@ -251,6 +251,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::free(argv0);
     memory::heap::free(envp0);
 
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"exec error\n");
     arch::x86_64::scheduling::kill(proc);
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
@@ -302,12 +303,18 @@ syscall_ret_t sys_waitpid(int pid) {
 
     arch::x86_64::process_t* current = head_proc;
     
+    if(pid < -1 || pid == 0)
+        return {0,ENOSYS,0};
+
     int success = 0;
+
+    std::uint64_t current_timestamp = time::counter();
+    std::uint64_t ns = 1000 * 1000 * 1000;
 
     if(pid == -1) {
         while (current)
         {
-            if(current->parent_id == proc->id && !current->kill_lock.test()) {
+            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING) &&current->waitpid_state == 0) {
                 current->waitpid_state = 1;
                 success = 1;
             }
@@ -316,9 +323,10 @@ syscall_ret_t sys_waitpid(int pid) {
     } else if(pid > 0) {
         while (current)
         {
-            if(current->parent_id == proc->id && !current->kill_lock.test() && current->id == pid) {
+            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING) && current->id == pid) {
                 current->waitpid_state = 1;
                 success = 1;
+                break;
             }
             current = current->next;
         }
@@ -327,14 +335,25 @@ syscall_ret_t sys_waitpid(int pid) {
     if(!success) 
         return {0,ECHILD,0};
 
+    int parent_id = proc->id;
+
+    SYSCALL_ENABLE_PREEMPT();
+
     current = head_proc;
-    while (current)
-    {
-        if(current->parent_id == proc->id && current->kill_lock.test() && current->waitpid_state == 1) {
-            current->waitpid_state = 0;
-            return {1,0,(std::int64_t)(((std::uint64_t)current->exit_code) << 32) | current->id};
+    while(1) {
+        while (current)
+        {
+            if(current) {
+                if(current->parent_id == parent_id && current->kill_lock.test() && current->waitpid_state == 1 && current->id != 0) {
+                    current->waitpid_state = 2;
+                    std::int64_t bro = (std::int64_t)(((std::uint64_t)current->exit_code) << 32) | current->id;
+                    current->status = PROCESS_STATE_KILLED;
+                    return {1,0,bro};
+                }
+            }
+            current = current->next;
         }
-        current = current->next;
+        current = head_proc;
     }
 
 }

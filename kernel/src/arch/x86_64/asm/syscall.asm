@@ -2,10 +2,9 @@
 global syscall_handler
 extern syscall_handler_c
 syscall_handler:
-    swapgs ; i should have disabled interrupts to swapgs
+    swapgs 
     mov qword [gs:0],rsp
     mov rsp, qword [gs:8]
-    sti
     push qword (0x18 | 3)
     push qword [gs:0]
     push qword r11

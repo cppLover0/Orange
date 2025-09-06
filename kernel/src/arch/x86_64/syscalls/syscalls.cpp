@@ -43,7 +43,8 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {31,(void*)sys_getppid},
     {32,(void*)sys_gethostname},
     {33,(void*)sys_getcwd},
-    {34,(void*)sys_waitpid}
+    {34,(void*)sys_waitpid},
+    {35,(void*)sys_fcntl}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {

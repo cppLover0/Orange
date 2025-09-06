@@ -67,8 +67,7 @@ limine/limine:
 		LIBS="$(HOST_LIBS)"
 
 kernel-deps:
-	./kernel/get-deps
-	touch kernel-deps
+	./kernel/get-deps .
 
 .PHONY: kernel
 kernel: kernel-deps

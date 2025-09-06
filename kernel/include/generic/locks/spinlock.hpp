@@ -4,10 +4,14 @@
 
 #pragma once
 
+#include <etc/logging.hpp>
+#include <etc/assembly.hpp>
+
 namespace locks {
     class spinlock {
     private:
         volatile std::atomic_flag flag = ATOMIC_FLAG_INIT;
+        char is_process_switch = 0;
     public:
         spinlock() {
 
@@ -15,7 +19,11 @@ namespace locks {
 
         void lock() {
             while(flag.test_and_set(std::memory_order_acquire))
-                asm volatile("nop");
+                asm volatile("pause");
+        }
+
+        void enable_scheduling_optimization() {
+            is_process_switch = 1;
         }
 
         std::uint8_t test_and_set() {

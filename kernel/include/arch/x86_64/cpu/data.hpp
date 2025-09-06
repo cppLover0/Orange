@@ -29,7 +29,7 @@ typedef struct {
 namespace arch {
     namespace x86_64 {
         namespace cpu {
-            inline cpudata_t* data() {
+            inline static cpudata_t* data() {
                 std::uint64_t cpudata = __rdmsr(0xC0000101);
                 if(!cpudata) {
                     cpudata = (std::uint64_t)new cpudata_t;

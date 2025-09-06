@@ -8,6 +8,10 @@
 
 #include <drivers/hpet.hpp>
 
+#include <generic/time.hpp>
+
+#include <etc/logging.hpp>
+
 #include <etc/assembly.hpp>
 #include <etc/etc.hpp>
 
@@ -45,7 +49,7 @@ namespace arch {
                     write(0x3e0,1);
                     write(0x320,32 | (1 << 16));
                     write(0x380,0xFFFFFFFF);
-                    drivers::hpet::sleep(us);
+                    time::sleep(us);
                     std::uint64_t ticks = 0xFFFFFFFF - read(0x390);
                     write(0x320, 32 | (1 << 17));
                     write(0x3e0,1);

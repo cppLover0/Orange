@@ -13,6 +13,7 @@
 #define PROCESS_STATE_NONE    0
 #define PROCESS_STATE_KILLED  1
 #define PROCESS_STATE_RUNNING 2
+#define PROCESS_STATE_ZOMBIE  3
 
 #define MIN2(a, b) ((a) < (b) ? (a) : (b))
 #define MAX2(a, b) ((a) > (b) ? (a) : (b))
@@ -105,6 +106,7 @@ typedef enum {
     AT_EXECFN = 31
 } auxv_t;
 
+extern "C" void schedulingScheduleAndChangeStack(std::uint64_t stack, int_frame_t* ctx);
 extern "C" void schedulingSchedule(int_frame_t* ctx);
 extern "C" void schedulingEnter();
 extern "C" void schedulingEnd(int_frame_t* ctx);
@@ -143,6 +145,9 @@ namespace arch {
             std::uint64_t syscall_stack;
             std::uint64_t user_stack;
 
+            std::uint64_t create_timestamp;
+            std::uint64_t exit_timestamp;
+
             std::uint32_t parent_id;
 
             struct process* next;
@@ -169,4 +174,3 @@ namespace arch {
     }
 }
 
-extern "C" void schedulingScheduleAndChangeStack(std::uint64_t stack, int_frame_t* ctx);

@@ -12,6 +12,8 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/uacpi.h>
 
+#include <drivers/io.hpp>
+
 #include <generic/locks/spinlock.hpp>
 
 #include <arch/x86_64/interrupts/irq.hpp>
@@ -51,16 +53,7 @@ void drivers::acpi::init() {
     drivers::ioapic::init();
     Log::Display(LEVEL_MESSAGE_OK,"IOAPIC initializied\n");
 
-    std::uint64_t start = drivers::tsc::currentnano();
-    for(int i = 0; i < 1000; i++) {
-        asm volatile("pause");
-    }
-    std::uint64_t end = drivers::tsc::currentnano();
-
-    std::uint64_t delta = (end - start) / 1000; 
-
-    arch::x86_64::cpu::lapic::init(delta);
-    Log::Display(LEVEL_MESSAGE_OK,"LAPIC timer initializied (frequency: %d)\n",delta);
+    arch::x86_64::cpu::lapic::init(10000);
 
     ret = uacpi_namespace_load();
 

@@ -1,7 +1,9 @@
 
 #include <drivers/tsc.hpp>
-#include <arch/x86_64/interrupts/pit.hpp>
+#include <drivers/hpet.hpp>
 #include <cstdint>
+
+#include <generic/time.hpp>
 
 #include <arch/x86_64/cpu/data.hpp>
 
@@ -11,15 +13,24 @@
 
 using namespace drivers;
 
+std::uint64_t freq;
+
 void tsc::init() {
     std::uint64_t start = __rdtsc();
-    arch::x86_64::interrupts::pit::sleep(100 * 1000);
+    time::sleep(100 * 1000);
     std::uint64_t end = __rdtsc();
     std::uint64_t d = end - start;
     arch::x86_64::cpu::data()->tsc.freq = (d * 1000000000ULL) / (100 * 1000000ULL);
 }
 
+
 void tsc::sleep(std::uint64_t us) {
+    
+    if(freq == 0) {
+        drivers::hpet::sleep(us);
+        return;
+    }
+
     std::uint64_t current = currentnano();
     std::uint64_t end = us * 1000;
     while((currentnano() - current) < end);

@@ -1,0 +1,23 @@
+diff -Naur coreutils/build-aux/config.sub coreutils-patched/build-aux/config.sub
+--- coreutils/build-aux/config.sub	2024-08-11 16:58:11.000000000 +0300
++++ coreutils-patched/build-aux/config.sub	2025-05-25 12:55:11.367837322 +0300
+@@ -2012,6 +2012,7 @@
+ 	| glidix* \
+ 	| gnu* \
+ 	| go32* \
++	| orange* \
+ 	| haiku* \
+ 	| hcos* \
+ 	| hiux* \
+diff -Naur coreutils/gnulib-tests/getlocalename_l-unsafe.c coreutils-patched/gnulib-tests/getlocalename_l-unsafe.c
+--- coreutils/gnulib-tests/getlocalename_l-unsafe.c	2025-04-06 01:23:58.000000000 +0300
++++ coreutils-patched/gnulib-tests/getlocalename_l-unsafe.c	2025-05-25 16:46:35.306435434 +0300
+@@ -469,6 +469,8 @@
+       struct gl_locale_category_t *plc =
+         &locale->category[gl_log2_lcmask_to_index (gl_log2_lc_mask (category))];
+       return (struct string_with_storage) { plc->name, STORAGE_OBJECT };
++#elif defined __orange__
++	return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #elif __GLIBC__ >= 2 && !defined __UCLIBC__
+       /* Work around an incorrect definition of the _NL_LOCALE_NAME macro in
+          glibc < 2.12.

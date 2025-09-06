@@ -16,18 +16,26 @@ std::uint8_t hpet_is_32_bit = 0;
 
 #include <generic/mm/paging.hpp>
 
+#include <generic/time.hpp>
+
 #include <etc/etc.hpp>
 
 std::uint64_t __hpet_counter() {
     return hpet_is_32_bit ? *(volatile uint32_t*)(hpet_base + 0xf0) : *(volatile uint64_t*)(hpet_base + 0xf0);
 }
 
+extern std::uint16_t KERNEL_GOOD_TIMER;
+
 void drivers::hpet::init() {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature("HPET",&hpet);
     if(ret != UACPI_STATUS_OK) {
-        Log::Display(LEVEL_MESSAGE_FAIL,"HPET is disabled, Orange requires it to work\n");
-        while(1) { asm volatile("hlt"); }
+        if(KERNEL_GOOD_TIMER != KVM_TIMER) {
+            Log::Display(LEVEL_MESSAGE_FAIL,"Can't continue work, orange requires hpet to work (or kvmclock if present)\n");
+            while(1) {asm volatile("hlt");}
+        }
+        Log::Display(LEVEL_MESSAGE_WARN,"hpet timer doesn't present\n");
+        return;
     }
     struct acpi_hpet* hpet_table = ((struct acpi_hpet*)hpet.virt_addr);
     hpet_base = (std::uint64_t)Other::toVirt(hpet_table->address.address);

@@ -25,6 +25,8 @@
 #include <etc/etc.hpp>
 #include <limine.h>
 
+#include <generic/locks/spinlock.hpp>
+
 std::uint16_t KERNEL_GOOD_TIMER = 0;
 
 static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
@@ -91,13 +93,10 @@ extern "C" void main() {
 
     char* argv[] = {0};
     char* envp[] = {"TERM=linux",0};
-    extern std::atomic<int> how_much_cpus;
 
     arch::x86_64::process_t* init = arch::x86_64::scheduling::create();
     arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp);
     arch::x86_64::scheduling::wakeup(init);
-
-    Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
 
     Log::Display(LEVEL_MESSAGE_INFO,"Trying to sync cpus...\n");
     arch::x86_64::cpu::mp::sync(1);

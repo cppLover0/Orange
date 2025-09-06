@@ -17,6 +17,8 @@
 #include <etc/libc.hpp>
 #include <etc/list.hpp>
 
+#include <generic/time.hpp>
+
 #include <etc/logging.hpp>
 
 #include <atomic>
@@ -26,8 +28,7 @@
 arch::x86_64::process_t* head_proc;
 std::uint32_t id_ptr = 0;
 
-locks::spinlock* process_lock;
-locks::spinlock* process_in_use_lock;
+locks::spinlock process_lock; 
 
 #define PUT_STACK(dest,value) *--dest = value;
 #define PUT_STACK_STRING(dest,string) memcpy(dest,string,strlen(string)); 
@@ -292,8 +293,9 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_fram
 
 void arch::x86_64::scheduling::kill(process_t* proc) {
     proc->kill_lock.nowaitlock();
-    proc->lock.lock();
-    proc->status = PROCESS_STATE_KILLED;
+    proc->lock.nowaitlock();
+    proc->status = PROCESS_STATE_ZOMBIE;
+    proc->exit_timestamp = time::counter();
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
     memory::pmm::_virtual::free(proc->sse_ctx);
@@ -342,13 +344,14 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     memory::vmm::initproc(proc);
     memory::vmm::reload(proc);
 
+    proc->create_timestamp = time::counter();
+
     __scheduling_balance_cpus();
 
     return proc;
 }
 
 void arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
-    process_lock->lock();
     process_t* proc0 = head_proc;
     while(proc0) {
         if(proc0->parent_id == proc->id && proc0->futex == (std::uint64_t)lock) {
@@ -357,17 +360,14 @@ void arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
         }
         proc0 = proc->next;
     }
-    process_lock->unlock();
 }
 
 void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val) {
     int lock_val = *lock;
-    process_lock->lock();
     if(lock_val == val) {
         proc->futex = (std::uint64_t)lock;
         proc->lock.nowaitlock();
     }
-    process_lock->unlock();
 }
 
 int l = 0;
@@ -377,12 +377,14 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
 
     arch::x86_64::process_t* current = arch::x86_64::cpu::data()->temp.proc;    
 
+    cpudata_t* data = arch::x86_64::cpu::data();
+
     if(ctx) {
         if(current) {
             current->ctx = *ctx;
             current->fs_base = __rdmsr(0xC0000100);
             arch::x86_64::cpu::sse::save((std::uint8_t*)current->sse_ctx);
-            current->user_stack = arch::x86_64::cpu::data()->user_stack; /* Only user stack should be saved */
+            current->user_stack = data->user_stack; /* Only user stack should be saved */
         }
     }
 
@@ -391,7 +393,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
         current = current->next; 
     } 
 
-    int current_cpu = arch::x86_64::cpu::data()->smp.cpu_id;
+    int current_cpu = data->smp.cpu_id;
 
     while (true) {
         while (current) {
@@ -421,12 +423,11 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
                     if(ctx->ss == 0x18)
                         ctx->ss |= 3;
 
-                    arch::x86_64::cpu::data()->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
-                    arch::x86_64::cpu::data()->user_stack = current->user_stack;
-                    arch::x86_64::cpu::data()->temp.proc = current;
+                    data->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
+                    data->user_stack = current->user_stack;
+                    data->temp.proc = current;
 
                     arch::x86_64::cpu::lapic::eoi();
-                    process_lock->unlock();
                     schedulingEnd(ctx);
                 }
             }
@@ -438,9 +439,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
     
 
 void arch::x86_64::scheduling::init() {
-    process_lock = new locks::spinlock;
     process_t* main_proc = create();
     main_proc->kill_lock.nowaitlock();
-    process_lock->unlock();
     arch::x86_64::interrupts::idt::set_entry((std::uint64_t)schedulingEnter,32,0x8E,2);
 }

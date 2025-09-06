@@ -226,6 +226,8 @@ typedef struct userspace_fd {
     std::uint8_t state;
     std::uint8_t pipe_side;
 
+    std::uint8_t is_a_tty;
+
     std::uint8_t other_state;
 
     std::uint32_t queue;

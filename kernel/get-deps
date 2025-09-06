@@ -87,7 +87,7 @@ download_by_hash \
 
 set -ex
 
-srcdir="$(dirname "$0")"
+srcdir="$(dirname "$1")"
 test -z "$srcdir" && srcdir=.
 
 cd "$srcdir"

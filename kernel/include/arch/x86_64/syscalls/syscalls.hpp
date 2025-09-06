@@ -10,6 +10,8 @@
 #include <etc/bootloaderinfo.hpp>
 #include <etc/libc.hpp>
 
+#include <arch/x86_64/cpu/data.hpp>
+
 inline void copy_in_userspace(arch::x86_64::process_t* proc,void* dest, void* src, std::uint64_t size) {
     memory::paging::enablepaging(proc->original_cr3);
     memcpy(dest,src,size);
@@ -65,8 +67,16 @@ public:
     if(!syscall_safe::is_safe(x,sz)) \
         return {0,EFAULT,0};
 
-#define CURRENT_PROC arch::x86_64::cpu::data()->temp.proc
+inline arch::x86_64::process_t* __proc_get() {
+    arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
+    return proc;
+}
+
+#define CURRENT_PROC __proc_get()
 #define FIND_FD(x) vfs::fdmanager::search(proc,x)
+
+#define SYSCALL_DISABLE_PREEMPT() asm volatile("cli");
+#define SYSCALL_ENABLE_PREEMPT() asm volatile("sti");
 
 typedef struct {
     std::int8_t is_rdx_ret;
@@ -86,6 +96,12 @@ typedef struct {
 #define MAP_FIXED     0x10
 #define MAP_ANON      0x20
 #define MAP_ANONYMOUS 0x20
+
+#define F_DUPFD  0
+#define F_GETFD  1
+#define F_SETFD  2
+#define F_GETFL  3
+#define F_SETFL  4
 
 extern "C" void syscall_handler();
 
@@ -112,6 +128,8 @@ syscall_ret_t sys_ptsname(int fd, void* out, int max_size);
 
 syscall_ret_t sys_setup_ring_bytelen(char* path, int bytelen);
 syscall_ret_t sys_read_dir(int fd, void* buffer);
+
+syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg);
 
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);

@@ -28,6 +28,18 @@ extern "C" void irqHandler(int_frame_t* ctx) {
         arch::x86_64::cpu::lapic::eoi();
     }
 
+    if(ctx->cs & 3)
+        ctx->ss |= 3;
+                        
+    if(ctx->ss & 3)
+        ctx->cs |= 3;
+
+    if(ctx->cs == 0x20)
+        ctx->cs |= 3;
+                        
+    if(ctx->ss == 0x18)
+        ctx->ss |= 3;
+
 }
 
 void arch::x86_64::interrupts::irq::reset() {

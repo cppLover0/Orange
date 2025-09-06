@@ -67,6 +67,8 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
         fd->queue = is_slave == 1 ? node->readring->ring.tail : node->writering->ring.tail;
         fd->cycle = is_slave == 1 ? node->readring->ring.cycle : node->writering->ring.cycle;
     }
+
+    fd->is_a_tty = node->is_tty;
     fd->other_state = is_slave == 1 ? USERSPACE_FD_OTHERSTATE_SLAVE : USERSPACE_FD_OTHERSTATE_MASTER;
     return 0;    
 }
@@ -160,6 +162,23 @@ std::int32_t __devfs__var(userspace_fd_t* fd, char* path, std::uint64_t value, s
     return status;
 }
 
+std::int32_t __devfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
+    if(!path)
+        return EFAULT;
+
+    vfs::devfs_node_t* node = devfs_find_dev(path);
+    
+    if(!node)
+        return ENOENT;
+
+    if(!out)
+        return EINVAL;
+
+    out->st_size = 0;
+    out->st_mode = S_IFCHR;
+    return 0;
+}
+
 extern locks::spinlock* vfs_lock;
 
 std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
@@ -207,7 +226,9 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                 return count;
             } else {
                 vfs::unlock();
+                asm volatile("sti");
                 std::uint64_t count = node->readpipe->read((char*)packet->value,packet->size);
+                asm volatile("cli");
                 return count;
             }
         }
@@ -230,7 +251,10 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                 vfs::vfs::unlock();
             } else { 
                 vfs::vfs::unlock();
-                return node->readpipe->write((char*)packet->value,packet->size);
+                asm volatile("sti");
+                std::uint64_t i = node->readpipe->write((char*)packet->value,packet->size);
+                asm volatile("cli");
+                return i;
             }
 
             return 8;
@@ -246,7 +270,9 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                 return count;
             } else {
                 vfs::unlock();
+                asm volatile("sti");
                 std::int64_t count = node->writepipe->read((char*)packet->value,packet->size);
+                asm volatile("cli");
                 return count;
             }
         }
@@ -269,9 +295,12 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                 vfs::vfs::unlock();
             } else {
                 vfs::vfs::unlock();
-                return node->writepipe->write((char*)packet->value,packet->size);
+                asm volatile("sti");
+                std::uint64_t i = node->writepipe->write((char*)packet->value,packet->size);
+                asm volatile("cli");
+                return i;
             }
-            return 8;
+            return node->writering->ring.bytelen;
 
         case DEVFS_PACKET_IOCTL: {
 
@@ -438,6 +467,7 @@ void vfs::devfs::mount(vfs_node_t* node) {
     node->ioctl = __devfs__ioctl;
     node->mmap = __devfs__mmap;
     node->var = __devfs__var;
+    node->stat = __devfs__stat;
 
     const char* name = "/ptmx";
 
