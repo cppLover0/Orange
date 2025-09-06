@@ -9,6 +9,9 @@
 #include <etc/libc.hpp>
 #include <etc/logging.hpp>
 
+#include <drivers/ioapic.hpp>
+#include <arch/x86_64/interrupts/irq.hpp>
+
 #include <etc/errno.hpp>
 
 vfs::devfs_node_t* __devfs_head;
@@ -459,6 +462,35 @@ std::int32_t __ptmx_open(userspace_fd_t* fd, char* path) {
     return 0;
 }
 
+std::int64_t __pic_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
+    if(size != 10) {vfs::vfs::unlock();
+        return -EINVAL; }
+
+    std::uint16_t irq_num = *(std::uint16_t*)((std::uint64_t)buffer);
+    std::uint64_t ioapic_flags = *(std::uint64_t*)((std::uint64_t)buffer + 2);
+
+    const char* path0 = "/masterirq";
+    const char* path1 = "/irq";
+
+    vfs::devfs_node_t* new_node = (vfs::devfs_node_t*)memory::pmm::_virtual::alloc(4096);
+    memcpy(new_node->slavepath,path1,strlen(path1)); 
+    memcpy(new_node->masterpath,(char*)path0,strlen((const char*)path0)); 
+    new_node->readring = new Lists::Ring(128);
+    new_node->writering = new Lists::Ring(128);
+    new_node->dev_num = irq_num;
+    new_node->next = __devfs_head;
+    __devfs_head = new_node;
+
+    new_node->writering->setup_bytelen(1);
+    new_node->readring->setup_bytelen(1);
+
+    arch::x86_64::interrupts::irq::create(irq_num,IRQ_TYPE_LEGACY_USERSPACE,0,0,ioapic_flags);    
+    
+    vfs::vfs::unlock();
+    return 10;
+
+}
+
 void vfs::devfs::mount(vfs_node_t* node) {
     __devfs_head = (devfs_node_t*)memory::pmm::_virtual::alloc(4096);
     node->open = __devfs__open;
@@ -477,8 +509,19 @@ void vfs::devfs::mount(vfs_node_t* node) {
     packet.value = (std::uint64_t)name;
 
     send_packet((char*)name,&packet);
+
+    __devfs_head->open = __ptmx_open;
+
+    const char* name0 = "/pic";
+
+    packet.size = tty_ptr;
+    packet.request = DEVFS_PACKET_CREATE_DEV;
+    packet.value = (std::uint64_t)name0;
+
+    send_packet((char*)name0,&packet);
+
     /* The head should be this dev so all ok */
     
-    __devfs_head->open = __ptmx_open;
+    __devfs_head->write = __pic_write;
 
 }

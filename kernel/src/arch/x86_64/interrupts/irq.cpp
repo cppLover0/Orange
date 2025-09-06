@@ -8,6 +8,8 @@
 #include <drivers/ioapic.hpp>
 #include <etc/libc.hpp>
 
+#include <generic/vfs/vfs.hpp>
+
 #include <etc/logging.hpp>
 
 irq_t irq_table[255];
@@ -21,12 +23,17 @@ extern "C" void irqHandler(int_frame_t* ctx) {
 
     memory::paging::enablekernel();
 
-    irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
-    if(is_legacy_pic) {
-        arch::x86_64::interrupts::pic::eoi(ctx->vec);
-    } else {
-        arch::x86_64::cpu::lapic::eoi();
+    if(!irq_table[ctx->vec - 1].is_userspace)
+        irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
+    else {
+        userspace_fd_t fd;
+        memset(fd.path,0,sizeof(fd.path));
+        __printfbuf(fd.path,sizeof(fd.path),"/dev/masterirq%d",ctx->vec - 1);
+        char i = 1;
+        int status = vfs::vfs::write(&fd,&i,1);
     }
+
+    arch::x86_64::cpu::lapic::eoi();
 
     if(ctx->cs & 3)
         ctx->ss |= 3;
@@ -49,9 +56,13 @@ void arch::x86_64::interrupts::irq::reset() {
 
 std::uint8_t arch::x86_64::interrupts::irq::create(std::uint16_t irq,std::uint8_t type,void (*func)(void* arg),void* arg,std::uint64_t flags) {
     uint8_t entry = 0;
+
     if(!is_legacy_pic) {
         entry = arch::x86_64::interrupts::idt::alloc();
         arch::x86_64::interrupts::idt::set_entry((std::uint64_t)irqTable[entry - 0x20],entry,0x8E,3);
+        if(type == IRQ_TYPE_LEGACY_USERSPACE)
+            irq_table[irq_ptr].is_userspace = 1;
+
         drivers::ioapic::set(entry,irq,0,arch::x86_64::cpu::lapic::id());
     } else {
         arch::x86_64::interrupts::idt::set_entry((std::uint64_t)irqTable[irq],irq + 0x20,0x8E,3);

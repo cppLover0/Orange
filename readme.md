@@ -45,7 +45,7 @@ make run
 ## TODO
 
 - [ ] Move XHCI driver from old kernel to userspace
-- [ ] Implement IRQ userspace handling
+- [x] Implement IRQ userspace handling
 - [ ] Port lua, fastfetch, doomgeneric, nano and etc.
 - [ ] Port Xorg 
 - [ ] Implement userspace disk drivers
