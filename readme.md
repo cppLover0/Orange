@@ -13,13 +13,12 @@ Orange is my posix x86_64 os with microkernel features
 
 ## Devices which supported by orange
 
-- [x] Serial
-- [x] CMOS
-- [x] HPET
-- [x] IOAPIC
-- [x] PS/2 Keyboard
-- [x] XHCI
-- [x] USB Keyboard
+- [x] serial
+- [x] cmos
+- [x] hpet
+- [x] pvclock
+- [x] ioapic
+- [x] ps/2 Keyboard
 
 # Build
 
