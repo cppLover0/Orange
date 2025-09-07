@@ -130,4 +130,9 @@ void liborange_free_dma(uint64_t dma_addr);
 
 uint64_t liborange_map_phys(uint64_t phys_addr);
 
+typedef struct {
+    uint16_t irq;
+    uint64_t flags;
+} __attribute__((packed)) liborange_pic_create_t;
+
 #endif

@@ -26,6 +26,7 @@ extern "C" void irqHandler(int_frame_t* ctx) {
     if(!irq_table[ctx->vec - 1].is_userspace)
         irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
     else {
+        drivers::ioapic::mask(ctx->vec - 1); /* Mask */
         userspace_fd_t fd;
         memset(fd.path,0,sizeof(fd.path));
         __printfbuf(fd.path,sizeof(fd.path),"/dev/masterirq%d",ctx->vec - 1);

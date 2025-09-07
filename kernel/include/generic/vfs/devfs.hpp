@@ -123,6 +123,9 @@ namespace vfs {
 
         std::int64_t (*read)(userspace_fd_t* fd, void* buffer, std::uint64_t count);
         std::int64_t (*write)(userspace_fd_t* fd, void* buffer, std::uint64_t size);
+
+        std::int64_t (*slave_write)(userspace_fd_t* fd, void* buffer, std::uint64_t size);
+
         std::int32_t (*ioctl)(userspace_fd_t* fd, unsigned long req, void *arg, int *res);
         std::int32_t (*open)(userspace_fd_t* fd, char* path);
 

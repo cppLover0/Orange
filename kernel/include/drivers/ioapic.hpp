@@ -23,6 +23,8 @@ namespace drivers {
 
         static void init();
         static void set(std::uint8_t vec,std::uint8_t irq,std::uint64_t flags,std::uint64_t lapic);
+        static void mask(std::uint8_t irq);
+        static void unmask(std::uint8_t irq);
 
     };
 };

@@ -86,6 +86,9 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
     if(node->write) 
         return node->write(fd,buffer,size);
 
+    if(is_slave == 1 && node->slave_write)
+        return node->slave_write(fd,buffer,size);
+
     vfs::devfs_packet_t packet;
     packet.request = !is_slave ? DEVFS_PACKET_WRITE_READRING : DEVFS_PACKET_WRITE_WRITERING;
     packet.cycle = &fd->cycle;
@@ -462,6 +465,12 @@ std::int32_t __ptmx_open(userspace_fd_t* fd, char* path) {
     return 0;
 }
 
+std::int64_t __irq_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
+    drivers::ioapic::unmask(dev_num);
+    vfs::vfs::unlock();
+    return size;
+}
+
 std::int64_t __pic_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
     if(size != 10) {vfs::vfs::unlock();
         return -EINVAL; }
@@ -479,6 +488,7 @@ std::int64_t __pic_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
     new_node->writering = new Lists::Ring(128);
     new_node->dev_num = irq_num;
     new_node->next = __devfs_head;
+    new_node->slave_write = __irq_write;
     __devfs_head = new_node;
 
     new_node->writering->setup_bytelen(1);

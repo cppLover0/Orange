@@ -17,24 +17,24 @@ int main() {
 
     int pic = open("/dev/pic",O_RDWR);
 
-    short buf[5];
-    memset(buf,0,sizeof(buf));
-    buf[0] = 1;
+    liborange_pic_create_t irq_create_request;
+    irq_create_request.flags = 0;
+    irq_create_request.irq = 1;
     
-    write(pic,buf,10);
+    write(pic,&irq_create_request,sizeof(liborange_pic_create_t));
     close(pic);
 
     int kbd_irq = open("/dev/irq1",O_RDWR);
     
     char val = 0;
     while(1) {
-        val = 0;
         int count = read(kbd_irq,&val,1);
         if(count && val == 1) {
-            while(!(inb(0x64) & 1)) asm volatile ("pause"); 
-            uint8_t scancode = inb(0x60);
-
-            write(masterinput,&scancode,1);
+            write(kbd_irq,&val,1); /* Ask kernel to unmask this irq */
+            while((inb(0x64) & 1)) { 
+                uint8_t scancode = inb(0x60);
+                write(masterinput,&scancode,1);
+            }
         }
     }
 }

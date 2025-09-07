@@ -86,3 +86,35 @@ void drivers::ioapic::set(std::uint8_t vec,std::uint8_t irq,std::uint64_t flags,
     write(apic->address,irqreg + 1,(std::uint32_t)((std::uint64_t)calc_flags >> 32));
 
 }
+
+void drivers::ioapic::mask(std::uint8_t irq) {
+    struct acpi_madt_ioapic* apic;
+    struct acpi_madt_interrupt_source_override* ciso;
+
+    for(std::uint8_t i = 0;i < apic_ent; i++) {
+        apic = &apics[i];
+        std::uint32_t ver = read(apic->address,1);
+        std::uint32_t max = ver >> 16;
+        if(apic->gsi_base <= irq && apic->gsi_base + max > irq)
+            break;
+    }
+
+    std::uint32_t irqreg = ((irq - apic->gsi_base) * 2) + 0x10;
+    write(apic->address,irqreg,(std::uint32_t)read(apic->address,irqreg) | (1 << 16));
+}
+
+void drivers::ioapic::unmask(std::uint8_t irq) {
+    struct acpi_madt_ioapic* apic;
+    struct acpi_madt_interrupt_source_override* ciso;
+
+    for(std::uint8_t i = 0;i < apic_ent; i++) {
+        apic = &apics[i];
+        std::uint32_t ver = read(apic->address,1);
+        std::uint32_t max = ver >> 16;
+        if(apic->gsi_base <= irq && apic->gsi_base + max > irq)
+            break;
+    }
+
+    std::uint32_t irqreg = ((irq - apic->gsi_base) * 2) + 0x10;
+    write(apic->address,irqreg,(std::uint32_t)read(apic->address,irqreg) & ~(1 << 16));
+}
