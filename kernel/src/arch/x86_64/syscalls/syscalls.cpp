@@ -44,7 +44,12 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {32,(void*)sys_gethostname},
     {33,(void*)sys_getcwd},
     {34,(void*)sys_waitpid},
-    {35,(void*)sys_fcntl}
+    {35,(void*)sys_fcntl},
+    {36,(void*)sys_fchdir},
+    {37,(void*)sys_sleep},
+    {38,(void*)sys_alloc_dma},
+    {39,(void*)sys_map_phys},
+    {40,(void*)sys_free_dma}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {

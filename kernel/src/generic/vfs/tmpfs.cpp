@@ -93,6 +93,10 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
     char copy[2048];
     memset(copy,0,2048);
     memcpy(copy,path,strlen(path));
+
+    if(path[0] == '\0')
+        return EINVAL;
+
     __tmpfs__find_dir(copy);
 
     if(!__tmpfs__exists(copy)) {
@@ -115,7 +119,7 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
     }
 
     if(!node)
-        node = new vfs::tmpfs_node_t;
+        node = (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
 
     node->type = type;
     node->content = 0;
@@ -267,12 +271,14 @@ std::int32_t __tmpfs__ls(userspace_fd_t* fd, char* path, vfs::dirent_t* out) {
     if(!__tmpfs__exists(path))
         return ENOENT;
 
+again:
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
     if(node->type != VFS_TYPE_DIRECTORY)
         return ENOTDIR;
 
     if(fd->offset == node->size / 8) {
         out->d_reclen = 0;
+        memset(out->d_name,0,sizeof(out->d_name));
         return 0; 
     }
 
@@ -281,6 +287,10 @@ std::int32_t __tmpfs__ls(userspace_fd_t* fd, char* path, vfs::dirent_t* out) {
     memcpy(out->d_name,__tmpfs__find_name(next->name),strlen(__tmpfs__find_name(next->name)));
     out->d_reclen = sizeof(vfs::dirent_t);
     fd->offset++;
+
+    if(out->d_name[0] == 0)
+        goto again;
+
     return 0;
 }
 

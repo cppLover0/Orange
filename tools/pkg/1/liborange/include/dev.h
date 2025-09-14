@@ -125,10 +125,31 @@ inline void liborange_setup_ring_bytelen(char* path, int bytelen) {
     asm volatile("syscall" : : "a"(27), "D"(path), "S"(bytelen) : "rcx","r11");
 }
 
-uint64_t liborange_alloc_dma(uint64_t dma_size);
-void liborange_free_dma(uint64_t dma_addr);
+inline uint64_t liborange_alloc_dma(uint64_t dma_size) {
+    uint64_t addr = 0;
+    asm volatile("syscall" : "=d"(addr) : "a"(38), "D"(dma_size) : "rcx","r11");
+    return addr;
+}
 
-uint64_t liborange_map_phys(uint64_t phys_addr);
+void liborange_free_dma(uint64_t dma_addr) {
+    asm volatile("syscall" : : "a"(40), "D"(dma_addr) : "rcx","r11");
+}
+
+inline void* liborange_map_phys(uint64_t phys_addr,uint64_t flags,uint64_t size) {
+    uint64_t addr = 0;
+    asm volatile("syscall" : "=d"(addr) : "a"(39), "D"(phys_addr), "S"(flags), "d"(size) : "rcx","r11");
+    return (void*)addr;
+}
+
+#define PAGE_SIZE 4096
+
+#define ROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
+#define ALIGNPAGEUP(VALUE) (ROUNDUP(VALUE,PAGE_SIZE) * PAGE_SIZE)
+#define ALIGNPAGEDOWN(VALUE) ((VALUE / PAGE_SIZE) * PAGE_SIZE)
+
+#define CROUNDUP(VALUE,ROUND) ((VALUE + (ROUND - 1)) / ROUND)
+#define CALIGNPAGEUP(VALUE,c) ((VALUE + c - 1) & ~(c - 1))
+#define CALIGNPAGEDOWN(VALUE,c) ((VALUE / c) * c)
 
 typedef struct {
     uint16_t irq;

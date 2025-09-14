@@ -131,6 +131,8 @@ syscall_ret_t sys_read_dir(int fd, void* buffer);
 
 syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg);
 
+syscall_ret_t sys_fchdir(int fd);
+
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
 syscall_ret_t sys_free(void *pointer, size_t size);
@@ -153,6 +155,13 @@ syscall_ret_t sys_gethostname(void* buffer, std::uint64_t bufsize);
 syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize);
 
 syscall_ret_t sys_waitpid(int pid);
+
+syscall_ret_t sys_sleep(long us);
+
+syscall_ret_t sys_alloc_dma(std::uint64_t size);
+syscall_ret_t sys_free_dma(std::uint64_t phys);
+
+syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_t size);
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);

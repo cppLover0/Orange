@@ -123,6 +123,19 @@ namespace memory {
 
         inline static void* map(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t length, std::uint64_t flags) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+
+            while(current) {
+
+                if(current->phys == base)
+                    return (void*)current->base; // Just return
+
+                if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                    break;
+
+                current = current->next;
+            }
+
+            current = (vmm_obj_t*)proc->vmm_start;
             vmm_obj_t* new_vmm = v_alloc(current,length);
             new_vmm->flags = flags;
             new_vmm->phys = base;

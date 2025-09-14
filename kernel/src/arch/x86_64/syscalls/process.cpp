@@ -200,6 +200,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     vfs::stat_t stat;
 
     userspace_fd_t fd;
+    memset(fd.path,0,2048);
     memcpy(fd.path,stack_path,strlen(stack_path));
 
     int status = vfs::vfs::nlstat(&fd,&stat); 
@@ -207,7 +208,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     vfs::vfs::unlock();
 
     if(status == 0) {
-        if(stat.st_mode & S_IXUSR && stat.st_mode & S_IFCHR) {
+        if((stat.st_mode & S_IXUSR) && (stat.st_mode & S_IFCHR)) {
 
             proc->fs_base = 0;
 
@@ -291,7 +292,11 @@ syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
     zero_in_userspace(proc,buffer,bufsize);
-    copy_in_userspace(proc,buffer,(void*)proc->cwd,strlen(proc->cwd));
+    
+    char buffer0[4096];
+    memcpy(buffer0,proc->cwd,4096);
+
+    copy_in_userspace(proc,buffer,buffer0,strlen((const char*)buffer0) > bufsize ? bufsize : strlen((const char*)buffer0));
 
     return {0,0,0};
 }
@@ -356,4 +361,24 @@ syscall_ret_t sys_waitpid(int pid) {
         current = head_proc;
     }
 
+}
+
+syscall_ret_t sys_sleep(long us) {
+    SYSCALL_ENABLE_PREEMPT();
+    time::sleep(us);
+    return {0,0,0};
+}
+
+syscall_ret_t sys_alloc_dma(std::uint64_t size) {
+    return {1,0,memory::pmm::_physical::alloc(size)};
+}
+
+syscall_ret_t sys_free_dma(std::uint64_t phys) {
+    memory::pmm::_physical::free(phys);
+    return {0,0,0};
+}
+
+syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_t size) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    return {1,0,(std::int64_t)memory::vmm::map(proc,phys,size,PTE_PRESENT | PTE_USER | PTE_RW | flags)};
 }

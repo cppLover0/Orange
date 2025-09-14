@@ -23,6 +23,8 @@
 
 #include <etc.hpp>
 
+#include <sys/wait.h>
+
 int ends_with(const char *str, const char *suffix) {
     if (!str || !suffix)
         return 0;
@@ -43,7 +45,7 @@ void start_all_drivers() {
     }
 
     while ((entry = readdir(dir)) != NULL) {
-        if (ends_with(entry->d_name, EXT)) {
+        if (ends_with(entry->d_name, ".sys")) {
             char filepath[1024];
             snprintf(filepath, sizeof(filepath), "%s%s", DIR_PATH, entry->d_name);
 
@@ -52,6 +54,23 @@ void start_all_drivers() {
             pid_t pid = fork();
             if (pid < 0) {
                 continue;
+            } else if (pid == 0) {
+                execl(filepath, filepath, (char *)NULL);
+            } 
+        } else if(ends_with(entry->d_name,".wsys")) {
+            char filepath[1024];
+            snprintf(filepath, sizeof(filepath), "%s%s", DIR_PATH, entry->d_name);
+
+            log(LEVEL_MESSAGE_OK,"Starting %s",entry->d_name);
+
+            pid_t pid = fork();
+            if (pid != 0) {
+                char success = 0;
+                while(!success) {
+                    int r_pid = wait(NULL);
+                    if(pid == r_pid)
+                        success = 1;
+                }
             } else if (pid == 0) {
                 execl(filepath, filepath, (char *)NULL);
             } 

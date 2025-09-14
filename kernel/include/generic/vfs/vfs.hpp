@@ -112,12 +112,13 @@ namespace vfs {
         std::int64_t size = 0;
         std::uint64_t total_size = 0;
         std::uint64_t read_ptr = 0;
-        std::uint64_t flags = 0;
         locks::spinlock lock;
         std::atomic_flag is_received = ATOMIC_FLAG_INIT;
         std::atomic_flag is_n_closed = ATOMIC_FLAG_INIT;
         std::atomic_flag is_closed = ATOMIC_FLAG_INIT;
     public:
+
+        std::uint64_t flags = 0;
 
         pipe(std::uint64_t flags) {
             this->buffer = (char*)memory::pmm::_virtual::alloc(USERSPACE_PIPE_SIZE);

@@ -318,6 +318,16 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                     memcpy((void*)packet->ioctl.arg,node->ioctls[i].pointer_to_struct,node->ioctls[i].size);
                     return 0;
                 } else if(node->ioctls[i].write_req == packet->ioctl.ioctlreq) { /* Write */
+                    if(node->is_tty) {
+                        if(packet->ioctl.ioctlreq == TCSETS) {
+                            termios_t* termios = (termios_t*)packet->ioctl.arg;
+                            if(!(termios->c_lflag & ICANON) && termios->c_cc[VMIN] == 0) {
+                                node->readpipe->flags |= (O_NONBLOCK);
+                            } else {
+                                node->readpipe->flags &= ~(O_NONBLOCK);
+                            }
+                        }
+                    }
                     memcpy(node->ioctls[i].pointer_to_struct,(void*)packet->ioctl.arg,node->ioctls[i].size);
                     return 0;
                 }

@@ -151,6 +151,9 @@ syscall_ret_t sys_seek(int fd, long offset, int whence) {
     if(!fd_s) 
         return {1,EBADF,0};
 
+    if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+        return {1,0,0};
+
     vfs::stat_t stat;
     vfs::vfs::stat(fd_s,&stat);
 
@@ -379,6 +382,9 @@ syscall_ret_t sys_isatty(int fd) {
     if(!fd_s)
         return {0,EBADF,0};
 
+    if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+        return {0,ENOTTY,0};
+
     int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
 
     fd_s->is_a_tty = ret == 0 ? 1 : 0;
@@ -461,7 +467,7 @@ syscall_ret_t sys_read_dir(int fd, void* buffer) {
     copy_in_userspace(proc,&dirent,buffer,sizeof(vfs::dirent_t));
 
     int status = vfs::vfs::ls(fd_s,&dirent);
-
+        
     copy_in_userspace(proc,buffer,&dirent,sizeof(vfs::dirent_t));
     return {1,status,dirent.d_reclen};
     
@@ -478,4 +484,26 @@ syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
         }
     }
     return {0,ENOSYS,0};
+}
+
+syscall_ret_t sys_fchdir(int fd) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    vfs::stat_t stat;
+    int ret = vfs::vfs::stat(fd_s,&stat);
+
+    if(ret != 0)
+        return {0,ret,0};
+
+    if(!(stat.st_mode & S_IFDIR))
+        return {0,ENOTDIR,0};
+
+    memset(proc->cwd,0,4096);
+    memcpy(proc->cwd,fd_s->path,2048);
+
+    return {0,0,0};
+
 }

@@ -52,6 +52,9 @@ typedef struct {
 	speed_t obaud;
 } __attribute__((packed)) termios_t;
 
+#define ICANON	0000002 
+#define VMIN 6
+
 namespace vfs {
 
     typedef struct {
