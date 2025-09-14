@@ -1135,6 +1135,7 @@ void __xhci_process_fetch(xhci_device_t* dev) {
                 switch(current->info_s.type) {
                     case TRB_PORTSTATUSCHANGEEVENT_TYPE: {
                         xhci_port_change_trb_t* trb = (xhci_port_change_trb_t*)current;
+                        printf("portstatuschange on port %d\n",trb->port);
                         __xhci_init_dev(dev,trb->port);
                         break;
                     }

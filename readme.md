@@ -19,6 +19,8 @@ Orange is my posix x86_64 os with microkernel features
 - [x] pvclock
 - [x] ioapic
 - [x] ps/2 Keyboard
+- [x] xhci
+- [x] usb keyboard
 
 # Build
 
@@ -44,7 +46,7 @@ make run
 
 ## TODO
 
-- [ ] Move XHCI driver from old kernel to userspace
+- [x] Move XHCI driver from old kernel to userspace
 - [x] Implement IRQ userspace handling
 - [ ] Port lua, fastfetch, doomgeneric, nano and etc.
 - [ ] Port Xorg 
