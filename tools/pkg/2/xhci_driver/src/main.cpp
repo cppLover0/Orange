@@ -7,6 +7,7 @@
 #include <orange/dev.h>
 #include <orange/io.h>
 #include <orange/pci.h>
+#include <orange/log.h>
 
 #include <fcntl.h>
 
@@ -44,7 +45,7 @@ void __xhci_reset(xhci_device_t* dev) {
     uint16_t timeout = XHCI_RESET_TIMEOUT;
     while(dev->op->usbsts & (1 << 11)) {
         if(!timeout) {
-            printf("Can't reset XHCI Controller, ignoring\n");
+            log(LEVEL_MESSAGE_FAIL,"Can't reset XHCI Controller, ignoring\n");
             break;
         }
         usleep(5 * 1000);
@@ -61,7 +62,7 @@ void __xhci_enable(xhci_device_t* dev) {
     uint16_t timeout = XHCI_RESET_TIMEOUT;
     while(dev->op->usbsts & (1 << 0)) {
         if(!timeout) {
-            printf("Can't start XHCI Controller, crying\n");
+            log(LEVEL_MESSAGE_FAIL,"Can't start XHCI Controller, crying\n");
             break;
         }
         usleep(5 * 1000);
@@ -75,7 +76,7 @@ void __xhci_enable(xhci_device_t* dev) {
 void __xhci_reset_intr(xhci_device_t* dev, uint16_t intr) {
 
     if(intr > dev->cap->hcsparams1.maxintrs) {
-        printf("Intr is higher than maxintrs! Skipping");
+        log(LEVEL_MESSAGE_FAIL,"Intr is higher than maxintrs! Skipping");
         return;
     }
 
@@ -243,7 +244,7 @@ xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
                 if(current->info_s.type == type) {
                     return *current;
                 } else {
-                    printf("Wait for wrong type %d\n",current->info_s.type);
+                    log(LEVEL_MESSAGE_WARN,"Wait for wrong type %d\n",current->info_s.type);
                 }
             }
         }
@@ -335,7 +336,7 @@ int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
     xhci_slot_trb_t* slot_ret = (xhci_slot_trb_t*)&ret;
 
     if(slot_ret->ret_code != 1)
-        printf("Can't allocate slot for port %d (ret %d)\n",portnum,ret.status & 0xFF);
+        log(LEVEL_MESSAGE_FAIL,"Can't allocate slot for port %d (ret %d)\n",portnum,ret.status & 0xFF);
 
     return slot_ret->info_s.slotid;
 
@@ -357,7 +358,7 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
     if(ret.ret_code != 1)
-        printf("Can't set XHCI port address (ret %d)\n",ret.status & 0xFF);
+        log(LEVEL_MESSAGE_FAIL,"Can't set XHCI port address (ret %d)\n",ret.status & 0xFF);
 
     return ret.ret_code;
 
@@ -422,13 +423,13 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_TRANSFEREVENT_TYPE);
 
     if(ret.base == 0xDEAD) {
-        printf("Timeout on port %d\n",usbdev->portnum);
+        log(LEVEL_MESSAGE_FAIL,"Timeout on port %d\n",usbdev->portnum);
         ret.ret_code = 0;
         return ret;
     }
 
     if(ret.ret_code != 1) {
-        printf("Failed to request xhci device, idx: %p, val: %p, type: %p, len: %p, request: %d ret_code %d\n",usbcommand.index,usbcommand.value,usbcommand.type,usbcommand.len,usbcommand.request,ret.ret_code);
+        log(LEVEL_MESSAGE_FAIL,"Failed to request xhci device, idx: %p, val: %p, type: %p, len: %p, request: %d ret_code %d\n",usbcommand.index,usbcommand.value,usbcommand.type,usbcommand.len,usbcommand.request,ret.ret_code);
         ret.ret_code = 0;
         return ret;
     }
@@ -471,9 +472,6 @@ xhci_trb_t __xhci_send_usb_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,x
     usleep(10000);
 
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_TRANSFEREVENT_TYPE);
-
-    if(ret.base == 0xDEAD)
-        printf("Timeout !\n");
 
     return ret;
 
@@ -546,7 +544,7 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
     if(dev->usb3ports[portnum]) {
         while(*portsc & (1 << 19)) {
             if(time-- == 0) {
-                printf("Can't reset USB 3.0 device with port %d, ignoring\n",portnum);
+                log(LEVEL_MESSAGE_FAIL,"Can't reset USB 3.0 device with port %d, ignoring\n",portnum);
                 return 0;
             }
             usleep(50000);
@@ -554,7 +552,7 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
     } else {
         while((*portsc & (1 << 1)) == old_bit) {
             if(time-- == 0) {
-                printf("Can't reset USB 2.0 device with port %d, ignoring\n",portnum);
+                log(LEVEL_MESSAGE_FAIL,"Can't reset USB 2.0 device with port %d, ignoring\n",portnum);
                 return 0;
             }
             usleep(50000);
@@ -670,7 +668,7 @@ void __xhci_setup_config(xhci_device_t* dev,xhci_usb_device_t* usbdev,uint16_t v
     int ret = __xhci_send_usb_packet(dev,usbdev,command).ret_code;
 
     if(ret != 1) 
-        printf("Can't set configuration on port %d with val %d (ret %d)\n",usbdev->portnum,value,ret);
+        log(LEVEL_MESSAGE_FAIL,"Can't set configuration on port %d with val %d (ret %d)\n",usbdev->portnum,value,ret);
 }
 
 void __xhci_get_config_descriptor(xhci_device_t* dev,xhci_usb_device_t* usbdev, xhci_config_descriptor_t* out) {
@@ -849,7 +847,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     usb_dev->type = 0;
 
     if(!speed) {
-        printf("Broken USB Device/Firmware, can't continue work. skipping\n");
+        log(LEVEL_MESSAGE_FAIL,"Broken USB Device/Firmware, can't continue work. skipping\n");
         return; //now i cant ignore anymore...
     }
 
@@ -1025,11 +1023,8 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
-    if(ret.base == 0xDEAD)
-        printf("Timeout !\n");
-
     if(ret.ret_code != 1) {
-        printf("Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
+        log(LEVEL_MESSAGE_FAIL,"Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
         return;
     }
     
@@ -1037,7 +1032,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     usleep(1000);
 
-    printf("Found USB%s Device %s (%d, %d, %d) %s %s on port %d and slot %d\n",dev->usb3ports[portnum] == 1 ? "3.0" : "2.0",((load_portsc & 0x3C00) >> 10) < 7 ? speed_to_str[(load_portsc & 0x3C00) >> 10] : "Broken (0 MB/S - USB ?)",(load_portsc & 0x3C00) >> 10,speed,descriptor->maxpacketsize,manufacter,product,portnum,usb_dev->slotid);
+    log(LEVEL_MESSAGE_INFO,"Found USB%s Device %s (%d, %d, %d) %s %s on port %d and slot %d\n",dev->usb3ports[portnum] == 1 ? "3.0" : "2.0",((load_portsc & 0x3C00) >> 10) < 7 ? speed_to_str[(load_portsc & 0x3C00) >> 10] : "Broken (0 MB/S - USB ?)",(load_portsc & 0x3C00) >> 10,speed,descriptor->maxpacketsize,manufacter,product,portnum,usb_dev->slotid);
 
 }
 
@@ -1083,8 +1078,6 @@ void __xhci_iterate_usb_ports(xhci_device_t* dev) {
             *cap |= (1 << 24);
 
             usleep(500 * 1000);
-            if(*cap & (1 << 16)) 
-                printf("Bios is annoying, can't fuck up this\n");
 
         }
 
@@ -1133,12 +1126,6 @@ void __xhci_process_fetch(xhci_device_t* dev) {
             for(int i = 0;i < count;i++) {
                 current = buffer[i];
                 switch(current->info_s.type) {
-                    case TRB_PORTSTATUSCHANGEEVENT_TYPE: {
-                        xhci_port_change_trb_t* trb = (xhci_port_change_trb_t*)current;
-                        printf("portstatuschange on port %d\n",trb->port);
-                        __xhci_init_dev(dev,trb->port);
-                        break;
-                    }
                     case TRB_TRANSFEREVENT_TYPE: {
                         xhci_usb_device_t* usbdev = usbdevs;
                         xhci_done_trb_t* trb = (xhci_done_trb_t*)current;
@@ -1157,6 +1144,9 @@ void __xhci_process_fetch(xhci_device_t* dev) {
                             usbdev = usbdev->next;
                         }
                         break;
+                    }
+                    default: {
+                        log(LEVEL_MESSAGE_WARN,"xhci unsupported trb: %d\n",current->info_s.type);
                     }
                 }
             }
@@ -1364,6 +1354,8 @@ int main() {
     liborange_setup_iopl_3();
 
     input0_fd = open("/dev/masterinput0",O_RDWR);
+
+    log(LEVEL_MESSAGE_WARN,"XHCI Driver is currently under development so it's unstable\n");
 
     xhci_hid_register(__usbkeyboard_handler,USB_TYPE_KEYBOARD);
     hid_layout_init();

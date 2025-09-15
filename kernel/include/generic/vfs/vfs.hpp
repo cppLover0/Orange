@@ -15,6 +15,7 @@
 #define USERSPACE_FD_STATE_UNUSED 0
 #define USERSPACE_FD_STATE_FILE 1
 #define USERSPACE_FD_STATE_PIPE 2
+#define USERSPACE_FD_STATE_SOCKET 3
 
 #define VFS_TYPE_NONE 0
 #define VFS_TYPE_FILE 1
@@ -226,6 +227,9 @@ typedef struct userspace_fd {
     std::int32_t index;
     std::uint8_t state;
     std::uint8_t pipe_side;
+
+    vfs::pipe* read_socket_pipe;
+    vfs::pipe* write_socket_pipe;
 
     std::uint8_t is_a_tty;
 

@@ -49,7 +49,12 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {37,(void*)sys_sleep},
     {38,(void*)sys_alloc_dma},
     {39,(void*)sys_map_phys},
-    {40,(void*)sys_free_dma}
+    {40,(void*)sys_free_dma},
+    {41,(void*)sys_connect},
+    {42,(void*)sys_accept},
+    {43,(void*)sys_bind},
+    {44,(void*)sys_socket},
+    {45,(void*)sys_listen}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {

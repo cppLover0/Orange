@@ -167,6 +167,15 @@ syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);
 syscall_ret_t sys_futex_wake(int* pointer);
 
+/* Socket */
+syscall_ret_t sys_socket(int family, int type, int protocol);
+
+syscall_ret_t sys_bind(int fd, struct sockaddr_un* path, int len);
+syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len);
+syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len);
+
+syscall_ret_t sys_listen(int fd, int backlog);
+
 namespace arch {
     namespace x86_64 {
         typedef struct {

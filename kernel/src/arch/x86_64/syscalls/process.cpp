@@ -319,7 +319,7 @@ syscall_ret_t sys_waitpid(int pid) {
     if(pid == -1) {
         while (current)
         {
-            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING) &&current->waitpid_state == 0) {
+            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING)) {
                 current->waitpid_state = 1;
                 success = 1;
             }

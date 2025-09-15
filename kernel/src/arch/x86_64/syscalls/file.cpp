@@ -102,6 +102,20 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
         SYSCALL_ENABLE_PREEMPT();
         bytes_read = fd_s->pipe->read(temp_buffer,count);
         SYSCALL_DISABLE_PREEMPT();
+    } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
+
+        if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
+            return {1,EFAULT,0};
+
+        if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+            SYSCALL_ENABLE_PREEMPT();
+            bytes_read = fd_s->write_socket_pipe->read(temp_buffer,count);
+            SYSCALL_DISABLE_PREEMPT();
+        } else {
+            SYSCALL_ENABLE_PREEMPT();
+            bytes_read = fd_s->read_socket_pipe->read(temp_buffer,count);
+            SYSCALL_DISABLE_PREEMPT();
+        }
     } else
         return {1,EBADF,0};
 
@@ -131,6 +145,20 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
         SYSCALL_ENABLE_PREEMPT();
         bytes_written = fd_s->pipe->write(temp_buffer,count);
         SYSCALL_DISABLE_PREEMPT();
+    } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
+
+        if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
+            return {1,EFAULT,0};
+
+        if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+            SYSCALL_ENABLE_PREEMPT();
+            bytes_written = fd_s->read_socket_pipe->write(temp_buffer,count);
+            SYSCALL_DISABLE_PREEMPT();
+        } else {
+            SYSCALL_ENABLE_PREEMPT();
+            bytes_written = fd_s->write_socket_pipe->write(temp_buffer,count);
+            SYSCALL_DISABLE_PREEMPT();
+        }
     } else
         return {1,EBADF,0};
 

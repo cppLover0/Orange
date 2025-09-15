@@ -1,5 +1,6 @@
 
 #include <arch/x86_64/syscalls/syscalls.hpp>
+#include <arch/x86_64/syscalls/sockets.hpp>
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/interrupts/irq.hpp>
 #include <arch/x86_64/interrupts/pic.hpp>
@@ -85,6 +86,9 @@ extern "C" void main() {
 
     arch::x86_64::syscall::init();
     Log::Display(LEVEL_MESSAGE_OK,"Syscalls initializied\n");
+
+    sockets::init();
+    Log::Display(LEVEL_MESSAGE_OK,"Sockets initializied\n");
 
     uacpi_status ret = uacpi_install_fixed_event_handler(
         UACPI_FIXED_EVENT_POWER_BUTTON,
