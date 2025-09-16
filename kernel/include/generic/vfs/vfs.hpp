@@ -136,7 +136,7 @@ namespace vfs {
             
             if(side == PIPE_SIDE_WRITE) {
                 this->connected_to_pipe_write--;
-                if(this->connected_to_pipe_write == 0) {
+                if(this->connected_to_pipe_write <= 1) {
                     this->is_received.clear();
                     this->is_closed.test_and_set();
                 }
@@ -224,6 +224,7 @@ typedef struct {
 
 typedef struct userspace_fd {
     std::uint64_t offset;
+    std::uint64_t flags;
     std::int32_t index;
     std::uint8_t state;
     std::uint8_t pipe_side;

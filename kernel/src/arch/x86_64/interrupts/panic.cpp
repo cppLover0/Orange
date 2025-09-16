@@ -39,15 +39,6 @@ void panic(int_frame_t* ctx, const char* msg) {
     asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
     Log::Display(LEVEL_MESSAGE_FAIL,"Got exception \"%s\" with rip 0x%p, vec %d, cr2 0x%p and error code 0x%p \n",msg,ctx->rip,ctx->vec,cr2,ctx->err_code);
     
-    stackframe_t* rbp = (stackframe_t*)ctx->rbp;
-
-    Log::Display(LEVEL_MESSAGE_INFO,"Back Trace\n");
-    for(unsigned int frame = 0; rbp && frame < 10; ++frame)
-    {
-        Log::Display(LEVEL_MESSAGE_INFO,"Address #%d: 0x%p\n",frame,rbp->rip);
-        rbp = rbp->rbp;
-    }
-    
     asm volatile("hlt");
 }
 

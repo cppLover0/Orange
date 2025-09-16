@@ -237,7 +237,14 @@ syscall_ret_t sys_stat(int fd, void* out) {
             return {0,status,0};
         copy_in_userspace(proc,out,&stat,sizeof(vfs::stat_t));
     } else {
-        return {0,ENOENT,0};
+        vfs::stat_t stat;
+        memset(&stat,0,sizeof(vfs::stat_t));
+        if(fd_s->state == USERSPACE_FD_STATE_SOCKET)
+            stat.st_mode |= S_IFSOCK;
+        else if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+            stat.st_mode |= S_IFIFO;
+        copy_in_userspace(proc,out,&stat,sizeof(vfs::stat_t));
+        return {0,0,0};
     }
     return {0,0,0};
 }
@@ -249,6 +256,7 @@ syscall_ret_t sys_pipe(int flags) {
     userspace_fd_t* fd1 = vfs::fdmanager::search(proc,read_fd);
     userspace_fd_t* fd2 = vfs::fdmanager::search(proc,write_fd);
 
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys_pipe flags 0x%p\n",flags);
     vfs::pipe* new_pipe = new vfs::pipe(flags);
     fd1->pipe_side = PIPE_SIDE_READ;
     fd2->pipe_side = PIPE_SIDE_WRITE;
@@ -290,7 +298,7 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
 
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"dup2 from %d to %d\n",fd,newfd);
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"dup2 from %d to %d in proc %d with flags 0x%p\n",fd,newfd,proc->id,flags);
 
     if(!fd_s)
         return {0,EBADF,0};
@@ -502,13 +510,40 @@ syscall_ret_t sys_read_dir(int fd, void* buffer) {
 }
 
 syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"fcntl %d\n",request);
     switch(request) {
         case F_DUPFD: {
             return sys_dup(fd,arg);
         }
 
+        case F_GETFL: {
+            arch::x86_64::process_t* proc = CURRENT_PROC;
+            userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+            if(!fd_s)
+                return {0,EBADF,0};
+
+            return {1,0,(std::int64_t)(fd_s->flags | (fd_s->state == USERSPACE_FD_STATE_PIPE ? fd_s->pipe->flags : 0))};
+        }
+
+        case F_SETFL: {
+            arch::x86_64::process_t* proc = CURRENT_PROC;
+            userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+            if(!fd_s)
+                return {0,EBADF,0};
+
+            fd_s->flags &= ~(O_APPEND | O_ASYNC | O_NONBLOCK);
+            fd_s->flags |= (arg & (O_APPEND | O_ASYNC | O_NONBLOCK));
+
+            if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
+                fd_s->pipe->flags & ~(O_NONBLOCK);
+                fd_s->pipe->flags |= (arg & O_NONBLOCK);
+            }
+
+            return {1,0,0};
+        }
+
         default: {
-            return {0,ENOSYS,0};
+            return {0,0,0};
         }
     }
     return {0,ENOSYS,0};
