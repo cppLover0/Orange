@@ -296,6 +296,7 @@ void arch::x86_64::scheduling::kill(process_t* proc) {
     proc->lock.nowaitlock();
     proc->status = PROCESS_STATE_ZOMBIE;
     proc->exit_timestamp = time::counter();
+    memory::vmm::free(proc);
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
     memory::pmm::_virtual::free(proc->sse_ctx);
@@ -381,10 +382,12 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
 
     if(ctx) {
         if(current) {
-            current->ctx = *ctx;
-            current->fs_base = __rdmsr(0xC0000100);
-            arch::x86_64::cpu::sse::save((std::uint8_t*)current->sse_ctx);
-            current->user_stack = data->user_stack; /* Only user stack should be saved */
+            if(!current->kill_lock.test()) {
+                current->ctx = *ctx;
+                current->fs_base = __rdmsr(0xC0000100);
+                arch::x86_64::cpu::sse::save((std::uint8_t*)current->sse_ctx);
+                current->user_stack = data->user_stack; /* Only user stack should be saved */
+            }
         }
     }
 

@@ -16,11 +16,14 @@
 
 #include <etc/logging.hpp>
 
+#include <arch/x86_64/syscalls/sockets.hpp>
+
 #include <cstdint>
 
-syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
+syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ctx) {
     SYSCALL_IS_SAFEA((void*)path,0);
 
+    std::uint32_t mode = ctx->r8;
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
     char first_path[2048];
@@ -58,6 +61,8 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags) {
 
     if(flags & O_CREAT)
         vfs::vfs::touch(new_fd_s->path);
+
+    new_fd_s->mode = mode;
 
     std::int32_t status = vfs::vfs::open(new_fd_s);
 
@@ -494,13 +499,14 @@ syscall_ret_t sys_setup_ring_bytelen(char* path, int bytelen) {
 
 syscall_ret_t sys_read_dir(int fd, void* buffer) {
 
+    SYSCALL_IS_SAFEA(buffer,4096);
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
     if(!fd_s)
         return {0,EBADF,0};
 
     vfs::dirent_t dirent;
-    copy_in_userspace(proc,&dirent,buffer,sizeof(vfs::dirent_t));
+    memset(&dirent,0,sizeof(vfs::dirent_t));
 
     int status = vfs::vfs::ls(fd_s,&dirent);
         
@@ -568,5 +574,36 @@ syscall_ret_t sys_fchdir(int fd) {
     memcpy(proc->cwd,fd_s->path,2048);
 
     return {0,0,0};
+
+}
+
+syscall_ret_t sys_mkfifoat(int dirfd, const char *path, int mode) {
+    SYSCALL_IS_SAFEA((void*)path,0);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    char first_path[2048];
+    memset(first_path,0,2048);
+    if(dirfd >= 0)
+        memcpy(first_path,vfs::fdmanager::search(proc,dirfd)->path,strlen(vfs::fdmanager::search(proc,dirfd)->path));
+    else if(dirfd == AT_FDCWD)
+        memcpy(first_path,proc->cwd,strlen(proc->cwd));
+
+    char kpath[2048];
+    memset(kpath,0,2048);
+    copy_in_userspace_string(proc,kpath,(void*)path,2048);
+
+    char result[2048];
+    memset(result,0,2048);
+    vfs::resolve_path(kpath,first_path,result,1,0);
+
+    userspace_fd_t* new_fd_s;
+    memset(new_fd_s->path,0,2048);
+    memcpy(new_fd_s->path,result,strlen(result));
+
+    vfs::stat_t stat;
+
+    if(vfs::vfs::stat(new_fd_s,&stat) == 0)
+        return {0,EEXIST,0};
 
 }

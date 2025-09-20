@@ -274,6 +274,9 @@ namespace memory {
             }
 
             memory::pmm::_physical::fullfree(proc->id);
+            memory::pmm::_physical::free(proc->original_cr3);
+
+            proc->original_cr3 = 0;
 
             proc->vmm_start = 0;
     

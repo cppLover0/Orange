@@ -135,16 +135,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     std::uint64_t argv_length = 0;
     std::uint64_t envp_length = 0;
 
-    vfs::vfs::lock();
-    memory::pmm::_physical::lock();
-    memory::heap::lock();
-
-    __cli();
-
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
-
-    memory::heap::unlock();
-    memory::pmm::_physical::unlock();
 
     memory::paging::enablepaging(ctx->cr3);
     argv_length = __elf_get_length2((char**)argv);
@@ -197,18 +188,18 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::vmm::free(proc);
     memory::vmm::initproc(proc);
 
+    memory::vmm::reload(proc);
+
     vfs::stat_t stat;
 
     userspace_fd_t fd;
     memset(fd.path,0,2048);
     memcpy(fd.path,stack_path,strlen(stack_path));
 
-    int status = vfs::vfs::nlstat(&fd,&stat); 
-    
-    vfs::vfs::unlock();
+    int status = vfs::vfs::stat(&fd,&stat); 
 
     if(status == 0) {
-        if((stat.st_mode & S_IXUSR) && (stat.st_mode & S_IFCHR)) {
+        if((stat.st_mode & S_IXUSR) && (stat.st_mode & S_IFREG)) {
 
             proc->fs_base = 0;
 
@@ -218,8 +209,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
             proc->ctx.ss = 0x18 | 3;
 
             proc->ctx.rflags = (1 << 9);
-        
-            memory::vmm::reload(proc);
+    
 
             arch::x86_64::scheduling::loadelf(proc,stack_path,argv0,envp0);
 

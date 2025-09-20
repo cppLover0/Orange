@@ -86,7 +86,7 @@ void memory::paging::mapkernel(std::uint64_t cr3,std::uint32_t id) {
 }
 
 void memory::paging::enablekernel() {
-    enablepaging(kernel_cr3);
+    asm volatile("mov %0, %%cr3" : : "r"(kernel_cr3) : "memory");
 }
 
 void memory::paging::enablepaging(std::uint64_t cr3) {

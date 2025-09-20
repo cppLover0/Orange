@@ -343,8 +343,9 @@ std::int32_t __tmpfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
         return ENOENT;
 
     out->st_size = node->type == TMPFS_TYPE_DIRECTORY ? 0 : node->size;
-    out->st_mode = node->type == TMPFS_TYPE_DIRECTORY ? S_IFDIR : S_IFCHR;
+    out->st_mode = node->type == TMPFS_TYPE_DIRECTORY ? S_IFDIR : S_IFREG;
     out->st_mode |= node->vars[0];
+
     return 0;
 }
 

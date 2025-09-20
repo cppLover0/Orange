@@ -165,6 +165,7 @@ namespace vfs {
         std::uint64_t write(const char* src_buffer, std::uint64_t count) {
             std::uint64_t written = 0;
             while (written < count) {
+                this->is_closed.clear(); /* Pipe is active */
                 std::uint64_t space_left = total_size - size;
                 if (space_left == 0) {
                     continue;
@@ -238,6 +239,8 @@ typedef struct userspace_fd {
 
     std::uint32_t queue;
     std::uint8_t cycle;
+
+    std::uint32_t mode;
 
     vfs::pipe* pipe;
     char path[2048];
@@ -460,12 +463,22 @@ namespace vfs {
         std::int32_t (*create) (char* path, std::uint8_t type                                             );
         std::int32_t (*touch)  (char* path                                                                );
 
+        void (*close)(userspace_fd_t* fd, char* path);
+
         char path[2048];
     } vfs_node_t;
+
+    typedef struct fifo_node {
+        pipe* main_pipe;
+        char path[2048];
+        char is_used;
+        struct fifo_node* next;
+    } fifo_node_t;
 
     class vfs {
     public:
         static void init();
+
         static std::int32_t open   (userspace_fd_t* fd                                            ); 
         static std::int64_t write  (userspace_fd_t* fd, void* buffer, std::uint64_t size          );
         static std::int64_t read   (userspace_fd_t* fd, void* buffer, std::uint64_t count         );
@@ -475,6 +488,8 @@ namespace vfs {
         static std::int32_t remove (userspace_fd_t* fd                                            );
         static std::int64_t ioctl  (userspace_fd_t* fd, unsigned long req, void *arg, int *res    );
         static std::int32_t mmap   (userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags);
+
+        static void close(userspace_fd_t* fd);
 
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );

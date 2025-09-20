@@ -106,8 +106,8 @@ typedef struct {
 extern "C" void syscall_handler();
 
 /* File,Pipes and etc. */
+syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ctx);
 syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg);
-syscall_ret_t sys_openat(int dirfd, const char* path, int flags);
 syscall_ret_t sys_write(int fd, const void *buf, size_t count);
 syscall_ret_t sys_read(int fd, void *buf, size_t count);
 syscall_ret_t sys_seek(int fd, long offset, int whence);

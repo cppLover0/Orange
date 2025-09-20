@@ -13,7 +13,9 @@
 #include <cstdint>
 
 locks::spinlock socket_spinlock;
-socket_node_t* head;
+socket_node_t* head = 0;
+
+char is_socket_init = 0;
 
 socket_node_t* find_node(struct sockaddr_un* path) {
     socket_node_t* current = head;
@@ -37,6 +39,17 @@ socket_node_t* find_node_str(char* path) {
     return 0;
 }
 
+char sockets::is_exists(char* path) {
+
+    if(!is_socket_init)
+        return 0;
+
+    socket_node_t* node = find_node_str(path);
+    if(!node)
+        return 0;
+    return 1;
+}
+
 int sockets::bind(userspace_fd_t* fd, struct sockaddr_un* path) {
     
     if(!fd || !path)
@@ -47,6 +60,10 @@ int sockets::bind(userspace_fd_t* fd, struct sockaddr_un* path) {
 
     memset(fd->path,0,2048);
     memcpy(fd->path,path->sun_path,strlen(path->sun_path));
+
+    vfs::stat_t stat;
+    if(vfs::vfs::stat(fd,&stat) == 0) /* Check is there vfs object with some name */
+        return EEXIST; 
 
     socket_spinlock.lock();
 
@@ -157,6 +174,7 @@ int sockets::accept(userspace_fd_t* fd, struct sockaddr_un* path) {
 }
 
 void sockets::init() {
+    is_socket_init = 1;
     socket_spinlock.unlock();
 }
 

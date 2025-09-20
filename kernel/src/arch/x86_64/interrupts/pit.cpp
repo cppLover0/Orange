@@ -25,7 +25,7 @@ void arch::x86_64::interrupts::pit::init() {
 
 }
 
-/* PIT Sleep is broken, redirect to hpet */
+/* idk why but pit sleep is broken on modern hw, redirect to hpet */
 void arch::x86_64::interrupts::pit::sleep(std::uint32_t ms) {
     drivers::hpet::sleep(ms);
 }

@@ -5,6 +5,8 @@
 #include <generic/locks/spinlock.hpp>
 #include <generic/vfs/devfs.hpp>
 
+#include <arch/x86_64/syscalls/sockets.hpp>
+
 #include <cstdint>
 #include <etc/errno.hpp>
 
@@ -56,6 +58,12 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
 
 std::int32_t vfs::vfs::create(char* path, std::uint8_t type) {
     vfs_lock->lock();
+
+    if(sockets::is_exists(path)) {
+        vfs_lock->unlock();
+        return EEXIST;
+    }
+
     vfs_node_t* node = find_node(path);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
@@ -147,6 +155,12 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
 
 std::int32_t vfs::vfs::touch(char* path) {
     vfs_lock->lock();
+
+    if(sockets::is_exists(path)) {
+        vfs_lock->unlock();
+        return EEXIST;
+    }
+
     vfs_node_t* node = find_node(path);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
@@ -162,6 +176,14 @@ std::int32_t vfs::vfs::touch(char* path) {
 
 std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
     vfs_lock->lock();
+
+    if(sockets::is_exists(fd->path)) {
+        memset(out,0,sizeof(stat_t));
+        out->st_mode |= S_IFSOCK;
+        vfs_lock->unlock();
+        return 0;
+    }
+
     vfs_node_t* node = find_node(fd->path);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }

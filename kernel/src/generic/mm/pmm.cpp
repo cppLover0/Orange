@@ -252,7 +252,9 @@ void memory::pmm::_physical::free(std::uint64_t phys) {
 }
 
 void memory::pmm::_physical::fullfree(std::uint32_t id) {
+    pmm_lock.lock();
     memory::buddy::fullfree(id);
+    pmm_lock.unlock();
 }
 
 std::int64_t memory::pmm::_physical::alloc(std::size_t size) {

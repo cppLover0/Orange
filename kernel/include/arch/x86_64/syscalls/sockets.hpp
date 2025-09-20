@@ -133,6 +133,7 @@ typedef struct socket_node {
 
 class sockets {
 public:
+	static char is_exists(char* path);
 	static int bind(userspace_fd_t* fd, struct sockaddr_un* path);
 	static int connect(userspace_fd_t* fd, struct sockaddr_un* path);
 	static int accept(userspace_fd_t* fd, struct sockaddr_un* path);
