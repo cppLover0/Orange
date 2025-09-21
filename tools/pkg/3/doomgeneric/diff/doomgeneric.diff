@@ -65,34 +65,34 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +
 +void DG_DrawFrame() {
 +
-+    for(int i = 0;i < DOOMGENERIC_RESY;i++) {
-+        uint64_t fb = (uint64_t)fb_ptr;fb += (finfo.line_length * i);
-+        memcpy((void*)fb,DG_ScreenBuffer + (DOOMGENERIC_RESX * i),DOOMGENERIC_RESX * 4);
++    int screen_width = vinfo.xres;  
++    int screen_height = vinfo.yres; 
++
++
++    float x_scale = (float)screen_width / DOOMGENERIC_RESX;
++    float y_scale = (float)screen_height / DOOMGENERIC_RESY;
++
++
++    for (int i = 0; i < screen_height; i++) {
++
++        int src_y = (int)(i / y_scale);
++        if (src_y >= DOOMGENERIC_RESY) {
++            src_y = DOOMGENERIC_RESY - 1; 
++        }
++
++
++        for (int j = 0; j < screen_width; j++) {
++
++            int src_x = (int)(j / x_scale);
++            if (src_x >= DOOMGENERIC_RESX) {
++                src_x = DOOMGENERIC_RESX - 1; 
++            }
++
++            uint64_t fb = (uint64_t)fb_ptr;
++            fb += (finfo.line_length * i);
++            memcpy((void*)(fb + j * 4), DG_ScreenBuffer + (DOOMGENERIC_RESX * src_y + src_x), 4);
++        }
 +    }
-+    return; 
-+    
-+
-+
-+    
-+
-+      
-+        
-+       
-+       
-+
-+
-+       
-+
-+           
-+         
-+             
-+            
-+
-+   
-+          
-+          
-+     
-+   
 +}
 +
 +void DG_SleepMs(uint32_t ms) {
