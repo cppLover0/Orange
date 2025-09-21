@@ -221,6 +221,8 @@ syscall_ret_t sys_close(int fd) {
 
     if(fd_s->state == USERSPACE_FD_STATE_PIPE)
         fd_s->pipe->close(fd_s->pipe_side);
+    else if(fd_s->state == USERSPACE_FD_STATE_FILE || fd_s->state == USERSPACE_FD_STATE_SOCKET)
+        vfs::vfs::close(fd_s);
 
     if(!fd_s->is_a_tty && fd_s->index > 2)
         fd_s->state = USERSPACE_FD_STATE_UNUSED;

@@ -170,6 +170,7 @@ namespace arch {
             static void futexwake(process_t* proc, int* lock);
             static void futexwait(process_t* proc, int* lock, int val);
             static void loadelf(process_t* proc,char* path,char** argv,char** envp);
+
         };
     }
 }

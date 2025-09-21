@@ -10,5 +10,6 @@ namespace drivers {
         static void init();
         static void sleep(std::uint64_t us);
         static std::uint64_t currentnano();
+        static std::uint64_t currentus();
     };
 };

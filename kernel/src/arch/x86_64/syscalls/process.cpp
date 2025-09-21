@@ -13,7 +13,15 @@
 #include <etc/assembly.hpp>
 #include <etc/logging.hpp>
 
+#include <drivers/cmos.hpp>
+
+#include <drivers/tsc.hpp>
+
 #include <etc/errno.hpp>
+
+#include <drivers/hpet.hpp>
+
+#include <drivers/kvmtimer.hpp>
 
 #include <generic/time.hpp>
 
@@ -39,7 +47,24 @@ syscall_ret_t sys_libc_log(const char* msg) {
 syscall_ret_t sys_exit(int status) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     proc->exit_code = status;
+
+    userspace_fd_t* fd = proc->fd;
+    while(fd) {
+        if(fd->state == USERSPACE_FD_STATE_PIPE)
+            fd->pipe->close(fd->pipe_side);
+        else if(fd->state == USERSPACE_FD_STATE_FILE || fd->state == USERSPACE_FD_STATE_SOCKET)
+            vfs::vfs::close(fd);
+        userspace_fd_t* next = fd->next;
+        memory::pmm::_virtual::free(fd);
+        fd = next;
+    }
+
     arch::x86_64::scheduling::kill(proc);
+    memory::vmm::free(proc);
+    memory::pmm::_virtual::free(proc->cwd);
+    memory::pmm::_virtual::free(proc->name);
+    memory::pmm::_virtual::free(proc->sse_ctx);
+
     Log::SerialDisplay(LEVEL_MESSAGE_INFO,"Process %d exited with code %d\n",proc->id,proc->exit_code);
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
@@ -355,7 +380,7 @@ syscall_ret_t sys_waitpid(int pid) {
 
 syscall_ret_t sys_sleep(long us) {
     SYSCALL_ENABLE_PREEMPT();
-    time::sleep(us);
+    drivers::tsc::sleep(us);
     return {0,0,0};
 }
 
@@ -371,4 +396,8 @@ syscall_ret_t sys_free_dma(std::uint64_t phys) {
 syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_t size) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     return {1,0,(std::int64_t)memory::vmm::map(proc,phys,size,PTE_PRESENT | PTE_USER | PTE_RW | flags)};
+}
+
+syscall_ret_t sys_timestamp() {
+    return {1,0,(std::int64_t)drivers::hpet::nanocurrent()};
 }

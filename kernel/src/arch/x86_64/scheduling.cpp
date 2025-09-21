@@ -296,10 +296,6 @@ void arch::x86_64::scheduling::kill(process_t* proc) {
     proc->lock.nowaitlock();
     proc->status = PROCESS_STATE_ZOMBIE;
     proc->exit_timestamp = time::counter();
-    memory::vmm::free(proc);
-    memory::pmm::_virtual::free(proc->cwd);
-    memory::pmm::_virtual::free(proc->name);
-    memory::pmm::_virtual::free(proc->sse_ctx);
 }
 
 void __scheduling_balance_cpus() {

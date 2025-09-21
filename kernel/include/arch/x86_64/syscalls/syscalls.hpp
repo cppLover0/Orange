@@ -163,6 +163,8 @@ syscall_ret_t sys_free_dma(std::uint64_t phys);
 
 syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_t size);
 
+syscall_ret_t sys_timestamp();
+
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);
 syscall_ret_t sys_futex_wake(int* pointer);

@@ -54,7 +54,8 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {42,(void*)sys_accept},
     {43,(void*)sys_bind},
     {44,(void*)sys_socket},
-    {45,(void*)sys_listen}
+    {45,(void*)sys_listen},
+    {46,(void*)sys_timestamp}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -74,14 +75,14 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     } else if(!item->syscall_func) {
         return;
     }
-
+    
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
     syscall_ret_t ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
     if(ret.is_rdx_ret) {
         ctx->rdx = ret.ret_val;
     }
 
-    if(ret.ret != 0)
+    if(ret.ret != 0 && item->syscall_num != 46)
         Log::Raw("non zero ret %d from sys %d\n",ret.ret,item->syscall_num);
 
     ctx->rax = ret.ret;

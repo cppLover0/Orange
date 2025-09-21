@@ -205,12 +205,15 @@ syscall_ret_t sys_bind(int fd, struct sockaddr_un* path, int len) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
-    
-    if(!fd_s)
-        return {0,EBADF,0};
 
     if(!path)
         return {0,EINVAL,0};
+
+    if(path->sun_family != AF_UNIX)
+        return {0,ENOSYS,0};
+
+    if(!fd_s)
+        return {0,EBADF,0};
 
     struct sockaddr_un spath;
 
@@ -226,16 +229,18 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
-    
-    if(!fd_s)
-        return {1,EBADF,0};
 
     struct sockaddr_un spath;
 
     if(path) {
         memset(&spath,0,sizeof(spath));
         copy_in_userspace(proc,&spath,path,len > sizeof(spath) ? sizeof(spath) : len);
+        if(spath.sun_family != AF_UNIX)
+            return {0,ENOSYS,0};
     }
+
+    if(!fd_s)
+        return {1,EBADF,0};
 
     SYSCALL_ENABLE_PREEMPT();
     int status = sockets::accept(fd_s,path != 0 ? &spath : 0);
@@ -250,6 +255,9 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
 syscall_ret_t sys_socket(int family, int type, int protocol) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     int new_fd = vfs::fdmanager::create(proc);
+
+    if(family != AF_UNIX)
+        return {0,ENOSYS,0};
 
     userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
     memset(new_fd_s->path,0,2048);

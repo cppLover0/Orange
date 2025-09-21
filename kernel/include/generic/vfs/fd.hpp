@@ -19,7 +19,7 @@ namespace vfs {
             }
 
             if(!current) {
-                current = new userspace_fd_t;
+                current = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
                 zeromem(current);
                 current->next = proc->fd;
                 proc->fd = current;

@@ -40,3 +40,7 @@ void tsc::sleep(std::uint64_t us) {
 std::uint64_t tsc::currentnano() {
     return (__rdtsc() * 1000000000ULL) / arch::x86_64::cpu::data()->tsc.freq;
 }
+
+std::uint64_t tsc::currentus() {
+    return currentnano() / 1000;
+}

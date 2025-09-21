@@ -169,7 +169,7 @@ namespace Lists {
                 } else if (ring.bytelen == 8) {
                     ((long long*)out)[len] = ring.objs[*queue].value1;
                 }
-                (*queue)++;
+                *queue = *queue + 1;
                 if (*queue == ring.size) {
                     *queue = 0;
                     *cycle = !(*cycle);

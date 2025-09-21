@@ -9,6 +9,8 @@
 #include <etc/libc.hpp>
 #include <etc/logging.hpp>
 
+#include <generic/mm/paging.hpp>
+
 #include <drivers/ioapic.hpp>
 #include <arch/x86_64/interrupts/irq.hpp>
 

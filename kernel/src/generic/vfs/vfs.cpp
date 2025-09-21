@@ -225,6 +225,21 @@ std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, i
     return status;
 }
 
+void vfs::vfs::close(userspace_fd_t* fd) {
+    vfs_lock->lock();
+    vfs_node_t* node = find_node(fd->path);
+    if(!node) { vfs::vfs::unlock();
+        return; }
+
+    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    if(!node->close) { vfs::vfs::unlock();
+        return; }
+
+    node->close(fd,fs_love_name);
+    vfs_lock->unlock();
+    return;
+}
+
 void vfs::vfs::unlock() {
     vfs_lock->unlock();
 }

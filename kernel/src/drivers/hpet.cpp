@@ -20,8 +20,12 @@ std::uint8_t hpet_is_32_bit = 0;
 
 #include <etc/etc.hpp>
 
-std::uint64_t __hpet_counter() {
+std::uint64_t __hpet_timestamp() {
     return hpet_is_32_bit ? *(volatile uint32_t*)(hpet_base + 0xf0) : *(volatile uint64_t*)(hpet_base + 0xf0);
+}
+
+std::uint64_t drivers::hpet::nanocurrent() {
+    return __hpet_timestamp() * hpet_clock_nano;
 }
 
 extern std::uint16_t KERNEL_GOOD_TIMER;
@@ -30,11 +34,8 @@ void drivers::hpet::init() {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature("HPET",&hpet);
     if(ret != UACPI_STATUS_OK) {
-        if(KERNEL_GOOD_TIMER != KVM_TIMER) {
-            Log::Display(LEVEL_MESSAGE_FAIL,"Can't continue work, orange requires hpet to work (or kvmclock if present)\n");
-            while(1) {asm volatile("hlt");}
-        }
-        Log::Display(LEVEL_MESSAGE_WARN,"hpet timer doesn't present\n");
+        Log::Display(LEVEL_MESSAGE_FAIL,"Can't continue work, orange requires hpet to work");
+        while(1) {asm volatile("hlt");}
         return;
     }
     struct acpi_hpet* hpet_table = ((struct acpi_hpet*)hpet.virt_addr);
@@ -48,8 +49,8 @@ void drivers::hpet::init() {
 }
 
 void drivers::hpet::sleep(std::uint64_t us) {
-    std::uint64_t start = __hpet_counter();
+    std::uint64_t start = __hpet_timestamp();
     std::uint64_t conv = us * 1000;
-    while((__hpet_counter() - start) * hpet_clock_nano < conv)
+    while((__hpet_timestamp() - start) * hpet_clock_nano < conv)
         asm volatile("nop");
 }
