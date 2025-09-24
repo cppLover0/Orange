@@ -255,7 +255,7 @@ xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
             return t;
         }
 
-        usleep(5000);
+        usleep(500);
         
     }
 }
@@ -570,6 +570,7 @@ void __xhci_unicode_to_ascii(uint16_t* src,char* dest) {
 
     uint16_t* ptr = (uint16_t*)src;
     while(ptr[src_ptr]) {
+
         if(ptr[src_ptr] < 128)
             dest[dest_ptr++] = ptr[src_ptr++];
         else
@@ -591,6 +592,10 @@ int __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_str
         return 0;
 
     usbcommand.len = out->head.len;
+
+    if(usbcommand.len < 8) {
+        return 1;
+    }
 
     ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
     if(ret.ret_code != 1)
@@ -636,6 +641,9 @@ int __xhci_print_device_info(xhci_device_t* dev,xhci_usb_device_t* usb_dev,char*
 
     xhci_string_descriptor_t product;
     xhci_string_descriptor_t manufacter;
+
+    memset(&product,0,sizeof(product));
+    memset(&manufacter,0,sizeof(manufacter));
 
     status = __xhci_read_usb_string(dev,usb_dev,&product,usb_dev->desc->product1,lang0);
 
@@ -770,12 +778,15 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     uint64_t addr = liborange_alloc_dma(4096);
     __xhci_create_dcbaa(dev,usb_dev->slotid,addr);
 
-    if(!dev->cap->hccparams1.contextsize)
+    uint32_t* hccparams = (uint32_t*)(&dev->cap->hccparams1);
+    char context_size = ((hccparams1_t*)hccparams)->contextsize;
+
+    if(!context_size)
         dev->dcbaa[id] += 64;
     else
         dev->dcbaa[id] += 128; 
 
-    if(!dev->cap->hccparams1.contextsize)
+    if(!context_size)
         usb_dev->_is64byte = 0;
     else 
         usb_dev->_is64byte = 1;
@@ -795,7 +806,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         "(10 Gb/s - USB 3.1)"
     };
 
-    if(!dev->cap->hccparams1.contextsize) {
+    if(!context_size) {
         xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)liborange_map_phys(addr,0,4096);
 
         memset(input_ctx,0,4096);
@@ -851,8 +862,11 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         return; //now i cant ignore anymore...
     }
 
-    char product[256];
-    char manufacter[256];
+    char product[1024];
+    char manufacter[1024];
+
+    memset(product,0,1024);
+    memset(manufacter,0,1024);
 
     int status4 = __xhci_print_device_info(dev,usb_dev,product,manufacter);
     if(!status4)
@@ -862,9 +876,10 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     usb_dev->config = cfg;
 
     __xhci_get_config_descriptor(dev,usb_dev,cfg);
+
     __xhci_setup_config(dev,usb_dev,cfg->configval);
 
-    if(!dev->cap->hccparams1.contextsize) {
+    if(!context_size) {
         usb_dev->input_ctx->input_ctx.A = (1 << 0);
     } else {
         xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)liborange_map_phys(addr,0,4096);
@@ -950,7 +965,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                 usb_dev->buffers[idx] = (uint8_t*)liborange_map_phys(usb_dev->phys_buffers[idx],0,4096);
                 usb_dev->doorbell_values[idx] = idx + 2;
 
-                if(!dev->cap->hccparams1.contextsize) { 
+                if(!context_size) { 
                     xhci_input_ctx_t* input = (xhci_input_ctx_t*)liborange_map_phys(addr,0,4096);
                     xhci_endpoint_ctx_t* ep1 = &input->ep[idx];
                     memset(ep1,0,sizeof(xhci_endpoint_ctx_t));
@@ -1020,7 +1035,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&ep_trb);
     __xhci_doorbell(dev,0);
     usleep(10000);
-    
+
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
     if(ret.ret_code != 1) {
@@ -1043,7 +1058,9 @@ void __xhci_init_ports(xhci_device_t* dev) {
 }
 
 void __xhci_iterate_usb_ports(xhci_device_t* dev) {
+
     volatile uint32_t* cap = (volatile uint32_t*)(dev->xhci_virt_base + dev->cap->hccparams1.xECP * 4);
+    
     xhci_ext_cap_t load_cap;
     load_cap.full = *cap;
     //INFO("0x%p\n",cap);
@@ -1064,12 +1081,12 @@ void __xhci_iterate_usb_ports(xhci_device_t* dev) {
             if(usb_cap.major == 3) {
                 for(uint8_t i = usb_cap.portoffset - 1;i <= (usb_cap.portoffset - 1) + usb_cap.portcount - 1;i++) {
                     dev->usb3ports[i] = 1;
-                    //INFO("Found USB 3.0 Port %d !\n",i);
+                    //log(LEVEL_MESSAGE_INFO,"Found USB 3.0 Port %d !\n",i);
                 }
             } else {
                 for(uint8_t i = usb_cap.portoffset - 1;i <= (usb_cap.portoffset - 1) + usb_cap.portcount - 1;i++) {
                     dev->usb3ports[i] = 0;
-                    //INFO("Found USB 2.0 Port %d !\n",i);
+                    //log(LEVEL_MESSAGE_INFO,"Found USB 2.0 Port %d !\n",i);
                 }
             }
 
@@ -1163,6 +1180,12 @@ void __xhci_device(pci_t pci_dev,uint8_t a, uint8_t b,uint8_t c) {
 
     xhci_device_t* dev = (xhci_device_t*)malloc(4096);
     memset(dev,0,4096);
+
+    uint32_t usb3_ports = pci_in(a,b,c,0xDC,4);
+    pci_out(a,b,c,0xD8,usb3_ports,4);
+
+	auto usb2_ports = pci_in(a,b,c,0xD4,4);
+	pci_out(a,b,c,0xD0,usb2_ports,4);
 
     uint64_t addr = pci_dev.bar0 & ~4; // clear upper 2 bits
     addr |= ((uint64_t)pci_dev.bar1 << 32);

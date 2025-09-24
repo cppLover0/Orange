@@ -138,4 +138,7 @@ public:
 	static int connect(userspace_fd_t* fd, struct sockaddr_un* path);
 	static int accept(userspace_fd_t* fd, struct sockaddr_un* path);
 	static void init();
+
+	static socket_node_t* find(char* path);
+
 };

@@ -139,10 +139,15 @@ namespace Lists {
 
         locks::spinlock ring_lock;
 
+        std::uint64_t read_counter = 0;
+        std::uint64_t write_counter = 0;
+
         void send(std::uint64_t value1) {
             ring_lock.lock();
             ring.objs[ring.tail].cycle = ring.cycle;
             ring.objs[ring.tail].value1 = value1;
+
+            read_counter++;
 
             if (++ring.tail == ring.size) {
                 ring.tail = 0;

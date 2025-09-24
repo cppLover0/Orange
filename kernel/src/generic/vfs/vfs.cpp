@@ -28,8 +28,79 @@ vfs::vfs_node_t* find_node(char* path) {
     return match;
 }
 
+vfs::fifo_node_t* fifo_head = 0;
+
+int is_fifo_exists(char* path) {
+    vfs::fifo_node_t* current = fifo_head;
+    while(current) {
+        if(!strcmp(current->path,path))
+            return 1;
+        current = current->next;
+    }
+    return 0;
+}
+
+vfs::fifo_node_t* fifo_get(char* path) {
+
+    vfs::fifo_node_t* current = fifo_head;
+    while(current) {
+        if(!strcmp(current->path,path))
+            return current;
+        current = current->next;
+    }
+    return 0;
+
+}
+
+std::uint32_t vfs::vfs::create_fifo(char* path) {
+
+    vfs_lock->lock();
+
+    if(!path) {
+        vfs_lock->unlock();
+        return EINVAL;
+    }
+
+    if(is_fifo_exists(path)) {
+        vfs_lock->unlock();
+        return EEXIST;
+    }
+
+    fifo_node_t* current = fifo_head;
+    while(current) {
+        if(!current->is_used)
+            break;
+        current = current->next;
+    }
+
+    if(!current) {
+        current = new fifo_node_t;
+        current->next = fifo_head;
+        fifo_head = current;
+    }
+
+    current->main_pipe = new pipe(0);
+    current->main_pipe->connected_to_pipe_write = 2;
+
+    memset(current->path,0,2048);
+    memcpy(current->path,path,strlen(path));
+
+    current->is_used = 1;
+
+    vfs_lock->unlock();
+    return 0;
+}
+
 std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
     vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        fifo_node_t* fifo = fifo_get(fd->path);
+        vfs_lock->unlock();
+        asm volatile("sti");
+        return fifo->main_pipe->write((const char*)buffer,size);
+    }
+
     vfs_node_t* node = find_node(fd->path);
     if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
@@ -44,6 +115,14 @@ std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t siz
 
 std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t count) {
     vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        fifo_node_t* fifo = fifo_get(fd->path);
+        vfs_lock->unlock();
+        asm volatile("sti");
+        return fifo->main_pipe->read((char*)buffer,count);
+    }
+
     vfs_node_t* node = find_node(fd->path);
     if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
@@ -59,7 +138,7 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
 std::int32_t vfs::vfs::create(char* path, std::uint8_t type) {
     vfs_lock->lock();
 
-    if(sockets::is_exists(path)) {
+    if(sockets::is_exists(path) || is_fifo_exists(path)) {
         vfs_lock->unlock();
         return EEXIST;
     }
@@ -94,6 +173,13 @@ std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64
 
 std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
     vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        fifo_node_t* fifo = fifo_get(fd->path);
+        vfs_lock->unlock();
+        return 0;
+    }
+
     vfs_node_t* node = find_node(fd->path);
 
     if(!node) { vfs::vfs::unlock();
@@ -110,6 +196,16 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
 
 std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
     vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        fifo_node_t* fifo = fifo_get(fd->path);
+        memset(fifo->path,0,2048);
+        fifo->is_used = 0;
+        delete fifo->main_pipe;
+        vfs_lock->unlock();
+        return 0;
+    }
+
     vfs_node_t* node = find_node(fd->path);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
@@ -156,7 +252,7 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
 std::int32_t vfs::vfs::touch(char* path) {
     vfs_lock->lock();
 
-    if(sockets::is_exists(path)) {
+    if(sockets::is_exists(path) || is_fifo_exists(path)) {
         vfs_lock->unlock();
         return EEXIST;
     }
@@ -176,6 +272,13 @@ std::int32_t vfs::vfs::touch(char* path) {
 
 std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
     vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        memset(out,0,sizeof(stat_t));
+        out->st_mode |= S_IFIFO;
+        vfs_lock->unlock();
+        return 0;
+    }
 
     if(sockets::is_exists(fd->path)) {
         memset(out,0,sizeof(stat_t));
@@ -227,6 +330,14 @@ std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, i
 
 void vfs::vfs::close(userspace_fd_t* fd) {
     vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        fifo_node_t* fifo = fifo_get(fd->path);
+        fifo->main_pipe->fifoclose();
+        vfs_lock->unlock();
+        return;
+    }
+
     vfs_node_t* node = find_node(fd->path);
     if(!node) { vfs::vfs::unlock();
         return; }
@@ -239,6 +350,80 @@ void vfs::vfs::close(userspace_fd_t* fd) {
     vfs_lock->unlock();
     return;
 }
+
+std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
+    vfs_lock->lock();
+
+    if(is_fifo_exists(fd->path)) {
+        fifo_node_t* fifo = fifo_get(fd->path);
+        std::int64_t ret = 0;
+        switch (operation_type)
+        {
+        
+        case POLLIN:
+            ret = fifo->main_pipe->read_counter;
+            break;
+        
+        case POLLOUT:
+            ret = fifo->main_pipe->write_counter;
+            break;
+        
+        default:
+            break;
+        }
+        vfs_lock->unlock();
+        return ret;
+    } else if(fd->state == USERSPACE_FD_STATE_SOCKET) {
+        std::int64_t ret = 0;
+        switch (operation_type)
+        {
+        
+        case POLLIN:
+            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
+            break;
+        
+        case POLLOUT:
+            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
+            break;
+        
+        default:
+            break;
+        }
+        vfs_lock->unlock();
+        return ret;
+    } else if(fd->state == USERSPACE_FD_STATE_PIPE) {
+        std::int64_t ret = 0;
+        switch (operation_type)
+        {
+        
+        case POLLIN:
+            ret = fd->pipe->read_counter;
+            break;
+        
+        case POLLOUT:
+            ret = fd->pipe->write_counter;
+            break;
+        
+        default:
+            break;
+        }
+        vfs_lock->unlock();
+        return ret;
+    }
+
+    vfs_node_t* node = find_node(fd->path);
+    if(!node) { vfs::vfs::unlock();
+        return -ENOENT; }
+
+    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    if(!node->poll) { vfs::vfs::unlock();
+        return -ENOSYS ; }
+
+    std::int64_t ret = node->poll(fd,fs_love_name,operation_type);
+    vfs_lock->unlock();
+    return ret;
+}
+
 
 void vfs::vfs::unlock() {
     vfs_lock->unlock();

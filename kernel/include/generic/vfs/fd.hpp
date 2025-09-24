@@ -27,6 +27,8 @@ namespace vfs {
             }
 
             current->state = USERSPACE_FD_STATE_FILE;
+            current->read_counter = -1;
+            current->write_counter = -1;
 
             return current->index;
 

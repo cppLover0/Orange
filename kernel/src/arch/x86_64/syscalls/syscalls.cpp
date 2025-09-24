@@ -55,7 +55,9 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {43,(void*)sys_bind},
     {44,(void*)sys_socket},
     {45,(void*)sys_listen},
-    {46,(void*)sys_timestamp}
+    {46,(void*)sys_timestamp},
+    {47,(void*)sys_mkfifoat},
+    {48,(void*)sys_poll}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {

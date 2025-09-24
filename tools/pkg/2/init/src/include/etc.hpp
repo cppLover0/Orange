@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <termios.h>
 #include <signal.h>
+
+#include <poll.h>
 #include <fcntl.h>
 
 #include <dirent.h>
@@ -217,15 +219,25 @@ public:
         pid = fork();
 
         if(pid == 0) {
+            struct pollfd pfd;
+            pfd.fd = slave_input;
+            pfd.events = POLLIN;
+
             while(1) {
-                char buffer[32];
-                memset(buffer,0,32);
-                int count = read(slave_input,buffer,32);
-                if(count) {
-                    for(int i = 0;i < count;i++) {
-                        doKeyWork(buffer[i],master_fd);
+                int ret = poll(&pfd, 1, -1); 
+                if(ret > 0) {
+                    if(pfd.revents & POLLIN) {
+                        char buffer[32];
+                        memset(buffer, 0, 32);
+                        int count = read(slave_input, buffer, 32);
+                        if(count > 0) {
+                            for(int i = 0; i < count; i++) {
+                                doKeyWork(buffer[i], master_fd);
+                            }
+                        }
                     }
                 }
+                
             }
         }
     }

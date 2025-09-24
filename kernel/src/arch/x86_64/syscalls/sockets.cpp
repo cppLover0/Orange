@@ -28,6 +28,17 @@ socket_node_t* find_node(struct sockaddr_un* path) {
     return 0;
 }
 
+socket_node_t* sockets::find(char* path) {
+    socket_node_t* current = head;
+    while(current) {
+        if(!strcmp(current->path,path)) {
+            return current;
+        }
+        current = current->next;
+    }
+    return 0;
+}
+
 socket_node_t* find_node_str(char* path) {
     socket_node_t* current = head;
     while(current) {

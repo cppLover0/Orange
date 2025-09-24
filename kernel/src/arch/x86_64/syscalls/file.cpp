@@ -11,6 +11,8 @@
 
 #include <generic/vfs/devfs.hpp>
 
+#include <drivers/tsc.hpp>
+
 #include <etc/etc.hpp>
 #include <etc/errno.hpp>
 
@@ -295,6 +297,9 @@ syscall_ret_t sys_dup(int fd, int flags) {
     nfd_s->pipe_side = fd_s->pipe_side;
     nfd_s->queue = fd_s->queue;
     nfd_s->is_a_tty = fd_s->is_a_tty;
+    nfd_s->read_counter = fd_s->read_counter;
+    nfd_s->write_counter = fd_s->write_counter;
+
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
 
     return {1,0,new_fd};
@@ -328,6 +333,8 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     nfd_s->pipe_side = fd_s->pipe_side;
     nfd_s->queue = fd_s->queue;
     nfd_s->is_a_tty = fd_s->is_a_tty;
+    nfd_s->write_counter = fd_s->write_counter;
+    nfd_s->read_counter = fd_s->read_counter;
 
     if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
         nfd_s->pipe->create(nfd_s->pipe_side);
@@ -599,13 +606,126 @@ syscall_ret_t sys_mkfifoat(int dirfd, const char *path, int mode) {
     memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
 
-    userspace_fd_t* new_fd_s;
-    memset(new_fd_s->path,0,2048);
-    memcpy(new_fd_s->path,result,strlen(result));
+    userspace_fd_t new_fd_s;
+    memset(new_fd_s.path,0,2048);
+    memcpy(new_fd_s.path,result,strlen(result));
 
     vfs::stat_t stat;
 
-    if(vfs::vfs::stat(new_fd_s,&stat) == 0)
+    if(vfs::vfs::stat(&new_fd_s,&stat) == 0)
         return {0,EEXIST,0};
+
+    int status = vfs::vfs::create_fifo(result);
+
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"new fifo %s status %d\n",result,status);
+
+    return {0,status,0};
+}
+
+syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
+    SYSCALL_IS_SAFEA((void*)fds,0);
+
+    if(!fds)
+        return {1,EINVAL,0};
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    struct pollfd fd[count];
+
+    copy_in_userspace(proc,fd,fds,count * sizeof(struct pollfd));
+
+    std::uint64_t current_timestamp = drivers::tsc::currentus();
+
+    int total_events = 0;
+
+    for(int i = 0;i < count; i++) {
+        userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
+
+        fd[i].revents = 0;
+
+        if(!fd0)
+            return {1,EINVAL,0};
+
+        if(fd[i].events & POLLIN)
+            total_events++;
+
+        if(fd[i].events & POLLOUT)
+            total_events++;
+
+        if(fd0->write_counter == -1) {
+            std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+            fd0->write_counter = ret < 0 ? 0 : ret;
+        } 
+
+        if(fd0->read_counter == -1) {
+            std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+            fd0->read_counter = ret < 0 ? 0 : ret;
+        }
+            
+    }
+
+    int num_events = 0;
+
+    SYSCALL_ENABLE_PREEMPT();
+
+    int success = true;
+
+    if(timeout == -1) {
+        while(success) {
+            for(int i = 0;i < count; i++) {
+                userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
+                if(fd[i].events & POLLIN) {
+                    std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                    if(ret > fd0->read_counter) {
+                        fd0->read_counter = ret;
+                        num_events++;
+                        fd[i].revents |= POLLIN;
+                    }
+                }
+
+                if(fd[i].events & POLLOUT) {
+                    std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                    if(ret > fd0->write_counter) {
+                        fd0->write_counter = ret;
+                        num_events++;
+                        fd[i].revents |= POLLOUT;
+                    }
+                }
+
+                if(num_events)
+                    success = false;
+            }
+        }
+    } else {
+        while(drivers::tsc::currentus() < (current_timestamp + (timeout * 1000)) && success) {
+            for(int i = 0;i < count; i++) {
+                userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
+                if(fd[i].events & POLLIN) {
+                    std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                    if(ret > fd0->read_counter) {
+                        fd0->read_counter = ret;
+                        num_events++;
+                        fd[i].revents |= POLLIN;
+                    }
+                }
+
+                if(fd[i].events & POLLOUT) {
+                    std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                    if(ret > fd0->write_counter) {
+                        fd0->write_counter = ret;
+                        num_events++;
+                        fd[i].revents |= POLLOUT;
+                    }
+                }
+
+                if(num_events)
+                    success = false;
+            }
+        }
+    }
+
+    copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
+
+    return {1,0,num_events};
+
 
 }

@@ -108,8 +108,6 @@ namespace vfs {
     class pipe {
     private:
         char* buffer;
-        std::uint32_t connected_to_pipe = 0;
-        std::uint32_t connected_to_pipe_write = 0;
         std::int64_t size = 0;
         std::uint64_t total_size = 0;
         std::uint64_t read_ptr = 0;
@@ -117,8 +115,16 @@ namespace vfs {
         std::atomic_flag is_received = ATOMIC_FLAG_INIT;
         std::atomic_flag is_n_closed = ATOMIC_FLAG_INIT;
         std::atomic_flag is_closed = ATOMIC_FLAG_INIT;
+
+        int is_was_writed_ever = 0;
+
     public:
 
+        std::uint64_t write_counter = 0;
+        std::uint64_t read_counter = 0;
+
+        std::uint32_t connected_to_pipe = 0;
+        std::uint32_t connected_to_pipe_write = 0;
         std::uint64_t flags = 0;
 
         pipe(std::uint64_t flags) {
@@ -130,15 +136,23 @@ namespace vfs {
             this->flags = flags;
         }
 
+        void fifoclose() {
+            this->lock.lock();
+            this->is_received.clear();
+            this->is_closed.test_and_set();
+            this->lock.unlock();
+        }
+
         void close(std::uint8_t side) {
             this->lock.lock();
             this->connected_to_pipe--;
             
             if(side == PIPE_SIDE_WRITE) {
                 this->connected_to_pipe_write--;
-                if(this->connected_to_pipe_write == 0) {
+                if(is_was_writed_ever || this->connected_to_pipe_write == 0) {
                     this->is_received.clear();
                     this->is_closed.test_and_set();
+                    is_was_writed_ever = 0;
                 }
             }
 
@@ -170,10 +184,12 @@ namespace vfs {
                 if (space_left == 0) {
                     continue;
                 }
+                is_was_writed_ever = 1;
                 std::uint64_t to_write = (count - written < space_left) ? (count - written) : space_left;
                 force_write(src_buffer + written, to_write);
                 written += to_write;
                 this->is_received.clear();
+                read_counter++;
             }
             return written;
         }
@@ -198,6 +214,7 @@ namespace vfs {
                     this->read_ptr = 0;
                     this->size = 0;
                     this->is_received.test_and_set();
+                    write_counter++;
                 }
                 break;
             }
@@ -211,6 +228,18 @@ namespace vfs {
     };
 
 };
+
+#define POLLIN 0x0001
+#define POLLPRI 0x0002
+#define POLLOUT 0x0004
+#define POLLERR 0x0008
+#define POLLHUP 0x0010
+#define POLLNVAL 0x0020
+#define POLLRDNORM 0x0040
+#define POLLRDBAND 0x0080
+#define POLLWRNORM 0x0100
+#define POLLWRBAND 0x0200
+#define POLLRDHUP 0x2000
 
 #define USERSPACE_FD_OTHERSTATE_MASTER 1
 #define USERSPACE_FD_OTHERSTATE_SLAVE  2
@@ -241,6 +270,9 @@ typedef struct userspace_fd {
     std::uint8_t cycle;
 
     std::uint32_t mode;
+
+    std::int64_t write_counter;
+    std::int64_t read_counter;
 
     vfs::pipe* pipe;
     char path[2048];
@@ -463,6 +495,8 @@ namespace vfs {
         std::int32_t (*create) (char* path, std::uint8_t type                                             );
         std::int32_t (*touch)  (char* path                                                                );
 
+        std::int64_t (*poll)   (userspace_fd_t* fd, char* path, int request);
+
         void (*close)(userspace_fd_t* fd, char* path);
 
         char path[2048];
@@ -489,12 +523,16 @@ namespace vfs {
         static std::int64_t ioctl  (userspace_fd_t* fd, unsigned long req, void *arg, int *res    );
         static std::int32_t mmap   (userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags);
 
+        static std::int64_t poll(userspace_fd_t* fd, int operation_type); 
+
         static void close(userspace_fd_t* fd);
 
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );
 
         static std::int32_t nlstat (userspace_fd_t* fd, stat_t* out                               );
+
+        static std::uint32_t create_fifo(char* path);
 
         static void unlock();
         static void lock();

@@ -399,5 +399,5 @@ syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_
 }
 
 syscall_ret_t sys_timestamp() {
-    return {1,0,(std::int64_t)drivers::hpet::nanocurrent()};
+    return {1,0,(std::int64_t)drivers::tsc::currentnano()};
 }

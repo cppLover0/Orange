@@ -133,6 +133,8 @@ syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg);
 
 syscall_ret_t sys_fchdir(int fd);
 
+syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout);
+
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
 syscall_ret_t sys_free(void *pointer, size_t size);
@@ -165,6 +167,8 @@ syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_
 
 syscall_ret_t sys_timestamp();
 
+syscall_ret_t sys_mkfifoat(int dirfd, const char *path, int mode);
+
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);
 syscall_ret_t sys_futex_wake(int* pointer);
@@ -177,6 +181,12 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len);
 syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len);
 
 syscall_ret_t sys_listen(int fd, int backlog);
+
+struct pollfd {
+    int fd;          
+    short events;   
+    short revents;  
+};
 
 namespace arch {
     namespace x86_64 {

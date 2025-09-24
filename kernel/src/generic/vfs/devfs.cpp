@@ -67,7 +67,7 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
     if(node->open_flags.is_pipe) {
         fd->pipe = (vfs::pipe*)(node->pipe0 | (((uint64_t)node->pipe0 & (1 << 62)) << 63));
         fd->state = USERSPACE_FD_STATE_PIPE;
-        fd->pipe_side = (node->pipe0 & (1 << 63)) == 1 ? PIPE_SIDE_WRITE : PIPE_SIDE_READ;
+        fd->pipe_side = (node->pipe0 & (1 << 63)) ? PIPE_SIDE_WRITE : PIPE_SIDE_READ;
     } else {
         fd->queue = is_slave == 1 ? node->readring->ring.tail : node->writering->ring.tail;
         fd->cycle = is_slave == 1 ? node->readring->ring.cycle : node->writering->ring.cycle;
@@ -185,6 +185,36 @@ std::int32_t __devfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
     out->st_size = 0;
     out->st_mode = S_IFCHR;
     return 0;
+}
+
+std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
+
+    vfs::devfs_node_t* node = devfs_find_dev(path);
+
+    std::int64_t ret = 0;
+    if(node->open_flags.is_pipe_rw) {
+        switch (operation_type)
+        {
+            
+        case POLLIN:
+            ret = !is_slave ? node->writepipe->read_counter : node->readpipe->read_counter;
+            break;
+            
+        case POLLOUT:
+            ret = !is_slave ? node->readpipe->write_counter : node->writepipe->write_counter;
+            break;
+            
+        default:
+            break;
+        }
+    } else {
+        if(operation_type == POLLIN) {
+            ret = !is_slave ? node->writering->read_counter : node->readring->read_counter;
+        } else if(operation_type == POLLOUT) {
+            ret = !is_slave ? ++node->readring->write_counter : ++node->writering->write_counter;
+        } 
+    }
+    return ret;
 }
 
 extern locks::spinlock* vfs_lock;
@@ -522,6 +552,7 @@ void vfs::devfs::mount(vfs_node_t* node) {
     node->mmap = __devfs__mmap;
     node->var = __devfs__var;
     node->stat = __devfs__stat;
+    node->poll = __devfs__poll;
 
     const char* name = "/ptmx";
 
