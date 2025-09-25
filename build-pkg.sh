@@ -9,27 +9,27 @@ cd ../../../../
 
 cd initrd/lib
 
-echo Creating symlinks ./*.so
+#echo Creating symlinks ./*.so
 for file in ../usr/lib/*.so; do
-	echo $file "$(basename "$file")"
+	#echo $file "$(basename "$file")"
     ln -sf "$file" "$(basename "$file")"
 done
 
 for file in ../usr/local/lib/*.so; do
-	echo $file "$(basename "$file")"
+	#echo $file "$(basename "$file")"
     ln -sf "$file" "$(basename "$file")"
 done
 
 cd ../bin
 
-echo Creating symlinks ./*
+#echo Creating symlinks ./*
 for file in ../usr/bin/*; do
-	echo $file "$(basename "$file")"
+	#echo $file "$(basename "$file")"
     ln -sf "$file" "$(basename "$file")"
 done
 
 for file in ../usr/local/bin/*; do
-	echo $file "$(basename "$file")"
+	#echo $file "$(basename "$file")"
     ln -sf "$file" "$(basename "$file")"
 done
 

@@ -14,11 +14,13 @@ kernel/cc-runtime-x86_64
 kernel/freestnd-c-hdrs
 kernel/freestnd-cxx-hdrs
 main.o
+.jinx-cache
 serial.txt
 output.txt
 Orange-distro-build
 ovmf
 cached
+.vscode
 linux-headers
 initrd/usr/lib
 initrd/usr/include

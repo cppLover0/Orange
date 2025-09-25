@@ -12,38 +12,48 @@ if [ ! "$(which x86_64-orange-gcc)" ]; then
     exit 1
 fi
 
+chmod +x jinx
 
-bash tools/pkg/build-pkg.sh "$(realpath initrd)"
+mkdir -p initrd/lib initrd/bin initrd/usr/bin initrd/usr/lib
 
-cd initrd/lib
+script_dir="$(dirname "$0")"
+source_dir="$(cd "${script_dir}" && pwd -P)"
 
-echo Creating symlinks ./*.so
-for file in ../usr/lib/*.so; do
-	echo $file "$(basename "$file")"
-    ln -s "$file" "$(basename "$file")"
-done
+chmod +x "${source_dir}/jinx"
 
-for file in ../usr/local/lib/*.so; do
-	echo $file "$(basename "$file")"
-    ln -s "$file" "$(basename "$file")"
-done
+cd "${source_dir}/build-x86_64"
+"${source_dir}"/jinx update base "*"
+sudo "${source_dir}"/jinx install "sysroot" base "*"
 
-cd ../bin
+# cd initrd/lib
 
-echo Creating symlinks ./*
-for file in ../usr/bin/*; do
-	echo $file "$(basename "$file")"
-    ln -sf "$file" "$(basename "$file")"
-done
+# echo Creating symlinks ./*.so
+# for file in ../usr/lib/*.so; do
+# 	echo $file "$(basename "$file")"
+#     ln -s "$file" "$(basename "$file")"
+# done
 
-for file in ../usr/local/bin/*; do
-	echo $file "$(basename "$file")"
-    ln -sf "$file" "$(basename "$file")"
-done
+# for file in ../usr/local/lib/*.so; do
+# 	echo $file "$(basename "$file")"
+#     ln -s "$file" "$(basename "$file")"
+# done
 
-cd ../../
+# cd ../bin
 
-cp -rf tools/initbase/* initrd
+# echo Creating symlinks ./*
+# for file in ../usr/bin/*; do
+# 	echo $file "$(basename "$file")"
+#     ln -sf "$file" "$(basename "$file")"
+# done
 
-mkdir -p tools/base/boot
-tar -cf tools/base/boot/initrd.tar -C initrd .
+# for file in ../usr/local/bin/*; do
+# 	echo $file "$(basename "$file")"
+#     ln -sf "$file" "$(basename "$file")"
+# done
+
+# cd ../../
+
+# cp -rf tools/initbase/* initrd
+
+# mkdir -p tools/base/boot
+# tar -cf tools/base/boot/initrd.tar -C initrd .

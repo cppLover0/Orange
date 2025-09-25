@@ -1,0 +1,27 @@
+#! /bin/sh
+
+name=mlibc
+skip_pkg_check=yes
+version=0.0git
+revision=44
+git_url="https://github.com/cppLover0/orange-mlibc.git"
+commit=0cc3366d0b8be7bf3ac38700ce3ae6ec68062586
+hostdeps=""
+deps=""
+
+early_prepare() {
+
+}
+
+configure() {
+    
+}
+
+build() {
+    
+}
+
+package() {
+    mkdir -p "${dest_dir}/usr/lib" "${dest_dir}/usr/bin" "${dest_dir}/bin" "${dest_dir}/lib"
+    sh build_to_cross.sh "${dest_dir}"
+}
