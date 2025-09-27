@@ -152,6 +152,24 @@ meson_configure_noflags() {
         "$@"
 }
 
+meson_configure_noflags_no_cross() {
+    if [ -z "${meson_source_dir}" ]; then
+        meson_source_dir="${source_dir}"
+    fi
+
+    meson setup "${meson_source_dir}" \
+        --cross-file "${base_dir}/build-support/cross_file-${JINX_ARCH}.txt" \
+        --prefix=${prefix} \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --libdir=lib \
+        --sbindir=bin \
+        --buildtype=release \
+        --wrap-mode=nodownload \
+        -Ddefault_library=shared \
+        "$@"
+}
+
 cmake_configure() {
         CFLAGS="$TARGET_CFLAGS" \
         CXXFLAGS="$TARGET_CXXFLAGS" \

@@ -1,0 +1,10 @@
+#! /bin/sh
+
+name=binutils
+version=15.1.0
+tarball_url="https://mirror.dogado.de/gnu/binutils/binutils-2.38.tar.gz"
+tarball_blake2b="c8613763ab32b838692acd27ebbcb430ade6be09b834512a1a412ba05acbedacabf407d4344cce2a54a6657a8c0b68b8884e2797ab29cbe8e6799e806e77f4c7"
+
+prepare() {
+    autotools_recursive_regen
+}

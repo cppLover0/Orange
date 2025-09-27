@@ -1,0 +1,25 @@
+#! /bin/sh
+
+name=linux-headers
+version=6.12.8
+revision=1
+tarball_url="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${version}.tar.xz"
+tarball_blake2b="62a3f435bbe7d24bea361f2545ba50f8b36030a98bd28d0979b86052d8af34dc7a4c27f7ca2890daba5e5bb51f5848e6b21cd5df4dbbd19919867bf67d38790d"
+imagedeps="build-essential rsync"
+
+build() {
+    cp -rp "${source_dir}"/. ./
+
+    LINUX_ARCH="${JINX_ARCH}"
+    case "${LINUX_ARCH}" in
+        "aarch64") LINUX_ARCH="arm64" ;;
+        "riscv64") LINUX_ARCH="riscv" ;;
+        "loongarch64") LINUX_ARCH="loongarch" ;;
+    esac
+    make ARCH=${LINUX_ARCH} headers_install
+    find usr/include -type f ! -name *.h -delete
+}
+
+package() {
+    mv usr/include "${dest_dir}${prefix}"/include
+}

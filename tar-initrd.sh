@@ -1,16 +1,14 @@
 
 rm -rf initrd
 
-export PATH="$HOME/opt/cross/orange/bin:$PATH"
-
-if [ ! "$(which x86_64-orange-gcc)" ]; then
-    echo "It looks like you don't have the cross-compiler installed, or it isn't in your PATH."
-    echo "If you built your cross-compiler, add it to your PATH with:"
-    echo 'export PATH="$HOME/opt/cross/orange/bin:$PATH"'
-    echo 'Alternatively, you can build the cross-compiler with: sh build-cross.sh'
-    echo 'Also you should have host gcc with version < 14 (i am using 13.3.0)'
-    exit 1
-fi
+# if [ ! "$(which x86_64-orange-gcc)" ]; then
+#     echo "It looks like you don't have the cross-compiler installed, or it isn't in your PATH."
+#     echo "If you built your cross-compiler, add it to your PATH with:"
+#     echo 'export PATH="$HOME/opt/cross/orange/bin:$PATH"'
+#     echo 'Alternatively, you can build the cross-compiler with: sh build-cross.sh'
+#     echo 'Also you should have host gcc with version < 14 (i am using 13.3.0)'
+#     exit 1
+# fi
 
 chmod +x jinx
 
@@ -22,8 +20,8 @@ source_dir="$(cd "${script_dir}" && pwd -P)"
 chmod +x "${source_dir}/jinx"
 
 cd "${source_dir}/build-x86_64"
-"${source_dir}"/jinx update base "*"
-sudo "${source_dir}"/jinx install "sysroot" base "*"
+"${source_dir}"/jinx update base 
+"${source_dir}"/jinx install "sysroot" base 
 
 # cd initrd/lib
 

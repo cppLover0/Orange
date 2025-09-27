@@ -1,0 +1,174 @@
+diff -Naur gcc-15.1.0/fixincludes/mkfixinc.sh gcc-patched/fixincludes/mkfixinc.sh
+--- gcc-15.1.0/fixincludes/mkfixinc.sh	2025-04-25 11:17:59.000000000 +0300
++++ gcc-patched/fixincludes/mkfixinc.sh	2025-07-26 08:31:28.520072553 +0300
+@@ -13,6 +13,8 @@
+ case $machine in
+     i?86-*-cygwin* | \
+     *-mingw32* | \
++    *-orange*  | \
++    *-*-orange* | \
+     powerpc-*-eabisim* | \
+     powerpc-*-eabi*    | \
+     powerpc-*-rtems*   | \
+diff -Naur gcc-15.1.0/gcc/config/gnu-user.h gcc-patched/gcc/config/gnu-user.h
+--- gcc-15.1.0/gcc/config/gnu-user.h	2025-04-25 11:18:00.000000000 +0300
++++ gcc-patched/gcc/config/gnu-user.h	2025-07-26 09:09:48.204916096 +0300
+@@ -51,13 +51,12 @@
+ #define GNU_USER_TARGET_STARTFILE_SPEC \
+   "%{shared:; \
+      pg|p|profile:%{static-pie:grcrt1.o%s;:gcrt1.o%s}; \
+-     static:crt1.o%s; \
+-     static-pie:rcrt1.o%s; \
++     static|static-pie:%{" PIE_SPEC ":rcrt1.o%s;:crt1.o%s}; \
+      " PIE_SPEC ":Scrt1.o%s; \
+      :crt1.o%s} " \
+    GNU_USER_TARGET_CRTI " \
+-   %{static:crtbeginT.o%s; \
+-     shared|static-pie|" PIE_SPEC ":crtbeginS.o%s; \
++   %{shared|" PIE_SPEC ":crtbeginS.o%s; \
++     static:crtbeginT.o%s; \
+      :crtbegin.o%s} \
+    %{fvtable-verify=none:%s; \
+      fvtable-verify=preinit:vtv_start_preinit.o%s; \
+@@ -73,11 +72,11 @@
+    GNU userspace "finalizer" file, `crtn.o'.  */
+ 
+ #define GNU_USER_TARGET_ENDFILE_SPEC \
+-  "%{!static:%{fvtable-verify=none:%s; \
++  "%{static|static-pie:; \
++     fvtable-verify=none:%s; \
+      fvtable-verify=preinit:vtv_end_preinit.o%s; \
+      fvtable-verify=std:vtv_end.o%s}} \
+-   %{static:crtend.o%s; \
+-     shared|static-pie|" PIE_SPEC ":crtendS.o%s; \
++  %{shared|" PIE_SPEC ":crtendS.o%s; \
+      :crtend.o%s} " \
+    GNU_USER_TARGET_CRTN " " \
+    CRTOFFLOADEND
+@@ -106,7 +105,7 @@
+ #define LIB_SPEC GNU_USER_TARGET_LIB_SPEC
+ 
+ #if defined(HAVE_LD_EH_FRAME_HDR)
+-#define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
++#define LINK_EH_SPEC "%{!static|" PIE_SPEC ":--eh-frame-hdr} "
+ #endif
+ 
+ #define GNU_USER_TARGET_LINK_GCC_C_SEQUENCE_SPEC \
+diff -Naur gcc-15.1.0/gcc/config/orange.h gcc-patched/gcc/config/orange.h
+--- gcc-15.1.0/gcc/config/orange.h	1970-01-01 03:00:00.000000000 +0300
++++ gcc-patched/gcc/config/orange.h	2025-07-26 08:30:27.666446812 +0300
+@@ -0,0 +1,31 @@
++/* Useful if you wish to make target-specific GCC changes. */
++#undef TARGET_ORANGE
++#define TARGET_ORANGE 1
++
++#undef LINK_SPEC
++#define LINK_SPEC "%{shared:-shared} %{static:-static} %{!shared: %{!static: %{rdynamic:-export-dynamic}}}"
++
++/* Default arguments you want when running your
++   i686-myos-gcc/x86_64-myos-gcc toolchain */
++#undef LIB_SPEC
++#define LIB_SPEC "-lc" /* link against C standard library */
++
++/* Files that are linked before user code.
++   The %s tells GCC to look for these files in the library directory. */
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared|static-pie|pie|!no-pie:crtbeginS.o%s;:crtbegin.o%s}"
++
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared|static-pie|pie|!no-pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* Additional predefined macros. */
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()      \
++  do {                                \
++    builtin_define ("__orange__");      \
++    builtin_define ("__unix__");      \
++    builtin_assert ("system=orange");   \
++    builtin_assert ("system=unix");   \
++    builtin_assert ("system=posix");   \
++  } while(0);
+diff -Naur gcc-15.1.0/gcc/config/sh/sh.cc gcc-patched/gcc/config/sh/sh.cc
+--- gcc-15.1.0/gcc/config/sh/sh.cc	2025-04-25 11:18:00.000000000 +0300
++++ gcc-patched/gcc/config/sh/sh.cc	2025-07-26 09:12:46.043423847 +0300
+@@ -9154,7 +9154,7 @@
+ 	{
+ 	  /* Weak functions may be NULL which doesn't work with
+ 	     GOTOFFFUNCDESC because the runtime offset is not known.  */
+-	  if (SYMBOL_REF_WEAK (orig))
++	  if (SYMBOL_REF_WEAK (orig) || (TREE_PUBLIC(SYMBOL_REF_DECL(orig)) && DECL_VISIBILITY (SYMBOL_REF_DECL(orig)) != VISIBILITY_HIDDEN))
+ 	    emit_insn (gen_symGOTFUNCDESC2reg (reg, orig));
+ 	  else
+ 	    emit_insn (gen_symGOTOFFFUNCDESC2reg (reg, orig));
+diff -Naur gcc-15.1.0/gcc/config.gcc gcc-patched/gcc/config.gcc
+--- gcc-15.1.0/gcc/config.gcc	2025-04-25 11:18:00.000000000 +0300
++++ gcc-patched/gcc/config.gcc	2025-07-26 08:28:59.040282804 +0300
+@@ -993,6 +993,13 @@
+   rust_target_objs="${rust_target_objs} netbsd-rust.o"
+   target_has_targetrustm=yes
+   ;;
++*-*-orange*)
++  extra_options="$extra_options gnu-user.opt"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=provide
++  ;;
+ *-*-openbsd*)
+   tmake_file="t-openbsd"
+   case ${enable_threads} in
+@@ -1700,6 +1707,12 @@
+ 	extra_options="${extra_options} cris/elf.opt"
+ 	use_gcc_stdint=wrap
+ 	;;
++i[34567]86-*-orange*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h orange.h"
++    ;;
++x86_64-*-orange*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h orange.h"
++    ;;
+ csky-*-*)
+ 	if test x${with_endian} != x; then
+ 	    case ${with_endian} in
+diff -Naur gcc-15.1.0/libgcc/config.host gcc-patched/libgcc/config.host
+--- gcc-15.1.0/libgcc/config.host	2025-04-25 11:18:04.000000000 +0300
++++ gcc-patched/libgcc/config.host	2025-07-26 09:16:11.367660694 +0300
+@@ -750,6 +750,14 @@
+ 	extra_parts="$extra_parts crtfastmath.o libheapt_w.a"
+ 	tmake_file="${tmake_file} i386/t-heap-trampoline"
+ 	;;
++i[34567]86-*-orange*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o crtbeginS.o crtendS.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++        ;;
++x86_64-*-orange*)
++	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o crtbeginS.o crtendS.o"
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
+ i[34567]86-*-elfiamcu)
+ 	tmake_file="$tmake_file i386/t-crtstuff t-softfp-sfdftf i386/32/t-softfp i386/32/t-iamcu i386/t-softfp t-softfp t-dfprules"
+ 	;;
+diff -Naur gcc-15.1.0/libstdc++-v3/crossconfig.m4 gcc-patched/libstdc++-v3/crossconfig.m4
+--- gcc-15.1.0/libstdc++-v3/crossconfig.m4	2025-04-25 11:18:05.000000000 +0300
++++ gcc-patched/libstdc++-v3/crossconfig.m4	2025-07-26 09:14:05.187145188 +0300
+@@ -257,12 +257,19 @@
+       AC_DEFINE(HAVE_ISNANL)
+     fi
+     ;;
++
+   *-*vms*)
+     # Check for available headers.
+     # Don't call GLIBCXX_CHECK_LINKER_FEATURES, VMS doesn't have a GNU ld
+     GLIBCXX_CHECK_MATH_SUPPORT
+     GLIBCXX_CHECK_STDLIB_SUPPORT
+     ;;
++  *-orange*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
+   *-vxworks*)
+     AC_DEFINE(HAVE_ACOSF)
+     AC_DEFINE(HAVE_ASINF)

@@ -1,0 +1,22 @@
+#! /bin/sh
+
+name=mlibc-headers
+skip_pkg_check=yes
+version=8beff77484af4c8bddd1febd922f3d31ede9be40
+revision=1
+git_url="https://github.com/cpplover0/orange-mlibc.git"
+commit=${version}
+imagedeps="meson ninja-build"
+
+configure() {
+    meson_configure \
+        -Dheaders_only=true
+}
+
+build() {
+    ninja -j${parallelism}
+}
+
+package() {
+    DESTDIR="${dest_dir}" ninja install
+}

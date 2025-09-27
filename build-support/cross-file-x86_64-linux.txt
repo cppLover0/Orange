@@ -1,0 +1,14 @@
+[binaries]
+c = 'gcc'
+cpp = 'g++'
+ar = 'ar'
+nm = 'nm'
+strip = 'strip'
+pkg-config = 'x86_64-orange-pkg-config'
+llvm-config = '/base_dir/build-support/cross-llvm-config'
+
+[host_machine]
+system = 'orange'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
