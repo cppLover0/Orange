@@ -112,7 +112,7 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count);
 syscall_ret_t sys_read(int fd, void *buf, size_t count);
 syscall_ret_t sys_seek(int fd, long offset, int whence);
 syscall_ret_t sys_dup2(int fd, int flags, int newfd);
-syscall_ret_t sys_stat(int fd, void* out);
+syscall_ret_t sys_stat(int fd, void* out, int flags);
 syscall_ret_t sys_dup(int fd, int flags);
 syscall_ret_t sys_pipe(int flags);
 syscall_ret_t sys_close(int fd);

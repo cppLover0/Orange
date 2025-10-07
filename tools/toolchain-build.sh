@@ -79,4 +79,11 @@ mkdir -p gcc-build
 cd gcc-build
 ../gcc-15.1.0/configure --target=x86_64-orange --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --enable-linker-build-id --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared CFLAGS=""
 
+make all-gcc -j$(nproc)
+make all-target-libgcc -j$(nproc)
+make install-gcc -j$(nproc)
+make install-target-libgcc -j$(nproc)
+make all-target-libstdc++-v3
+make install-target-libstdc++-v3
+
 echo Done

@@ -50,28 +50,7 @@ char* __tmpfs__find_name(char* path) {
 }
 
 vfs::tmpfs_node_t* __tmpfs__symfind(char* path) {
-    vfs::tmpfs_node_t* current = head_node;
-    while(current) {
-        if(current->type != TMPFS_TYPE_NONE && !strcmp(current->name,path) && current->name[0] != '\0') {
-            
-            if(current->type != TMPFS_TYPE_SYMLINK)
-                return current;
-            
-            std::uint8_t is_find = 1;
-            vfs::tmpfs_node_t* try_find = current;
-            while(is_find) {
-                if(current->type == TMPFS_TYPE_SYMLINK && current->content) {
-                    char buf[2048];
-                    vfs::resolve_path((const char*)current->content,current->name,buf,0,1);
-                    return __tmpfs__symfind(buf);
-                } else
-                    is_find = 0;
-            }
-            return try_find;
-        }
-        current = current->next;
-    }
-    return 0;
+    return __tmpfs__find(path); // symlinks will be handled by vfs
 }
 
 std::uint8_t __tmpfs__exists(char* path) {
@@ -160,9 +139,6 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
     vfs::tmpfs_node_t* node = __tmpfs__find(path);
     if (!node) { vfs::vfs::unlock();
         return -ENOENT; }
-
-    if(node->content)
-        node = __tmpfs__symfind(path);
 
     if (node->type == TMPFS_TYPE_DIRECTORY) { vfs::vfs::unlock();
         return -EISDIR; }
@@ -344,7 +320,39 @@ std::int32_t __tmpfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
 
     out->st_size = node->type == TMPFS_TYPE_DIRECTORY ? 0 : node->size;
     out->st_mode = node->type == TMPFS_TYPE_DIRECTORY ? S_IFDIR : S_IFREG;
+    if(node->type == TMPFS_TYPE_SYMLINK) 
+        out->st_mode = S_IFLNK;
     out->st_mode |= node->vars[0];
+
+    return 0;
+}
+
+std::int32_t __tmpfs__readlink(char* path, char* out, std::uint32_t out_len) {
+    if(!path)
+        return EFAULT;
+
+    if(!__tmpfs__exists(path))
+        return ENOENT;
+
+    if(!out)
+        return EINVAL;
+
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
+        return ENOENT;
+
+    if(node->type != TMPFS_TYPE_SYMLINK)
+        return EINVAL;
+
+    if(node->size >= out_len)
+        return EINVAL;
+
+    if(!node->content)
+        return EINVAL; // symlink is not initializied now :(
+
+    memset(out,0,out_len);
+    memcpy(out,node->content,node->size);
 
     return 0;
 }
@@ -358,6 +366,7 @@ void vfs::tmpfs::mount(vfs_node_t* node) {
 
     head_node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
 
+    node->readlink = __tmpfs__readlink;
     node->create = __tmpfs__create;
     node->remove = __tmpfs__remove;
     node->write = __tmpfs__write;

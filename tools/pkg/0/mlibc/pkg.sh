@@ -28,6 +28,8 @@ mkdir -p "$1/usr/include"
 cp -rf linux-headers/* "$1/usr/include"
 
 cd pack
+ 
+export CFLAGS="-std=gnu11"
 
 # mlibc doesn't need to be cached
 git clone https://github.com/cpplover0/orange-mlibc --depth=1
@@ -37,8 +39,8 @@ sh build_to_cross.sh "$(realpath $1/..)"
 
 T=$(realpath .)
 
-cd $1/lib
-ln -sf ../usr/lib/ld.so ld64.so.1
+cd $1/usr/lib
+ln -sf ld.so ld64.so.1
 
 cd "$T"
 

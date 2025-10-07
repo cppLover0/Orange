@@ -52,6 +52,99 @@ vfs::fifo_node_t* fifo_get(char* path) {
 
 }
 
+char * __vfs__strtok(char *str, const char *delim) {
+    static char *next = NULL;
+    if (str) next = str;
+    if (!next) return NULL;
+
+    char *start = next;
+    while (*start && strchr(delim, *start)) {
+        start++;
+    }
+    if (!*start) {
+        next = NULL;
+        return NULL;
+    }
+
+    char *end = start;
+    while (*end && !strchr(delim, *end)) {
+        end++;
+    }
+
+    if (*end) {
+        *end = '\0';
+        next = end + 1;
+    } else {
+        next = NULL;
+    }
+
+    return start;
+}
+
+void __vfs_symlink_resolve(char* path, char* out) {
+    char buffer[2048];
+    int e = vfs::vfs::readlink(path,buffer,2048);
+
+    if(!vfs_lock->test())
+        Log::Display(LEVEL_MESSAGE_WARN,"vfs_lock didnt set lock in symlink resolve");
+
+    if(e == ENOSYS) 
+        memcpy(out,path,strlen(path));
+
+    if(e == EINVAL)
+        memcpy(out,path,strlen(path));
+    else if(e == 0) {
+        
+        char result[2048];
+        memset(result,0,2048);
+        vfs::resolve_path(buffer,path,result,0,1);
+        __vfs_symlink_resolve(result,out);
+    } else if(e == ENOENT) {
+        memcpy(out,path,strlen(path));
+        // maybe it wants directory symlink ?
+        char path0[2048];
+        memset(path0,0,2048);
+        memcpy(path0,path,strlen(path));
+
+        char result[2048];
+        memset(result,0,2048);
+
+        int c = 0;
+
+        char* token = __vfs__strtok(path0, "/");
+        
+        /* Start building path from null and trying to find symlink */
+        while(token) {
+            
+            result[c] = '/';
+            c++;
+
+            std::uint64_t mm = 0;
+            mm = strlen(token);
+            memcpy((char*)((std::uint64_t)result + c),token,mm);
+            c += mm;
+            result[c] = '\0';
+
+            e = vfs::vfs::readlink(result,buffer,2048);
+            if(e == 0) {
+                char buffer2[2048];
+                memset(buffer2,0,2048);
+                vfs::resolve_path(buffer,result,buffer2,0,1);
+                c = strlen(buffer2);
+                buffer2[c++] = '/';
+                memcpy(buffer2 + c, path + strlen(result) + 1, strlen(path) - strlen(result));
+                __vfs_symlink_resolve(buffer2,out);
+                return;
+            } else if(e == ENOENT) {
+                memcpy(out,path,strlen(path));
+            }
+
+            token = __vfs__strtok(0,"/");
+        }
+        memcpy(out,path,strlen(path));
+    }
+}
+
 std::uint32_t vfs::vfs::create_fifo(char* path) {
 
     vfs_lock->lock();
@@ -94,18 +187,23 @@ std::uint32_t vfs::vfs::create_fifo(char* path) {
 std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
-        fifo_node_t* fifo = fifo_get(fd->path);
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out);
+
+    if(is_fifo_exists(out)) {
+        fifo_node_t* fifo = fifo_get(out);
         vfs_lock->unlock();
         asm volatile("sti");
         return fifo->main_pipe->write((const char*)buffer,size);
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
-    char* fs_love_name = &fd->path[0] + strlen(node->path) - 1;
+    char* fs_love_name = &out[0] + strlen(node->path) - 1;
     if(!node->write) { vfs::vfs::unlock();
         return -ENOSYS; }
 
@@ -116,18 +214,23 @@ std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t siz
 std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t count) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
-        fifo_node_t* fifo = fifo_get(fd->path);
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out);
+
+    if(is_fifo_exists(out)) {
+        fifo_node_t* fifo = fifo_get(out);
         vfs_lock->unlock();
         asm volatile("sti");
         return fifo->main_pipe->read((char*)buffer,count);
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out + strlen(node->path) - 1;
     if(!node->read) { vfs::vfs::unlock();
         return -ENOSYS; }
 
@@ -138,31 +241,42 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
 std::int32_t vfs::vfs::create(char* path, std::uint8_t type) {
     vfs_lock->lock();
 
-    if(sockets::is_exists(path) || is_fifo_exists(path)) {
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(path,out);
+
+    if(sockets::is_exists(out) || is_fifo_exists(out)) {
         vfs_lock->unlock();
         return EEXIST;
     }
 
-    vfs_node_t* node = find_node(path);
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = path + strlen(node->path) - 1;
+    char* fs_love_name = out + strlen(node->path) - 1;
     if(!node->create) { vfs::vfs::unlock();
         return ENOSYS; }
 
-    std::int32_t status = node->create(path,type);
+    std::int32_t status = node->create(out,type);
     vfs_lock->unlock();
     return status;
 }
 
 std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags) {
     vfs_lock->lock();
-    vfs_node_t* node = find_node(fd->path);
+
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out);
+
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out + strlen(node->path) - 1;
     if(!node->mmap) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -174,18 +288,23 @@ std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64
 std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
-        fifo_node_t* fifo = fifo_get(fd->path);
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out);
+
+    if(is_fifo_exists(out)) {
+        fifo_node_t* fifo = fifo_get(out);
         vfs_lock->unlock();
         return 0;
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out);
 
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
     
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out + strlen(node->path) - 1;
     if(!node->open) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -197,8 +316,13 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
 std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
-        fifo_node_t* fifo = fifo_get(fd->path);
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out);
+
+    if(is_fifo_exists(out)) {
+        fifo_node_t* fifo = fifo_get(out);
         memset(fifo->path,0,2048);
         fifo->is_used = 0;
         delete fifo->main_pipe;
@@ -206,13 +330,13 @@ std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
         return 0;
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
     
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
-    if(!node->remove)
-        return ENOSYS;
+    char* fs_love_name = out + strlen(node->path) - 1;
+    if(!node->remove) {vfs::vfs::unlock();
+        return ENOSYS; }
 
     std::int32_t status = node->remove(fd,fs_love_name);
     vfs_lock->unlock();
@@ -221,11 +345,17 @@ std::int32_t vfs::vfs::remove(userspace_fd_t* fd) {
 
 std::int32_t vfs::vfs::ls(userspace_fd_t* fd, dirent_t* out) {
     vfs_lock->lock();
-    vfs_node_t* node = find_node(fd->path);
+
+    char out0[2048];
+    memset(out0,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out0);
+
+    vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out0 + strlen(node->path) - 1;
     if(!node->ls) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -236,11 +366,17 @@ std::int32_t vfs::vfs::ls(userspace_fd_t* fd, dirent_t* out) {
 
 std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t request) {
     vfs_lock->lock();
-    vfs_node_t* node = find_node(fd->path);
+
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out);
+
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out + strlen(node->path) - 1;
     if(!node->var) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -252,16 +388,21 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
 std::int32_t vfs::vfs::touch(char* path) {
     vfs_lock->lock();
 
-    if(sockets::is_exists(path) || is_fifo_exists(path)) {
+    char out[2048];
+    memset(out,0,2048);
+
+    __vfs_symlink_resolve(path,out);
+
+    if(sockets::is_exists(out) || is_fifo_exists(out)) {
         vfs_lock->unlock();
         return EEXIST;
     }
 
-    vfs_node_t* node = find_node(path);
+    vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = path + strlen(node->path) - 1;
+    char* fs_love_name = out + strlen(node->path) - 1;
     if(!node->touch) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -270,28 +411,32 @@ std::int32_t vfs::vfs::touch(char* path) {
     return status;
 }
 
-std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
+std::int32_t vfs::vfs::nosym_stat(userspace_fd_t* fd, stat_t* out) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
+    char out0[2048];
+    memset(out0,0,2048);
+    memcpy(out0,fd->path,strlen(fd->path));
+
+    if(is_fifo_exists(out0)) {
         memset(out,0,sizeof(stat_t));
         out->st_mode |= S_IFIFO;
         vfs_lock->unlock();
         return 0;
     }
 
-    if(sockets::is_exists(fd->path)) {
+    if(sockets::is_exists(out0)) {
         memset(out,0,sizeof(stat_t));
         out->st_mode |= S_IFSOCK;
         vfs_lock->unlock();
         return 0;
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out0 + strlen(node->path) - 1;
     if(!node->stat) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -300,26 +445,54 @@ std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
     return status;
 } 
 
-std::int32_t vfs::vfs::nlstat(userspace_fd_t* fd, stat_t* out) {
-    vfs_node_t* node = find_node(fd->path);
+std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
+    vfs_lock->lock();
+
+    char out0[2048];
+    memset(out0,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out0);
+
+    if(is_fifo_exists(out0)) {
+        memset(out,0,sizeof(stat_t));
+        out->st_mode |= S_IFIFO;
+        vfs_lock->unlock();
+        return 0;
+    }
+
+    if(sockets::is_exists(out0)) {
+        memset(out,0,sizeof(stat_t));
+        out->st_mode |= S_IFSOCK;
+        vfs_lock->unlock();
+        return 0;
+    }
+
+    vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out0 + strlen(node->path) - 1;
     if(!node->stat) { vfs::vfs::unlock();
         return ENOSYS; }
 
     std::int32_t status = node->stat(fd,fs_love_name,out);
+    vfs_lock->unlock();
     return status;
 } 
 
 std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, int *res) {
     vfs_lock->lock();
-    vfs_node_t* node = find_node(fd->path);
+
+    char out0[2048];
+    memset(out0,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out0);
+
+    vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out0 + strlen(node->path) - 1;
     if(!node->ioctl) { vfs::vfs::unlock();
         return ENOSYS; }
 
@@ -331,18 +504,23 @@ std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, i
 void vfs::vfs::close(userspace_fd_t* fd) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
-        fifo_node_t* fifo = fifo_get(fd->path);
+    char out0[2048];
+    memset(out0,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out0);
+
+    if(is_fifo_exists(out0)) {
+        fifo_node_t* fifo = fifo_get(out0);
         fifo->main_pipe->fifoclose();
         vfs_lock->unlock();
         return;
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
         return; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out0 + strlen(node->path) - 1;
     if(!node->close) { vfs::vfs::unlock();
         return; }
 
@@ -351,11 +529,34 @@ void vfs::vfs::close(userspace_fd_t* fd) {
     return;
 }
 
+std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
+    if(is_fifo_exists(path)) {
+        return EINVAL;
+    } else if(sockets::is_exists(path)) {
+        return EINVAL;
+    }
+
+    vfs_node_t* node = find_node(path);
+    if(!node) { 
+        return ENOENT; }
+
+    char* fs_love_name = path + strlen(node->path) - 1;
+    if(!node->readlink) { 
+        return EINVAL; }
+
+    return node->readlink(fs_love_name,out,out_len);
+}
+
 std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
     vfs_lock->lock();
 
-    if(is_fifo_exists(fd->path)) {
-        fifo_node_t* fifo = fifo_get(fd->path);
+    char out0[2048];
+    memset(out0,0,2048);
+
+    __vfs_symlink_resolve(fd->path,out0);
+
+    if(is_fifo_exists(out0)) {
+        fifo_node_t* fifo = fifo_get(out0);
         std::int64_t ret = 0;
         switch (operation_type)
         {
@@ -411,11 +612,11 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         return ret;
     }
 
-    vfs_node_t* node = find_node(fd->path);
+    vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
-    char* fs_love_name = fd->path + strlen(node->path) - 1;
+    char* fs_love_name = out0 + strlen(node->path) - 1;
     if(!node->poll) { vfs::vfs::unlock();
         return -ENOSYS ; }
 

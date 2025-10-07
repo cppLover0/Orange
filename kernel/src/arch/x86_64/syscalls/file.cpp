@@ -232,7 +232,7 @@ syscall_ret_t sys_close(int fd) {
     return {0,0,0};
 }
 
-syscall_ret_t sys_stat(int fd, void* out) {
+syscall_ret_t sys_stat(int fd, void* out, int flags) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
@@ -241,9 +241,16 @@ syscall_ret_t sys_stat(int fd, void* out) {
 
     if(fd_s->state == USERSPACE_FD_STATE_FILE) {
         vfs::stat_t stat;
-        int status = vfs::vfs::stat(fd_s,&stat);
+        int status;
+        if(flags & AT_SYMLINK_NOFOLLOW) 
+            status = vfs::vfs::nosym_stat(fd_s,&stat);
+        else 
+            status = vfs::vfs::stat(fd_s,&stat);
         if(status != 0)
             return {0,status,0};
+        vfs::vfs::lock();
+        char test_buf[2048];
+        vfs::vfs::unlock();
         copy_in_userspace(proc,out,&stat,sizeof(vfs::stat_t));
     } else {
         vfs::stat_t stat;
@@ -674,7 +681,9 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
             for(int i = 0;i < count; i++) {
                 userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
                 if(fd[i].events & POLLIN) {
+                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->read_counter) {
                         fd0->read_counter = ret;
                         num_events++;
@@ -683,7 +692,9 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                 }
 
                 if(fd[i].events & POLLOUT) {
+                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->write_counter) {
                         fd0->write_counter = ret;
                         num_events++;
@@ -700,7 +711,9 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
             for(int i = 0;i < count; i++) {
                 userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
                 if(fd[i].events & POLLIN) {
+                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->read_counter) {
                         fd0->read_counter = ret;
                         num_events++;
@@ -709,7 +722,9 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                 }
 
                 if(fd[i].events & POLLOUT) {
+                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->write_counter) {
                         fd0->write_counter = ret;
                         num_events++;

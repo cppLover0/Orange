@@ -103,6 +103,8 @@
 #define PIPE_SIDE_WRITE 1
 #define PIPE_SIDE_READ 2
 
+void __vfs_symlink_resolve(char* path, char* out);
+
 namespace vfs {
 
     class pipe {
@@ -497,6 +499,8 @@ namespace vfs {
 
         std::int64_t (*poll)   (userspace_fd_t* fd, char* path, int request);
 
+        std::int32_t (*readlink) (char* path, char* out, std::uint32_t out_len);
+
         void (*close)(userspace_fd_t* fd, char* path);
 
         char path[2048];
@@ -517,6 +521,7 @@ namespace vfs {
         static std::int64_t write  (userspace_fd_t* fd, void* buffer, std::uint64_t size          );
         static std::int64_t read   (userspace_fd_t* fd, void* buffer, std::uint64_t count         );
         static std::int32_t stat   (userspace_fd_t* fd, stat_t* out                               );
+        static std::int32_t nosym_stat   (userspace_fd_t* fd, stat_t* out                         );
         static std::int32_t var    (userspace_fd_t* fd, std::uint64_t value, std::uint8_t request );
         static std::int32_t ls     (userspace_fd_t* fd, dirent_t* out                             ); 
         static std::int32_t remove (userspace_fd_t* fd                                            );
@@ -530,7 +535,7 @@ namespace vfs {
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );
 
-        static std::int32_t nlstat (userspace_fd_t* fd, stat_t* out                               );
+        static std::int32_t readlink(char* path, char* out, std::uint32_t out_len); /* Lock-less, vfs lock should be already locked */
 
         static std::uint32_t create_fifo(char* path);
 

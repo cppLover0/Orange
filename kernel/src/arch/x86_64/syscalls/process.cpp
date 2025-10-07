@@ -219,7 +219,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     userspace_fd_t fd;
     memset(fd.path,0,2048);
-    memcpy(fd.path,stack_path,strlen(stack_path));
+    memcpy(fd.path,result,strlen(result));
 
     int status = vfs::vfs::stat(&fd,&stat); 
 
@@ -236,7 +236,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
             proc->ctx.rflags = (1 << 9);
     
 
-            arch::x86_64::scheduling::loadelf(proc,stack_path,argv0,envp0);
+            arch::x86_64::scheduling::loadelf(proc,result,argv0,envp0);
 
 
             for(int i = 0;i < argv_length; i++) {
