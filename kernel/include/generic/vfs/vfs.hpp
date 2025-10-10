@@ -12,6 +12,8 @@
 
 #include <etc/logging.hpp>
 
+#include <algorithm>
+
 #define USERSPACE_FD_STATE_UNUSED 0
 #define USERSPACE_FD_STATE_FILE 1
 #define USERSPACE_FD_STATE_PIPE 2
@@ -133,39 +135,49 @@ namespace vfs {
             this->buffer = (char*)memory::pmm::_virtual::alloc(USERSPACE_PIPE_SIZE);
             this->total_size = USERSPACE_PIPE_SIZE;
             this->size = 0;
-            this->connected_to_pipe = 2; /* Syscall which creates pipe should create 2 fds too */ 
+            this->connected_to_pipe = 2; /* syscall which creates pipe should create 2 fds too */ 
             this->connected_to_pipe_write = 1;
             this->flags = flags;
+
+            this->is_closed.clear(std::memory_order_release);
+
         }
 
         void fifoclose() {
+            asm volatile("sti");
             this->lock.lock();
             this->is_received.clear();
             this->is_closed.test_and_set();
             this->lock.unlock();
+            asm volatile("cli");
         }
 
         void close(std::uint8_t side) {
+            asm volatile("sti");
             this->lock.lock();
+            asm volatile("cli");
             this->connected_to_pipe--;
             
             if(side == PIPE_SIDE_WRITE) {
                 this->connected_to_pipe_write--;
-                if(is_was_writed_ever || this->connected_to_pipe_write == 0) {
+                if(this->connected_to_pipe_write == 0) {
                     this->is_received.clear();
-                    this->is_closed.test_and_set();
-                    is_was_writed_ever = 0;
+                    this->is_closed.test_and_set(std::memory_order_acquire);
                 }
             }
+
+            this->lock.unlock();
+            asm volatile("cli");
 
             if(this->connected_to_pipe == 0) {
                 delete this;
             }
-            this->lock.unlock();
         }
 
         void create(std::uint8_t side) {
+            asm volatile("sti");
             this->lock.lock();
+            asm volatile("cli");
             this->connected_to_pipe++;
             if(side == PIPE_SIDE_WRITE)
                 this->connected_to_pipe_write++;
@@ -173,25 +185,37 @@ namespace vfs {
         }
 
         std::uint64_t force_write(const char* src_buffer, std::uint64_t count) {
-            memcpy(this->buffer + this->size, src_buffer, count);
+            if (this->size + count > this->total_size) {
+                count = this->total_size - this->size;
+            }
             this->size += count;
+            memcpy(this->buffer + (this->size - count), src_buffer, count);
             return count;
         }
 
         std::uint64_t write(const char* src_buffer, std::uint64_t count) {
             std::uint64_t written = 0;
             while (written < count) {
-                this->is_closed.clear(); /* Pipe is active */
-                std::uint64_t space_left = total_size - size;
+                this->lock.lock();
+
+                std::uint64_t space_left = this->total_size - this->size;
                 if (space_left == 0) {
+                    this->lock.unlock();
+                    asm volatile("pause");
                     continue;
                 }
-                is_was_writed_ever = 1;
-                std::uint64_t to_write = (count - written < space_left) ? (count - written) : space_left;
+
+                asm volatile("cli");
+
+                std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
                 force_write(src_buffer + written, to_write);
+
                 written += to_write;
-                this->is_received.clear();
-                read_counter++;
+
+                asm volatile("sti");
+
+                this->lock.unlock();
+                asm volatile("pause");
             }
             return written;
         }
@@ -199,29 +223,37 @@ namespace vfs {
         std::uint64_t read(char* dest_buffer, std::uint64_t count) {
             std::uint64_t read_bytes = 0;
             while (true) {
-                if (this->size == 0 || this->read_ptr >= this->size) {
-                    if (this->is_closed.test()) {
-                        return 0;
+                this->lock.lock();
+
+                if (this->size == 0) {
+                    if (this->is_closed.test(std::memory_order_acquire)) {
+                        this->lock.unlock();
+                        return 0; 
                     }
                     if (flags & O_NONBLOCK) {
+                        this->lock.unlock();
                         return 0;
                     }
+                    this->lock.unlock();
+                    asm volatile("pause");
                     continue;
                 }
-                std::int64_t size0 = this->size - this->read_ptr;
-                read_bytes = (count < static_cast<std::uint64_t>(size0)) ? count : static_cast<std::uint64_t>(size0);
-                memcpy(dest_buffer, this->buffer + this->read_ptr, read_bytes);
-                this->read_ptr += read_bytes;
-                if (this->read_ptr >= this->size) {
-                    this->read_ptr = 0;
-                    this->size = 0;
-                    this->is_received.test_and_set();
-                    write_counter++;
-                }
+
+                asm volatile("cli");
+
+                read_bytes = (count < this->size) ? count : this->size;
+                memcpy(dest_buffer, this->buffer, read_bytes);
+                memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
+                this->size -= read_bytes;
+
+                asm volatile("sti");
+
+                this->lock.unlock();
                 break;
             }
             return read_bytes;
         }
+
 
         ~pipe() {
             memory::pmm::_virtual::free(this->buffer);

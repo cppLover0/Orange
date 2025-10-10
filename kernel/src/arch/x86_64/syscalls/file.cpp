@@ -186,11 +186,14 @@ syscall_ret_t sys_seek(int fd, long offset, int whence) {
     if(!fd_s) 
         return {1,EBADF,0};
 
-    if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+    if(fd_s->state == USERSPACE_FD_STATE_PIPE || fd_s->is_a_tty)
         return {1,0,0};
 
     vfs::stat_t stat;
-    vfs::vfs::stat(fd_s,&stat);
+    int res = vfs::vfs::stat(fd_s,&stat);
+
+    if(res != 0)
+        return {1,res,0};
 
     switch (whence)
     {
@@ -218,15 +221,17 @@ syscall_ret_t sys_close(int fd) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
-    if(!fd_s)
+    if(!fd_s && fd > 2)
         return {0,EBADF,0};
+    else if(fd < 3)
+        return {0,0,0}; // ignoring
 
     if(fd_s->state == USERSPACE_FD_STATE_PIPE)
         fd_s->pipe->close(fd_s->pipe_side);
     else if(fd_s->state == USERSPACE_FD_STATE_FILE || fd_s->state == USERSPACE_FD_STATE_SOCKET)
         vfs::vfs::close(fd_s);
 
-    if(!fd_s->is_a_tty && fd_s->index > 2)
+    if(!fd_s->is_a_tty)
         fd_s->state = USERSPACE_FD_STATE_UNUSED;
 
     return {0,0,0};
@@ -308,6 +313,9 @@ syscall_ret_t sys_dup(int fd, int flags) {
     nfd_s->write_counter = fd_s->write_counter;
 
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
+
+    if(nfd_s->state ==USERSPACE_FD_STATE_PIPE)
+        nfd_s->pipe->create(nfd_s->pipe_side);
 
     return {1,0,new_fd};
 }

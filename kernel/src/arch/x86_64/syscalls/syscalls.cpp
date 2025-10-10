@@ -84,7 +84,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
         ctx->rdx = ret.ret_val;
     }
 
-    if(ret.ret != 0 && item->syscall_num != 46)
+    if(ret.ret != 0 && item->syscall_num != 46 && item->syscall_num != 23 && item->syscall_num != 30 && item->syscall_num != 31)
         Log::Raw("non zero ret %d from sys %d\n",ret.ret,item->syscall_num);
 
     ctx->rax = ret.ret;

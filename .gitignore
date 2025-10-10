@@ -34,3 +34,4 @@ pack
 initrd.tar
 qemu.txt
 build-x86_64
+linux-headers
