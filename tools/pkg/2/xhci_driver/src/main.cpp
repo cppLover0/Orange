@@ -818,7 +818,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         input_ctx->ep0.cerr = 3;
         input_ctx->ep0.maxpacketsize = speed;
         input_ctx->ep0.base = usb_dev->transfer_ring->phys | usb_dev->transfer_ring->cycle;
-        input_ctx->ep0.averagetrblen = 8;
+        input_ctx->ep0.averagetrblen = 0x8;
         usb_dev->input_ctx = (xhci_input_ctx_t*)input_ctx;
 
     } else {
@@ -859,7 +859,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     if(!speed) {
         log(LEVEL_MESSAGE_FAIL,"Broken USB Device/Firmware, can't continue work. skipping\n");
-        return; //now i cant ignore anymore...
+        return; 
     }
 
     char product[1024];
@@ -940,6 +940,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                             continue;
 
                         need_interface->buffer = malloc(desc->desclen + 1);
+                        memset(need_interface->buffer,0,desc->desclen + 1);
                         need_interface->len = desc->desclen;
 
                         xhci_interface_descriptor_t* interface = (xhci_interface_descriptor_t*)need_interface;
@@ -971,6 +972,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     memset(ep1,0,sizeof(xhci_endpoint_ctx_t));
                     usb_dev->input_ctx->input_ctx.A |= (1 << (idx + 2));
                     
+                    input->slot.contextentries += 2;
                     ep1->state = 0;
                     ep1->endpointtype = __xhci_ep_to_type(ep);
                     ep1->maxpacketsize = ep->maxpacketsize;
@@ -994,6 +996,8 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)liborange_map_phys(addr,0,4096);
                     xhci_endpoint_ctx_t* ep1 = (xhci_endpoint_ctx_t*)(&input->ep[idx]);
                     memset(ep1,0,sizeof(xhci_endpoint_ctx_t));
+                    
+                    input->slot.contextentries += 2;
                     input->input_ctx.A |= (1 << (idx + 2));
                     ep1->state = 0;
                     ep1->endpointtype = __xhci_ep_to_type(ep);
@@ -1034,13 +1038,15 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&ep_trb);
     __xhci_doorbell(dev,0);
-    usleep(10000);
+    usleep(5000);
 
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
-    if(ret.ret_code != 1) {
-        log(LEVEL_MESSAGE_FAIL,"Can't configure endpoints for port %d (ret %d)\n",portnum,ret.status & 0xFF);
+    if(ret.ret_code > 1) {
+        log(LEVEL_MESSAGE_FAIL,"Can't configure endpoints for port %d (ret %d base %p), context_size: %d, given addr %p\n",portnum,ret.ret_code,ret.base,usb_dev->_is64byte,ep_trb.base);
         return;
+    } else if(ret.ret_code == 0) {
+        log(LEVEL_MESSAGE_WARN,"Endpoint configure TRB ret_code is 0 (it shouldn't)\n");
     }
     
     __xhci_ask_for_help_hid(dev,usb_dev);
