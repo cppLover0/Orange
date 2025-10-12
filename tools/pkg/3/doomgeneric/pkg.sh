@@ -16,7 +16,7 @@ cd doomgeneric
 make -j$(nproc)
 
 rm -rf "$1/usr/bin/doomgeneric"
-cp -rf doomgeneric "$1/usr/bin/doomgeneric"
+cp -rf doomgeneric "$1/usr/bin/doomgeneric-fbdev"
 
 old="$(pwd)"
 cd "$1/usr/share"

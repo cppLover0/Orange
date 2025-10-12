@@ -293,6 +293,8 @@ typedef struct userspace_fd {
     std::uint8_t state;
     std::uint8_t pipe_side;
 
+    std::uint8_t can_be_closed;
+
     vfs::pipe* read_socket_pipe;
     vfs::pipe* write_socket_pipe;
 

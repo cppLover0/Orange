@@ -57,7 +57,8 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {45,(void*)sys_listen},
     {46,(void*)sys_timestamp},
     {47,(void*)sys_mkfifoat},
-    {48,(void*)sys_poll}
+    {48,(void*)sys_poll},
+    {49,(void*)sys_readlinkat}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -84,7 +85,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
         ctx->rdx = ret.ret_val;
     }
 
-    if(ret.ret != 0 && item->syscall_num != 46 && item->syscall_num != 23 && item->syscall_num != 30 && item->syscall_num != 31)
+    if(ret.ret != 0)
         Log::Raw("non zero ret %d from sys %d\n",ret.ret,item->syscall_num);
 
     ctx->rax = ret.ret;

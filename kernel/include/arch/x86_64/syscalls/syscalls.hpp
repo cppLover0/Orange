@@ -134,6 +134,7 @@ syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg);
 syscall_ret_t sys_fchdir(int fd);
 
 syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout);
+syscall_ret_t sys_readlinkat(int dirfd, const char* path, void* buffer, int_frame_t* ctx);
 
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);

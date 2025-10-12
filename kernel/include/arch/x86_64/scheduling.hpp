@@ -52,6 +52,7 @@ typedef struct {
     std::uint64_t phdr;
     std::uint64_t phnum;
     std::uint64_t phentsize;
+    int status;
 } elfloadresult_t;
 
 enum ELF_Type {
@@ -169,7 +170,8 @@ namespace arch {
             static void wakeup(process_t* proc);
             static void futexwake(process_t* proc, int* lock);
             static void futexwait(process_t* proc, int* lock, int val);
-            static void loadelf(process_t* proc,char* path,char** argv,char** envp);
+            static int loadelf(process_t* proc,char* path,char** argv,char** envp,int free_mem);
+            static process_t* head_proc_();
 
         };
     }

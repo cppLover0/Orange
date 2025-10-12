@@ -48,7 +48,8 @@ make run
 
 - [x] Move XHCI driver from old kernel to userspace
 - [x] Implement IRQ userspace handling
-- [ ] Port lua, fastfetch, doomgeneric, nano and etc.
+- [x] Port lua, fastfetch, doomgeneric, nano and etc.
+- [ ] Improve XHCI driver
 - [ ] Port Xorg 
 - [ ] Implement userspace disk drivers
-- [ ] Improve kernel path resolver (add symlink support when trying to access another filesystem)
+- [x] Improve kernel path resolver (add symlink support when trying to access another filesystem)

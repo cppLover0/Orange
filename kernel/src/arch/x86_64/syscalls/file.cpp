@@ -87,6 +87,9 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
     
     new_fd_s->offset = 0;
 
+    if(status != 0)
+        Log::SerialDisplay(LEVEL_MESSAGE_WARN,"failed to open %s\n",result);
+
     return {1,status,status == 0 ? new_fd : -1};
 }
 
@@ -223,15 +226,21 @@ syscall_ret_t sys_close(int fd) {
 
     if(!fd_s && fd > 2)
         return {0,EBADF,0};
-    else if(fd < 3)
+    else if(fd < 3 && !fd_s)
         return {0,0,0}; // ignoring
 
-    if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+    if(fd_s->can_be_closed)
+        return {0,EBADF,0};
+
+    if(fd < 3)
+        fd_s->can_be_closed = 1;
+
+    if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
         fd_s->pipe->close(fd_s->pipe_side);
-    else if(fd_s->state == USERSPACE_FD_STATE_FILE || fd_s->state == USERSPACE_FD_STATE_SOCKET)
+    } else if(fd_s->state == USERSPACE_FD_STATE_FILE || fd_s->state == USERSPACE_FD_STATE_SOCKET)
         vfs::vfs::close(fd_s);
 
-    if(!fd_s->is_a_tty)
+    if(!fd_s->is_a_tty && fd_s->index > 2)
         fd_s->state = USERSPACE_FD_STATE_UNUSED;
 
     return {0,0,0};
@@ -311,6 +320,7 @@ syscall_ret_t sys_dup(int fd, int flags) {
     nfd_s->is_a_tty = fd_s->is_a_tty;
     nfd_s->read_counter = fd_s->read_counter;
     nfd_s->write_counter = fd_s->write_counter;
+    nfd_s->can_be_closed = fd_s->can_be_closed;
 
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
 
@@ -350,6 +360,7 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     nfd_s->is_a_tty = fd_s->is_a_tty;
     nfd_s->write_counter = fd_s->write_counter;
     nfd_s->read_counter = fd_s->read_counter;
+    nfd_s->can_be_closed = fd_s->can_be_closed;
 
     if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
         nfd_s->pipe->create(nfd_s->pipe_side);
@@ -447,7 +458,9 @@ syscall_ret_t sys_isatty(int fd) {
     if(!fd_s)
         return {0,EBADF,0};
 
-    if(fd_s->state == USERSPACE_FD_STATE_PIPE)
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"isatty fd %d with state %d\n",fd,fd_s->state);
+
+    if(fd_s->state == USERSPACE_FD_STATE_PIPE || fd_s->state == USERSPACE_FD_STATE_SOCKET)
         return {0,ENOTTY,0};
 
     int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
@@ -750,5 +763,43 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
     return {1,0,num_events};
 
+
+}
+
+syscall_ret_t sys_readlinkat(int dirfd, const char* path, void* buffer, int_frame_t* ctx) {
+    std::size_t max_size = ctx->r8;
+
+    SYSCALL_IS_SAFEA((void*)path,0);
+    SYSCALL_IS_SAFEA((void*)buffer,max_size);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    char first_path[2048];
+    memset(first_path,0,2048);
+    if(dirfd >= 0)
+        memcpy(first_path,vfs::fdmanager::search(proc,dirfd)->path,strlen(vfs::fdmanager::search(proc,dirfd)->path));
+    else if(dirfd == AT_FDCWD)
+        memcpy(first_path,proc->cwd,strlen(proc->cwd));
+
+    char kpath[2048];
+    memset(kpath,0,2048);
+    copy_in_userspace_string(proc,kpath,(void*)path,2048);
+
+    char result[2048];
+    memset(result,0,2048);
+    vfs::resolve_path(kpath,first_path,result,1,0);
+
+    char readlink_buf[2048];
+    memset(readlink_buf,0,2048);
+    vfs::vfs::lock();
+    int ret = vfs::vfs::readlink(result,readlink_buf,2048);
+    vfs::vfs::unlock();
+
+    if(ret != 0)
+        return {1,ret,0};
+
+    copy_in_userspace(proc,buffer,readlink_buf, strlen(readlink_buf) > max_size ? max_size : strlen(readlink_buf));
+
+    return {1,0,(int64_t)(strlen(readlink_buf) > max_size ? max_size : strlen(readlink_buf))};
 
 }

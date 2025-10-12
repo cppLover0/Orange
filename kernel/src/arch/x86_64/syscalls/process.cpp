@@ -50,10 +50,12 @@ syscall_ret_t sys_exit(int status) {
 
     userspace_fd_t* fd = proc->fd;
     while(fd) {
-        if(fd->state == USERSPACE_FD_STATE_PIPE)
-            fd->pipe->close(fd->pipe_side);
-        else if(fd->state == USERSPACE_FD_STATE_FILE || fd->state == USERSPACE_FD_STATE_SOCKET)
-            vfs::vfs::close(fd);
+        if(!fd->can_be_closed) {
+            if(fd->state == USERSPACE_FD_STATE_PIPE)
+                fd->pipe->close(fd->pipe_side);
+            else if(fd->state == USERSPACE_FD_STATE_FILE || fd->state == USERSPACE_FD_STATE_SOCKET)
+                vfs::vfs::close(fd);
+        }
         userspace_fd_t* next = fd->next;
         memory::pmm::_virtual::free(fd);
         fd = next;
@@ -210,11 +212,6 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     char result[2048];
     vfs::resolve_path(stack_path,proc->cwd,result,1,0);
 
-    memory::vmm::free(proc);
-    memory::vmm::initproc(proc);
-
-    memory::vmm::reload(proc);
-
     vfs::stat_t stat;
 
     userspace_fd_t fd;
@@ -229,30 +226,35 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
             proc->fs_base = 0;
 
             memset(&proc->ctx,0,sizeof(int_frame_t));
+
+            memory::vmm::free(proc);
+
+            memory::vmm::initproc(proc);
+            memory::vmm::reload(proc);
             
             proc->ctx.cs = 0x20 | 3;
             proc->ctx.ss = 0x18 | 3;
 
             proc->ctx.rflags = (1 << 9);
-    
 
-            arch::x86_64::scheduling::loadelf(proc,result,argv0,envp0);
+            status = arch::x86_64::scheduling::loadelf(proc,result,argv0,envp0,0);
+            if(status == 0) {
 
+                for(int i = 0;i < argv_length; i++) {
+                    memory::heap::free(argv0[i]);
+                }
 
-            for(int i = 0;i < argv_length; i++) {
-                memory::heap::free(argv0[i]);
-            }
+                for(int i = 0;i < envp_length; i++) {
+                    memory::heap::free(envp0[i]);
+                }
 
-            for(int i = 0;i < envp_length; i++) {
-                memory::heap::free(envp0[i]);
-            }
+                memory::heap::free(argv0);
+                memory::heap::free(envp0);
 
-            memory::heap::free(argv0);
-            memory::heap::free(envp0);
-
-            schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
-            __builtin_unreachable();
-
+                schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
+                __builtin_unreachable();
+            } 
+            status = -1;
         }
     }
 
@@ -267,11 +269,13 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::free(argv0);
     memory::heap::free(envp0);
 
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"exec error\n");
-    arch::x86_64::scheduling::kill(proc);
-    schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
-    __builtin_unreachable();
-
+    if(status == -1) {
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"exec error\n");
+        arch::x86_64::scheduling::kill(proc);
+        schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
+        __builtin_unreachable();
+    } else 
+        return {0,status,0};
 }
 
 syscall_ret_t sys_getpid() {
@@ -317,11 +321,10 @@ syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize) {
 }
 
 syscall_ret_t sys_waitpid(int pid) {
-    extern arch::x86_64::process_t* head_proc;
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
-    arch::x86_64::process_t* current = head_proc;
+    arch::x86_64::process_t* current = arch::x86_64::scheduling::head_proc_();
     
     if(pid < -1 || pid == 0)
         return {0,ENOSYS,0};
@@ -334,7 +337,7 @@ syscall_ret_t sys_waitpid(int pid) {
     if(pid == -1) {
         while (current)
         {
-            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING)) {
+            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING) && current->waitpid_state != 2) {
                 current->waitpid_state = 1;
                 success = 1;
             }
@@ -343,7 +346,7 @@ syscall_ret_t sys_waitpid(int pid) {
     } else if(pid > 0) {
         while (current)
         {
-            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING) && current->id == pid) {
+            if(current->parent_id == proc->id && (current->status = PROCESS_STATE_ZOMBIE || current->status == PROCESS_STATE_RUNNING) && current->id == pid && current->waitpid_state != 2) {
                 current->waitpid_state = 1;
                 success = 1;
                 break;
@@ -359,7 +362,7 @@ syscall_ret_t sys_waitpid(int pid) {
 
     SYSCALL_ENABLE_PREEMPT();
 
-    current = head_proc;
+    current = arch::x86_64::scheduling::head_proc_();
     while(1) {
         while (current)
         {
@@ -373,7 +376,7 @@ syscall_ret_t sys_waitpid(int pid) {
             }
             current = current->next;
         }
-        current = head_proc;
+        current = arch::x86_64::scheduling::head_proc_();
     }
 
 }

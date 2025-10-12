@@ -23,6 +23,8 @@
 
 #include <atomic>
 
+#include <etc/errno.hpp>
+
 #include <config.hpp>
 
 arch::x86_64::process_t* head_proc;
@@ -77,8 +79,9 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
     std::uint64_t size = 0;
     std::uint64_t phdr = 0;
     char ELF[4] = {0x7F,'E','L','F'};
-    if(strncmp((const char*)head->e_ident,ELF,4))
-        return {0,0,0,0,0};
+    if(strncmp((const char*)head->e_ident,ELF,4)) {
+        return {0,0,0,0,0,ENOENT};
+    }
 
     elfloadresult_t elfload;
     elfload.real_entry = head->e_entry;
@@ -115,7 +118,7 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
 
             int status = vfs::vfs::stat(&fd,&stat);
             if(status) {
-                return {0,0,0,0,0};
+                return {0,0,0,0,0,ENOENT};
             }
 
             char* inter = (char*)memory::pmm::_virtual::alloc(stat.st_size);
@@ -177,11 +180,13 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
         }
 
     }
-    
+
+    elfload.status = 0;
+
     return elfload;
 }
 
-void arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,char** envp) {
+int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,char** envp, int free_mem) {
     vfs::stat_t stat;
     userspace_fd_t fd;
     zeromem(&fd);
@@ -191,19 +196,20 @@ void arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,ch
 
     int status = vfs::vfs::stat(&fd,&stat);
     if(status) {
-        return;
+        return status;
     }
 
     char* inter = (char*)memory::pmm::_virtual::alloc(stat.st_size);
 
     vfs::vfs::read(&fd,inter,stat.st_size);
     elfloadresult_t elfload = __scheduling_load_elf(proc,(std::uint8_t*)inter);
+
     memory::pmm::_virtual::free(inter);
+    if(elfload.status != 0)
+        return elfload.status;
 
     proc->ctx.rsp = (std::uint64_t)memory::vmm::alloc(proc,USERSPACE_STACK_SIZE,PTE_PRESENT | PTE_USER | PTE_RW) + USERSPACE_STACK_SIZE - 4096;
     std::uint64_t* _stack = (std::uint64_t*)proc->ctx.rsp;
-
-    memory::vmm::reload(proc);
 
     std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ};
     std::uint64_t argv_length = __elf_get_length(argv);
@@ -247,6 +253,8 @@ void arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,ch
     memory::heap::free(stack_envp);
 
     memory::vmm::reload(proc);
+
+    return 0;
 
 }
 
@@ -435,7 +443,10 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
         current = head_proc;
     }
 }
-    
+
+arch::x86_64::process_t* arch::x86_64::scheduling::head_proc_() {
+    return head_proc;
+}
 
 void arch::x86_64::scheduling::init() {
     process_t* main_proc = create();

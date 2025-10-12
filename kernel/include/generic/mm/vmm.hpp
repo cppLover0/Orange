@@ -251,6 +251,10 @@ namespace memory {
 
         inline static void free(arch::x86_64::process_t* proc) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+
+            if(!current)
+                return;
+
             vmm_obj_t* next = current->next;
 
             while (current)

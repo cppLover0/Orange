@@ -23,7 +23,7 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +
 +struct fb_var_screeninfo vinfo;
 +struct fb_fix_screeninfo finfo;
-+unsigned char *fb_ptr;
++unsigned char *fb_ptr;void* old_fb;
 +
 +
 +struct termios back;
@@ -36,7 +36,7 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +    for(int i = 0;i < 128;i++) {
 +        read(STDIN_FILENO,dummy,128);
 +    } // clear the queue and go to the latest queue
-+    tcsetattr(STDIN_FILENO, TCSANOW, &back);
++    tcsetattr(STDIN_FILENO, TCSANOW, &back);memcpy(fb_ptr,old_fb,vinfo.yres * vinfo.xres * vinfo.bits_per_pixel / 8);
 +    
 +}
 +
@@ -52,7 +52,7 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +    ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo);
 +
 +    fb_ptr = (unsigned char *)mmap(0, vinfo.yres_virtual * vinfo.xres_virtual * vinfo.bits_per_pixel / 8,
-+                                    PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
++                                    PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);old_fb = (void*)malloc(vinfo.yres * vinfo.xres * vinfo.bits_per_pixel / 8);
 +
 +    struct termios newt;
 +    tcgetattr(STDIN_FILENO, &back);
@@ -62,9 +62,9 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +    atexit(__restore);
 +
 +}
-+
++ int is_saved = 0;
 +void DG_DrawFrame() {
-+
++    if(!is_saved) { memcpy(old_fb,fb_ptr,vinfo.yres * vinfo.xres * vinfo.bits_per_pixel / 8); is_saved = 1; }
 +    int screen_width = vinfo.xres;  
 +    int screen_height = vinfo.yres; 
 +

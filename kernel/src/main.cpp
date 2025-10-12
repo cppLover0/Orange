@@ -99,7 +99,7 @@ extern "C" void main() {
     char* envp[] = {"TERM=linux",0};
 
     arch::x86_64::process_t* init = arch::x86_64::scheduling::create();
-    arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp);
+    arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp,0);
     arch::x86_64::scheduling::wakeup(init);
 
     Log::Display(LEVEL_MESSAGE_INFO,"Trying to sync cpus...\n");

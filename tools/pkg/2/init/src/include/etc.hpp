@@ -28,6 +28,77 @@
 
 #pragma once
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+void scale_image_nn(unsigned char* src, int src_w, int src_h,
+                    unsigned char* dst, int dst_w, int dst_h, int channels) {
+    for (int y = 0; y < dst_h; y++) {
+        int src_y = y * src_h / dst_h;
+        for (int x = 0; x < dst_w; x++) {
+            int src_x = x * src_w / dst_w;
+            for (int c = 0; c < channels; c++) {
+                dst[(y*dst_w + x)*channels + c] = src[(src_y*src_w + src_x)*channels + c];
+            }
+        }
+    }
+}
+
+uint32_t rgb_to_pixel(uint8_t r, uint8_t g, uint8_t b,
+                      int r_len, int r_off,
+                      int g_len, int g_off,
+                      int b_len, int b_off) {
+    uint32_t pixel = 0;
+    uint32_t R = (r >> (8 - r_len)) << r_off;
+    uint32_t G = (g >> (8 - g_len)) << g_off;
+    uint32_t B = (b >> (8 - b_len)) << b_off;
+    pixel = R | G | B;
+    return pixel;
+}
+
+static uint32_t blend_pixel(uint32_t dst, uint8_t r_src, uint8_t g_src, uint8_t b_src, float alpha,
+                            int r_len, int r_off, int g_len, int g_off, int b_len, int b_off) {
+    uint8_t r_dst = (dst >> r_off) & ((1 << r_len) - 1);
+    uint8_t g_dst = (dst >> g_off) & ((1 << g_len) - 1);
+    uint8_t b_dst = (dst >> b_off) & ((1 << b_len) - 1);
+
+    r_dst = (r_dst << (8 - r_len)) | (r_dst >> (2 * r_len - 8));
+    g_dst = (g_dst << (8 - g_len)) | (g_dst >> (2 * g_len - 8));
+    b_dst = (b_dst << (8 - b_len)) | (b_dst >> (2 * b_len - 8));
+
+    uint8_t r = (uint8_t)(r_src * alpha + r_dst * (1.0f - alpha));
+    uint8_t g = (uint8_t)(g_src * alpha + g_dst * (1.0f - alpha));
+    uint8_t b = (uint8_t)(b_src * alpha + b_dst * (1.0f - alpha));
+
+    uint32_t pixel = 0;
+    pixel |= ((r >> (8 - r_len)) << r_off);
+    pixel |= ((g >> (8 - g_len)) << g_off);
+    pixel |= ((b >> (8 - b_len)) << b_off);
+
+    return pixel;
+}
+
+static void draw_transparent_black_square(uint32_t* canvas, int width, int height,
+                                          int r_len, int r_off,
+                                          int g_len, int g_off,
+                                          int b_len, int b_off,
+                                          int margin) {
+    int square_w = width - 2 * margin;
+    int square_h = height - 2 * margin;
+    int start_x = margin;
+    int start_y = margin;
+    float alpha = 0.5f; 
+
+    for (int y = start_y; y < start_y + square_h; y++) {
+        for (int x = start_x; x < start_x + square_w; x++) {
+            int idx = y * width + x;
+
+            canvas[idx] = blend_pixel(canvas[idx], 0, 0, 0, alpha,
+                                     r_len, r_off, g_len, g_off, b_len, b_off);
+        }
+    }
+}
+
 void debug_log(const char* msg) {
     asm volatile("syscall" : : "a"(9), "D"(msg) : "rcx","r11");
 }
@@ -147,26 +218,68 @@ public:
     static void init() {
         struct fb_var_screeninfo vinfo;
         struct fb_fix_screeninfo finfo;
-        int fb0_dev = open("/dev/fb0",O_RDWR);
-        ioctl(fb0_dev,FBIOGET_VSCREENINFO,&vinfo);
-        ioctl(fb0_dev,FBIOGET_FSCREENINFO,&finfo);
-        void* address = (unsigned char *)mmap(0, vinfo.yres_virtual * vinfo.xres_virtual * vinfo.bits_per_pixel / 8,
-                                        PROT_READ | PROT_WRITE, MAP_SHARED, fb0_dev, 0);
-        memset(address,0,vinfo.xres * finfo.line_length);
+        int fb0_dev = open("/dev/fb0", O_RDWR);
+        ioctl(fb0_dev, FBIOGET_VSCREENINFO, &vinfo);
+        ioctl(fb0_dev, FBIOGET_FSCREENINFO, &finfo);
+
+        void* address = mmap(0, vinfo.yres_virtual * vinfo.xres_virtual * vinfo.bits_per_pixel / 8,
+                            PROT_READ | PROT_WRITE, MAP_SHARED, fb0_dev, 0);
+
+        uint32_t* test_canvas = (uint32_t*)malloc(vinfo.yres_virtual * vinfo.xres_virtual * sizeof(uint32_t));
+        if (!test_canvas) {
+            exit(1);
+        }
+
+        int img_w, img_h, img_channels;
+        unsigned char* img_data = stbi_load("/etc/bg.jpg", &img_w, &img_h, &img_channels, 3);
+        if (!img_data) {
+            exit(2);
+        }
+
+        unsigned char* scaled_rgb = (unsigned char*)malloc(vinfo.xres * vinfo.yres * 3);
+        if (!scaled_rgb) {
+            exit(3);
+        }
+
+        scale_image_nn(img_data, img_w, img_h, scaled_rgb, vinfo.xres, vinfo.yres, 3);
+
+        for (int y = 0; y < vinfo.yres; y++) {
+            for (int x = 0; x < vinfo.xres; x++) {
+                int idx = (y * vinfo.xres + x) * 3;
+                uint8_t r = scaled_rgb[idx];
+                uint8_t g = scaled_rgb[idx + 1];
+                uint8_t b = scaled_rgb[idx + 2];
+                test_canvas[y * vinfo.xres + x] = rgb_to_pixel(r, g, b,
+                                                            vinfo.red.length, vinfo.red.offset,
+                                                            vinfo.green.length, vinfo.green.offset,
+                                                            vinfo.blue.length, vinfo.blue.offset);
+            }
+        }
+
+        stbi_image_free(img_data);
+        free(scaled_rgb);
+
+        int margin = 64; 
+
+        draw_transparent_black_square(test_canvas, vinfo.xres, vinfo.yres,
+                                    vinfo.red.length, vinfo.red.offset,
+                                    vinfo.green.length, vinfo.green.offset,
+                                    vinfo.blue.length, vinfo.blue.offset,
+                                    margin - 1);
+
         struct flanterm_context *ft_ctx = flanterm_fb_init(
-            __flanterm_malloc,__flanterm_free,
-            (uint32_t*)address, vinfo.xres,vinfo.yres,
+            __flanterm_malloc, __flanterm_free,
+            (uint32_t*)address, vinfo.xres, vinfo.yres,
             finfo.line_length,
-            vinfo.red.length,vinfo.red.offset,
+            vinfo.red.length, vinfo.red.offset,
             vinfo.green.length, vinfo.green.offset,
             vinfo.blue.length, vinfo.blue.offset,
-            NULL,
+            test_canvas,
             NULL, NULL,
             NULL, &default_fg,
             NULL, &default_fg_bright,
-            unifont_arr, FONT_WIDTH, FONT_HEIGHT, 0,
-            //0, 0, 0, 0,
-            1,1,0
+            (void*)unifont_arr, FONT_WIDTH, FONT_HEIGHT, 0,
+            1, 1, margin
         );
         int master_fd = posix_openpt(O_RDWR | O_NOCTTY);
         grantpt(master_fd);
