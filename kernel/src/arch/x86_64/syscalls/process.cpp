@@ -32,6 +32,7 @@
 syscall_ret_t sys_tcb_set(std::uint64_t fs) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     __wrmsr(0xC0000100,fs);
+    DEBUG(proc->is_debug,"Setting tcb %p to proc %d",fs,proc->id);
     return {0,0,0};
 }
 
@@ -40,7 +41,8 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"libc_log from proc %d: %s\n",proc->id,buffer);
+    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
+
     return {0,0,0};
 }
 
@@ -62,12 +64,14 @@ syscall_ret_t sys_exit(int status) {
     }
 
     arch::x86_64::scheduling::kill(proc);
-    memory::vmm::free(proc);
+    
+    if(!proc->is_cloned)
+        memory::vmm::free(proc); 
+
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
     memory::pmm::_virtual::free(proc->sse_ctx);
-
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"Process %d exited with code %d\n",proc->id,proc->exit_code);
+    DEBUG(proc->is_debug,"Process %d exited with code %d",proc->id,status);
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
 }
@@ -77,10 +81,11 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
     arch::x86_64::process_t* proc = CURRENT_PROC;
     if(flags & MAP_ANONYMOUS) {
         std::uint64_t new_hint = hint;
+        int is_shared = (flags & MAP_SHARED) ? 1 : 0;
         if(!new_hint)
-            new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW);
+            new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,is_shared == 1 ? 1 : 0);
         else 
-            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER);
+            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,is_shared == 1 ? 1 : 0);
 
         return {1,0,(std::int64_t)new_hint};
     } else {
@@ -89,13 +94,18 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
         std::uint64_t mmap_size = 0;
         std::uint64_t mmap_flags = 0;
         userspace_fd_t* fd = vfs::fdmanager::search(proc,fd0);
+
+        DEBUG(proc->is_debug,"Trying to mmap fd %d from proc %d",fd0,proc->id);
         if(!fd)
             return {1,EBADF,0};
+        DEBUG(proc->is_debug,"Trying to mmap %s from proc %d",fd->path,proc->id);
+
         int status = vfs::vfs::mmap(fd,&mmap_base,&mmap_size,&mmap_flags);
         if(status != 0)
             return {1,status,0};
 
         std::uint64_t new_hint_hint = (std::uint64_t)memory::vmm::map(proc,mmap_base,mmap_size,PTE_PRESENT | PTE_USER | PTE_RW | mmap_flags);
+        
         return {1,0,(std::int64_t)new_hint_hint};
     }
 }
@@ -119,6 +129,8 @@ syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
     
     arch::x86_64::scheduling::wakeup(new_proc);
 
+    DEBUG(proc->is_debug,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
+    new_proc->is_debug = proc->is_debug;
 
     return {1,0,new_proc->id};
 }
@@ -215,10 +227,18 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     vfs::stat_t stat;
 
     userspace_fd_t fd;
+    fd.is_cached_path = 0;
     memset(fd.path,0,2048);
     memcpy(fd.path,result,strlen(result));
 
     int status = vfs::vfs::stat(&fd,&stat); 
+
+    DEBUG(proc->is_debug,"Exec file %s from proc %d",fd.path,proc->id);
+    if(proc->is_debug) {
+        for(int i = 0;i < argv_length;i++) {
+            DEBUG(proc->is_debug,"Argv %d: %s",i,argv0[i]);
+        }
+    }
 
     if(status == 0) {
         if((stat.st_mode & S_IXUSR) && (stat.st_mode & S_IFREG)) {
@@ -254,9 +274,18 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
                 schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
                 __builtin_unreachable();
             } 
-            status = -1;
+            
+            // maybe sh ?
+            char interp[2048];
+            memset(interp,0,2048);
+
+            int i = 0;
+            memcpy(interp,"/bin/sh",strlen("/bin/sh"));
+
         }
     }
+
+
 
     for(int i = 0;i < argv_length; i++) {
         memory::heap::free(argv0[i]);
@@ -269,13 +298,9 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::free(argv0);
     memory::heap::free(envp0);
 
-    if(status == -1) {
-        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"exec error\n");
-        arch::x86_64::scheduling::kill(proc);
-        schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
-        __builtin_unreachable();
-    } else 
-        return {0,status,0};
+    arch::x86_64::scheduling::kill(proc);
+    schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
+    __builtin_unreachable();
 }
 
 syscall_ret_t sys_getpid() {
@@ -320,11 +345,13 @@ syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize) {
     return {0,0,0};
 }
 
-syscall_ret_t sys_waitpid(int pid) {
+syscall_ret_t sys_waitpid(int pid,int flags) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
     arch::x86_64::process_t* current = arch::x86_64::scheduling::head_proc_();
+
+    DEBUG(proc->is_debug,"Trying to waitpid with pid %d from proc %d",pid,proc->id);
     
     if(pid < -1 || pid == 0)
         return {0,ENOSYS,0};
@@ -371,11 +398,24 @@ syscall_ret_t sys_waitpid(int pid) {
                     current->waitpid_state = 2;
                     std::int64_t bro = (std::int64_t)(((std::uint64_t)current->exit_code) << 32) | current->id;
                     current->status = PROCESS_STATE_KILLED;
+                    DEBUG(proc->is_debug,"Waitpid done pid %d from proc %d",pid,proc->id);
                     return {1,0,bro};
                 }
             }
             current = current->next;
         }
+
+        if(flags & WNOHANG) {
+            arch::x86_64::process_t* pro = arch::x86_64::scheduling::head_proc_();
+            while(pro) {
+                if(pro->parent_id == parent_id && proc->waitpid_state == 1)
+                    proc->waitpid_state = 0;
+                pro = pro->next;
+            }
+            DEBUG(proc->is_debug,"Waitpid return WNOHAND from proc %d",proc->id);
+            return {1,0,0};
+        }
+
         current = arch::x86_64::scheduling::head_proc_();
     }
 
@@ -403,4 +443,31 @@ syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_
 
 syscall_ret_t sys_timestamp() {
     return {1,0,(std::int64_t)drivers::tsc::currentnano()};
+}
+
+syscall_ret_t sys_enabledebugmode() {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    proc->is_debug = 1;
+    DEBUG(proc->is_debug,"Enabling debug mode for proc %d",proc->id);
+    return {0,0,0};
+}
+
+syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame_t* ctx) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::clone(proc,ctx);
+    memory::paging::maprangeid(new_proc->original_cr3,Other::toPhys(new_proc->syscall_stack),(std::uint64_t)new_proc->syscall_stack,SYSCALL_STACK_SIZE,PTE_USER | PTE_PRESENT | PTE_RW,*new_proc->vmm_id);
+
+    new_proc->ctx.rax = 0;
+    new_proc->ctx.rdx = 0;
+    
+    new_proc->ctx.rsp = stack;
+    new_proc->ctx.rip = rip;
+
+    arch::x86_64::scheduling::wakeup(new_proc);
+
+    DEBUG(proc->is_debug,"Clone from proc %d, new proc %d (new syscall_stack: 0x%p)",proc->id,new_proc->id,new_proc->syscall_stack);
+    new_proc->is_debug = proc->is_debug;
+
+    return {1,0,new_proc->id};
 }

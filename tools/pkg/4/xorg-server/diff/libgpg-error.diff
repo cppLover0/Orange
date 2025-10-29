@@ -1,0 +1,53 @@
+diff -Naur libgpg-error-1.45/build-aux/config.sub libgpg-error-patched3/build-aux/config.sub
+--- libgpg-error-1.45/build-aux/config.sub	2018-10-24 11:00:20.000000000 +0300
++++ libgpg-error-patched3/build-aux/config.sub	2025-10-15 14:39:02.553948824 +0300
+@@ -1358,7 +1358,7 @@
+ 	     | os2* | vos* | palmos* | uclinux* | nucleus* \
+ 	     | morphos* | superux* | rtmk* | windiss* \
+ 	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
+-	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
++	     | skyos* | orange* | haiku* | rdos* | toppers* | drops* | es* \
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+diff -Naur libgpg-error-1.45/src/syscfg/lock-obj-pub.orange.h libgpg-error-patched3/src/syscfg/lock-obj-pub.orange.h
+--- libgpg-error-1.45/src/syscfg/lock-obj-pub.orange.h	1970-01-01 03:00:00.000000000 +0300
++++ libgpg-error-patched3/src/syscfg/lock-obj-pub.orange.h	2018-10-12 18:12:38.000000000 +0300
+@@ -0,0 +1,25 @@
++## lock-obj-pub.x86_64-pc-linux-gnu.h
++## File created by gen-posix-lock-obj - DO NOT EDIT
++## To be included by mkheader into gpg-error.h
++
++typedef struct
++{
++  long _vers;
++  union {
++    volatile char _priv[40];
++    long _x_align;
++    long *_xp_align;
++  } u;
++} gpgrt_lock_t;
++
++#define GPGRT_LOCK_INITIALIZER {1,{{0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0}}}
++##
++## Local Variables:
++## mode: c
++## buffer-read-only: t
++## End:
++##
+diff -Naur libgpg-error-1.45/tests/t-printf.c libgpg-error-patched3/tests/t-printf.c
+--- libgpg-error-1.45/tests/t-printf.c	2018-12-12 11:14:31.000000000 +0300
++++ libgpg-error-patched3/tests/t-printf.c	2025-10-15 14:44:20.729513269 +0300
+@@ -449,7 +449,7 @@
+ static void
+ check_fprintf_sf (void)
+ {
+-  volatile char *nullptr = NULL; /* Avoid compiler warning.  */
++  
+   struct sfstate_s sfstate = {NULL};
+   gpgrt_stream_t stream;
+   const char *expect;

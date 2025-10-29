@@ -72,9 +72,12 @@ int sockets::bind(userspace_fd_t* fd, struct sockaddr_un* path) {
     memset(fd->path,0,2048);
     memcpy(fd->path,path->sun_path,strlen(path->sun_path));
 
+    SYSCALL_DISABLE_PREEMPT();
     vfs::stat_t stat;
     if(vfs::vfs::stat(fd,&stat) == 0) /* Check is there vfs object with some name */
         return EEXIST; 
+
+    SYSCALL_ENABLE_PREEMPT();
 
     socket_spinlock.lock();
 
@@ -85,6 +88,7 @@ int sockets::bind(userspace_fd_t* fd, struct sockaddr_un* path) {
     memset(new_node->path,0,128);
     memcpy(new_node->path,path->sun_path,108);
     new_node->is_used = 1;
+    new_node->socket_counter = 0;
     new_node->next = head;
     head = new_node;
     socket_spinlock.unlock();
@@ -112,6 +116,8 @@ int sockets::connect(userspace_fd_t* fd, struct sockaddr_un* path) {
     pending->next = node->pending_list;
     pending->is_accepted.unlock();
     node->pending_list = pending;
+
+    node->socket_counter++;
 
     while(!pending->is_accepted.test()) { socket_spinlock.unlock(); asm volatile("pause"); socket_spinlock.lock(); }
 
@@ -147,6 +153,7 @@ int sockets::accept(userspace_fd_t* fd, struct sockaddr_un* path) {
                 new_fd_s->pipe_side = 0;
                 new_fd_s->cycle = 0;
                 new_fd_s->is_a_tty = 0;
+                new_fd_s->is_cached_path = 0;
 
                 new_fd_s->state = USERSPACE_FD_STATE_SOCKET;
                 new_fd_s->other_state = USERSPACE_FD_OTHERSTATE_MASTER; // master - writes to read pipe and reads from write pipe 
@@ -205,9 +212,13 @@ syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len) {
     memset(&spath,0,sizeof(spath));
     copy_in_userspace(proc,&spath,path,len > sizeof(spath) ? sizeof(spath) : len);
 
+    DEBUG(proc->is_debug,"Trying to connect to socket %s from proc %d",spath.sun_path,proc->id);
+
     SYSCALL_ENABLE_PREEMPT();
     int status = sockets::connect(fd_s,&spath);
     SYSCALL_DISABLE_PREEMPT();
+
+    DEBUG(proc->is_debug,"Socket is connected %s from proc %d",spath.sun_path,proc->id);
 
     return {0,status,0};
 }
@@ -220,9 +231,6 @@ syscall_ret_t sys_bind(int fd, struct sockaddr_un* path, int len) {
     if(!path)
         return {0,EINVAL,0};
 
-    if(path->sun_family != AF_UNIX)
-        return {0,ENOSYS,0};
-
     if(!fd_s)
         return {0,EBADF,0};
 
@@ -231,7 +239,11 @@ syscall_ret_t sys_bind(int fd, struct sockaddr_un* path, int len) {
     memset(&spath,0,sizeof(spath));
     copy_in_userspace(proc,&spath,path,len > sizeof(spath) ? sizeof(spath) : len);
 
+    DEBUG(proc->is_debug,"Binding socket from fd %d to %s from proc %d",fd,spath.sun_path,proc->id);
+
+    SYSCALL_ENABLE_PREEMPT();
     int status = sockets::bind(fd_s,&spath);
+    SYSCALL_DISABLE_PREEMPT();
 
     return {0,status,0};
 }
@@ -246,8 +258,6 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
     if(path) {
         memset(&spath,0,sizeof(spath));
         copy_in_userspace(proc,&spath,path,len > sizeof(spath) ? sizeof(spath) : len);
-        if(spath.sun_family != AF_UNIX)
-            return {0,ENOSYS,0};
     }
 
     if(!fd_s)
@@ -257,6 +267,8 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
     int status = sockets::accept(fd_s,path != 0 ? &spath : 0);
     SYSCALL_DISABLE_PREEMPT();
 
+    DEBUG(proc->is_debug,"Accepting socket %s on fd %d from proc %d",fd_s->path,fd,proc->id);
+
     if(path)
         copy_in_userspace(proc,path,&spath,len > sizeof(spath) ? sizeof(spath) : len);
 
@@ -265,10 +277,11 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
 
 syscall_ret_t sys_socket(int family, int type, int protocol) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    int new_fd = vfs::fdmanager::create(proc);
 
     if(family != AF_UNIX)
         return {0,ENOSYS,0};
+
+    int new_fd = vfs::fdmanager::create(proc);
 
     userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
     memset(new_fd_s->path,0,2048);
@@ -279,14 +292,28 @@ syscall_ret_t sys_socket(int family, int type, int protocol) {
     new_fd_s->pipe_side = 0;
     new_fd_s->cycle = 0;
     new_fd_s->is_a_tty = 0;
+    new_fd_s->is_listen = 0;
 
     new_fd_s->state = USERSPACE_FD_STATE_SOCKET;
 
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys_socket %d\n",new_fd);
+    DEBUG(proc->is_debug,"Creating socket on fd %d from proc %d",new_fd,proc->id);
 
     return {1,0,new_fd};
 }
 
 syscall_ret_t sys_listen(int fd, int backlog) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
+        if(!fd_s->read_socket_pipe) { // not connected
+            fd_s->is_listen = 1;
+        }
+    } else
+        return {0,ENOTSOCK,0};
+    
     return {0,0,0};
 }

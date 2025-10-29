@@ -219,6 +219,8 @@ std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
 
 extern locks::spinlock* vfs_lock;
 
+
+
 std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
     devfs_node_t* node = devfs_find_dev(path);
 

@@ -35,3 +35,6 @@ public:
 };
 
 #define BREAKPOINT() Log::Display(LEVEL_MESSAGE_INFO,"breakpoint %s:%d\n ",__FILE__,__LINE__)
+
+#define DEBUG(is_enabled,fmt,...) if(is_enabled) Log::SerialDisplay(LEVEL_MESSAGE_INFO,"%s(): " fmt "\n", __FUNCTION__, ##__VA_ARGS__)
+#define STUB(is_enabled) if(is_enabled) Log::SerialDisplay(LEVEL_MESSAGE_INFO, "%s() is a stub !\n", __FUNCTION__)

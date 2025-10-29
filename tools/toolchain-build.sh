@@ -65,19 +65,27 @@ cd ../../gcc-15.1.0/libstdc++-v3
 autoconf
 cd ../../
 
+cd gcc-15.1.0
+cp -rf "$1/tools/pkg/config.sub" "$1/tools/pkg/config.guess" . 
+cd ..
+
+cd binutils-2.38
+cp -rf "$1/tools/pkg/config.sub" "$1/tools/pkg/config.guess" . 
+cd ..
+
 echo Building binutils and gcc
 
 mkdir -p binutils-build
 cd binutils-build
 mkdir -p $1/initrd
-../binutils-2.38/configure --target=x86_64-orange --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-shared
+../binutils-2.38/configure --target=x86_64-orange-mlibc --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-shared
 make -j$(nproc)
 make install -j$(nproc)
 
 cd ..
 mkdir -p gcc-build
 cd gcc-build
-../gcc-15.1.0/configure --target=x86_64-orange --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --enable-linker-build-id --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared CFLAGS=""
+../gcc-15.1.0/configure --target=x86_64-orange-mlibc --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --enable-linker-build-id --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared CFLAGS=""
 
 make all-gcc -j$(nproc)
 make all-target-libgcc -j$(nproc)

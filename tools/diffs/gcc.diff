@@ -1,15 +1,3 @@
-diff -Naur gcc-15.1.0/config.sub gcc-patched/config.sub
---- gcc-15.1.0/config.sub	2025-04-25 11:17:59.000000000 +0300
-+++ gcc-patched/config.sub	2025-07-26 08:25:33.087405360 +0300
-@@ -1745,7 +1745,7 @@
- 	     | os2* | vos* | palmos* | uclinux* | nucleus* | morphos* \
- 	     | scout* | superux* | sysv* | rtmk* | tpf* | windiss* \
- 	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
--	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
-+	     | skyos* | orange* | haiku* | rdos* | toppers* | drops* | es* \
- 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
- 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
- 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
 diff -Naur gcc-15.1.0/fixincludes/mkfixinc.sh gcc-patched/fixincludes/mkfixinc.sh
 --- gcc-15.1.0/fixincludes/mkfixinc.sh	2025-04-25 11:17:59.000000000 +0300
 +++ gcc-patched/fixincludes/mkfixinc.sh	2025-07-26 08:31:28.520072553 +0300
@@ -17,8 +5,8 @@ diff -Naur gcc-15.1.0/fixincludes/mkfixinc.sh gcc-patched/fixincludes/mkfixinc.s
  case $machine in
      i?86-*-cygwin* | \
      *-mingw32* | \
-+    *-orange*  | \
-+    *-*-orange* | \
++    *-*-mlibc*  | \
++    *-mlibc* | \
      powerpc-*-eabisim* | \
      powerpc-*-eabi*    | \
      powerpc-*-rtems*   | \
@@ -95,7 +83,7 @@ diff -Naur gcc-15.1.0/gcc/config/orange.h gcc-patched/gcc/config/orange.h
 +#undef TARGET_OS_CPP_BUILTINS
 +#define TARGET_OS_CPP_BUILTINS()      \
 +  do {                                \
-+    builtin_define ("__orange__");      \
++    builtin_define ("__orange__"); builtin_define ("__mlibc__");      \
 +    builtin_define ("__unix__");      \
 +    builtin_assert ("system=orange");   \
 +    builtin_assert ("system=unix");   \
@@ -120,7 +108,7 @@ diff -Naur gcc-15.1.0/gcc/config.gcc gcc-patched/gcc/config.gcc
    rust_target_objs="${rust_target_objs} netbsd-rust.o"
    target_has_targetrustm=yes
    ;;
-+*-*-orange*)
++*-*-*-mlibc)
 +  extra_options="$extra_options gnu-user.opt"
 +  gas=yes
 +  gnu_ld=yes
@@ -177,11 +165,11 @@ diff -Naur gcc-15.1.0/libgcc/config.host gcc-patched/libgcc/config.host
  	extra_parts="$extra_parts crtfastmath.o libheapt_w.a"
  	tmake_file="${tmake_file} i386/t-heap-trampoline"
  	;;
-+i[34567]86-*-orange*)
++*-*-*-mlibc)
 +	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o crtbeginS.o crtendS.o"
 +	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
 +        ;;
-+x86_64-*-orange*)
++x86_64-*-*-mlibc)
 +	extra_parts="$extra_parts crti.o crtbegin.o crtend.o crtn.o crtbeginS.o crtendS.o"
 +	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
 +	;;
@@ -202,7 +190,7 @@ diff -Naur gcc-15.1.0/libstdc++-v3/crossconfig.m4 gcc-patched/libstdc++-v3/cross
      GLIBCXX_CHECK_MATH_SUPPORT
      GLIBCXX_CHECK_STDLIB_SUPPORT
      ;;
-+  *-orange*)
++  *-mlibc*)
 +    GLIBCXX_CHECK_COMPILER_FEATURES
 +    GLIBCXX_CHECK_LINKER_FEATURES
 +    GLIBCXX_CHECK_MATH_SUPPORT

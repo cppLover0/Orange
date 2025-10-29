@@ -206,6 +206,35 @@ std::int64_t memory::buddy::alloc(std::size_t size) {
 
 }
 
+alloc_t memory::buddy::alloc_ext(std::size_t size) {
+    std::uint64_t top_size = UINT64_MAX;
+    buddy_info_t* nearest_buddy = 0;
+
+    if(size < 4096)
+        size = 4096;
+
+    for(std::uint64_t i = 0;i < mem.buddy_queue; i++) {
+        if(LEVEL_TO_SIZE(mem.mem[i].level) >= size && LEVEL_TO_SIZE(mem.mem[i].level) < top_size && mem.mem[i].is_free) {
+            top_size = LEVEL_TO_SIZE(mem.mem[i].level);
+            nearest_buddy = &mem.mem[i];
+        }
+    }
+
+    if(nearest_buddy) {
+        auto blud = split_maximum(nearest_buddy,size);
+        blud->is_free = 0;
+        memset(Other::toVirt(blud->phys),0,LEVEL_TO_SIZE(blud->level));
+
+        alloc_t result;
+        result.real_size = LEVEL_TO_SIZE(blud->level);
+        result.virt = blud->phys;
+
+        return result;
+    }
+
+    return {0,0};
+}
+
 std::int64_t memory::buddy::allocid(std::size_t size,std::uint32_t id0) {
     std::uint64_t top_size = UINT64_MAX;
     buddy_info_t* nearest_buddy = 0;
@@ -285,6 +314,14 @@ void memory::pmm::_virtual::free(void* virt) {
 
 void* memory::pmm::_virtual::alloc(std::size_t size) {
     return Other::toVirt(memory::pmm::_physical::alloc(size));
+}
+
+alloc_t memory::pmm::_physical::alloc_ext(std::size_t size) {
+    pmm_lock.lock();
+    alloc_t result = memory::buddy::alloc_ext(size);
+    result.virt = (std::uint64_t)Other::toVirt(result.virt);
+    pmm_lock.unlock();
+    return result;
 }
 
 /* some helper functions */

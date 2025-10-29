@@ -1,0 +1,12 @@
+diff -Naur pkg-config-0.29.2/config.sub pkg-config-patched/config.sub
+--- pkg-config-0.29.2/config.sub	2015-09-27 17:07:23.000000000 +0300
++++ pkg-config-patched/config.sub	2025-10-14 19:04:15.422008115 +0300
+@@ -1393,7 +1393,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
++	      | -skyos* | -haiku* | -orange* | -rdos* | -toppers* | -drops* | -es* | -tirtos*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)

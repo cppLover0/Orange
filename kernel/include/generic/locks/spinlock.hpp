@@ -11,7 +11,7 @@ namespace locks {
     class spinlock {
     private:
         volatile std::atomic_flag flag = ATOMIC_FLAG_INIT;
-        char is_process_switch = 0;
+        char is_cli = 0;
     public:
         spinlock() {
 
@@ -23,7 +23,7 @@ namespace locks {
         }
 
         void enable_scheduling_optimization() {
-            is_process_switch = 1;
+            
         }
 
         std::uint8_t test_and_set() {

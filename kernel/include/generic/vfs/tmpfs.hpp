@@ -16,6 +16,7 @@ namespace vfs {
         std::uint64_t vars[8];
         std::uint8_t type;
         std::uint8_t* content;
+        std::uint64_t real_size; // real size in ram (optimization)
         struct tmpfs_node* next;
         char name[2048];
     } tmpfs_node_t;
@@ -24,4 +25,11 @@ namespace vfs {
     public:
         static void mount(vfs_node_t* node);
     };
+};
+
+#define NODE_POOL_BLOCK_SIZE (16 * 1024 * 1024)
+
+struct NodePoolBlock {
+    vfs::tmpfs_node_t* block;
+    NodePoolBlock* next;
 };

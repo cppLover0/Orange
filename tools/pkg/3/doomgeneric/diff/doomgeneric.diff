@@ -42,7 +42,7 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +
 +void DG_Init() {
 +    fb_fd = open("/dev/fb0", O_RDWR);
-+    kbd_fd = open("/dev/input0", O_RDWR); 
++    kbd_fd = open("/dev/ps2keyboard", O_RDWR); 
 +
 +    char dummy[1024];
 +    for(int i = 0;i < 128;i++) {
@@ -221,7 +221,7 @@ diff -Naur doomgeneric/doomgeneric/Makefile doomgeneric-patched/doomgeneric/Make
  
 -CC=clang  # gcc or g++
 -CFLAGS+=-ggdb3 -Os
-+CC=x86_64-orange-gcc  # gcc or g++
++CC=x86_64-orange-mlibc-gcc  # gcc or g++
 +CFLAGS+=-ggdb3 -Os -std=gnu17
  LDFLAGS+=-Wl,--gc-sections
  CFLAGS+=-ggdb3 -Wall -DNORMALUNIX -DLINUX -DSNDSERV -D_DEFAULT_SOURCE # -DUSEASM

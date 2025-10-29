@@ -322,10 +322,10 @@ public:
 
         ioctl(STDIN_FILENO, TCSETS, &t);
 
-        liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_DEV << 32) | 0, "/input", "/masterinput");
-        liborange_setup_ring_bytelen("/input0",1);
-        int master_input = open("/dev/masterinput0", O_RDWR);
-        int slave_input = open("/dev/input0", O_RDWR);
+        liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_DEV << 32) | 0, "/ps2keyboard", "/masterps2keyboard");
+        liborange_setup_ring_bytelen("/ps2keyboard0",1);
+        int master_input = open("/dev/masterps2keyboard0", O_RDWR);
+        int slave_input = open("/dev/ps2keyboard0", O_RDWR);
 
         keybuffer = (char*)malloc(1024);
 
@@ -356,6 +356,8 @@ public:
     }
 };
 
+#include <emmintrin.h> 
+
 #define LEVEL_MESSAGE_OK 0
 #define LEVEL_MESSAGE_FAIL 1
 #define LEVEL_MESSAGE_WARN 2
@@ -372,16 +374,21 @@ const char* level_messages[] = {
 
 class fbdev {
 public:
-    static void init() {
+
+    static void refresh(void* ptr, void* a) {
         struct limine_framebuffer fb;
         liborange_access_framebuffer(&fb);
-        liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_PIPE_DEV << 32) | 0, "/fb", "/masterfb");
-        liborange_setup_mmap("/fb0",fb.address,fb.pitch * fb.width,PTE_WC);
+        int buffer_in_use = 0;
+        void* real_fb = liborange_map_phys(fb.address, PTE_WC, fb.pitch * fb.height);
+
+        while(1) {
+            memcpy(real_fb,ptr,fb.height * fb.pitch);
+        }
+    }
+
+    static void setup_ioctl(int fb0_dev ,struct limine_framebuffer fb) {
         struct fb_var_screeninfo vinfo;
         struct fb_fix_screeninfo finfo;
-        liborange_setup_ioctl("/fb0",sizeof(struct fb_var_screeninfo),FBIOGET_VSCREENINFO,0x1);
-        liborange_setup_ioctl("/fb0",sizeof(struct fb_fix_screeninfo),FBIOGET_FSCREENINFO,0x2);
-        int fb0_dev = open("/dev/fb0",O_RDWR);
         vinfo.red.length = fb.red_mask_size;
         vinfo.red.offset = fb.red_mask_shift;
         vinfo.blue.offset = fb.blue_mask_shift;
@@ -393,12 +400,49 @@ public:
         vinfo.bits_per_pixel = fb.bpp < 5 ? (fb.bpp * 8) : fb.bpp;
         vinfo.xres_virtual = fb.width;
         vinfo.yres_virtual = fb.height;
+        vinfo.red.msb_right = 1;
+        vinfo.green.msb_right = 1;
+        vinfo.blue.msb_right = 1;
+        vinfo.transp.msb_right = 1;
+        vinfo.height = -1;
+        vinfo.width = -1;
         finfo.line_length = fb.pitch;
         finfo.smem_len = fb.pitch * fb.height;
+        finfo.visual = FB_VISUAL_TRUECOLOR;
+        finfo.type = FB_TYPE_PACKED_PIXELS;
+        finfo.mmio_len = fb.pitch * fb.height;
         ioctl(fb0_dev,0x1,&vinfo);
         ioctl(fb0_dev,0x2,&finfo);
+    }
+
+    static void init() {
+        struct limine_framebuffer fb;
+        liborange_access_framebuffer(&fb);
+        liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_PIPE_DEV << 32) | 0, "/fb", "/masterfb");
+        liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_PIPE_DEV << 32) | 0, "/vbe", "/mastervbe");
+
+        uint64_t doublebuffer_dma = liborange_alloc_dma(fb.pitch * fb.height);
+        void* mapped_dma = liborange_map_phys(doublebuffer_dma,0,fb.pitch * fb.height);
+
+        void* a = aligned_alloc(4096,fb.pitch * fb.height);
+        void* b = aligned_alloc(4096,fb.pitch * fb.height);
+
+        int pid = fork();
+        if(pid == 0) {
+            refresh(mapped_dma,a);
+        }
+
+        liborange_setup_mmap("/fb0",doublebuffer_dma,fb.pitch * fb.height,0);
+        
+        liborange_setup_ioctl("/fb0",sizeof(struct fb_var_screeninfo),FBIOGET_VSCREENINFO,0x1);
+        liborange_setup_ioctl("/fb0",sizeof(struct fb_fix_screeninfo),FBIOGET_FSCREENINFO,0x2);
+        int fb0_dev = open("/dev/fb0",O_RDWR);
+        
+        setup_ioctl(fb0_dev,fb);
+        
         close(fb0_dev);
     }
+
 };
 
 #define DIR_PATH "/etc/drivers/"

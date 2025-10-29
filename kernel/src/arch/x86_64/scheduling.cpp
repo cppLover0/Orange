@@ -50,10 +50,10 @@ uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t le
     uint64_t* temp_stack = stack;
 
     for(uint64_t i = 0;i < len; i++) {
+        temp_stack -= ALIGNUP(strlen(arr[i]),8);
         PUT_STACK_STRING(temp_stack,arr[i])
         out[i] = (char*)temp_stack;
         PUT_STACK(temp_stack,0);
-        temp_stack -= ALIGNUP(strlen(arr[i]),8);
     }
 
     return temp_stack;
@@ -145,9 +145,9 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
     void* elf_vmm;
 
     if(head->e_type != ET_DYN) {
-        elf_vmm = memory::vmm::customalloc(proc,elf_base,size,PTE_PRESENT | PTE_RW | PTE_USER);
+        elf_vmm = memory::vmm::customalloc(proc,elf_base,size,PTE_PRESENT | PTE_RW | PTE_USER,0);
     } else {
-        elf_vmm = memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_RW | PTE_USER);
+        elf_vmm = memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_RW | PTE_USER,0);
 
         if(phdr) {
             phdr += (uint64_t)elf_vmm;
@@ -208,7 +208,7 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
     if(elfload.status != 0)
         return elfload.status;
 
-    proc->ctx.rsp = (std::uint64_t)memory::vmm::alloc(proc,USERSPACE_STACK_SIZE,PTE_PRESENT | PTE_USER | PTE_RW) + USERSPACE_STACK_SIZE - 4096;
+    proc->ctx.rsp = (std::uint64_t)memory::vmm::alloc(proc,USERSPACE_STACK_SIZE,PTE_PRESENT | PTE_USER | PTE_RW,0) + USERSPACE_STACK_SIZE - 4096;
     std::uint64_t* _stack = (std::uint64_t*)proc->ctx.rsp;
 
     std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ};
@@ -260,6 +260,50 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
 
 void arch::x86_64::scheduling::wakeup(process_t* proc) {
     proc->lock.unlock(); /* Just clear */
+}
+
+arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_frame_t* ctx) {
+    process_t* nproc = create();
+    memory::vmm::free(nproc);
+
+    nproc->is_cloned = 1;
+    nproc->ctx.cr3 = ctx->cr3;
+    nproc->original_cr3 = ctx->cr3;
+
+    nproc->vmm_end = proc->vmm_end;
+    nproc->vmm_start = proc->vmm_start;
+
+    nproc->parent_id = proc->id;
+    nproc->fs_base = proc->fs_base;
+    nproc->reversedforid = *proc->vmm_id;
+    nproc->vmm_id = &nproc->reversedforid;
+
+    memset(nproc->cwd,0,4096);
+    memset(nproc->name,0,4096);
+    memcpy(nproc->cwd,proc->cwd,strlen(proc->cwd));
+    memcpy(nproc->name,proc->name,strlen(proc->name));
+
+    memcpy(nproc->sse_ctx,proc->sse_ctx,arch::x86_64::cpu::sse::size());
+
+    nproc->fd_ptr = proc->fd_ptr;
+
+    userspace_fd_t* fd = proc->fd;
+    while(fd) {
+        userspace_fd_t* newfd = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
+        memcpy(newfd,fd,sizeof(userspace_fd_t));
+        
+        if(newfd->state == USERSPACE_FD_STATE_PIPE) {
+            newfd->pipe->create(newfd->pipe_side);
+        }
+
+        newfd->next = nproc->fd;
+        nproc->fd = newfd;
+        fd = fd->next;
+    }
+
+    memcpy(&nproc->ctx,ctx,sizeof(int_frame_t));
+
+    return nproc;
 }
 
 arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_frame_t* ctx) {
@@ -345,6 +389,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     head_proc = proc;
 
     proc->id = id_ptr++;
+    proc->vmm_id = &proc->id;
 
     memory::vmm::initproc(proc);
     memory::vmm::reload(proc);
@@ -359,19 +404,20 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
 void arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
     process_t* proc0 = head_proc;
     while(proc0) {
-        if(proc0->parent_id == proc->id && proc0->futex == (std::uint64_t)lock) {
-            proc->futex = 0;
-            proc->lock.unlock();
-        }
-        proc0 = proc->next;
+        if((proc0->parent_id == proc->id || proc->parent_id == proc0->id) && proc0->futex == (std::uint64_t)lock) {
+            proc0->futex = 0;
+            proc0->futex_lock.unlock();
+            DEBUG(proc->is_debug,"Process which we can wakeup is %d",proc0->id);
+        } 
+        proc0 = proc0->next;
     }
 }
 
-void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val) {
+void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val, int* original_lock) {
     int lock_val = *lock;
     if(lock_val == val) {
-        proc->futex = (std::uint64_t)lock;
-        proc->lock.nowaitlock();
+        proc->futex_lock.lock();
+        proc->futex = (std::uint64_t)original_lock;
     }
 }
 
@@ -405,7 +451,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
     while (true) {
         while (current) {
 
-            if (!current->kill_lock.test() && current->id != 0 && current_cpu == current->target_cpu) {
+            if (!current->kill_lock.test() && current->id != 0 && current_cpu == current->target_cpu && !current->futex_lock.test()) {
                 if(!current->lock.test_and_set()) {
 
                     if(!ctx) {

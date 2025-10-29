@@ -127,6 +127,7 @@ typedef struct socket_pending_obj {
 typedef struct socket_node {
 	char path[128];
 	char is_used;
+	uint64_t socket_counter;
 	socket_pending_obj_t* pending_list;
 	struct socket_node* next;
 } socket_node_t;

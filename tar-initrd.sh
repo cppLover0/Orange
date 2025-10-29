@@ -1,9 +1,16 @@
 
 rm -rf initrd
 
+export LIBTOOL="$HOME/opt/cross/orange/bin/libtool"
+export LIBTOOLIZE="$HOME/opt/cross/orange/bin/libtoolize"
 export PATH="$HOME/opt/cross/orange/bin:$PATH"
 
-if [ ! "$(which x86_64-orange-gcc)" ]; then
+sysroot_path="$(realpath initrd)"
+
+export CFLAGS="-fPIC -Wno-error -O2"
+export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
+export PKG_CONFIG_PATH="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig:$sysroot_path/usr/local/lib/pkgconfig:$sysroot_path/usr/local/share/pkgconfig:$HOME/opt/cross/orange/lib/pkgconfig:$HOME/opt/cross/orange/share/pkgconfig"
+if [ ! "$(which x86_64-orange-mlibc-gcc)" ]; then
     echo "It looks like you don't have the cross-compiler installed, or it isn't in your PATH."
     echo "If you built your cross-compiler, add it to your PATH with:"
     echo 'export PATH="$HOME/opt/cross/orange/bin:$PATH"'

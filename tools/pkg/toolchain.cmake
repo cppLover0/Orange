@@ -2,8 +2,8 @@
 set(CMAKE_SYSTEM_NAME Orange)
 set(CMAKE_SYSTEM_PROCESSOR x86_64) 
 
-set(CMAKE_C_COMPILER x86_64-orange-gcc)
-set(CMAKE_LINKER x86_64-orange-ld)
+set(CMAKE_C_COMPILER x86_64-orange-mlibc-gcc)
+set(CMAKE_LINKER x86_64-orange-mlibc-ld)
 
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_C_EXTENSIONS ON)

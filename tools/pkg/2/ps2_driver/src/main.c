@@ -11,7 +11,7 @@
 #include <string.h>
 
 int main() {
-    int masterinput = open("/dev/masterinput0",O_RDWR);
+    int masterinput = open("/dev/masterps2keyboard",O_RDWR);
     
     liborange_setup_iopl_3();
 

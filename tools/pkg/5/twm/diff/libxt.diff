@@ -1,0 +1,16 @@
+diff -Naur libXt-1.2.1/src/Shell.c libXt-patched/src/Shell.c
+--- libXt-1.2.1/src/Shell.c	2021-01-24 17:47:39.000000000 +0300
++++ libXt-patched/src/Shell.c	2025-10-26 08:06:07.473650705 +0300
+@@ -1003,10 +1003,10 @@
+ static void
+ _XtShellAncestorSensitive(Widget widget, int closure, XrmValue *value)
+ {
+-    static Boolean true = True;
++    int xx = 1;
+ 
+     if (widget->core.parent == NULL)
+-        value->addr = (XPointer) (&true);
++        value->addr = (XPointer) (&xx);
+     else
+         _XtCopyFromParent(widget, closure, value);
+ }

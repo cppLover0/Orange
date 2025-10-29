@@ -15,6 +15,9 @@
 #define PROCESS_STATE_RUNNING 2
 #define PROCESS_STATE_ZOMBIE  3
 
+#define	WNOHANG		1	/* Don't block waiting.  */
+#define	WUNTRACED	2	/* Report status of stopped children.  */
+
 #define MIN2(a, b) ((a) < (b) ? (a) : (b))
 #define MAX2(a, b) ((a) > (b) ? (a) : (b))
 
@@ -130,7 +133,12 @@ namespace arch {
             locks::spinlock lock;
             locks::spinlock kill_lock; /* Never should be setup by not kill() function */
 
+            locks::spinlock futex_lock;
+
             std::uint32_t fd_ptr;
+
+            std::uint32_t reversedforid;
+            std::uint32_t* vmm_id;
             userspace_fd_t* fd;
 
             char* vmm_start;
@@ -141,6 +149,8 @@ namespace arch {
             char* name;
 
             int exit_code;
+            int is_cloned;
+            std::uint64_t* original_cr3_pointer;
 
             std::uint64_t futex;
             std::uint64_t syscall_stack;
@@ -150,6 +160,8 @@ namespace arch {
             std::uint64_t exit_timestamp;
 
             std::uint32_t parent_id;
+
+            int is_debug;
 
             struct process* next;
 
@@ -166,10 +178,11 @@ namespace arch {
             static void init();
             static process_t* create();
             static process_t* fork(process_t* proc,int_frame_t* ctx);
+            static process_t* clone(process_t* proc,int_frame_t* ctx);
             static void kill(process_t* proc);
             static void wakeup(process_t* proc);
             static void futexwake(process_t* proc, int* lock);
-            static void futexwait(process_t* proc, int* lock, int val);
+            static void futexwait(process_t* proc, int* lock, int val, int* original_lock);
             static int loadelf(process_t* proc,char* path,char** argv,char** envp,int free_mem);
             static process_t* head_proc_();
 

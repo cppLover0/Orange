@@ -34,6 +34,12 @@ typedef struct {
     buddy_info_t* mem;
 } __attribute__((packed)) buddy_t;
 
+typedef struct {
+    std::uint64_t virt;
+    std::uint64_t real_size; //optimization for tmpfs
+} alloc_t;
+
+
 namespace memory {
     class buddy {
     private:
@@ -45,15 +51,19 @@ namespace memory {
         static void init();
         static void free(std::uint64_t phys);
         static void fullfree(std::uint32_t id);
+        static alloc_t alloc_ext(std::size_t size);
         static std::int64_t alloc(std::size_t size);
         static std::int64_t allocid(std::size_t size, std::uint32_t id);
     };
     namespace pmm {
+
+        
         class _physical {
         public:
             static void init();
             static void free(std::uint64_t phys);
             static void fullfree(std::uint32_t id);
+            static alloc_t alloc_ext(std::size_t size);
             static std::int64_t alloc(std::size_t size);
             static std::int64_t allocid(std::size_t size, std::uint32_t id);
 

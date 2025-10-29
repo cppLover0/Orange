@@ -14,6 +14,7 @@ tar -xvf 2.44.0.tar.gz
 
 cd fastfetch-2.44.0
 diff_patch ../../diff/fastfetch.diff
+patch_config_sub "$(realpath $1/..)"
 cd ..
 
 mkdir -p fastfetch-build

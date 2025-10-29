@@ -1,0 +1,366 @@
+diff -Naur libtool-2.5.4/build-aux/config.sub libtool-patched/build-aux/config.sub
+--- libtool-2.5.4/build-aux/config.sub	2024-11-20 22:08:12.000000000 +0300
++++ libtool-patched/build-aux/config.sub	2025-10-15 15:25:52.941696228 +0300
+@@ -2013,6 +2013,7 @@
+ 	| gnu* \
+ 	| go32* \
+ 	| haiku* \
++	| orange* \
+ 	| hcos* \
+ 	| hiux* \
+ 	| hms* \
+diff -Naur libtool-2.5.4/configure libtool-patched/configure
+--- libtool-2.5.4/configure	2024-11-20 22:41:01.000000000 +0300
++++ libtool-patched/configure	2025-10-15 15:25:06.323056653 +0300
+@@ -7842,7 +7842,7 @@
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+-*-mlibc)
++*-mlibc | orange*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+@@ -11409,7 +11409,7 @@
+       lt_prog_compiler_static='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl='-Wl,'
+       lt_prog_compiler_pic='-fPIC'
+       lt_prog_compiler_static='-static'
+@@ -12076,7 +12076,7 @@
+       fi
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+ 	archive_cmds='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
+ 	archive_expsym_cmds='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
+       ;;
+@@ -12785,7 +12785,7 @@
+       esac
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       ;;
+ 
+     netbsd* | netbsdelf*-gnu)
+@@ -13980,7 +13980,7 @@
+   hardcode_into_libs=yes
+   ;;
+ 
+-*-mlibc)
++*-mlibc | orange*)
+   version_type=linux # correct to gnu/linux during the next big refactor
+   need_lib_prefix=no
+   need_version=no
+@@ -14457,7 +14457,7 @@
+       lt_prog_compiler_static='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl='-Wl,'
+       lt_prog_compiler_pic='-fPIC'
+       lt_prog_compiler_static='-static'
+@@ -16278,7 +16278,7 @@
+     # at 6.2 and later dlopen does load deplibs.
+     lt_cv_sys_dlopen_deplibs=yes
+     ;;
+-  *-mlibc)
++  *-mlibc | orange*)
+     lt_cv_sys_dlopen_deplibs=yes
+     ;;
+   netbsd* | netbsdelf*-gnu)
+@@ -18356,7 +18356,7 @@
+ 	esac
+ 	;;
+ 
+-      *-mlibc)
++      *-mlibc | orange*)
+         ld_shlibs_CXX=yes
+ 	;;
+ 
+@@ -19081,7 +19081,7 @@
+ 	;;
+       netbsd* | netbsdelf*-gnu)
+ 	;;
+-      *-mlibc)
++      *-mlibc | orange*)
+ 	;;
+       *qnx* | *nto*)
+         # QNX uses GNU C++, but need to define -shared option too, otherwise
+@@ -20234,7 +20234,7 @@
+   hardcode_into_libs=yes
+   ;;
+ 
+-*-mlibc)
++*-mlibc | orange*)
+   version_type=linux # correct to gnu/linux during the next big refactor
+   need_lib_prefix=no
+   need_version=no
+@@ -20681,7 +20681,7 @@
+ 	;;
+       netbsd* | netbsdelf*-gnu)
+ 	;;
+-      *-mlibc)
++      *-mlibc | orange*)
+ 	;;
+       *qnx* | *nto*)
+         # QNX uses GNU C++, but need to define -shared option too, otherwise
+@@ -21689,7 +21689,7 @@
+       lt_prog_compiler_static_F77='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl_F77='-Wl,'
+       lt_prog_compiler_pic_F77='-fPIC'
+       lt_prog_compiler_static_F77='-static'
+@@ -22341,7 +22341,7 @@
+       fi
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+ 	archive_cmds_F77='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
+ 	archive_expsym_cmds_F77='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
+       ;;
+@@ -22998,7 +22998,7 @@
+       esac
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       ;;
+ 
+     netbsd* | netbsdelf*-gnu)
+@@ -24014,7 +24014,7 @@
+   hardcode_into_libs=yes
+   ;;
+ 
+-*-mlibc)
++*-mlibc | orange*)
+   version_type=linux # correct to gnu/linux during the next big refactor
+   need_lib_prefix=no
+   need_version=no
+@@ -24491,7 +24491,7 @@
+       lt_prog_compiler_static_F77='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl_F77='-Wl,'
+       lt_prog_compiler_pic_F77='-fPIC'
+       lt_prog_compiler_static_F77='-static'
+@@ -25628,7 +25628,7 @@
+       lt_prog_compiler_static_FC='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl_FC='-Wl,'
+       lt_prog_compiler_pic_FC='-fPIC'
+       lt_prog_compiler_static_FC='-static'
+@@ -26280,7 +26280,7 @@
+       fi
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+ 	archive_cmds_FC='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
+ 	archive_expsym_cmds_FC='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
+       ;;
+@@ -26937,7 +26937,7 @@
+       esac
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       ;;
+ 
+     netbsd* | netbsdelf*-gnu)
+@@ -27953,7 +27953,7 @@
+   hardcode_into_libs=yes
+   ;;
+ 
+-*-mlibc)
++*-mlibc | orange*)
+   version_type=linux # correct to gnu/linux during the next big refactor
+   need_lib_prefix=no
+   need_version=no
+@@ -28430,7 +28430,7 @@
+       lt_prog_compiler_static_FC='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl_FC='-Wl,'
+       lt_prog_compiler_pic_FC='-fPIC'
+       lt_prog_compiler_static_FC='-static'
+@@ -29277,7 +29277,7 @@
+       lt_prog_compiler_static_GO='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl_GO='-Wl,'
+       lt_prog_compiler_pic_GO='-fPIC'
+       lt_prog_compiler_static_GO='-static'
+@@ -29929,7 +29929,7 @@
+       fi
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+ 	archive_cmds_GO='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
+ 	archive_expsym_cmds_GO='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
+       ;;
+@@ -30597,7 +30597,7 @@
+       esac
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       ;;
+ 
+     netbsd* | netbsdelf*-gnu)
+@@ -31568,7 +31568,7 @@
+       lt_prog_compiler_static_GCJ='-Bstatic'
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       lt_prog_compiler_wl_GCJ='-Wl,'
+       lt_prog_compiler_pic_GCJ='-fPIC'
+       lt_prog_compiler_static_GCJ='-static'
+@@ -32220,7 +32220,7 @@
+       fi
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+ 	archive_cmds_GCJ='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
+ 	archive_expsym_cmds_GCJ='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
+       ;;
+@@ -32888,7 +32888,7 @@
+       esac
+       ;;
+ 
+-    *-mlibc)
++    *-mlibc | orange*)
+       ;;
+ 
+     netbsd* | netbsdelf*-gnu)
+diff -Naur libtool-2.5.4/libtoolize.in libtool-patched/libtoolize.in
+--- libtool-2.5.4/libtoolize.in	2024-11-20 22:01:08.000000000 +0300
++++ libtool-patched/libtoolize.in	2025-10-15 15:25:06.323056653 +0300
+@@ -1922,7 +1922,7 @@
+   # Do not remove config.guess, config.sub or install-sh, we don't
+   # install them without --install, and the project may not be using
+   # Automake.  Similarly, do not remove Gnulib files.
+-  all_pkgaux_files="compile depcomp missing ltmain.sh"
++  all_pkgaux_files=""
+   all_pkgmacro_files="libtool.m4 ltargz.m4 ltdl.m4 ltoptions.m4 ltsugar.m4 ltversion.in ltversion.m4 lt~obsolete.m4"
+   all_pkgltdl_files="COPYING.LIB Makefile Makefile.in Makefile.inc Makefile.am README acinclude.m4 aclocal.m4 argz_.h argz.c config.h.in config-h.in configure configure.ac configure.in libltdl/lt__alloc.h libltdl/lt__argz.h libltdl/lt__dirent.h libltdl/lt__glibc.h libltdl/lt__private.h libltdl/lt__strl.h libltdl/lt_dlloader.h libltdl/lt_error.h libltdl/lt_system.h libltdl/slist.h loaders/dld_link.c loaders/dlopen.c loaders/dyld.c loaders/load_add_on.c loaders/loadlibrary.c loaders/preopen.c loaders/shl_load.c lt__alloc.c lt__argz.c lt__dirent.c lt__strl.c lt_dlloader.c lt_error.c ltdl.c ltdl.h ltdl.mk slist.c"
+ 
+diff -Naur libtool-2.5.4/m4/libtool.m4 libtool-patched/m4/libtool.m4
+--- libtool-2.5.4/m4/libtool.m4	2024-11-20 22:01:08.000000000 +0300
++++ libtool-patched/m4/libtool.m4	2025-10-15 15:25:06.324056688 +0300
+@@ -1725,7 +1725,7 @@
+     lt_cv_sys_max_cmd_len=12288;    # 12K is about right
+     ;;
+ 
+-  gnu* | ironclad*)
++  gnu* | ironclad* | orange*)
+     # Under GNU Hurd and Ironclad, this test is not required because there
+     # is no limit to the length of command line arguments.
+     # Libtool will interpret -1 as no limit whatsoever
+@@ -2550,6 +2550,18 @@
+   esac
+   ;;
+ 
++orange*)
++	version_type=linux
++	need_lib_prefix=no
++	need_version=no
++	library_names_spec='$libname$release$shared_ext$versuffix $libname$release$shared_ext$major $libname$shared_ext'
++	soname_spec='$libname$release$shared_ext$major'
++	dynamic_linker='mlibc ld.so'
++	shlibpath_var=LD_LIBRARY_PATH
++	shlibpath_overrides_runpath=no
++	hardcode_into_libs=yes
++	;;
++
+ beos*)
+   library_names_spec='$libname$shared_ext'
+   dynamic_linker="$host_os ld.so"
+@@ -3576,6 +3588,10 @@
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
++orange*)
++  lt_cv_deplibs_check_method=pass_all
++  ;;
++
+ beos*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+@@ -4427,6 +4443,8 @@
+ 	  _LT_TAGVAR(lt_prog_compiler_static, $1)='-bnso -bI:/lib/syscalls.exp'
+ 	fi
+ 	;;
++      orange*)
++	;;
+       chorus*)
+ 	case $cc_basename in
+ 	cxch68*)
+@@ -4682,6 +4700,12 @@
+         ;;
+       esac
+       ;;
++    
++    orange*)
++    	_LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
++	_LT_TAGVAR(lt_prog_compiler_pic, $1)='-fPIC'
++	_LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
++    ;;
+ 
+     beos* | irix5* | irix6* | nonstopux* | osf3* | osf4* | osf5*)
+       # PIC is the default for these OSes.
+@@ -5239,6 +5263,11 @@
+         ;;
+       esac
+       ;;
++    
++    orange*)
++    	_LT_TAGVAR(archive_cmds, $1)='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname -o $lib'
++	_LT_TAGVAR(archive_expsym_cmds, $1)='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname $wl-retain-symbols-file $wl$export_symbols -o $lib'
++	;;
+ 
+     beos*)
+       if $LD --help 2>&1 | $GREP ': supported targets:.* elf' > /dev/null; then
+@@ -5710,7 +5739,8 @@
+         ;;
+       esac
+       ;;
+-
++    orange*)
++    	;;
+     bsdi[[45]]*)
+       _LT_TAGVAR(export_dynamic_flag_spec, $1)=-rdynamic
+       ;;
+@@ -6776,6 +6806,10 @@
+           fi
+         fi
+         ;;
++	
++      orange*)
++      	_LT_TAGVAR(ld_shlibs, $1)=yes
++	;;
+ 
+       beos*)
+ 	if $LD --help 2>&1 | $GREP ': supported targets:.* elf' > /dev/null; then

@@ -190,7 +190,13 @@ std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t siz
     char out[2048];
     memset(out,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out);
+        memcpy(fd->path,out,strlen(out));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out,fd->path,strlen(fd->path));
+
 
     if(is_fifo_exists(out)) {
         fifo_node_t* fifo = fifo_get(out);
@@ -217,7 +223,12 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
     char out[2048];
     memset(out,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out);
+        memcpy(fd->path,out,strlen(out));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out,fd->path,strlen(fd->path));
 
     if(is_fifo_exists(out)) {
         fifo_node_t* fifo = fifo_get(out);
@@ -270,7 +281,12 @@ std::int32_t vfs::vfs::mmap(userspace_fd_t* fd, std::uint64_t* outp, std::uint64
     char out[2048];
     memset(out,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out);
+        memcpy(fd->path,out,strlen(out));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out,fd->path,strlen(fd->path));
 
     vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
@@ -291,7 +307,12 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
     char out[2048];
     memset(out,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out);
+        memcpy(fd->path,out,strlen(out));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out,fd->path,strlen(fd->path));
 
     if(is_fifo_exists(out)) {
         fifo_node_t* fifo = fifo_get(out);
@@ -349,7 +370,12 @@ std::int32_t vfs::vfs::ls(userspace_fd_t* fd, dirent_t* out) {
     char out0[2048];
     memset(out0,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out0);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
 
     vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
@@ -370,7 +396,12 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
     char out[2048];
     memset(out,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out);
+        memcpy(fd->path,out,strlen(out));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out,fd->path,strlen(fd->path));
 
     vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
@@ -451,7 +482,12 @@ std::int32_t vfs::vfs::stat(userspace_fd_t* fd, stat_t* out) {
     char out0[2048];
     memset(out0,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out0);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
 
     if(is_fifo_exists(out0)) {
         memset(out,0,sizeof(stat_t));
@@ -486,7 +522,12 @@ std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, i
     char out0[2048];
     memset(out0,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out0);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
 
     vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();
@@ -507,7 +548,12 @@ void vfs::vfs::close(userspace_fd_t* fd) {
     char out0[2048];
     memset(out0,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out0);
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
 
     if(is_fifo_exists(out0)) {
         fifo_node_t* fifo = fifo_get(out0);
@@ -536,6 +582,11 @@ std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
         return EINVAL;
     }
 
+    if(path[0] == '\0') {
+        path[0] = '/';
+        path[1] = '\n';
+    }
+
     vfs_node_t* node = find_node(path);
     if(!node) { 
         return ENOENT; }
@@ -548,12 +599,32 @@ std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
 }
 
 std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
-    vfs_lock->lock();
 
+    vfs_lock->lock();
     char out0[2048];
     memset(out0,0,2048);
 
-    __vfs_symlink_resolve(fd->path,out0);
+    if(!fd) {
+        vfs_lock->unlock();
+        return 0;
+    }
+
+    if(fd->state == USERSPACE_FD_STATE_SOCKET) {
+        if(fd->is_listen) {
+                uint64_t counter = 0;
+                if(operation_type == POLLIN)
+                    counter = sockets::find(fd->path)->socket_counter;
+                vfs_lock->unlock();
+                return counter; 
+            }
+    }
+
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
 
     if(is_fifo_exists(out0)) {
         fifo_node_t* fifo = fifo_get(out0);
@@ -581,6 +652,7 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         
         case POLLIN:
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
+            
             break;
         
         case POLLOUT:
@@ -590,6 +662,7 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         default:
             break;
         }
+
         vfs_lock->unlock();
         return ret;
     } else if(fd->state == USERSPACE_FD_STATE_PIPE) {

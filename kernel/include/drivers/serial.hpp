@@ -37,6 +37,7 @@ public:
         }
 
         void write(std::uint8_t* data,std::size_t len) {
+            //return;
             for(std::size_t i = 0; i < len; i++) {
                 send(data[i]);
             }

@@ -13,10 +13,11 @@ mkdir -p ncurses-build
 
 cd ncurses-6.5
 diff_patch ../../diff/ncurses.diff
+patch_config_sub "$(realpath $1/..)"
 cd ..
 
 cd ncurses-build
-../ncurses-6.5/configure --host=x86_64-orange --prefix="/usr" --with-shared --without-ada CFLAGS="-std=gnu17"
+../ncurses-6.5/configure --host=x86_64-orange-mlibc --prefix="/usr" --with-shared --without-ada CFLAGS="-std=gnu17"
 make -j$(nproc)
 make install -j$(nproc) DESTDIR="$1"
 

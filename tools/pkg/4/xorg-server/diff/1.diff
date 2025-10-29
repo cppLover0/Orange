@@ -1,0 +1,401 @@
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Bus.c xorg-server-patched/hw/xfree86/common/xf86Bus.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Bus.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Bus.c	2025-10-23 12:44:22.775506715 +0300
+@@ -556,21 +556,7 @@
+ void
+ xf86PostProbe(void)
+ {
+-    if (fbSlotClaimed && (
+-#if (defined(__sparc__) || defined(__sparc)) && !defined(__OpenBSD__)
+-                             sbusSlotClaimed ||
+-#endif
+-#ifdef XSERVER_PLATFORM_BUS
+-                             platformSlotClaimed ||
+-#endif
+-#ifdef XSERVER_LIBPCIACCESS
+-                             pciSlotClaimed
+-#else
+-                             TRUE
+-#endif
+-        ))
+-        FatalError("Cannot run in framebuffer mode. Please specify busIDs "
+-                   "       for all framebuffer devices\n");
++
+ }
+ 
+ Bool
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Config.c xorg-server-patched/hw/xfree86/common/xf86Config.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Config.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Config.c	2025-10-18 14:14:41.313332537 +0300
+@@ -49,6 +49,8 @@
+ #include <sys/types.h>
+ #include <grp.h>
+ 
++#include <sys/stat.h>
++
+ #include "xf86.h"
+ #include "xf86Modes.h"
+ #include "xf86Parser.h"
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Configure.c xorg-server-patched/hw/xfree86/common/xf86Configure.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Configure.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Configure.c	2025-10-18 14:15:07.924147512 +0300
+@@ -27,6 +27,8 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <errno.h>
++
+ #include "xf86.h"
+ #include "xf86Config.h"
+ #include "xf86_OSlib.h"
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Events.c xorg-server-patched/hw/xfree86/common/xf86Events.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Events.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Events.c	2025-10-18 14:15:29.363803215 +0300
+@@ -53,6 +53,8 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <errno.h>
++
+ #include <X11/X.h>
+ #include <X11/Xproto.h>
+ #include <X11/Xatom.h>
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Helper.c xorg-server-patched/hw/xfree86/common/xf86Helper.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Helper.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Helper.c	2025-10-23 14:57:42.305808491 +0300
+@@ -34,6 +34,8 @@
+  * different drivers.
+  */
+ 
++#include <sys/stat.h>
++
+ #ifdef HAVE_XORG_CONFIG_H
+ #include <xorg-config.h>
+ #endif
+@@ -851,49 +853,65 @@
+ xf86SetDpi(ScrnInfoPtr pScrn, int x, int y)
+ {
+     MessageType from = X_DEFAULT;
++    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+     xf86MonPtr DDC = (xf86MonPtr) (pScrn->monitor->DDC);
++    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+     int probedWidthmm, probedHeightmm;
+     int widthErr, heightErr;
++    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+     xf86OutputPtr compat = xf86CompatOutput(pScrn);
++    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+ 
+     /* XXX Maybe there is no need for widthmm/heightmm in ScrnInfoRec */
+     pScrn->widthmm = pScrn->monitor->widthmm;
+     pScrn->heightmm = pScrn->monitor->heightmm;
++    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+ 
+     if (DDC && (DDC->features.hsize > 0 && DDC->features.vsize > 0)) {
+         /* DDC gives display size in mm for individual modes,
+          * but cm for monitor
+          */
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy1\n");
+         probedWidthmm = DDC->features.hsize * 10;  /* 10mm in 1cm */
+         probedHeightmm = DDC->features.vsize * 10; /* 10mm in 1cm */
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy1\n");
+     }
+     else if (compat && compat->mm_width > 0 && compat->mm_height > 0) {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy2\n");
+         probedWidthmm = compat->mm_width;
+         probedHeightmm = compat->mm_height;
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy2\n");
+     }
+     else {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy3\n");
+         probedWidthmm = probedHeightmm = 0;
+     }
+ 
+     if (monitorResolution > 0) {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy4\n");
+         pScrn->xDpi = monitorResolution;
+         pScrn->yDpi = monitorResolution;
+         from = X_CMDLINE;
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy5\n");
+     }
+     else if (pScrn->widthmm > 0 || pScrn->heightmm > 0) {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy6\n");
+         from = X_CONFIG;
+         if (pScrn->widthmm > 0) {
+             pScrn->xDpi =
+                 (int) ((double) pScrn->virtualX * MMPERINCH / pScrn->widthmm);
+         }
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+         if (pScrn->heightmm > 0) {
+             pScrn->yDpi =
+                 (int) ((double) pScrn->virtualY * MMPERINCH / pScrn->heightmm);
+         }
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+         if (pScrn->xDpi > 0 && pScrn->yDpi <= 0)
+             pScrn->yDpi = pScrn->xDpi;
+         if (pScrn->yDpi > 0 && pScrn->xDpi <= 0)
+             pScrn->xDpi = pScrn->yDpi;
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+         xf86DrvMsg(pScrn->scrnIndex, from, "Display dimensions: (%d, %d) mm\n",
+                    pScrn->widthmm, pScrn->heightmm);
+ 
+@@ -919,8 +937,10 @@
+                            pScrn->heightmm);
+             }
+         }
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guy\n");
+     }
+     else if (probedWidthmm && probedHeightmm) {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guyZ\n");
+         from = X_PROBED;
+         xf86DrvMsg(pScrn->scrnIndex, from, "Display dimensions: (%d, %d) mm\n",
+                    probedWidthmm, probedHeightmm);
+@@ -940,6 +960,7 @@
+             pScrn->xDpi = pScrn->yDpi;
+     }
+     else {
++        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "guyX\n");
+         if (x > 0)
+             pScrn->xDpi = x;
+         else
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Init.c xorg-server-patched/hw/xfree86/common/xf86Init.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Init.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Init.c	2025-10-18 14:17:21.699226880 +0300
+@@ -34,6 +34,8 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <sys/stat.h>
++
+ #include <stdlib.h>
+ #include <errno.h>
+ 
+diff -Naur xorg-server-21.1.0/hw/xfree86/common/xf86Mode.c xorg-server-patched/hw/xfree86/common/xf86Mode.c
+--- xorg-server-21.1.0/hw/xfree86/common/xf86Mode.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/common/xf86Mode.c	2025-10-23 14:29:02.407987453 +0300
+@@ -2118,5 +2118,6 @@
+         if (hsync != 0 && refresh != 0)
+             xf86PrintModeline(scrp->scrnIndex, p);
+         p = p->next;
++        
+     } while (p != NULL && p != scrp->modes);
+ }
+diff -Naur xorg-server-21.1.0/hw/xfree86/fbdevhw/fbdevhw.c xorg-server-patched/hw/xfree86/fbdevhw/fbdevhw.c
+--- xorg-server-21.1.0/hw/xfree86/fbdevhw/fbdevhw.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/fbdevhw/fbdevhw.c	2025-10-19 09:37:47.188152245 +0300
+@@ -9,13 +9,10 @@
+ #include "xf86Modes.h"
+ #include "xf86_OSproc.h"
+ 
+-/* pci stuff */
+-#include "xf86Pci.h"
+-
+ #include "xf86cmap.h"
+ 
+ #include "fbdevhw.h"
+-#include "fbpriv.h"
++#include <linux/fb.h>
+ #include "globals.h"
+ #include <X11/extensions/dpmsconst.h>
+ 
+@@ -253,57 +250,6 @@
+     mode->CrtcVAdjusted = FALSE;
+ }
+ 
+-/* -------------------------------------------------------------------- */
+-/* open correct framebuffer device                                      */
+-
+-/**
+- * Try to find the framebuffer device for a given PCI device
+- */
+-static int
+-fbdev_open_pci(struct pci_device *pPci, char **namep)
+-{
+-    struct fb_fix_screeninfo fix;
+-    char filename[256];
+-    int fd, i;
+-
+-    for (i = 0; i < 8; i++) {
+-        snprintf(filename, sizeof(filename),
+-                 "/sys/bus/pci/devices/%04x:%02x:%02x.%d/graphics/fb%d",
+-                 pPci->domain, pPci->bus, pPci->dev, pPci->func, i);
+-
+-        fd = open(filename, O_RDONLY, 0);
+-        if (fd < 0) {
+-            snprintf(filename, sizeof(filename),
+-                     "/sys/bus/pci/devices/%04x:%02x:%02x.%d/graphics:fb%d",
+-                     pPci->domain, pPci->bus, pPci->dev, pPci->func, i);
+-            fd = open(filename, O_RDONLY, 0);
+-        }
+-        if (fd >= 0) {
+-            close(fd);
+-            snprintf(filename, sizeof(filename), "/dev/fb%d", i);
+-
+-            fd = open(filename, O_RDWR, 0);
+-            if (fd != -1) {
+-                if (ioctl(fd, FBIOGET_FSCREENINFO, (void *) &fix) != -1) {
+-                    if (namep) {
+-                        *namep = xnfalloc(16);
+-                        strncpy(*namep, fix.id, 16);
+-                    }
+-
+-                    return fd;
+-                }
+-                close(fd);
+-            }
+-        }
+-    }
+-
+-    if (namep)
+-        *namep = NULL;
+-
+-    xf86DrvMsg(-1, X_ERROR, "Unable to find a valid framebuffer device\n");
+-    return -1;
+-}
+-
+ static int
+ fbdev_open(int scrnIndex, const char *dev, char **namep)
+ {
+@@ -329,22 +275,6 @@
+         return -1;
+     }
+ 
+-    /* only touch non-PCI devices on this path */
+-    {
+-        char buf[PATH_MAX] = {0};
+-        char *sysfs_path = NULL;
+-        char *node = strrchr(dev, '/') + 1;
+-
+-        if (asprintf(&sysfs_path, "/sys/class/graphics/%s", node) < 0 ||
+-            readlink(sysfs_path, buf, sizeof(buf) - 1) < 0 ||
+-            strstr(buf, "devices/pci")) {
+-            free(sysfs_path);
+-            close(fd);
+-            return -1;
+-        }
+-        free(sysfs_path);
+-    }
+-
+     if (namep) {
+         if (-1 == ioctl(fd, FBIOGET_FSCREENINFO, (void *) (&fix))) {
+             *namep = NULL;
+@@ -363,14 +293,12 @@
+ /* -------------------------------------------------------------------- */
+ 
+ Bool
+-fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
++fbdevHWProbe(void *pPci, char *device, char **namep)
+ {
+     int fd;
+-
+-    if (pPci)
+-        fd = fbdev_open_pci(pPci, namep);
+-    else
+-        fd = fbdev_open(-1, device, namep);
++    
++    fd = fbdev_open(-1, device, namep);
++        
+ 
+     if (-1 == fd)
+         return FALSE;
+@@ -379,18 +307,15 @@
+ }
+ 
+ Bool
+-fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
++fbdevHWInit(ScrnInfoPtr pScrn, void *pPci, char *device)
+ {
+     fbdevHWPtr fPtr;
+ 
+     fbdevHWGetRec(pScrn);
+     fPtr = FBDEVHWPTR(pScrn);
+ 
+-    /* open device */
+-    if (pPci)
+-        fPtr->fd = fbdev_open_pci(pPci, NULL);
+-    else
+-        fPtr->fd = fbdev_open(pScrn->scrnIndex, device, NULL);
++    fPtr->fd = fbdev_open(pScrn->scrnIndex, device, NULL);
++        
+     if (-1 == fPtr->fd) {
+         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                    "Failed to open framebuffer device, consult warnings"
+diff -Naur xorg-server-21.1.0/hw/xfree86/fbdevhw/fbdevhw.h xorg-server-patched/hw/xfree86/fbdevhw/fbdevhw.h
+--- xorg-server-21.1.0/hw/xfree86/fbdevhw/fbdevhw.h	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/fbdevhw/fbdevhw.h	2025-10-19 09:38:08.190818849 +0300
+@@ -16,9 +16,9 @@
+ 
+ extern _X_EXPORT int fbdevHWGetFD(ScrnInfoPtr pScrn);
+ 
+-extern _X_EXPORT Bool fbdevHWProbe(struct pci_device *pPci, char *device,
++extern _X_EXPORT Bool fbdevHWProbe(void *pPci, char *device,
+                                    char **namep);
+-extern _X_EXPORT Bool fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci,
++extern _X_EXPORT Bool fbdevHWInit(ScrnInfoPtr pScrn, void *pPci,
+                                   char *device);
+ 
+ extern _X_EXPORT char *fbdevHWGetName(ScrnInfoPtr pScrn);
+diff -Naur xorg-server-21.1.0/hw/xfree86/os-support/shared/posix_tty.c xorg-server-patched/hw/xfree86/os-support/shared/posix_tty.c
+--- xorg-server-21.1.0/hw/xfree86/os-support/shared/posix_tty.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/os-support/shared/posix_tty.c	2025-10-18 14:18:16.925903537 +0300
+@@ -56,6 +56,9 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <termios.h>
++#include <errno.h>
++
+ #include <X11/X.h>
+ #include <xserver_poll.h>
+ #include "xf86.h"
+diff -Naur xorg-server-21.1.0/hw/xfree86/os-support/shared/sigio.c xorg-server-patched/hw/xfree86/os-support/shared/sigio.c
+--- xorg-server-21.1.0/hw/xfree86/os-support/shared/sigio.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/hw/xfree86/os-support/shared/sigio.c	2025-10-18 14:18:36.612500292 +0300
+@@ -56,6 +56,9 @@
+ #include <xorg-config.h>
+ #endif
+ 
++#include <sys/stat.h>
++#include <errno.h>
++
+ #include <X11/X.h>
+ #include <xserver_poll.h>
+ #include "xf86.h"
+diff -Naur xorg-server-21.1.0/include/os.h xorg-server-patched/include/os.h
+--- xorg-server-21.1.0/include/os.h	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/include/os.h	2025-10-18 14:19:09.429494076 +0300
+@@ -51,6 +51,7 @@
+ #include <stdarg.h>
+ #include <stdint.h>
+ #include <string.h>
++#include <strings.h>
+ #ifdef MONOTONIC_CLOCK
+ #include <time.h>
+ #endif
+diff -Naur xorg-server-21.1.0/os/access.c xorg-server-patched/os/access.c
+--- xorg-server-21.1.0/os/access.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/os/access.c	2025-10-18 14:19:29.654105938 +0300
+@@ -116,7 +116,7 @@
+ #endif
+ #endif
+ 
+-#if defined(SVR4) ||  (defined(SYSV) && defined(__i386__)) || defined(__GNU__)
++#if defined(SVR4) ||  (defined(SYSV) && defined(__i386__)) || defined(__GNU__) || defined(__orange__)
+ #include <sys/utsname.h>
+ #endif
+ #if defined(SYSV) &&  defined(__i386__)
+diff -Naur xorg-server-21.1.0/os/ospoll.c xorg-server-patched/os/ospoll.c
+--- xorg-server-21.1.0/os/ospoll.c	2021-10-27 13:47:08.000000000 +0300
++++ xorg-server-patched/os/ospoll.c	2025-10-18 14:20:06.530220468 +0300
+@@ -45,12 +45,6 @@
+ #define HAVE_OSPOLL     1
+ #endif
+ 
+-#if !HAVE_OSPOLL && defined(HAVE_EPOLL_CREATE1)
+-#include <sys/epoll.h>
+-#define EPOLL           1
+-#define HAVE_OSPOLL     1
+-#endif
+-
+ #if !HAVE_OSPOLL
+ #include "xserver_poll.h"
+ #define POLL            1

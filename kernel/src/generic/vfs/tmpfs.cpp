@@ -6,6 +6,8 @@
 #include <generic/mm/pmm.hpp>
 #include <generic/mm/heap.hpp>
 
+#include <etc/etc.hpp>
+
 #include <etc/libc.hpp>
 #include <etc/errno.hpp>
 
@@ -64,6 +66,44 @@ std::uint8_t __tmpfs__exists(char* path) {
 
 std::uint8_t __tmpfs__create_parent_dirs_by_default = 1; /* Used for ustar */
 
+NodePoolBlock* node_pool_blocks_head = 0;
+
+vfs::tmpfs_node_t* node_pool_current = 0;
+size_t node_pool_offset = 0;
+size_t node_pool_capacity = 0;
+
+static void allocate_node_pool_block() {
+    void* block = memory::pmm::_virtual::alloc(NODE_POOL_BLOCK_SIZE);
+    if (!block) {
+        return;
+    }
+
+    NodePoolBlock* new_block = (NodePoolBlock*)memory::pmm::_virtual::alloc(sizeof(NodePoolBlock));
+    if (!new_block) {
+        return;
+    }
+    new_block->block = reinterpret_cast<vfs::tmpfs_node_t*>(block);
+    new_block->next = node_pool_blocks_head;
+    node_pool_blocks_head = new_block;
+
+    node_pool_current = new_block->block;
+    node_pool_offset = 0;
+    node_pool_capacity = NODE_POOL_BLOCK_SIZE / sizeof(vfs::tmpfs_node_t);;
+}
+
+static vfs::tmpfs_node_t* allocate_node_from_pool() {
+    if (!node_pool_current || node_pool_offset >= node_pool_capacity) {
+        allocate_node_pool_block();
+        if (!node_pool_current) {
+            return 0; 
+        }
+    }
+    vfs::tmpfs_node_t* node = node_pool_current + node_pool_offset;
+    node_pool_offset++;
+    memset(node, 0, sizeof(vfs::tmpfs_node_t));
+    return node;
+}
+
 std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
 
     if(__tmpfs__exists(path))
@@ -98,7 +138,7 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
     }
 
     if(!node)
-        node = (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
+        node = (vfs::tmpfs_node_t*)allocate_node_from_pool();
 
     node->type = type;
     node->content = 0;
@@ -152,14 +192,16 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
         std::uint64_t offset = fd->offset;
         std::uint64_t new_size = offset + size;
 
-        if (new_size > node->size) {
-            std::uint8_t* new_content = (std::uint8_t*)memory::pmm::_virtual::alloc(new_size);
+        if (new_size > node->real_size) {
+            alloc_t new_content0 = memory::pmm::_physical::alloc_ext(new_size);
+            std::uint8_t* new_content = (std::uint8_t*)new_content0.virt;
             if (node->content) {
                 memcpy(new_content, node->content, node->size); 
                 __tmpfs__dealloc(node);
             }
             node->content = new_content;
             node->size = new_size;
+            node->real_size = new_content0.real_size;
         }
 
         memcpy(node->content + offset, buffer, size);
@@ -345,8 +387,10 @@ std::int32_t __tmpfs__readlink(char* path, char* out, std::uint32_t out_len) {
     if(node->type != TMPFS_TYPE_SYMLINK)
         return EINVAL;
 
-    if(node->size >= out_len)
+    if(node->size >= out_len) {
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"ur taking too long nodesize %d outlen %d",node->size,out_len);
         return EINVAL;
+    }
 
     if(!node->content)
         return EINVAL; // symlink is not initializied now :(

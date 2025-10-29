@@ -112,7 +112,6 @@ namespace vfs {
     class pipe {
     private:
         char* buffer;
-        std::int64_t size = 0;
         std::uint64_t total_size = 0;
         std::uint64_t read_ptr = 0;
         locks::spinlock lock;
@@ -124,6 +123,7 @@ namespace vfs {
 
     public:
 
+        std::int64_t size = 0;
         std::uint64_t write_counter = 0;
         std::uint64_t read_counter = 0;
 
@@ -211,6 +211,7 @@ namespace vfs {
                 force_write(src_buffer + written, to_write);
 
                 written += to_write;
+                this->read_counter++;
 
                 asm volatile("sti");
 
@@ -221,33 +222,41 @@ namespace vfs {
         }
 
         std::uint64_t read(char* dest_buffer, std::uint64_t count) {
+
             std::uint64_t read_bytes = 0;
             while (true) {
                 this->lock.lock();
+                asm volatile("cli");
 
                 if (this->size == 0) {
                     if (this->is_closed.test(std::memory_order_acquire)) {
                         this->lock.unlock();
+                        asm volatile("sti");
                         return 0; 
                     }
                     if (flags & O_NONBLOCK) {
                         this->lock.unlock();
+                        asm volatile("sti");
                         return 0;
                     }
                     this->lock.unlock();
+                    asm volatile("sti");
                     asm volatile("pause");
                     continue;
                 }
 
-                asm volatile("cli");
-
+                
                 read_bytes = (count < this->size) ? count : this->size;
                 memcpy(dest_buffer, this->buffer, read_bytes);
                 memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
                 this->size -= read_bytes;
 
-                asm volatile("sti");
+                if(this->size == 0) {
+                    this->write_counter++;
+                } else
+                    this->read_counter++;
 
+                asm volatile("sti");
                 this->lock.unlock();
                 break;
             }
@@ -295,6 +304,7 @@ typedef struct userspace_fd {
 
     std::uint8_t can_be_closed;
 
+    std::uint8_t is_listen;
     vfs::pipe* read_socket_pipe;
     vfs::pipe* write_socket_pipe;
 
@@ -309,6 +319,8 @@ typedef struct userspace_fd {
 
     std::int64_t write_counter;
     std::int64_t read_counter;
+
+    int is_cached_path;
 
     vfs::pipe* pipe;
     char path[2048];
@@ -579,3 +591,5 @@ namespace vfs {
     };
 
 };
+
+void __vfs_symlink_resolve(char* path, char* out);

@@ -71,6 +71,7 @@ extern "C" void main() {
     vfs::vfs::init();
     Log::Display(LEVEL_MESSAGE_OK,"VFS initializied\n");
 
+    Log::Display(LEVEL_MESSAGE_INFO,"Loading initrd\n");
     vfs::ustar::copy();
     Log::Display(LEVEL_MESSAGE_OK,"USTAR parsed\n");
 

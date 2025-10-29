@@ -58,7 +58,12 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {46,(void*)sys_timestamp},
     {47,(void*)sys_mkfifoat},
     {48,(void*)sys_poll},
-    {49,(void*)sys_readlinkat}
+    {49,(void*)sys_readlinkat},
+    {50,(void*)sys_link},
+    {51,(void*)sys_mkdirat},
+    {52,(void*)sys_chmod},
+    {53,(void*)sys_enabledebugmode},
+    {54,(void*)sys_clone}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -77,8 +82,11 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
         return;
     } else if(!item->syscall_func) {
         return;
-    }
+    } 
     
+
+    arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
+
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
     syscall_ret_t ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
     if(ret.is_rdx_ret) {
@@ -86,7 +94,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     }
 
     if(ret.ret != 0)
-        Log::Raw("non zero ret %d from sys %d\n",ret.ret,item->syscall_num);
+        DEBUG(proc->is_debug,"Syscall %d from proc %d fails with code %d",ctx->rax,proc->id,ret.ret);
 
     ctx->rax = ret.ret;
     return;

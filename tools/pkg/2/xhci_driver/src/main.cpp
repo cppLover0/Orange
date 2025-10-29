@@ -553,7 +553,7 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
         while((*portsc & (1 << 1)) == old_bit) {
             if(time-- == 0) {
                 log(LEVEL_MESSAGE_FAIL,"Can't reset USB 2.0 device with port %d, ignoring\n",portnum);
-                return 0;
+                return 1;
             }
             usleep(50000);
         }
@@ -1082,8 +1082,6 @@ void __xhci_iterate_usb_ports(xhci_device_t* dev) {
             usb_cap.thirdhalf = cap[2];
             usb_cap.fourhalf = cap[3];
 
-            //INFO("UsbCap with major %d\n",usb_cap.major);
-
             if(usb_cap.major == 3) {
                 for(uint8_t i = usb_cap.portoffset - 1;i <= (usb_cap.portoffset - 1) + usb_cap.portcount - 1;i++) {
                     dev->usb3ports[i] = 1;
@@ -1382,7 +1380,7 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
 int main() {
     liborange_setup_iopl_3();
 
-    input0_fd = open("/dev/masterinput0",O_RDWR);
+    input0_fd = open("/dev/masterps2keyboard",O_RDWR);
 
     log(LEVEL_MESSAGE_WARN,"XHCI Driver is currently under development so it's unstable\n");
 

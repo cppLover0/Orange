@@ -10,24 +10,102 @@
 #include <etc/bootloaderinfo.hpp>
 #include <etc/libc.hpp>
 
+#include <generic/mm/vmm.hpp>
+#include <etc/etc.hpp>
+
 #include <arch/x86_64/cpu/data.hpp>
 
 inline void copy_in_userspace(arch::x86_64::process_t* proc,void* dest, void* src, std::uint64_t size) {
-    memory::paging::enablepaging(proc->original_cr3);
-    memcpy(dest,src,size);
-    memory::paging::enablekernel();
+
+    void* ddest = 0;
+    void* ssrc = 0;
+
+    if((std::uint64_t)dest > BootloaderInfo::AccessHHDM()) {
+        ddest = dest;
+    }
+
+    if((std::uint64_t)src > BootloaderInfo::AccessHHDM()) {
+        ssrc = src;
+    }
+
+    if((std::uint64_t)dest < BootloaderInfo::AccessHHDM()) {
+        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)dest);
+
+        if(!vmm_object)
+            return;
+
+        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)dest - vmm_object->base);
+        ddest = Other::toVirt(need_phys);
+    }
+
+    if((std::uint64_t)src < BootloaderInfo::AccessHHDM()) {
+        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)src);
+
+        if(!vmm_object)
+            return;
+
+        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)src - vmm_object->base);
+        ssrc = Other::toVirt(need_phys);
+    }
+
+    memcpy(ddest,ssrc,size);
 }
 
 inline void copy_in_userspace_string(arch::x86_64::process_t* proc,void* dest, void* src, std::uint64_t size) {
-    memory::paging::enablepaging(proc->original_cr3);
-    memcpy(dest,src,strlen((char*)src) > size ? size : strlen((char*)src));
-    memory::paging::enablekernel();
+
+    void* ddest = 0;
+    void* ssrc = 0;
+
+    if((std::uint64_t)dest > BootloaderInfo::AccessHHDM()) {
+        ddest = dest;
+    }
+
+    if((std::uint64_t)src > BootloaderInfo::AccessHHDM()) {
+        ssrc = src;
+    }
+
+    if((std::uint64_t)dest < BootloaderInfo::AccessHHDM()) {
+        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)dest);
+
+        if(!vmm_object)
+            return;
+
+        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)dest - vmm_object->base);
+        ddest = Other::toVirt(need_phys);
+    }
+
+    if((std::uint64_t)src < BootloaderInfo::AccessHHDM()) {
+        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)src);
+
+        if(!vmm_object)
+            return;
+
+        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)src - vmm_object->base);
+        ssrc = Other::toVirt(need_phys);
+    }
+
+    memcpy(ddest,ssrc,strlen((char*)ssrc) > size ? size : strlen((char*)ssrc));
 }
 
 inline void zero_in_userspace(arch::x86_64::process_t* proc,void* buf, std::uint64_t size) {
-    memory::paging::enablepaging(proc->original_cr3);
-    memset(buf,0,size);
-    memory::paging::enablekernel();
+    
+    void* bbuf;
+
+    if((std::uint64_t)buf > BootloaderInfo::AccessHHDM()) {
+        bbuf = buf;
+    }
+
+    if((std::uint64_t)buf < BootloaderInfo::AccessHHDM()) {
+        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
+
+        if(!vmm_object)
+            return;
+
+        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
+        bbuf = Other::toVirt(need_phys);
+    }
+
+    memset(bbuf,0,size);
 }
 
 class syscall_safe {
@@ -136,6 +214,10 @@ syscall_ret_t sys_fchdir(int fd);
 syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout);
 syscall_ret_t sys_readlinkat(int dirfd, const char* path, void* buffer, int_frame_t* ctx);
 
+syscall_ret_t sys_link(char* old_path, char* new_path);
+syscall_ret_t sys_mkdirat(int dirfd, char* path, int mode);
+syscall_ret_t sys_chmod(char* path, int mode);
+
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
 syscall_ret_t sys_free(void *pointer, size_t size);
@@ -157,7 +239,7 @@ syscall_ret_t sys_getppid();
 syscall_ret_t sys_gethostname(void* buffer, std::uint64_t bufsize);
 syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize);
 
-syscall_ret_t sys_waitpid(int pid);
+syscall_ret_t sys_waitpid(int pid, int flags);
 
 syscall_ret_t sys_sleep(long us);
 
@@ -169,6 +251,10 @@ syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_
 syscall_ret_t sys_timestamp();
 
 syscall_ret_t sys_mkfifoat(int dirfd, const char *path, int mode);
+
+syscall_ret_t sys_enabledebugmode();
+
+syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame_t* ctx);
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);
