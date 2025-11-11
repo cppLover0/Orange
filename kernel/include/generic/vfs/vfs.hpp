@@ -24,6 +24,22 @@
 #define VFS_TYPE_DIRECTORY 2
 #define VFS_TYPE_SYMLINK 3
 
+#define   CS8	0000060
+#define ECHO	0000010   /* Enable echo.  */
+#define IGNBRK	0000001  /* Ignore break condition.  */
+#define BRKINT	0000002  /* Signal interrupt on break.  */
+#define IGNPAR	0000004  /* Ignore characters with parity errors.  */
+#define PARMRK	0000010  /* Mark parity and framing errors.  */
+#define INPCK	0000020  /* Enable input parity check.  */
+#define ISTRIP	0000040  /* Strip 8th bit off characters.  */
+#define INLCR	0000100  /* Map NL to CR on input.  */
+#define IGNCR	0000200  /* Ignore CR.  */
+#define ICRNL	0000400  /* Map CR to NL on input.  */
+#define OPOST	0000001  /* Post-process output.  */
+
+#define ICANON	0000002 
+#define VMIN 6
+
 #define S_IRWXU 0700
 #define S_IRUSR 0400
 #define S_IWUSR 0200
@@ -105,16 +121,33 @@
 #define PIPE_SIDE_WRITE 1
 #define PIPE_SIDE_READ 2
 
+
+typedef unsigned char cc_t;
+typedef unsigned int speed_t;
+typedef unsigned int tcflag_t;
+
+#define NCCS     32
+
+typedef struct {
+	tcflag_t c_iflag;
+	tcflag_t c_oflag;
+	tcflag_t c_cflag;
+	tcflag_t c_lflag;
+	cc_t c_line;
+	cc_t c_cc[NCCS];
+	speed_t ibaud;
+	speed_t obaud;
+} __attribute__((packed)) termios_t;
+
 void __vfs_symlink_resolve(char* path, char* out);
 
 namespace vfs {
 
     class pipe {
     private:
-        char* buffer;
-        std::uint64_t total_size = 0;
+        
         std::uint64_t read_ptr = 0;
-        locks::spinlock lock;
+        
         std::atomic_flag is_received = ATOMIC_FLAG_INIT;
         std::atomic_flag is_n_closed = ATOMIC_FLAG_INIT;
         std::atomic_flag is_closed = ATOMIC_FLAG_INIT;
@@ -123,13 +156,21 @@ namespace vfs {
 
     public:
 
+        char* buffer;
+
+        locks::spinlock lock;
+
+        std::uint64_t total_size = 0;
         std::int64_t size = 0;
-        std::uint64_t write_counter = 0;
-        std::uint64_t read_counter = 0;
+        std::int64_t write_counter = 0;
+        std::int64_t read_counter = 0;
 
         std::uint32_t connected_to_pipe = 0;
         std::uint32_t connected_to_pipe_write = 0;
         std::uint64_t flags = 0;
+
+        int tty_ret = 0;
+        termios_t* ttyflags = 0;
 
         pipe(std::uint64_t flags) {
             this->buffer = (char*)memory::pmm::_virtual::alloc(USERSPACE_PIPE_SIZE);
@@ -143,19 +184,19 @@ namespace vfs {
 
         }
 
+        void set_tty_ret() {
+            tty_ret = 1;
+        }
+
         void fifoclose() {
-            asm volatile("sti");
             this->lock.lock();
             this->is_received.clear();
             this->is_closed.test_and_set();
             this->lock.unlock();
-            asm volatile("cli");
         }
 
         void close(std::uint8_t side) {
-            asm volatile("sti");
             this->lock.lock();
-            asm volatile("cli");
             this->connected_to_pipe--;
             
             if(side == PIPE_SIDE_WRITE) {
@@ -167,7 +208,6 @@ namespace vfs {
             }
 
             this->lock.unlock();
-            asm volatile("cli");
 
             if(this->connected_to_pipe == 0) {
                 delete this;
@@ -175,9 +215,7 @@ namespace vfs {
         }
 
         void create(std::uint8_t side) {
-            asm volatile("sti");
             this->lock.lock();
-            asm volatile("cli");
             this->connected_to_pipe++;
             if(side == PIPE_SIDE_WRITE)
                 this->connected_to_pipe_write++;
@@ -196,37 +234,43 @@ namespace vfs {
         std::uint64_t write(const char* src_buffer, std::uint64_t count) {
             std::uint64_t written = 0;
             while (written < count) {
+                asm volatile("cli");
                 this->lock.lock();
 
                 std::uint64_t space_left = this->total_size - this->size;
                 if (space_left == 0) {
                     this->lock.unlock();
+                    asm volatile("sti");
                     asm volatile("pause");
                     continue;
                 }
 
-                asm volatile("cli");
+                uint64_t old_size = this->size;
 
                 std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
+                if(to_write < 0)
+                    to_write = 0;
+
+
                 force_write(src_buffer + written, to_write);
 
                 written += to_write;
                 this->read_counter++;
 
-                asm volatile("sti");
-
                 this->lock.unlock();
+                asm volatile("sti");
                 asm volatile("pause");
             }
             return written;
         }
 
-        std::uint64_t read(char* dest_buffer, std::uint64_t count) {
+        std::uint64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
 
             std::uint64_t read_bytes = 0;
+
             while (true) {
-                this->lock.lock();
                 asm volatile("cli");
+                this->lock.lock();
 
                 if (this->size == 0) {
                     if (this->is_closed.test(std::memory_order_acquire)) {
@@ -234,10 +278,17 @@ namespace vfs {
                         asm volatile("sti");
                         return 0; 
                     }
-                    if (flags & O_NONBLOCK) {
+                    if (flags & O_NONBLOCK || is_block) {
                         this->lock.unlock();
                         asm volatile("sti");
                         return 0;
+                    }
+                    if(ttyflags) {
+                        if(!(ttyflags->c_lflag & ICANON) && ttyflags->c_cc[VMIN] == 0) {
+                            this->lock.unlock();
+                            asm volatile("sti");
+                            return 0;
+                        }
                     }
                     this->lock.unlock();
                     asm volatile("sti");
@@ -245,23 +296,47 @@ namespace vfs {
                     continue;
                 }
 
+                if(ttyflags) {
+                    if(!(ttyflags->c_lflag & ICANON)) {
+                        if(this->size < ttyflags->c_cc[VMIN]) {
+                            this->lock.unlock();
+                            return 0;
+                        }
+                    }
+                }
+
+                if(ttyflags) {
+                    if(ttyflags->c_lflag & ICANON) {
+                        if(!tty_ret) {
+                            this->lock.unlock();
+                            asm volatile("sti");
+                            asm volatile("pause");
+                            continue;
+                        }
+                    }
+                }
                 
                 read_bytes = (count < this->size) ? count : this->size;
                 memcpy(dest_buffer, this->buffer, read_bytes);
                 memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
                 this->size -= read_bytes;
 
-                if(this->size == 0) {
-                    this->write_counter++;
+                this->write_counter++; 
+
+                if(this->size <= 0) {
+                    *read_count = read_counter;
+                    tty_ret = 0;
                 } else
                     this->read_counter++;
 
-                asm volatile("sti");
+                
+
                 this->lock.unlock();
                 break;
             }
             return read_bytes;
         }
+
 
 
         ~pipe() {

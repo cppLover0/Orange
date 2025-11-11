@@ -63,7 +63,9 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {51,(void*)sys_mkdirat},
     {52,(void*)sys_chmod},
     {53,(void*)sys_enabledebugmode},
-    {54,(void*)sys_clone}
+    {54,(void*)sys_clone},
+    {56,(void*)sys_ttyname},
+    {57,(void*)sys_breakpoint}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -71,6 +73,8 @@ arch::x86_64::syscall_item_t* __syscall_find(int rax) {
         if(sys_table[i].syscall_num == rax)
             return &sys_table[i];
     }
+    Log::SerialDisplay(LEVEL_MESSAGE_WARN,"unknown syscall %d",rax);
+    return 0; // without it there will be ub
 }
 
 extern "C" void syscall_handler_c(int_frame_t* ctx) {
@@ -83,18 +87,25 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     } else if(!item->syscall_func) {
         return;
     } 
-    
 
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
+    proc->sys = ctx->rax;
+
+    DEBUG(0,"sys %d from %d",ctx->rax,proc->id);
+        
 
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
     syscall_ret_t ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
     if(ret.is_rdx_ret) {
         ctx->rdx = ret.ret_val;
+        if((std::int64_t)ret.ret_val < 0)
+            DEBUG(proc->is_debug,"rdx ret 0x%p smaller than zero from sys %d",ret.ret_val,ctx->rax);
     }
 
+    DEBUG(0,"sys ret %d from proc %d ",ret.ret,proc->id);
+
     if(ret.ret != 0)
-        DEBUG(proc->is_debug,"Syscall %d from proc %d fails with code %d",ctx->rax,proc->id,ret.ret);
+        DEBUG(0,"Syscall %d from proc %d fails with code %d",ctx->rax,proc->id,ret.ret);
 
     ctx->rax = ret.ret;
     return;

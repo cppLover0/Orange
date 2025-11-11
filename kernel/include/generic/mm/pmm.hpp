@@ -10,15 +10,16 @@
 typedef struct buddy_info {
     union {
         struct {
-            std::uint64_t level : 8;
-            std::uint64_t is_was_splitted : 1;
-            std::uint64_t is_splitted : 1;
-            std::uint64_t is_free : 1;
-            std::uint64_t split_x : 1;
-            std::uint64_t parent_id : 48;
+            std::uint16_t level : 8;
+            std::uint16_t is_was_splitted : 1;
+            std::uint16_t is_splitted : 1;
+            std::uint16_t is_free : 1;
+            std::uint16_t split_x : 1;
         };
-        std::uint64_t buddy_info_raw;
+        std::uint16_t buddy_info_raw;
     };
+    struct buddy_info* parent;
+    struct buddy_info* twin;
     std::uint32_t id;
     std::uint64_t phys;
 } __attribute__((packed)) buddy_info_t;
@@ -46,7 +47,7 @@ namespace memory {
         static buddy_info_t* split_maximum(buddy_info_t* blud, std::uint64_t size);
         static buddy_info_t* put(std::uint64_t phys, std::uint8_t level);
         static buddy_split_t split(buddy_info_t* info);
-        static void merge(uint64_t parent_id);
+        static void merge(buddy_info_t* budy);
     public:
         static void init();
         static void free(std::uint64_t phys);

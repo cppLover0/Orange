@@ -1,0 +1,154 @@
+diff -Naur xf86-input-mouse-1.9.5/configure xf86-input-mouse-patched/configure
+--- xf86-input-mouse-1.9.5/configure	2023-05-05 03:25:26.000000000 +0300
++++ xf86-input-mouse-patched/configure	2025-11-07 16:18:50.878312976 +0300
+@@ -19591,7 +19591,7 @@
+ 
+ # X Server SDK location is required to install xf86-mouse-properties.h
+ # This location is also relayed in the xorg-mouse.pc file
+-sdkdir=`$PKG_CONFIG --variable=sdkdir xorg-server`
++sdkdir="$includedir"
+ 
+ # Workaround overriding sdkdir to be able to create a tarball when user has no
+ # write permission in sdkdir. See DISTCHECK_CONFIGURE_FLAGS in Makefile.am
+@@ -19619,6 +19619,9 @@
+   gnu*)
+     OS_MOUSE_NAME=hurd
+     ;;
++  orange*)
++    OS_MOUSE_NAME=orange
++    ;;
+ esac
+ 
+ 
+diff -Naur xf86-input-mouse-1.9.5/src/orange_mouse.c xf86-input-mouse-patched/src/orange_mouse.c
+--- xf86-input-mouse-1.9.5/src/orange_mouse.c	1970-01-01 03:00:00.000000000 +0300
++++ xf86-input-mouse-patched/src/orange_mouse.c	2025-11-08 17:39:27.721764644 +0300
+@@ -0,0 +1,128 @@
++#ifdef HAVE_XORG_CONFIG_H
++#include <xorg-config.h>
++#endif
++
++#include <xorg-server.h>
++#include <X11/X.h>
++#include <X11/Xproto.h>
++#include "inputstr.h"
++#include "scrnintstr.h"
++#include "mipointer.h"
++
++#include "xf86.h"
++#include "xf86Xinput.h"
++#include "mouse.h"
++#include "xf86_OSlib.h"
++#include "xisb.h"
++
++#include <stdio.h>
++#include <errno.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <string.h>
++
++#include <sys/stat.h>
++
++#define MOUSE_LB (1 << 0)
++#define MOUSE_RB (1 << 1)
++#define MOUSE_MB (1 << 2)
++#define MOUSE_B4 (1 << 3)
++#define MOUSE_B5 (1 << 4)
++
++typedef struct {
++    unsigned char buttons;
++    unsigned char x;
++    unsigned char y;
++    unsigned char z;
++} __attribute__((packed)) mouse_packet_t;
++
++static void orangeReadInput(InputInfoPtr pInfo) {
++    MouseDevPtr mouse = pInfo->private;
++    mouse_packet_t packet;
++    int x = 0;
++    int y = 0;
++    int z = 0;
++    unsigned char buttons = 0;
++    while(read(pInfo->fd, &packet, sizeof(packet)) == sizeof(packet)){
++		x += (char)packet.x;
++		y += (char)packet.y;
++		z += (char)packet.z;
++		buttons |= packet.buttons;
++		
++	}
++
++	int b = mouse->lastButtons;
++	b &= ~0x7;	
++b |= (buttons & MOUSE_RB) ? 1 : 0;
++		b |= (buttons & MOUSE_MB) ? 2 : 0;
++		b |= (buttons & MOUSE_LB) ? 4 : 0;
++
++		mouse->PostEvent(pInfo, b, x, -y, z, 0);
++
++	
++
++}
++
++static Bool orangePreInit(InputInfoPtr pInfo, const char *proto, int flag) {
++    MouseDevPtr mouse;
++
++    mouse = pInfo->private;
++
++    mouse->protocol = proto;
++
++    xf86ProcessCommonOptions(pInfo, pInfo->options);
++
++    pInfo->fd = xf86OpenSerial(pInfo->options);
++    if (pInfo->fd == -1) {
++        xf86Msg(X_ERROR, "%s: cannot open mouse device!\n", pInfo->name);
++        return FALSE;
++    }
++
++    mouse->CommonOptions(pInfo);
++    pInfo->read_input = orangeReadInput;
++    return true;
++}
++
++#define DEVPATH "/dev/mouse"
++
++static const char *getdevice(InputInfoPtr pInfo, const char *proto, int flag){
++    pInfo->options = xf86AddNewOption(pInfo->options, "Device", DEVPATH);
++    return DEVPATH;
++}
++
++static int interfacesupport() {
++    return MSE_PS2;
++}
++
++static const char *names[] = {
++    "orangeMouseDev", NULL
++};
++
++static const char **protonames() {
++    return names;
++}
++
++static const char *defaultproto() {
++    return "orangeMouseDev";
++}
++
++static Bool isdefault(const char *protocol) {
++    return strcmp(protocol, defaultproto()) == 0;
++}
++
++OSMouseInfoPtr OSMouseInit(int flag) {
++    OSMouseInfoPtr p;
++
++    p = calloc(sizeof(OSMouseInfoRec), 1);
++
++    if (p == NULL)
++        return NULL;
++
++    p->SupportedInterfaces = interfacesupport;
++    p->BuiltinNames = protonames;
++    p->FindDevice = getdevice;
++    p->DefaultProtocol = defaultproto;
++    p->CheckProtocol = isdefault;
++    p->PreInit = orangePreInit;
++    return p;
++}

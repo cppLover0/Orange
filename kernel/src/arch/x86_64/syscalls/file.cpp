@@ -45,7 +45,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
     memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
 
-    //DEBUG(proc->is_debug,"Trying to open %s from proc %d",result,proc->id);
+    DEBUG(proc->is_debug,"Trying to open %s from proc %d",result,proc->id);
 
     if(result[0] == '\0') {
         result[0] = '/';
@@ -106,28 +106,33 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     if(!fd_s)
         return {1,EBADF,0};
 
+    if(fd_s->can_be_closed)
+        fd_s->can_be_closed = 0;
+
     vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
     uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
 
     char* temp_buffer = (char*)Other::toVirt(need_phys);
     memset(temp_buffer,0,count);
 
+    //DEBUG(proc->is_debug,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
+
     std::int64_t bytes_read;
     if(fd_s->state == USERSPACE_FD_STATE_FILE) 
         bytes_read = vfs::vfs::read(fd_s,temp_buffer,count);
     else if(fd_s->state == USERSPACE_FD_STATE_PIPE && fd_s->pipe) {
-        bytes_read = fd_s->pipe->read(temp_buffer,count);
+        bytes_read = fd_s->pipe->read(&fd_s->read_counter,temp_buffer,count,0);
     } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
 
         if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
             return {1,EFAULT,0};
 
-        DEBUG(proc->is_debug,"reading socket %d, buf 0x%p, count %d (target_size: %d)",fd,buf,count,fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd_s->write_socket_pipe->size : fd_s->read_socket_pipe->size);
- 
+        //DEBUG(proc->is_debug,"reading socket %d from proc %d",fd,proc->id);
+
         if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-            bytes_read = fd_s->write_socket_pipe->read(temp_buffer,count);
+            bytes_read = fd_s->write_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,0);
         } else {
-            bytes_read = fd_s->read_socket_pipe->read(temp_buffer,count);
+            bytes_read = fd_s->read_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,0);
         }
 
         if(bytes_read == 0)
@@ -147,6 +152,9 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     if(!fd_s)
         return {1,EBADF,0};
 
+    if(fd_s->can_be_closed)
+        fd_s->can_be_closed = 0;
+
     vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
     uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
 
@@ -154,32 +162,22 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
 
     const char* _0 = "Content view is disabled in files";
 
-    //DEBUG(proc->is_debug,"Writing to %s (fd %d) from proc %d with content \"%s\"",fd_s->path,fd,proc->id,temp_buffer,fd_s->state != USERSPACE_FD_STATE_FILE ? temp_buffer : _0);
-
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
         bytes_written = vfs::vfs::write(fd_s,temp_buffer,count);
     else if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
-        SYSCALL_ENABLE_PREEMPT();
         bytes_written = fd_s->pipe->write(temp_buffer,count);
-        SYSCALL_DISABLE_PREEMPT();
     } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
 
         if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
             return {1,EFAULT,0};
-
-        DEBUG(proc->is_debug,"Writing to socket %d from proc %d other_state: %d, buf: 0x%p, count: %d",fd,proc->id,fd_s->other_state,buf,count);
-
-
+        
+        //DEBUG(proc->is_debug,"writing socket %d from proc %d",fd,proc->id);
 
         if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-            SYSCALL_ENABLE_PREEMPT();
             bytes_written = fd_s->read_socket_pipe->write(temp_buffer,count);
-            SYSCALL_DISABLE_PREEMPT();
         } else {
-            SYSCALL_ENABLE_PREEMPT();
             bytes_written = fd_s->write_socket_pipe->write(temp_buffer,count);
-            SYSCALL_DISABLE_PREEMPT();
         }
 
         if(bytes_written == 0)
@@ -323,8 +321,14 @@ syscall_ret_t sys_dup(int fd, int flags) {
     if(!fd_s)
         return {0,EBADF,0};
     
-    int new_fd = vfs::fdmanager::create(proc);
-    userspace_fd_t* nfd_s = vfs::fdmanager::search(proc,new_fd);
+    userspace_fd_t* nfd_s = vfs::fdmanager::searchlowest(proc,0);
+
+    if(!nfd_s) {
+        int new_fd = vfs::fdmanager::create(proc);
+        nfd_s = vfs::fdmanager::search(proc,new_fd);
+    }
+
+    DEBUG(proc->is_debug,"dup from %d to %d",fd,nfd_s->index);
 
     nfd_s->cycle = fd_s->cycle;
     nfd_s->offset = fd_s->offset;
@@ -336,7 +340,7 @@ syscall_ret_t sys_dup(int fd, int flags) {
     nfd_s->is_a_tty = fd_s->is_a_tty;
     nfd_s->read_counter = fd_s->read_counter;
     nfd_s->write_counter = fd_s->write_counter;
-    nfd_s->can_be_closed = fd_s->can_be_closed;
+    nfd_s->can_be_closed = 0;
     nfd_s->write_socket_pipe = fd_s->write_socket_pipe;
     nfd_s->read_socket_pipe = fd_s->read_socket_pipe;
 
@@ -345,7 +349,7 @@ syscall_ret_t sys_dup(int fd, int flags) {
     if(nfd_s->state ==USERSPACE_FD_STATE_PIPE)
         nfd_s->pipe->create(nfd_s->pipe_side);
 
-    return {1,0,new_fd};
+    return {1,0,nfd_s->index};
 }
 
 syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
@@ -427,6 +431,7 @@ syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg) {
     copy_in_userspace(proc,ioctl_item,arg,ioctl_size);
  
     std::int64_t ret = vfs::vfs::ioctl(fd_s,request,ioctl_item,&res);
+
     copy_in_userspace(proc,arg,ioctl_item,ioctl_size);
 
     return {0,(int)ret,0};
@@ -481,6 +486,8 @@ syscall_ret_t sys_isatty(int fd) {
 
     int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
 
+    DEBUG(proc->is_debug,"sys_isatty %s fd %d ret %d",fd_s->path,fd,ret);
+
     fd_s->is_a_tty = ret == 0 ? 1 : 0;
 
     return {0,ret != 0 ? ENOTTY : 0,0};
@@ -529,6 +536,7 @@ syscall_ret_t sys_ptsname(int fd, void* out, int max_size) {
     memset(buffer2,0,256);
 
     __printfbuf(buffer2,256,"/dev%s",buffer);
+    zero_in_userspace(proc,out,max_size);
     copy_in_userspace(proc,out,buffer2,strlen(buffer2));
 
     return {0,0,0};
@@ -570,6 +578,7 @@ syscall_ret_t sys_read_dir(int fd, void* buffer) {
 
 syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
 
+    arch::x86_64::process_t* pproc = CURRENT_PROC;
     switch(request) {
         case F_DUPFD: {
             return sys_dup(fd,arg);
@@ -587,13 +596,12 @@ syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
         case F_SETFL: {
             arch::x86_64::process_t* proc = CURRENT_PROC;
             userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+
             if(!fd_s)
                 return {0,EBADF,0};
 
             fd_s->flags &= ~(O_APPEND | O_ASYNC | O_NONBLOCK);
             fd_s->flags |= (arg & (O_APPEND | O_ASYNC | O_NONBLOCK));
-
-            DEBUG(proc->is_debug,"Fcntl fd %d O_NONBLOCK %d from proc %d",fd,(fd_s->flags & O_NONBLOCK) ? 1 : 0,proc->id);
 
             if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
                 fd_s->pipe->flags & ~(O_NONBLOCK);
@@ -700,15 +708,14 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         fd[i].revents = 0;
 
         if(!fd0)
-            return {1,EINVAL,0};
-
-        DEBUG(proc->is_debug,"Trying to poll %s operation %d (fd %d with state %d, read_socket: 0x%p, write_socket: 0x%p) with timeout %d in proc %d",fd0->path,fd[i].events,fd[i].fd,fd0->state,fd0->read_socket_pipe,fd0->write_socket_pipe,timeout,proc->id);
+            return {1,EBADF,0};
 
         if(fd[i].events & POLLIN)
             total_events++;
 
-        if(fd[i].events & POLLOUT)
-            total_events++;
+        if(fd[i].events & POLLOUT) {
+            total_events++; 
+        }
 
         if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen && fd0->read_counter == -1) {
             fd0->read_counter = 0;
@@ -737,8 +744,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
             userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
             if(fd[i].events & POLLIN) {
                 std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                if(fd0->is_listen)
-                    DEBUG(proc->is_debug,"ret %d readcounter %d",ret,fd0->read_counter);
+                    
                 if(ret > fd0->read_counter) {
                     fd0->read_counter = ret;
                     num_events++;
@@ -763,7 +769,6 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
     if(success == false) {
         copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
-
         return {1,0,num_events};
     }
 
@@ -778,8 +783,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                     SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
                     SYSCALL_ENABLE_PREEMPT();
-                    if(fd0->is_listen)
-                        DEBUG(proc->is_debug,"ret %d readcounter %d",ret,fd0->read_counter);
+                        
                     if(ret > fd0->read_counter) {
                         fd0->read_counter = ret;
                         num_events++;
@@ -839,7 +843,6 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     }
 
     copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
-
     return {1,0,num_events};
 
 
@@ -970,4 +973,30 @@ syscall_ret_t sys_chmod(char* path, int mode) {
     ret = vfs::vfs::var(&fd,value | mode, TMPFS_VAR_CHMOD | (1 << 7));
 
     return {0,ret,0};
+}
+
+syscall_ret_t sys_ttyname(int fd, char *buf, size_t size) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    if(!buf)
+        return {0,EINVAL,0};
+
+    SYSCALL_IS_SAFEA(buf,2048);
+
+    int ret = vfs::vfs::var(fd_s,0,DEVFS_VAR_ISATTY);
+
+    fd_s->is_a_tty = ret == 0 ? 1 : 0;
+
+    if(!fd_s->is_a_tty)
+        return {0,ENOTTY,0};
+
+    zero_in_userspace(proc,buf,size);
+    if(strlen(fd_s->path) > size)
+        return {0,ERANGE,0};
+
+    copy_in_userspace(proc,buf,fd_s->path,strlen(fd_s->path));
+    return {0,0,0};
 }

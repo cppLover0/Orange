@@ -7,6 +7,7 @@
 #include <generic/locks/spinlock.hpp>
 
 #include <etc/bootloaderinfo.hpp>
+#include <generic/mm/vmm.hpp>
 
 #include <arch/x86_64/scheduling.hpp>
 
@@ -27,7 +28,8 @@ void panic(int_frame_t* ctx, const char* msg) {
     if(proc) {
         uint64_t cr2;
         asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
-        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p, cr2 0x%p, error code 0x%p\n",proc->id,ctx->vec,ctx->rip,cr2,ctx->err_code);
+        vmm_obj_t* obj = memory::vmm::getlen(proc,ctx->rip);
+        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx);
         arch::x86_64::scheduling::kill(proc);
        schedulingSchedule(0);
     }

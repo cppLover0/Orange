@@ -200,9 +200,10 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
                 __tmpfs__dealloc(node);
             }
             node->content = new_content;
-            node->size = new_size;
             node->real_size = new_content0.real_size;
         }
+
+        node->size = new_size;
 
         memcpy(node->content + offset, buffer, size);
 

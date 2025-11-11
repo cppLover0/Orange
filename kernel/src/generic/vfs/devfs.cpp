@@ -25,6 +25,19 @@ bool isdigit(char ch) {
     return ch >= '0' && ch <= '9';
 }
 
+long reverse_number(long num) {
+    long reversed_num = 0;
+    
+    while(num > 0) {
+        int digit = num % 10;     
+        reversed_num = reversed_num * 10 + digit; 
+        num /= 10;                
+    }
+    
+    return reversed_num;
+}
+
+
 vfs::devfs_node_t* devfs_find_dev(const char* loc) {
     vfs::devfs_node_t* dev = __devfs_head;
     char temp[256]; 
@@ -37,6 +50,8 @@ vfs::devfs_node_t* devfs_find_dev(const char* loc) {
         dev_num = dev_num * 10 + (loc[i] - '0'); 
         i--;
     }
+
+    dev_num = reverse_number(dev_num);
 
     memcpy(temp, loc, i + 1);
     temp[i + 1] = '\0'; 
@@ -56,7 +71,7 @@ vfs::devfs_node_t* devfs_find_dev(const char* loc) {
 }
 
 std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
-    vfs::devfs_node_t* node = devfs_find_dev(path);
+    vfs::devfs_node_t* node = devfs_find_dev(path); 
     
     if(!node)
         return ENOENT;
@@ -78,6 +93,10 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
     return 0;    
 }
 
+int is_printable(char c) {
+    return (c >= 32 && c <= 126) || c == 10; 
+}
+
 std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t size) {
 
     vfs::devfs_node_t* node = devfs_find_dev(path);
@@ -91,14 +110,96 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
     if(is_slave == 1 && node->slave_write)
         return node->slave_write(fd,buffer,size);
 
-    vfs::devfs_packet_t packet;
-    packet.request = !is_slave ? DEVFS_PACKET_WRITE_READRING : DEVFS_PACKET_WRITE_WRITERING;
-    packet.cycle = &fd->cycle;
-    packet.queue = &fd->queue;
-    packet.size = size;
-    packet.value = (std::uint64_t)buffer;
+    if(node->is_tty && !is_slave) { // handle stdio logic from /dev/pty writing 
+        vfs::vfs::unlock();
+        for(int i = 0;i < size;i++) {
+            char c = ((char*)buffer)[i];
 
-    return vfs::devfs::send_packet(path,&packet);
+            if(!(node->term_flags->c_lflag & ICANON)) {
+                if(c == '\n') c = 13;
+            }
+
+            if((node->term_flags->c_lflag & ECHO) && (is_printable(c) || c == 13)) {
+                if(c == 13) {
+                    node->writepipe->write("\n",1);
+                } else if(c == '\n') 
+                    node->writepipe->write("\r",1);
+                asm volatile("cli");
+                node->writepipe->write(&((char*)buffer)[i],1);
+                asm volatile("cli"); 
+            }
+
+            if(c == '\b') {
+                if(node->readpipe->size > 0) {
+                    const char* back = "\b \b";
+                    node->writepipe->write(back,strlen(back));
+                    asm volatile("cli");
+                    node->readpipe->lock.lock();
+                    node->readpipe->read_counter--;
+                    node->readpipe->buffer[node->readpipe->size--] = '\0';
+                    node->readpipe->lock.unlock(); 
+                }
+            }
+
+            if(is_printable(c) || !(node->term_flags->c_lflag & ICANON)) {
+                node->readpipe->write(&c,1);
+                asm volatile("cli");
+            } else if(c == 13) {
+                node->readpipe->write("\n",1);
+                asm volatile("cli");
+            }
+
+            if((c == '\n' || c == 13) && (node->term_flags->c_lflag & ICANON)) {
+                node->readpipe->set_tty_ret(); 
+            }
+            asm volatile("cli");
+        }
+        return size;
+    } else if(node->is_tty && is_slave) {
+        vfs::vfs::unlock();
+        for(int i = 0;i < size;i++) {
+            char c = ((char*)buffer)[i]; 
+            if(c == '\n') {
+                node->writepipe->write("\r\n",2);
+            } else
+                node->writepipe->write(&c,1);
+            asm volatile("cli");
+        }
+        return size;
+    }
+
+    std::uint64_t status;
+    int is_master = !is_slave;
+    if(node->open_flags.is_pipe_rw) {
+        vfs::vfs::unlock();
+        status = is_master ? node->readpipe->write((char*)buffer,size) : node->writepipe->write((char*)buffer,size);
+    } else {
+        if(!is_master) {
+            if(node->writering->ring.bytelen == 1) {
+                    node->writering->send(*(char*)buffer);
+            } else if(node->writering->ring.bytelen == 2) {
+                    node->writering->send(*(short*)buffer);
+            } else if(node->writering->ring.bytelen == 4) {
+                    node->writering->send(*(int*)buffer);
+            } else if(node->writering->ring.bytelen == 8) {
+                    node->writering->send(*(long long*)buffer);
+            }
+        } else {
+            if(node->readring->ring.bytelen == 1) {
+                    node->readring->send(*(char*)buffer);
+            } else if(node->readring->ring.bytelen == 2) {
+                    node->readring->send(*(short*)buffer);
+            } else if(node->readring->ring.bytelen == 4) {
+                    node->readring->send(*(int*)buffer);
+            } else if(node->readring->ring.bytelen == 8) {
+                    node->readring->send(*(long long*)buffer);
+            }
+        }
+        vfs::vfs::unlock();
+        return node->writering->ring.bytelen;
+    }
+
+    return status;
 }
 
 std::int64_t __devfs__read(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t count) {
@@ -111,14 +212,17 @@ std::int64_t __devfs__read(userspace_fd_t* fd, char* path, void* buffer, std::ui
     if(node->read)
         return node->read(fd,buffer,count);
 
-    vfs::devfs_packet_t packet;
-    packet.request = !is_slave ? DEVFS_PACKET_READ_WRITERING : DEVFS_PACKET_READ_READRING;
-    packet.cycle = &fd->cycle;
-    packet.queue = &fd->queue;
-    packet.size = count;
-    packet.value = (std::uint64_t)buffer;
+    std::uint64_t status;
+    int is_master = !is_slave;
 
-    std::int64_t status = vfs::devfs::send_packet(path,&packet);
+    if(node->open_flags.is_pipe_rw) {
+        vfs::vfs::unlock();
+        status = is_master ? node->writepipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0) : node->readpipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
+    } else {
+        //DEBUG(1,"read %s ring count %d",path,count);
+        status = is_master ? node->writering->receivevals(buffer,dev_num,count,&fd->cycle,&fd->queue) : node->readring->receivevals(buffer,dev_num,count,&fd->cycle,&fd->queue);
+        vfs::vfs::unlock();
+    }
 
     return status;
 }
@@ -164,9 +268,21 @@ std::int32_t __devfs__mmap(userspace_fd_t* fd, char* path, std::uint64_t* outp, 
 
 std::int32_t __devfs__var(userspace_fd_t* fd, char* path, std::uint64_t value, std::uint8_t request) {
 
-    vfs::devfs_packet_t packet;
-    packet.request = DEVFS_PACKET_ISATTY;
-    std::int32_t status = vfs::devfs::send_packet(path,&packet);
+    vfs::devfs_node_t* node = devfs_find_dev(path);
+    if(!node)
+        return ENOENT;
+
+    int status = 0;
+    if(request == DEVFS_VAR_ISATTY)
+        status = node->is_tty ? 0 : ENOTTY;
+    
+    if((request & ~(1 << 7)) == TMPFS_VAR_CHMOD) {
+        if(request & (1 << 7))
+            node->mode = value & 0xFFFFFFFF;
+        else 
+            *(std::uint64_t*)value = (std::uint64_t)node->mode;
+    }
+
     return status;
 }
 
@@ -198,10 +314,38 @@ std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
             
         case POLLIN:
             ret = !is_slave ? node->writepipe->read_counter : node->readpipe->read_counter;
+            if(!is_slave)
+                if(fd->read_counter == -1 && node->writepipe->size != 0)
+                    ret = 0;
+            else 
+                if(fd->read_counter == -1 && node->readpipe->size != 0)
+                    ret = 0;
+
+            if(!is_slave) {
+                if(fd->read_counter < node->writepipe->read_counter && node->writepipe->size == 0) {
+                    fd->read_counter = node->writepipe->read_counter;
+                } else if(fd->read_counter < node->readpipe->read_counter && node->readpipe->size == 0)
+                    fd->read_counter = node->readpipe->read_counter;
+            }
+
             break;
             
         case POLLOUT:
             ret = !is_slave ? node->readpipe->write_counter : node->writepipe->write_counter;
+            if(ret == fd->write_counter) {
+                if(!is_slave) {
+                    if(node->readpipe->size != node->readpipe->total_size) {
+                        // fix this shit
+                        node->readpipe->write_counter++;
+                    }
+                } else {
+                    if(node->writepipe->size != node->writepipe->total_size) {
+                        node->writepipe->write_counter++;
+                    }
+                }
+                ret = !is_slave ? node->readpipe->write_counter : node->writepipe->write_counter;
+            }
+            
             break;
             
         default:
@@ -210,6 +354,17 @@ std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
     } else {
         if(operation_type == POLLIN) {
             ret = !is_slave ? node->writering->read_counter : node->readring->read_counter;
+            if(!is_slave && ret == fd->read_counter) {
+                if(node->writering->isnotempty((int*)&fd->queue,(char*)&fd->cycle)) {
+                    fd->read_counter--;
+                } 
+            } else if(ret == fd->read_counter && is_slave) {
+                if(node->readring->isnotempty((int*)&fd->queue,(char*)&fd->cycle)) {    
+                    fd->read_counter--;
+
+                } 
+            }
+
         } else if(operation_type == POLLOUT) {
             ret = !is_slave ? ++node->readring->write_counter : ++node->writering->write_counter;
         } 
@@ -254,94 +409,6 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
             return 0;
         }
 
-        case DEVFS_PACKET_READ_READRING: {
-
-            if(!node) { vfs::vfs::unlock();
-                return -ENOENT; }
-
-            if(!node->open_flags.is_pipe_rw) {
-                
-                std::uint64_t count = node->readring->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
-                vfs::unlock();
-                return count;
-            } else {
-                vfs::unlock();
-                asm volatile("sti");
-                std::uint64_t count = node->readpipe->read((char*)packet->value,packet->size);
-                asm volatile("cli");
-                return count;
-            }
-        }
-
-        case DEVFS_PACKET_WRITE_READRING: 
-
-            if(!node) { vfs::vfs::unlock();
-                return -ENOENT; }
-                
-            if(!node->open_flags.is_pipe_rw) {
-                if(node->readring->ring.bytelen == 1) {
-                    node->readring->send(*(char*)packet->value);
-                } else if(node->readring->ring.bytelen == 2) {
-                    node->readring->send(*(short*)packet->value);
-                } else if(node->readring->ring.bytelen == 4) {
-                    node->readring->send(*(int*)packet->value);
-                } else if(node->readring->ring.bytelen == 8) {
-                    node->readring->send(*(long long*)packet->value);
-                }
-                vfs::vfs::unlock();
-            } else { 
-                vfs::vfs::unlock();
-                asm volatile("sti");
-                std::uint64_t i = node->readpipe->write((char*)packet->value,packet->size);
-                asm volatile("cli");
-                return i;
-            }
-
-            return 8;
-
-        case DEVFS_PACKET_READ_WRITERING: {
-
-            if(!node) { vfs::vfs::unlock();
-                return -ENOENT; }
-                
-            if(!node->open_flags.is_pipe_rw) {
-                std::int32_t count = node->writering->receivevals((std::uint64_t*)packet->value,dev_num,packet->size,packet->cycle,packet->queue);
-                vfs::unlock();
-                return count;
-            } else {
-                vfs::unlock();
-                asm volatile("sti");
-                std::int64_t count = node->writepipe->read((char*)packet->value,packet->size);
-                asm volatile("cli");
-                return count;
-            }
-        }
-
-        case DEVFS_PACKET_WRITE_WRITERING:
-
-            if(!node) { vfs::vfs::unlock();
-                return -ENOENT; }
-                
-            if(!node->open_flags.is_pipe_rw) {
-                if(node->writering->ring.bytelen == 1) {
-                    node->writering->send(*(char*)packet->value);
-                } else if(node->writering->ring.bytelen == 2) {
-                    node->writering->send(*(short*)packet->value);
-                } else if(node->writering->ring.bytelen == 4) {
-                    node->writering->send(*(int*)packet->value);
-                } else if(node->writering->ring.bytelen == 8) {
-                    node->writering->send(*(long long*)packet->value);
-                }
-                vfs::vfs::unlock();
-            } else {
-                vfs::vfs::unlock();
-                asm volatile("sti");
-                std::uint64_t i = node->writepipe->write((char*)packet->value,packet->size);
-                asm volatile("cli");
-                return i;
-            }
-            return node->writering->ring.bytelen;
-
         case DEVFS_PACKET_IOCTL: {
 
             if(!node)
@@ -355,11 +422,6 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                     if(node->is_tty) {
                         if(packet->ioctl.ioctlreq == TCSETS) {
                             termios_t* termios = (termios_t*)packet->ioctl.arg;
-                            if(!(termios->c_lflag & ICANON) && termios->c_cc[VMIN] == 0) {
-                                node->readpipe->flags |= (O_NONBLOCK);
-                            } else {
-                                node->readpipe->flags &= ~(O_NONBLOCK);
-                            }
                         }
                     }
                     memcpy(node->ioctls[i].pointer_to_struct,(void*)packet->ioctl.arg,node->ioctls[i].size);
@@ -394,6 +456,13 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
                     current->write_req = packet->create_ioctl.writereg;
                     current->pointer_to_struct = (void*)packet->create_ioctl.pointer;
                     current->size = packet->create_ioctl.size;
+
+                    if(current->write_req == TCSETS) {
+                        node->writepipe->ttyflags = 0;
+                        node->readpipe->ttyflags = (termios_t*)packet->create_ioctl.pointer;
+                        node->term_flags = (termios_t*)packet->create_ioctl.pointer;
+                    }
+
                     return 0;
                 }
             }
@@ -464,6 +533,7 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
     return 0;
 }
 
+
 int tty_ptr = 0;
 std::int32_t __ptmx_open(userspace_fd_t* fd, char* path) {
 
@@ -480,13 +550,26 @@ std::int32_t __ptmx_open(userspace_fd_t* fd, char* path) {
 
     vfs::devfs::send_packet(ttyname + 4,&packet);
 
+    memset(fd->path,0,2048);
+    __printfbuf(fd->path,2048,"/dev/pty%d",tty_ptr);
+    memset(ttyname,0,2048);
+    __printfbuf(ttyname,2048,"/dev/tty%d",tty_ptr);
+
     packet.request = DEVFS_PACKET_SETUPTTY;
     packet.value = (std::uint64_t)fd->path + 4;
 
     vfs::devfs::send_packet(ttyname + 4,&packet);
 
+    termios_t* t = (termios_t*)memory::pmm::_virtual::alloc(4096);
+    
+    t->c_lflag |= (ICANON | ECHO);
+
+    t->c_iflag = IGNPAR | ICRNL;
+    t->c_oflag = OPOST;         
+    t->c_cflag |= (CS8); 
+
     packet.request = DEVFS_PACKET_CREATE_IOCTL;
-    packet.create_ioctl.pointer = (uint64_t)memory::pmm::_virtual::alloc(4096);
+    packet.create_ioctl.pointer = (std::uint64_t)t;
     packet.create_ioctl.size = sizeof(termios_t);
     packet.create_ioctl.readreg = TCGETS;
     packet.create_ioctl.writereg = TCSETS;
@@ -538,11 +621,23 @@ std::int64_t __pic_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
     new_node->writering->setup_bytelen(1);
     new_node->readring->setup_bytelen(1);
 
-    arch::x86_64::interrupts::irq::create(irq_num,IRQ_TYPE_LEGACY_USERSPACE,0,0,ioapic_flags);    
+    arch::x86_64::interrupts::irq::create(irq_num,IRQ_TYPE_LEGACY_USERSPACE,0,0,ioapic_flags);   
+    drivers::ioapic::unmask(irq_num); 
     
     vfs::vfs::unlock();
     return 10;
 
+}
+
+std::int64_t __zero_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
+    vfs::vfs::unlock();
+    return size;
+}
+
+std::int64_t __zero_read(userspace_fd_t* fd, void* buffer, std::uint64_t count) {
+    vfs::vfs::unlock(); // dont waste time on this
+    memset(buffer,0,count); 
+    return 0;
 }
 
 void vfs::devfs::mount(vfs_node_t* node) {
@@ -578,5 +673,17 @@ void vfs::devfs::mount(vfs_node_t* node) {
     /* The head should be this dev so all ok */
     
     __devfs_head->write = __pic_write;
+
+
+    const char* name00 = "/null";
+
+    packet.size = 0;
+    packet.request = DEVFS_PACKET_CREATE_DEV;
+    packet.value = (std::uint64_t)name00;
+
+    send_packet((char*)name00,&packet);
+    
+    __devfs_head->write = __zero_write;
+    __devfs_head->read = __zero_read;
 
 }

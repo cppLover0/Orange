@@ -27,3 +27,4 @@ cp -rf etc/* "$1/etc"
 
 CFLAGS="-fPIC" SYSROOT="$1/" fast_install "$1" https://www.x.org/releases/individual/driver/xf86-video-fbdev-0.5.1.tar.gz "--disable-pciaccess --disable-static --enable-shared" "../../diff/xfbdev.diff"
 CFLAGS="-fPIC" SYSROOT="$1/" fast_install "$1" https://www.x.org/releases/individual/driver/xf86-input-keyboard-2.1.0.tar.gz "--disable-static --enable-shared" "../../diff/xkeyboard.diff"
+CFLAGS="-fPIC" SYSROOT="$1/" fast_install "$1" https://xorg.freedesktop.org/archive/individual/driver/xf86-input-mouse-1.9.5.tar.gz "--enable-shared" "../../diff/xmouse.diff"

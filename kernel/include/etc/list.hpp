@@ -161,6 +161,20 @@ namespace Lists {
             return len;
         }
 
+        int isnotempty(int* queue0, char* cycle0) {
+            char cycle = *cycle0;
+            int queue = *queue0;
+            while (ring.objs[queue].cycle == cycle) {
+                return 1;
+                queue = queue + 1;
+                if (queue == ring.size) {
+                    queue = 0;
+                    cycle = !(cycle);
+                }
+            }
+            return 0;
+        }
+
         int receivevals(void* out, int id, int max, std::uint8_t* cycle, std::uint32_t* queue) {
             ring_lock.lock();
             int len = 0;

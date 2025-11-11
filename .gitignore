@@ -2,6 +2,7 @@ build
 orange
 orange.iso
 obj
+serial.txt
 trash
 .code
 serial_output.txt

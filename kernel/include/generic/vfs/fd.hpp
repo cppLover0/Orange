@@ -13,7 +13,7 @@ namespace vfs {
         inline static int create(arch::x86_64::process_t* proc) {
             userspace_fd_t* current = proc->fd;
             while(current) {
-                if(current->state == USERSPACE_FD_STATE_UNUSED) 
+                if(current->state == USERSPACE_FD_STATE_UNUSED && current->index > 2) 
                     break;
                 current = current->next;
             }
@@ -36,6 +36,27 @@ namespace vfs {
 
             return current->index;
 
+        }
+
+        inline static userspace_fd_t* searchlowest(arch::x86_64::process_t* proc,std::uint32_t idx) {
+
+            if(!proc)
+                return 0;
+
+            userspace_fd_t* current = proc->fd;
+            userspace_fd_t* lowest = 0;
+
+            while(current) {
+                if(current->state == USERSPACE_FD_STATE_UNUSED || current->can_be_closed)  {
+                    if(!lowest)
+                        lowest = current;
+                    if(current->index < lowest->index)
+                        lowest = current;
+                }
+                current = current->next;
+            }
+
+            return lowest;
         }
 
         inline static userspace_fd_t* search(arch::x86_64::process_t* proc,std::uint32_t idx) {

@@ -13,6 +13,7 @@ typedef struct {
     std::uint64_t user_stack;
     std::uint64_t kernel_stack;
     std::uint64_t timer_ist_stack;
+    int last_sys;
     struct {
         std::uint16_t cpu_id;
     } smp;

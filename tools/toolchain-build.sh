@@ -1,5 +1,9 @@
 set -e
 
+export CFLAGS="-fPIC"
+export CXXFLAGS="-fPIC"
+export CPPFLAGS="-fPIC"
+
 GNU_MIRROR=https://mirror.dogado.de/
 CURRENT_DIR="$(realpath .)"
 

@@ -11,6 +11,7 @@
 typedef struct {
     void (*func)(void* arg);
     void* arg;
+    int irq;
     char is_userspace;
 } irq_t;
 

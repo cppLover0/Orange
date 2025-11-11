@@ -1,5 +1,5 @@
 
-rm -rf initrd
+sudo rm -rf initrd
 
 export LIBTOOL="$HOME/opt/cross/orange/bin/libtool"
 export LIBTOOLIZE="$HOME/opt/cross/orange/bin/libtoolize"

@@ -234,7 +234,7 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
         fifo_node_t* fifo = fifo_get(out);
         vfs_lock->unlock();
         asm volatile("sti");
-        return fifo->main_pipe->read((char*)buffer,count);
+        return fifo->main_pipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
     }
 
     vfs_node_t* node = find_node(out);
@@ -634,10 +634,20 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         
         case POLLIN:
             ret = fifo->main_pipe->read_counter;
+            if(fifo->main_pipe->size != 0 && fd->read_counter == -1)
+                ret = 0;
+            if(fifo->main_pipe->size != 0 && ret == fd->read_counter) {
+                fifo->main_pipe->read_counter++;
+                ret = fifo->main_pipe->read_counter;
+            }
             break;
         
         case POLLOUT:
             ret = fifo->main_pipe->write_counter;
+            if(fifo->main_pipe->write_counter == ret && fifo->main_pipe->size != fifo->main_pipe->total_size) {
+                fifo->main_pipe->write_counter++;
+                ret = fifo->main_pipe->write_counter;
+            }
             break;
         
         default:
@@ -652,11 +662,47 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         
         case POLLIN:
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
+            if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER)
+                if(fd->write_socket_pipe->size != 0 && fd->read_counter == -1)
+                    ret = 0;
+            if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE)
+                if(fd->read_socket_pipe->size != 0 && fd->read_counter == -1)
+                    ret = 0;
+
+            if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                if(fd->write_socket_pipe->read_counter == ret && fd->write_socket_pipe->size != 0) {
+                    fd->write_socket_pipe->read_counter++;
+                }
+            }
+
+            if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
+                if(fd->read_socket_pipe->read_counter == ret && fd->read_socket_pipe->size != 0) {
+                    fd->read_socket_pipe->read_counter++;
+                }
+            }
+
+            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
             
+                
             break;
         
         case POLLOUT:
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
+            
+            if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                if(fd->read_socket_pipe->write_counter == ret && fd->read_socket_pipe->size != fd->read_socket_pipe->total_size) {
+                    fd->read_socket_pipe->write_counter++;
+                }
+            }
+
+            if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
+                if(fd->write_socket_pipe->write_counter == ret && fd->write_socket_pipe->size != fd->write_socket_pipe->total_size) {
+                    fd->write_socket_pipe->write_counter++;
+                }
+            }
+
+            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
+            
             break;
         
         default:
@@ -666,16 +712,27 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         vfs_lock->unlock();
         return ret;
     } else if(fd->state == USERSPACE_FD_STATE_PIPE) {
+
         std::int64_t ret = 0;
         switch (operation_type)
         {
         
         case POLLIN:
             ret = fd->pipe->read_counter;
+            if(fd->pipe->read_counter == -1 && fd->pipe->size != 0)
+                ret = 0;
+            if(fd->pipe->read_counter == ret && fd->pipe->size != 0) {
+                fd->pipe->read_counter++;
+                ret = fd->pipe->read_counter;
+            }
             break;
         
         case POLLOUT:
             ret = fd->pipe->write_counter;
+            if(fd->pipe->write_counter == ret && fd->pipe->size != fd->pipe->total_size) {
+                fd->pipe->write_counter++;
+                ret = fd->pipe->write_counter;
+            }
             break;
         
         default:

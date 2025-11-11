@@ -148,6 +148,8 @@ namespace arch {
             char* cwd;
             char* name;
 
+            int sys;
+
             int exit_code;
             int is_cloned;
             std::uint64_t* original_cr3_pointer;

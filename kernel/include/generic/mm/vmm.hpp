@@ -25,6 +25,7 @@ typedef struct vmm_obj {
     uint8_t is_mapped;
 
     int* how_much_connected; // used for sharedmem
+    locks::spinlock lock;
 
     uint64_t src_len;
 
@@ -127,11 +128,12 @@ namespace memory {
 
         inline static void* map(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t length, std::uint64_t flags) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
 
             while(current) {
 
-                if(current->phys == base)
-                    return (void*)current->base; // Just return
+                if(current->phys == base) { ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+                        return (void*)current->base; }
 
                 if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     break;
@@ -146,6 +148,7 @@ namespace memory {
             new_vmm->src_len = length;
             new_vmm->is_mapped = 1;
             paging::maprangeid(proc->original_cr3,base,new_vmm->base,length,flags,*proc->vmm_id);
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
         }
 
@@ -164,25 +167,30 @@ namespace memory {
 
         inline static vmm_obj_t* get(arch::x86_64::process_t* proc, std::uint64_t base) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
 
             while(current) {
 
-                if(current->base == base)
-                    return current;
+                if(current->base == base) { ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+                    return current; }
 
                 if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     break;
 
                 current = current->next;
             }
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+            return 0;
         }
 
         inline static vmm_obj_t* getlen(arch::x86_64::process_t* proc, std::uint64_t addr) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
 
             while (current) {
 
                 if (addr >= current->base && addr < current->base + current->len) {
+                    ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
                     return current;
                 }
 
@@ -191,11 +199,13 @@ namespace memory {
 
                 current = current->next;
             }
-
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return 0;
         }
 
         inline static void clone(arch::x86_64::process_t* dest_proc, arch::x86_64::process_t* src_proc) {
+            vmm_obj_t* current = (vmm_obj_t*)src_proc->vmm_start;
+            current->lock.lock();
             if(dest_proc && src_proc) {
 
                 vmm_obj_t* src_current = (vmm_obj_t*)src_proc->vmm_start;
@@ -233,6 +243,7 @@ namespace memory {
                 }
 
             }
+            ((vmm_obj_t*)src_proc->vmm_start)->lock.unlock();
         }
 
         inline static void reload(arch::x86_64::process_t* proc) {
@@ -280,6 +291,7 @@ namespace memory {
 
         inline static void free(arch::x86_64::process_t* proc) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
 
             if(!current)
                 return;
@@ -323,6 +335,7 @@ namespace memory {
 
         inline static void* alloc(arch::x86_64::process_t* proc, std::uint64_t len, std::uint64_t flags, int is_shared) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
             vmm_obj_t* new_vmm = v_alloc(current,len);
             new_vmm->flags = flags;
             new_vmm->src_len = len;
@@ -336,20 +349,24 @@ namespace memory {
             }
 
             paging::maprangeid(proc->original_cr3,new_vmm->phys,new_vmm->base,new_vmm->len,flags,*proc->vmm_id);
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
         }
 
         inline static void* customalloc(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t len, std::uint64_t flags, int is_shared) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
             std::uint64_t phys = memory::pmm::_physical::alloc(len);
             void* new_virt = mark(proc,virt,phys,len,flags,is_shared);
             paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,len,flags,*proc->vmm_id);
-
+            current->lock.unlock();
             vmm_obj_t* new_vmm = get(proc,virt);
             if(is_shared) {
                 new_vmm->is_shared = 1;
                 new_vmm->how_much_connected = new int;
             }
+
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
 
             return (void*)virt;
         } 

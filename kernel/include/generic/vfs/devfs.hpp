@@ -35,26 +35,6 @@ struct	winsize {
 #define TIOCGWINSZ               0x5413
 #define TIOCSWINSZ               0x5414
 
-typedef unsigned char cc_t;
-typedef unsigned int speed_t;
-typedef unsigned int tcflag_t;
-
-#define NCCS     32
-
-typedef struct {
-	tcflag_t c_iflag;
-	tcflag_t c_oflag;
-	tcflag_t c_cflag;
-	tcflag_t c_lflag;
-	cc_t c_line;
-	cc_t c_cc[NCCS];
-	speed_t ibaud;
-	speed_t obaud;
-} __attribute__((packed)) termios_t;
-
-#define ICANON	0000002 
-#define VMIN 6
-
 namespace vfs {
 
     typedef struct {
@@ -131,6 +111,9 @@ namespace vfs {
 
         std::int32_t (*ioctl)(userspace_fd_t* fd, unsigned long req, void *arg, int *res);
         std::int32_t (*open)(userspace_fd_t* fd, char* path);
+        int mode;
+
+        termios_t* term_flags;
 
         struct devfs_node* next;
         char masterpath[256];

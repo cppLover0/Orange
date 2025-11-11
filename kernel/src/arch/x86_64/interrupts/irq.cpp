@@ -22,14 +22,22 @@ extern "C" void* irqTable[];
 extern "C" void irqHandler(int_frame_t* ctx) {
 
     memory::paging::enablekernel();
-
     if(!irq_table[ctx->vec - 1].is_userspace)
         irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
     else {
-        drivers::ioapic::mask(ctx->vec - 1); /* Mask */
+        
+        if(irq_table[ctx->vec - 1].irq == 1) { // irq 12 and irq 1 are connected together 
+            drivers::ioapic::mask(12);
+        } else if(irq_table[ctx->vec - 1].irq == 12) {
+            drivers::ioapic::mask(1);
+        } else
+            drivers::ioapic::mask(irq_table[ctx->vec - 1].irq); /* Mask */
+            
         userspace_fd_t fd;
+        fd.is_cached_path = 0;
         memset(fd.path,0,sizeof(fd.path));
-        __printfbuf(fd.path,sizeof(fd.path),"/dev/masterirq%d",ctx->vec - 1);
+        __printfbuf(fd.path,sizeof(fd.path),"/dev/masterirq%d",irq_table[ctx->vec - 1].irq);
+
         char i = 1;
         int status = vfs::vfs::write(&fd,&i,1);
     }
@@ -68,11 +76,13 @@ std::uint8_t arch::x86_64::interrupts::irq::create(std::uint16_t irq,std::uint8_
     } else {
         arch::x86_64::interrupts::idt::set_entry((std::uint64_t)irqTable[irq],irq + 0x20,0x8E,3);
         irq_table[irq].arg = arg;
+
         irq_table[irq].func = func;
         return irq + 0x20;
     }
 
     irq_table[irq_ptr].arg = arg;
+    irq_table[irq_ptr].irq = irq;
     irq_table[irq_ptr++].func = func;
     return entry;
 }

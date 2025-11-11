@@ -118,7 +118,7 @@ popd
 cd xkeyboard-config-2.36
 
 mkdir -p build
-meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix="/usr" build
+meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix="/usr" build -Dxorg-rules-symlinks=true
 
 cd build
 ninja 
@@ -126,13 +126,7 @@ sudo DESTDIR="$1" ninja install
 
 cd ../..
 
-rm -rf "$1/usr/share/X11/xkb"
-
-ooo="$(pwd)"
-cd "$1/usr/share/X11"
-ln -s ../xkeyboard-config-2 xkb
-
-cd "$ooo"
+sudo chmod 777 -R "$1/usr/share/X11/xkb"
 
 fast_install "$1" https://www.x.org/releases/individual/xserver/xorg-server-21.1.4.tar.gz "--with-xkb-bin-directory=/usr/bin --disable-pciaccess --disable-libdrm --disable-glx --disable-int10-module --disable-glamor --disable-vgahw --disable-dri3 --disable-dri2 --disable-dri --disable-xephyr --disable-xwayland --disable-xnest --disable-dmx --with-fontrootdir=/usr/share/fonts/X11 --disable-strict-compilation" "../../diff/xorgserver.diff"
 

@@ -1,0 +1,5 @@
+
+st &
+twm &
+feh --bg-scale /etc/bg.jpg &
+exit

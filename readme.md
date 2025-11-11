@@ -13,14 +13,15 @@ Orange is my posix x86_64 os with microkernel features
 
 ## Devices which supported by orange
 
-- [x] serial
-- [x] cmos
 - [x] hpet
 - [x] pvclock
 - [x] ioapic
-- [x] ps/2 Keyboard
+- [x] ps/2 
+- [x] ps/2 keyboard
+- [x] ps/2 mouse
 - [x] xhci
 - [x] usb keyboard
+- [x] usb mouse
 
 # Build
 
@@ -49,7 +50,9 @@ make run
 - [x] Move XHCI driver from old kernel to userspace
 - [x] Implement IRQ userspace handling
 - [x] Port lua, fastfetch, doomgeneric, nano and etc.
-- [ ] Improve XHCI driver
-- [ ] Port Xorg 
+- [x] Improve XHCI driver
+- [x] Port Xorg 
+- [ ] Port twm 
+- [ ] Port wine
 - [ ] Implement userspace disk drivers
 - [x] Improve kernel path resolver (add symlink support when trying to access another filesystem)

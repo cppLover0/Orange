@@ -14,15 +14,15 @@
 locks::spinlock pmm_lock;
 buddy_t mem;
 
-buddy_info_t* buddy_find_by_parent(std::uint64_t parent_id,char split_x) {
+buddy_info_t* buddy_find_by_parent(buddy_info_t* blud,char split_x) {
     if(split_x) {
         for(std::uint64_t i = 0;i < mem.buddy_queue;i++) {
-            if(mem.mem[i].parent_id == parent_id && mem.mem[i].split_x)
+            if(mem.mem[i].parent == blud && mem.mem[i].split_x)
                 return &mem.mem[i];
         }
     } else {
         for(std::uint64_t i = 0;i < mem.buddy_queue;i++) {
-            if(mem.mem[i].parent_id == parent_id && !mem.mem[i].split_x)
+            if(mem.mem[i].parent == blud && !mem.mem[i].split_x)
                 return &mem.mem[i];
         }
     }
@@ -51,7 +51,7 @@ buddy_info_t* memory::buddy::put(std::uint64_t phys, std::uint8_t level) {
     blud->is_free = 1;
     blud->is_splitted = 0;
     blud->is_was_splitted = 0;
-    blud->parent_id = 0;
+    blud->parent = 0;
     blud->split_x = 0;
     return blud;
 }
@@ -62,13 +62,13 @@ buddy_info_t* memory::buddy::split_maximum(buddy_info_t* blud, std::uint64_t siz
     return split_maximum(split(blud).first,size);
 }
 
-void memory::buddy::merge(uint64_t parent_id) {
-    buddy_info_t* bl = buddy_find_by_parent(parent_id,0);
-    buddy_info_t* ud = buddy_find_by_parent(parent_id,1);
+void memory::buddy::merge(buddy_info_t* budy) {
+    buddy_info_t* bl = budy;
+    buddy_info_t* ud = budy->twin;
     if(!bl || !ud || !bl->is_free || !ud->is_free)
         return;
 
-    buddy_info_t* blud = &mem.mem[parent_id];
+    buddy_info_t* blud = budy->parent;
     bl->is_free = 0;
     ud->is_free = 0;
     blud->is_splitted = 0;
@@ -77,15 +77,14 @@ void memory::buddy::merge(uint64_t parent_id) {
     blud->id = 0;
     bl->id = 0;
     ud->id = 0;
-    if(blud->parent_id)
-        merge(blud->parent_id);
+    if(blud->parent)
+        merge(blud);
     return;
 }
 
 buddy_split_t memory::buddy::split(buddy_info_t* info) {
     if(!info || LEVEL_TO_SIZE(info->level) == 4096 || !info->is_free)
         return {info,info};
-    uint64_t daddy = ((uint64_t)info - (uint64_t)mem.mem) / sizeof(buddy_info_t);
     buddy_info_t* bl = 0;
     buddy_info_t* ud = 0;
     if(!info->is_was_splitted) {
@@ -95,11 +94,13 @@ buddy_split_t memory::buddy::split(buddy_info_t* info) {
         bl->is_free = 1;
         ud->split_x = 1;
         ud->is_free = 1;
-        bl->parent_id = daddy;
-        ud->parent_id = daddy;
+        bl->parent = info;
+        ud->parent = info;
+        bl->twin = ud;
+        ud->twin = bl;
     } else {
-        bl = buddy_find_by_parent(daddy,0);
-        ud = buddy_find_by_parent(daddy,1);
+        bl = buddy_find_by_parent(info,0);
+        ud = bl->twin;
         bl->is_free = 1;
         ud->is_free = 1;
     }
@@ -177,8 +178,8 @@ void memory::buddy::free(std::uint64_t phys) {
         return;
     blud->is_free = 1;
     blud->id = 0;
-    if(blud->parent_id)
-        merge(blud->parent_id);
+    if(blud->parent)
+        merge(blud);
 }
 
 std::int64_t memory::buddy::alloc(std::size_t size) {
@@ -192,6 +193,8 @@ std::int64_t memory::buddy::alloc(std::size_t size) {
         if(LEVEL_TO_SIZE(mem.mem[i].level) >= size && LEVEL_TO_SIZE(mem.mem[i].level) < top_size && mem.mem[i].is_free) {
             top_size = LEVEL_TO_SIZE(mem.mem[i].level);
             nearest_buddy = &mem.mem[i];
+            if(top_size == size)
+                break;
         }
     }
 
@@ -217,6 +220,8 @@ alloc_t memory::buddy::alloc_ext(std::size_t size) {
         if(LEVEL_TO_SIZE(mem.mem[i].level) >= size && LEVEL_TO_SIZE(mem.mem[i].level) < top_size && mem.mem[i].is_free) {
             top_size = LEVEL_TO_SIZE(mem.mem[i].level);
             nearest_buddy = &mem.mem[i];
+            if(top_size == size)
+                break;
         }
     }
 
@@ -246,6 +251,8 @@ std::int64_t memory::buddy::allocid(std::size_t size,std::uint32_t id0) {
         if(LEVEL_TO_SIZE(mem.mem[i].level) >= size && LEVEL_TO_SIZE(mem.mem[i].level) < top_size && mem.mem[i].is_free) {
             top_size = LEVEL_TO_SIZE(mem.mem[i].level);
             nearest_buddy = &mem.mem[i];
+            if(top_size == size)
+                break;
         }
     }
 

@@ -31,6 +31,7 @@
 
 syscall_ret_t sys_tcb_set(std::uint64_t fs) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
+    proc->fs_base = fs;
     __wrmsr(0xC0000100,fs);
     DEBUG(proc->is_debug,"Setting tcb %p to proc %d",fs,proc->id);
     return {0,0,0};
@@ -41,7 +42,7 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
+    DEBUG(1,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
@@ -63,6 +64,8 @@ syscall_ret_t sys_exit(int status) {
         fd = next;
     }
 
+      DEBUG(proc->is_debug,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
+
     arch::x86_64::scheduling::kill(proc);
     
     if(!proc->is_cloned)
@@ -71,7 +74,6 @@ syscall_ret_t sys_exit(int status) {
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
     memory::pmm::_virtual::free(proc->sse_ctx);
-    DEBUG(proc->is_debug,"Process %d exited with code %d",proc->id,status);
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
 }
@@ -181,10 +183,10 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     envp_length = __elf_get_length2((char**)envp);
     memory::paging::enablekernel();
 
-    char** argv0 = (char**)memory::heap::malloc(8 * (argv_length + 1));
+    char** argv0 = (char**)memory::heap::malloc(8 * (argv_length + 2));
     char** envp0 = (char**)memory::heap::malloc(8 * (envp_length + 1));
 
-    memset(argv0,0,8 * (envp_length + 1));
+    memset(argv0,0,8 * (envp_length + 2));
     memset(envp0,0,8 * (envp_length + 1));
 
     char stack_path[2048];
@@ -233,7 +235,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     int status = vfs::vfs::stat(&fd,&stat); 
 
-    DEBUG(proc->is_debug,"Exec file %s from proc %d",fd.path,proc->id);
+    DEBUG(1,"Exec file %s from proc %d",fd.path,proc->id);
     if(proc->is_debug) {
         for(int i = 0;i < argv_length;i++) {
             DEBUG(proc->is_debug,"Argv %d: %s",i,argv0[i]);
@@ -281,6 +283,55 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
             int i = 0;
             memcpy(interp,"/bin/sh",strlen("/bin/sh"));
+
+            userspace_fd_t test;
+            test.is_cached_path = 0;
+            test.offset = 0;
+            memset(test.path,0,2048);
+            memcpy(test.path,result,strlen(result));
+
+            
+
+            char first;
+            status = vfs::vfs::read(&test,&first,1);
+            if(status > 0) {
+                if(first == '!') {
+                    memset(interp,0,2048);
+                    while(1) {
+                        int c = vfs::vfs::read(&test,&first,1);
+                        if(c && c != '\n') 
+                            interp[i++] = c;
+                        if(c && c == '\n') 
+                            break;
+                    }
+                } 
+                argv_length++;
+                memcpy(&argv0[1], argv0,sizeof(std::uint64_t) * argv_length);
+                char* t1 = (char*)malloc(2048);
+                memset(t1,0,2048);
+                memcpy(t1,result,strlen(result));
+                argv0[0] = t1;
+                
+
+                status = arch::x86_64::scheduling::loadelf(proc,interp,argv0,envp0,0);
+                if(status == 0) {
+
+                    for(int i = 0;i < argv_length; i++) {
+                        memory::heap::free(argv0[i]);
+                    }
+
+                    for(int i = 0;i < envp_length; i++) {
+                        memory::heap::free(envp0[i]);
+                    }
+
+                    memory::heap::free(argv0);
+                    memory::heap::free(envp0);
+
+                    schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
+                    __builtin_unreachable();
+                } 
+
+            }
 
         }
     }
@@ -470,4 +521,9 @@ syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame
     new_proc->is_debug = proc->is_debug;
 
     return {1,0,new_proc->id};
+}
+
+syscall_ret_t sys_breakpoint(int num) {
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"breakpoint %d\n",num);
+    return {0,0,0};
 }

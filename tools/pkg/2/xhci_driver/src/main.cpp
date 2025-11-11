@@ -336,7 +336,7 @@ int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
     xhci_slot_trb_t* slot_ret = (xhci_slot_trb_t*)&ret;
 
     if(slot_ret->ret_code != 1)
-        log(LEVEL_MESSAGE_FAIL,"Can't allocate slot for port %d (ret %d)\n",portnum,ret.status & 0xFF);
+        log(LEVEL_MESSAGE_FAIL,"Can't allocate slot for port %d (ret %d)\n",portnum,ret.ret_code);
 
     return slot_ret->info_s.slotid;
 
@@ -344,6 +344,7 @@ int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
 
 int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
     xhci_set_addr_trb_t trb;
+    memset(&trb,0,sizeof(trb));
     trb.base = addr;
     trb.info_s.bsr = 0;
     trb.info_s.type = TRB_ADDRESSDEVICECOMMAND_TYPE;
@@ -351,14 +352,18 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
 
     __xhci_clear_event(dev);
 
+    usleep(20000);
+
+    __xhci_clear_event(dev);
+
     __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&trb);
     __xhci_doorbell(dev,0);
-    usleep(10000);
+    usleep(20000);
     
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
     if(ret.ret_code != 1)
-        log(LEVEL_MESSAGE_FAIL,"Can't set XHCI port address (ret %d)\n",ret.status & 0xFF);
+        log(LEVEL_MESSAGE_FAIL,"Can't set XHCI port address (ret %d)\n",ret.ret_code);
 
     return ret.ret_code;
 
@@ -423,7 +428,6 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_TRANSFEREVENT_TYPE);
 
     if(ret.base == 0xDEAD) {
-        log(LEVEL_MESSAGE_FAIL,"Timeout on port %d\n",usbdev->portnum);
         ret.ret_code = 0;
         return ret;
     }
@@ -705,6 +709,18 @@ void __xhci_get_hid_report(xhci_device_t* dev,xhci_usb_device_t* usbdev,uint8_t 
     __xhci_send_usb_request_packet(dev,usbdev,cmd,data,len);
 }
 
+void __xhci_set_boot_protocol(xhci_device_t* dev, xhci_usb_device_t* usbdev, int internum) {
+    xhci_usb_command_t cmd;
+    cmd.index = internum;
+    cmd.request = 0x0B;
+    cmd.type = 0x21;
+    cmd.len = 0;
+    cmd.value = 0;
+
+    char data[4096];
+    __xhci_send_usb_request_packet(dev,usbdev,cmd,data,0);
+}
+
 int __xhci_ep_to_type(xhci_endpoint_descriptor_t* desc) {
     uint8_t direction = (desc->endpointaddr & 0x80) ? 1 : 0;
     uint8_t type = desc->attributes & 3;
@@ -753,6 +769,15 @@ const char* __xhci_usb_type_to_str(int type) {
         default:
             return "Unsupported";
     };
+}
+
+int log2(unsigned int x) {
+    int result = -1;
+    while (x) {
+        x >>= 1;
+        result++;
+    }
+    return result;
 }
 
 void __xhci_init_dev(xhci_device_t* dev,int portnum) {
@@ -838,6 +863,8 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         usb_dev->input_ctx = (xhci_input_ctx_t*)input_ctx;
 
     }
+
+
 
     if(__xhci_set_addr(dev,addr,id,0) != 1)
         return;
@@ -945,6 +972,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
                         xhci_interface_descriptor_t* interface = (xhci_interface_descriptor_t*)need_interface;
 
+                        __xhci_set_boot_protocol(dev,usb_dev,interface->num);
                         __xhci_get_hid_report(dev,usb_dev,0,interface->num,need_interface->buffer,need_interface->len);
 
                     }
@@ -981,17 +1009,21 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     ep1->maxburstsize = 0;
                     ep1->averagetrblen = ep->maxpacketsize;
                     ep1->base = usb_dev->ep_ctx[idx]->phys | usb_dev->ep_ctx[idx]->cycle;
-                    if((load_portsc & 0x3C00) >> 10 == 4 || (load_portsc & 0x3C00) >> 10 == 3) {
-                        ep1->interval = ep->interval - 1;
-                    } else {
-                        ep1->interval = ep->interval;
-                        if(ep1->endpointtype == 7 || ep1->endpointtype == 3 || ep1->endpointtype == 5 || ep1->endpointtype == 1) {
-                            if(ep1->interval < 3)
-                                ep1->interval = 3;
-                            else if(ep1->interval > 18)
-                                ep1->interval = 18;
-                        }
+                    uint8_t port_speed = (load_portsc & 0x3C00) >> 10;
+                    uint8_t interval = ep->interval;
+                    uint8_t epty = ep1->endpointtype;
+
+                    /* thanks n00byedge for tips */
+
+                    if(port_speed == XHCI_USB_SPEED_HIGH_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED_PLUS)
+                        ep1->interval = interval - 1;
+                    else if(port_speed == XHCI_USB_SPEED_FULL_SPEED && (epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_IN || epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_OUT))
+                        ep1->interval = interval + 2;
+                    else if((port_speed == XHCI_USB_SPEED_FULL_SPEED || port_speed == XHCI_USB_SPEED_LOW_SPEED) && (epty == XHCI_ENDPOINTTYPE_INTERRUPT_IN || epty == XHCI_ENDPOINTTYPE_INTERRUPT_OUT)) {
+                        ep1->interval = log2(interval) + 4;
                     }
+
+                    
                 } else {
                     xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)liborange_map_phys(addr,0,4096);
                     xhci_endpoint_ctx_t* ep1 = (xhci_endpoint_ctx_t*)(&input->ep[idx]);
@@ -1007,16 +1039,16 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     ep1->maxburstsize = 0;
                     ep1->averagetrblen = ep->maxpacketsize;
                     ep1->base = (uint64_t)usb_dev->ep_ctx[idx]->phys | usb_dev->ep_ctx[idx]->cycle;
-                    if((load_portsc & 0x3C00) >> 10 == 4 || (load_portsc & 0x3C00) >> 10 == 3) {
-                        ep1->interval = ep->interval - 1;
-                    } else {
-                        ep1->interval = ep->interval;
-                        if(ep1->endpointtype == 7 || ep1->endpointtype == 3 || ep1->endpointtype == 5 || ep1->endpointtype == 1) {
-                            if(ep1->interval < 3)
-                                ep1->interval = 3;
-                            else if(ep1->interval > 18)
-                                ep1->interval = 18;
-                        }
+                    uint8_t port_speed = (load_portsc & 0x3C00) >> 10;
+                    uint8_t interval = ep->interval;
+                    uint8_t epty = ep1->endpointtype;
+
+                    if(port_speed == XHCI_USB_SPEED_HIGH_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED_PLUS)
+                        ep1->interval = interval - 1;
+                    else if(port_speed == XHCI_USB_SPEED_FULL_SPEED && (epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_IN || epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_OUT))
+                        ep1->interval = interval + 2;
+                    else if((port_speed == XHCI_USB_SPEED_FULL_SPEED || port_speed == XHCI_USB_SPEED_LOW_SPEED) && (epty == XHCI_ENDPOINTTYPE_INTERRUPT_IN || epty == XHCI_ENDPOINTTYPE_INTERRUPT_OUT)) {
+                        ep1->interval = log2(interval) + 4;
                     }
                 }
 
@@ -1248,6 +1280,7 @@ pci_driver_t pci_drivers[256];
 char hid_to_ps2_layout[0x48];
 
 int input0_fd = 0;
+int mouse_fd = 0;
 
 void hid_layout_init() {
     hid_to_ps2_layout[0x04] = 0x1E;
@@ -1377,14 +1410,49 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     memcpy(usbdev->add_buffer, data, 8);
 }
 
+#define MOUSE_LB (1 << 0)
+#define MOUSE_RB (1 << 1)
+#define MOUSE_MB (1 << 2)
+#define MOUSE_B4 (1 << 3)
+#define MOUSE_B5 (1 << 4)
+
+typedef struct {
+    unsigned char buttons;
+    unsigned char x;
+    unsigned char y;
+    unsigned char z;
+} __attribute__((packed)) mouse_packet_t;
+
+void __usbmouse_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
+    uint8_t* data = usbdev->buffers[trb->info_s.ep_id - 2];
+    
+    mouse_packet_t packet;
+
+    packet.buttons = 0;
+
+    packet.buttons |= (data[0] & (1 << 0)) ? MOUSE_LB : 0;
+    packet.buttons |= (data[0] & (1 << 1)) ? MOUSE_RB : 0;
+    packet.buttons |= (data[0] & (1 << 2)) ? MOUSE_MB : 0;
+
+    packet.x = data[1];
+    packet.y = -data[2];
+    packet.z = 0; // todo: figure out how to get mouse scroll wheel data
+
+    
+    write(mouse_fd,&packet,4);
+}
+
 int main() {
     liborange_setup_iopl_3();
 
     input0_fd = open("/dev/masterps2keyboard",O_RDWR);
+    mouse_fd = open("/dev/mastermouse",O_RDWR);
 
     log(LEVEL_MESSAGE_WARN,"XHCI Driver is currently under development so it's unstable\n");
 
     xhci_hid_register(__usbkeyboard_handler,USB_TYPE_KEYBOARD);
+    xhci_hid_register(__usbmouse_handler,USB_TYPE_MOUSE);
+
     hid_layout_init();
 
     memset(pci_drivers,0,sizeof(pci_drivers));

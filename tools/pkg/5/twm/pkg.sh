@@ -26,7 +26,6 @@ fast_install "$1" https://www.x.org/releases/individual/lib/libXft-2.3.4.tar.gz
 fast_install "$1" https://www.x.org/releases/individual/lib/libXi-1.8.1.tar.gz
 
 fast_install "$1" https://www.x.org/pub/individual/app/xclock-1.1.1.tar.xz
-fast_install "$1" https://invisible-mirror.net/archives/xterm/xterm-390.tgz "--disable-tcap-fkeys --disable-tcap-query --enable-256-color" "../../diff/xterm.diff"
 fast_install "$1" https://www.x.org/releases/individual/app/xeyes-1.2.0.tar.gz
 
 fast_install "$1" https://www.x.org/releases/individual/app/xinit-1.4.1.tar.gz
