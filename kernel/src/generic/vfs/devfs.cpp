@@ -129,11 +129,13 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
                 asm volatile("cli"); 
             }
 
-            if(c == '\b') {
+            if(c == '\b' || c == '\x7f' || c == '\x08') {
                 if(node->readpipe->size > 0) {
-                    const char* back = "\b \b";
-                    node->writepipe->write(back,strlen(back));
-                    asm volatile("cli");
+                    if(node->term_flags->c_lflag & ECHO) {
+                        const char* back = "\b \b";
+                        node->writepipe->write(back,strlen(back));
+                        asm volatile("cli");
+                    }
                     node->readpipe->lock.lock();
                     node->readpipe->read_counter--;
                     node->readpipe->buffer[node->readpipe->size--] = '\0';

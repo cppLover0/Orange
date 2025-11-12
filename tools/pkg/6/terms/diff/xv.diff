@@ -1,0 +1,190 @@
+diff -Naur xv-3.10a/fix.c xv-patched/fix.c
+--- xv-3.10a/fix.c	1970-01-01 03:00:00.000000000 +0300
++++ xv-patched/fix.c	2025-11-12 16:28:44.068915138 +0300
+@@ -0,0 +1,138 @@
++
++const char *sys_errlist[] = {
++    "Success",                          // 0
++    "Operation not permitted",          // EPERM 1
++    "No such file or directory",        // ENOENT 2
++    "No such process",                  // ESRCH 3
++    "Interrupted system call",          // EINTR 4
++    "Input/output error",               // EIO 5
++    "No such device or address",        // ENXIO 6
++    "Argument list too long",           // E2BIG 7
++    "Exec format error",                // ENOEXEC 8
++    "Bad file descriptor",              // EBADF 9
++    "No child processes",               // ECHILD 10
++    "Resource temporarily unavailable",// EAGAIN 11
++    "Cannot allocate memory",           // ENOMEM 12
++    "Permission denied",                // EACCES 13
++    "Bad address",                     // EFAULT 14
++    "Block device required",           // ENOTBLK 15
++    "Device or resource busy",         // EBUSY 16
++    "File exists",                     // EEXIST 17
++    "Invalid cross-device link",       // EXDEV 18
++    "No such device",                  // ENODEV 19
++    "Not a directory",                 // ENOTDIR 20
++    "Is a directory",                  // EISDIR 21
++    "Invalid argument",                // EINVAL 22
++    "Too many open files in system",  // ENFILE 23
++    "Too many open files",             // EMFILE 24
++    "Inappropriate ioctl for device", // ENOTTY 25
++    "Text file busy",                  // ETXTBSY 26
++    "File too large",                  // EFBIG 27
++    "No space left on device",         // ENOSPC 28
++    "Illegal seek",                   // ESPIPE 29
++    "Read-only file system",           // EROFS 30
++    "Too many links",                 // EMLINK 31
++    "Broken pipe",                    // EPIPE 32
++    "Numerical argument out of domain",// EDOM 33
++    "Numerical result out of range",   // ERANGE 34
++    "Resource deadlock avoided",       // EDEADLK 35
++    "File name too long",             // ENAMETOOLONG 36
++    "No locks available",             // ENOLCK 37
++    "Function not implemented",       // ENOSYS 38
++    "Directory not empty",            // ENOTEMPTY 39
++    "Too many levels of symbolic links", // ELOOP 40
++    "Unknown error 41",               // (reserved)
++    "No message of desired type",    // ENOMSG 42
++    "Identifier removed",             // EIDRM 43
++    "Channel number out of range",   // ECHRNG 44
++    "Level 2 not synchronized",      // EL2NSYNC 45
++    "Level 3 halted",                // EL3HLT 46
++    "Level 3 reset",                 // EL3RST 47
++    "Link number out of range",      // ELNRNG 48
++    "Protocol driver not attached", // EUNATCH 49
++    "No CSI structure available",   // ENOCSI 50
++    "Level 2 halted",               // EL2HLT 51
++    "Invalid exchange",             // EBADE 52
++    "Invalid request descriptor",  // EBADR 53
++    "Exchange full",                // EXFULL 54
++    "No anode",                    // ENOANO 55
++    "Invalid request code",        // EBADRQC 56
++    "Invalid slot",                // EBADSLT 57
++    "Unknown error 58",            // (reserved)
++    "Bad font file format",        // EBFONT 59
++    "Device not a stream",         // ENOSTR 60
++    "No data available",           // ENODATA 61
++    "Timer expired",               // ETIME 62
++    "Out of streams resources",   // ENOSR 63
++    "Machine is not on the network", // ENONET 64
++    "Package not installed",       // ENOPKG 65
++    "Object is remote",            // EREMOTE 66
++    "Link has been severed",       // ENOLINK 67
++    "Advertise error",             // EADV 68
++    "Srmount error",               // ESRMNT 69
++    "Communication error on send", // ECOMM 70
++    "Protocol error",              // EPROTO 71
++    "Multihop attempted",          // EMULTIHOP 72
++    "RFS specific error",          // EDOTDOT 73
++    "Bad message",                 // EBADMSG 74
++    "Value too large for defined data type", // EOVERFLOW 75
++    "Name not unique on network",  // ENOTUNIQ 76
++    "File descriptor in bad state", // EBADFD 77
++    "Remote address changed",     // EREMCHG 78
++    "Can not access a needed shared library", // ELIBACC 79
++    "Accessing a corrupted shared library", // ELIBBAD 80
++    "Attempting to link in too many shared libraries", // ELIBSCN 81
++    "Cannot exec a shared library directly", // ELIBMAX 82
++    "Invalid or incomplete multibyte or wide character", // ELIBEXEC 83
++    "Interrupted system call should be restarted", // EILSEQ 84
++    "Streams pipe error",         // ERESTART 85
++    "Too many users",             // ESTRPIPE 86
++    "Too many levels of remote in path", // EUSERS 87
++    "Not a data message",         // ENOTSOCK 88
++    "Value too large for defined data type", // EDESTADDRREQ 89
++    "Message too long",           // EMSGSIZE 90
++    "Protocol wrong type for socket", // EPROTOTYPE 91
++    "Protocol not available",     // ENOPROTOOPT 92
++    "Protocol not supported",     // EPROTONOSUPPORT 93
++    "Socket type not supported",  // ESOCKTNOSUPPORT 94
++    "Operation not supported",    // ENOTSUP 95
++    "Protocol family not supported", // EPFNOSUPPORT 96
++    "Address family not supported by protocol", // EAFNOSUPPORT 97
++    "Address already in use",     // EADDRINUSE 98
++    "Cannot assign requested address", // EADDRNOTAVAIL 99
++    "Network is down",            // ENETDOWN 100
++    "Network is unreachable",    // ENETUNREACH 101
++    "Network dropped connection on reset", // ENETRESET 102
++    "Software caused connection abort", // ECONNABORTED 103
++    "Connection reset by peer",  // ECONNRESET 104
++    "No buffer space available", // ENOBUFS 105
++    "Transport endpoint is already connected", // EISCONN 106
++    "Transport endpoint is not connected", // ENOTCONN 107
++    "Cannot send after transport endpoint shutdown", // ESHUTDOWN 108
++    "Too many references: cannot splice", // ETOOMANYREFS 109
++    "Connection timed out",       // ETIMEDOUT 110
++    "Connection refused",         // ECONNREFUSED 111
++    "Host is down",               // EHOSTDOWN 112
++    "No route to host",           // EHOSTUNREACH 113
++    "Operation already in progress", // EALREADY 114
++    "Operation now in progress",  // EINPROGRESS 115
++    "Stale file handle",          // ESTALE 116
++    "Structure needs cleaning",   // EUCLEAN 117
++    "Not a XENIX named type file", // ENOTNAM 118
++    "No XENIX semaphores available", // ENAVAIL 119
++    "Is a named type file",       // EISNAM 120
++    "Remote I/O error",           // EREMOTEIO 121
++    "Quota exceeded",             // EDQUOT 122
++    "No medium found",            // ENOMEDIUM 123
++    "Wrong medium type",          // EMEDIUMTYPE 124
++    "Operation Canceled",         // ECANCELED 125
++    "Required key not available", // ENOKEY 126
++    "Key has expired",            // EKEYEXPIRED 127
++    "Key has been revoked",       // EKEYREVOKED 128
++    "Key was rejected by service", // EKEYREJECTED 129
++    "Owner died",                 // EOWNERDEAD 130
++    "State not recoverable"       // ENOTRECOVERABLE 131
++};
++
++const int sys_nerr = sizeof(sys_errlist) / sizeof(sys_errlist[0]);
++
+diff -Naur xv-3.10a/jpeg/jinclude.h xv-patched/jpeg/jinclude.h
+--- xv-3.10a/jpeg/jinclude.h	1994-12-23 01:35:06.000000000 +0300
++++ xv-patched/jpeg/jinclude.h	2025-11-12 15:59:23.515849947 +0300
+@@ -30,6 +30,10 @@
+  * But we must pull it in because of the references to FILE in jpeglib.h.
+  * You can remove those references if you want to compile without <stdio.h>.
+  */
++ 
++#define HAVE_STDDEF_H
++#define HAVE_STDLIB_H
++#define HAVE_SYS_TYPES_H
+ 
+ #ifdef HAVE_STDDEF_H
+ #include <stddef.h>
+diff -Naur xv-3.10a/Makefile xv-patched/Makefile
+--- xv-3.10a/Makefile	1995-01-23 23:20:54.000000000 +0300
++++ xv-patched/Makefile	2025-11-12 16:26:55.784061363 +0300
+@@ -196,7 +196,7 @@
+ 	xvdial.o xvgraf.o xvsunras.o xvjpeg.o xvps.o xvpopup.o xvdflt.o \
+ 	xvtiff.o xvtiffwr.o xvpds.o xvrle.o xviris.o xvgrab.o vprintf.o \
+ 	xvbrowse.o xvtext.o xvpcx.o xviff.o xvtarga.o xvxpm.o xvcut.o \
+-	xvxwd.o xvfits.o
++	xvxwd.o xvfits.o fix.o
+ 
+ MISC = README INSTALL CHANGELOG IDEAS
+ 
+diff -Naur xv-3.10a/xv.c xv-patched/xv.c
+--- xv-3.10a/xv.c	1995-01-19 21:08:43.000000000 +0300
++++ xv-patched/xv.c	2025-11-12 16:26:03.214754085 +0300
+@@ -48,6 +48,7 @@
+ 
+ 
+ 
++
+ static int    revvideo   = 0;   /* true if we should reverse video */
+ static int    dfltkludge = 0;   /* true if we want dfltpic dithered */
+ static int    clearonload;      /* clear window/root (on colormap visuals) */
+diff -Naur xv-3.10a/xv.h xv-patched/xv.h
+--- xv-3.10a/xv.h	1995-01-23 23:22:23.000000000 +0300
++++ xv-patched/xv.h	2025-11-12 16:32:18.017055828 +0300
+@@ -120,6 +120,7 @@
+ #  endif
+ #endif
+ 
++extern int sys_nerr;
+ 
+ /* not everyone has the strerror() function, or so I'm told */
+ #ifndef VMS

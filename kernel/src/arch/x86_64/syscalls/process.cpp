@@ -42,7 +42,7 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(1,"%s from proc %d",buffer,proc->id);
+    //DEBUG(1,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
@@ -235,7 +235,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     int status = vfs::vfs::stat(&fd,&stat); 
 
-    DEBUG(1,"Exec file %s from proc %d",fd.path,proc->id);
+    DEBUG(proc->is_debug,"Exec file %s from proc %d",fd.path,proc->id);
     if(proc->is_debug) {
         for(int i = 0;i < argv_length;i++) {
             DEBUG(proc->is_debug,"Argv %d: %s",i,argv0[i]);

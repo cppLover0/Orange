@@ -1,0 +1,25 @@
+diff -Naur xloadimage.4.1/Makefile xloadimage-patched/Makefile
+--- xloadimage.4.1/Makefile	1993-11-10 01:25:12.000000000 +0300
++++ xloadimage-patched/Makefile	2025-11-12 17:18:16.608965209 +0300
+@@ -9,9 +9,11 @@
+ include Make.conf
+ 
+ CFLAGS=$(OPT_FLAGS) $(CC_FLAGS) $(CC_CONFIG_FLAGS) $(X11_INC_DIR) \
+-  -DSYSPATHFILE=\"$(SYSPATHFILE)\"
++  -DSYSPATHFILE=\"$(SYSPATHFILE)\" -Wno-implicit-int -Wno-implicit-function-declaration -fPIC
+ LIBS=$(X11_LIB_DIR) $(X11_LIB_NAME) $(SYS_LIBS) -lm
+ 
++CC=x86_64-orange-mlibc-gcc
++
+ # stuff that should eventually make the configuration file
+ SYSPATHFILE=/usr/lib/X11/Xloadimage
+ 
+@@ -23,7 +25,7 @@
+ # the Make.conf file and recursively calls make.
+ 
+ autoconfig: autoconfig.c
+-	$(CC) -g -o autoconfig autoconfig.c
++	$(CC) -Wno-implicit-int -Wno-implicit-function-declaration -fPIC -g -o autoconfig autoconfig.c
+ 
+ # manual configuration target
+ configure:: autoconfig

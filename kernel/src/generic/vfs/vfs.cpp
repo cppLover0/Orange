@@ -670,15 +670,19 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
                     ret = 0;
 
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                fd->write_socket_pipe->lock.lock();
                 if(fd->write_socket_pipe->read_counter == ret && fd->write_socket_pipe->size != 0) {
                     fd->write_socket_pipe->read_counter++;
                 }
+                fd->write_socket_pipe->lock.unlock();
             }
 
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
+                fd->read_socket_pipe->lock.lock();
                 if(fd->read_socket_pipe->read_counter == ret && fd->read_socket_pipe->size != 0) {
                     fd->read_socket_pipe->read_counter++;
                 }
+                fd->read_socket_pipe->lock.unlock();
             }
 
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;

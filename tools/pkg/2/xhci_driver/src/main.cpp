@@ -1437,9 +1437,11 @@ void __usbmouse_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     packet.x = data[1];
     packet.y = -data[2];
     packet.z = 0; // todo: figure out how to get mouse scroll wheel data
-
     
     write(mouse_fd,&packet,4);
+
+    usleep(1000); // actually hid wants this only after 1 ms
+
 }
 
 int main() {

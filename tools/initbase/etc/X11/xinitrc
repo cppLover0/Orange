@@ -1,5 +1,5 @@
 
-st &
+xwallpaper --zoom /etc/twmbg.png
 twm &
-feh --bg-scale /etc/bg.jpg &
+st &
 exit

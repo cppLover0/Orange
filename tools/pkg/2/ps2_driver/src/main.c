@@ -238,7 +238,7 @@ int main() {
         uint8_t mouse_buffer[4] = {0,0,0,0};
 
         while(1) {
-            int num_events = poll(irq_fds,2,500);
+            int num_events = poll(irq_fds,2,200);
             if(num_events < 0) {
                 perror("Failed to poll irq fds");
                 exit(-1);
@@ -291,10 +291,15 @@ int main() {
                 char val = 0;
                 int count = read(irq1,&val,1);
                 if(count && val == 1) {
+                    uint8_t scancodes[64];
+                    int i = 0;
+                    memset(scancodes,0, 64);
                     while((inb(0x64) & 1)) { 
                         uint8_t scancode = inb(0x60);
-                        write(masterinput,&scancode,1);
+                        if(i < 64)
+                            scancodes[i++] = scancode;
                     }
+                    write(masterinput,scancodes,i);
                     write(irq1,&val,1); /* Ask kernel to unmask this irq */
                     write(irq12,&val,1); /* irq 12 and irq 1 are connected */
                 }
