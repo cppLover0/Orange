@@ -358,7 +358,7 @@ void __scheduling_balance_cpus() {
     while(proc) {
         if(!proc->kill_lock.test()) {
             proc->target_cpu.store(cpu_ptr++,std::memory_order_release);
-            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"cpu %d to proc %d cpu_count %d\n",cpu_ptr,proc->id,how_much_cpus);
+            //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"cpu %d to proc %d cpu_count %d\n",cpu_ptr,proc->id,how_much_cpus);
             if(cpu_ptr == how_much_cpus) 
                 cpu_ptr = 0;
         }

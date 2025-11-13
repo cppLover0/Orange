@@ -112,10 +112,19 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
     uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
 
+    std::uint64_t offset_start = (std::uint64_t)buf - vmm_object->base;
+    std::uint64_t end = vmm_object->base + vmm_object->len;
+
+    if(count > end - (std::uint64_t)buf) {
+        // weird try to fix
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"weird count %d reducing to %d\n",count,end - (std::uint64_t)buf);
+        // count = end - (std::uint64_t)buf;
+    }
+
     char* temp_buffer = (char*)Other::toVirt(need_phys);
     memset(temp_buffer,0,count);
 
-    //DEBUG(proc->is_debug,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
+    DEBUG(proc->is_debug,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
 
     std::int64_t bytes_read;
     if(fd_s->state == USERSPACE_FD_STATE_FILE) 
@@ -162,6 +171,8 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
 
     const char* _0 = "Content view is disabled in files";
 
+    DEBUG(proc->is_debug,"Writing %s fd %d from proc %d",fd_s->state == USERSPACE_FD_STATE_FILE ? fd_s->path : "Not file",fd,proc->id);
+
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
         bytes_written = vfs::vfs::write(fd_s,temp_buffer,count);
@@ -172,7 +183,7 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
         if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
             return {1,EFAULT,0};
         
-        //DEBUG(proc->is_debug,"writing socket %d from proc %d",fd,proc->id);
+        
 
         if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
             bytes_written = fd_s->read_socket_pipe->write(temp_buffer,count);
@@ -687,6 +698,18 @@ syscall_ret_t sys_mkfifoat(int dirfd, const char *path, int mode) {
     return {0,status,0};
 }
 
+void poll_to_str(int event, char* out) {
+    const char* result = "Undefined";
+    if(event & POLLIN && event & POLLOUT) {
+        result = "POLLIN and POLLOUT";
+    } else if(event & POLLIN) {
+        result = "POLLIN";
+    } else if(event & POLLOUT) {
+        result = "POLLOUT";
+    }
+    memcpy(out,result,strlen(result) + 1);
+}
+
 syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     SYSCALL_IS_SAFEA((void*)fds,0);
 
@@ -716,6 +739,10 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         if(fd[i].events & POLLOUT) {
             total_events++; 
         }
+
+        char out[64];
+        poll_to_str(fd[i].events,out);
+        DEBUG(proc->is_debug,"Trying to poll %s (%d) event %s from proc %d",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,out,proc->id);
 
         if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen && fd0->read_counter == -1) {
             fd0->read_counter = 0;
@@ -768,6 +795,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     }
 
     if(success == false) {
+        DEBUG(proc->is_debug,"Poll done from proc %d",proc->id);
         copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
         return {1,0,num_events};
     }
@@ -806,6 +834,8 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                 if(num_events)
                     success = false;
+                else
+                    asm volatile("int $32");
             }
         }
     } else {
@@ -838,10 +868,12 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                 if(num_events)
                     success = false;
+                // timeout poll yield is disabled just because it can do some bad things
             }
         }
     }
 
+    DEBUG(proc->is_debug,"Poll done from proc %d",proc->id);
     copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
     return {1,0,num_events};
 

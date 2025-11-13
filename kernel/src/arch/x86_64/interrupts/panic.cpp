@@ -30,6 +30,20 @@ void panic(int_frame_t* ctx, const char* msg) {
         asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
         vmm_obj_t* obj = memory::vmm::getlen(proc,ctx->rip);
         Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx);
+        
+        vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+
+        while(1) {
+
+            Log::Raw("Memory 0x%p-0x%p (with offset rip 0x%p)\n",current->base,current->base + current->src_len, ctx->rip - current->base);
+
+            if (current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                    break;
+
+            current = current->next;
+
+        }
+
         arch::x86_64::scheduling::kill(proc);
        schedulingSchedule(0);
     }

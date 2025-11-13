@@ -465,9 +465,12 @@ int main() {
     start_all_drivers();
     log(LEVEL_MESSAGE_OK,"Initialization done");
     printf("\n");
+    putenv("TERM=linux");
+    putenv("SHELL=/bin/bash");
+    putenv("PATH=/usr/bin");
     int pid = fork();
     if(pid == 0)
-        execl("/usr/bin/bash",NULL);
+        system("/bin/bash /etc/init.sh");
     else {
         while(1) {
             asm volatile("nop"); // nothing

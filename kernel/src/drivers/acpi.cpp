@@ -53,7 +53,7 @@ void drivers::acpi::init() {
     drivers::ioapic::init();
     Log::Display(LEVEL_MESSAGE_OK,"IOAPIC initializied\n");
 
-    arch::x86_64::cpu::lapic::init(100);
+    arch::x86_64::cpu::lapic::init(500);
 
     ret = uacpi_namespace_load();
 

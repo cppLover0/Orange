@@ -241,7 +241,7 @@ namespace vfs {
                 if (space_left == 0) {
                     this->lock.unlock();
                     asm volatile("sti");
-                    asm volatile("pause");
+                    asm volatile("int $32"); // yield
                     continue;
                 }
 
@@ -267,6 +267,7 @@ namespace vfs {
         std::uint64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
 
             std::uint64_t read_bytes = 0;
+            int tries = 0;
 
             while (true) {
                 asm volatile("cli");
@@ -292,7 +293,12 @@ namespace vfs {
                     }
                     this->lock.unlock();
                     asm volatile("sti");
-                    asm volatile("pause");
+                    tries++;
+                    if(tries == 50) {
+                        tries = 0;
+                        asm volatile("int $32");
+                    } else
+                        asm volatile("pause");
                     continue;
                 }
 
