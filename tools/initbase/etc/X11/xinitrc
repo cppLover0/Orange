@@ -1,5 +1,5 @@
 
 xwallpaper --zoom /etc/twmbg.png
-twm &
+twm -f /root/.twmrc &
 st &
 exit
