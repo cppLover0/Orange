@@ -42,7 +42,7 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(1,"%s from proc %d",buffer,proc->id);
+    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
@@ -90,10 +90,15 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
     if(flags & MAP_ANONYMOUS) {
         std::uint64_t new_hint = hint;
         int is_shared = (flags & MAP_SHARED) ? 1 : 0;
-        if(!new_hint)
-            new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,is_shared == 1 ? 1 : 0);
-        else 
+        if(!new_hint) {
+            if(is_shared) {
+                new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,is_shared == 1 ? 1 : 0);
+            } else 
+                new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+        } else 
             memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,is_shared == 1 ? 1 : 0);
+
+        memory::paging::enablepaging(ctx->cr3); // try to reset tlb
 
         mmap_lock.unlock();
         return {1,0,(std::int64_t)new_hint};
@@ -114,6 +119,7 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
             return {1,status,0}; }
 
         std::uint64_t new_hint_hint = (std::uint64_t)memory::vmm::map(proc,mmap_base,mmap_size,PTE_PRESENT | PTE_USER | PTE_RW | mmap_flags);
+        memory::paging::enablepaging(ctx->cr3); // try to reset tlb
         
         mmap_lock.unlock();
         return {1,0,(std::int64_t)new_hint_hint};
@@ -123,7 +129,7 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
 syscall_ret_t sys_free(void *pointer, size_t size) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     std::uint64_t phys = memory::vmm::get(proc,(std::uint64_t)pointer)->phys;
-    if(!memory::vmm::get(proc,(std::uint64_t)pointer)->is_mapped)
+    if(!memory::vmm::get(proc,(std::uint64_t)pointer)->is_mapped && !memory::vmm::get(proc,(std::uint64_t)pointer)->is_lazy_alloc)
         memory::pmm::_physical::free(phys);
     memory::vmm::get(proc,(std::uint64_t)pointer)->phys = 0;
     return {0,0,0};
@@ -534,4 +540,59 @@ syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame
 syscall_ret_t sys_breakpoint(int num) {
     Log::SerialDisplay(LEVEL_MESSAGE_INFO,"breakpoint %d\n",num);
     return {0,0,0};
+}
+
+// will do copying memory with disabled interrupts
+syscall_ret_t sys_copymemory(void* src, void* dest, int len) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    copy_in_userspace(proc,dest,src,len);
+    return {0,0,0};
+}
+
+#define PRIO_PROCESS 1
+#define PRIO_PGRP 2
+#define PRIO_USER 3
+
+syscall_ret_t sys_setpriority(int which, int who, int prio) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    DEBUG(1,"Setpriority %d to proc %d (who %d) which %d from proc %d",prio,0,who,which,proc->id);
+    if(which == PRIO_PROCESS) { 
+        
+        arch::x86_64::process_t* need_proc = arch::x86_64::scheduling::head_proc_();
+        while(need_proc) {
+            if(need_proc->id == who) 
+                break;
+            need_proc = need_proc->next;
+        }
+
+        if(!need_proc)
+            return {0,ESRCH,0};
+
+        need_proc->prio = prio;
+        
+    } else
+        return {0,ENOSYS,0};
+    return {0,0,0};
+}
+
+syscall_ret_t sys_getpriority(int which, int who) {
+    int prio = 0;
+    if(which == 0) { // PRIO_PROCESS
+        arch::x86_64::process_t* proc = CURRENT_PROC;
+        
+        arch::x86_64::process_t* need_proc = arch::x86_64::scheduling::head_proc_();
+        while(need_proc) {
+            if(need_proc->id == who) 
+                break;
+            need_proc = need_proc->next;
+        }
+
+        if(!need_proc)
+            return {1,ESRCH,0};
+
+        prio = need_proc->prio;
+        DEBUG(1,"Getpriority %d to proc %d (who %d) from proc %d",prio,need_proc->id,who,proc->id);
+    } else
+        return {1,ENOSYS,0};
+    return {1,0,prio};
 }

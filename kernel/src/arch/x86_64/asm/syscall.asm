@@ -2,6 +2,7 @@
 global syscall_handler
 extern syscall_handler_c
 syscall_handler:
+    cli
     swapgs 
     mov qword [gs:0],rsp
     mov rsp, qword [gs:8]
@@ -32,7 +33,6 @@ syscall_handler:
     mov rdi,rsp
     call syscall_handler_c
     pop rax
-    mov cr3,rax
     pop rax
     pop rbx
     pop rcx

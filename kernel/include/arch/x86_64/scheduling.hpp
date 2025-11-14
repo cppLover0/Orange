@@ -150,6 +150,8 @@ namespace arch {
 
             int sys;
 
+            int prio;
+
             int exit_code;
             int is_cloned;
             std::uint64_t* original_cr3_pointer;

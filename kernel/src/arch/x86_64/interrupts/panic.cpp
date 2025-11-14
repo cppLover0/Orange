@@ -29,6 +29,36 @@ void panic(int_frame_t* ctx, const char* msg) {
         uint64_t cr2;
         asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
         vmm_obj_t* obj = memory::vmm::getlen(proc,ctx->rip);
+
+
+        if(ctx->vec == 14) {
+            vmm_obj_t* obj0 = memory::vmm::getlen(proc,cr2);
+            if(obj0) {
+                if(obj0->is_lazy_alloc) {
+                    std::uint64_t phys = memory::pmm::_physical::alloc(obj0->src_len);
+                    obj0->phys = phys;
+
+                    memory::paging::maprangeid(proc->original_cr3,obj0->phys,obj0->base,obj0->len,obj0->flags,*proc->vmm_id);
+
+                    if(ctx->cs & 3)
+                        ctx->ss |= 3;
+                        
+                    if(ctx->ss & 3)
+                        ctx->cs |= 3;
+
+                    if(ctx->cs == 0x20)
+                        ctx->cs |= 3;
+                        
+                    if(ctx->ss == 0x18)
+                        ctx->ss |= 3;
+
+                    obj0->is_lazy_alloc = 0;
+
+                    schedulingEnd(ctx);
+                } 
+            }
+        }
+
         Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx);
         
         vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;

@@ -399,13 +399,12 @@ void get_cpu(char* out) {
 }
 
 void* refresh(void * arg) {
-    exit(0);
     struct limine_framebuffer fb;
     liborange_access_framebuffer(&fb);
     void* real_fb = liborange_map_phys(fb.address, PTE_WC, fb.pitch * fb.height);
 
     while(1) {
-        memcpy(real_fb,ptr,fb.pitch * fb.height);
+        asm volatile("syscall" : : "a"(58), "D"(ptr), "S"(real_fb), "d"(fb.pitch * fb.height) : "rcx","r11");
     }
 }
 
@@ -419,7 +418,10 @@ void init_fbdev() {
 
     ptr = mapped_dma;
 
-    liborange_setup_mmap("/fb0",fb.address,fb.pitch * fb.height,PTE_WC);
+    pthread_t pth;
+    pthread_create(&pth,NULL,refresh,0);
+
+    liborange_setup_mmap("/fb0",doublebuffer_dma,fb.pitch * fb.height,PTE_WC);
     struct fb_var_screeninfo vinfo;
     struct fb_fix_screeninfo finfo;
     liborange_setup_ioctl("/fb0",sizeof(struct fb_var_screeninfo),FBIOGET_VSCREENINFO,0x1);

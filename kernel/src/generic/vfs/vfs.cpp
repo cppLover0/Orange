@@ -600,62 +600,16 @@ std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
 
 std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
 
-    vfs_lock->lock();
-    char out0[2048];
-    memset(out0,0,2048);
-
-    if(!fd) {
-        vfs_lock->unlock();
-        return 0;
-    }
-
     if(fd->state == USERSPACE_FD_STATE_SOCKET) {
         if(fd->is_listen) {
                 uint64_t counter = 0;
                 if(operation_type == POLLIN)
                     counter = sockets::find(fd->path)->socket_counter;
-                vfs_lock->unlock();
                 return counter; 
             }
     }
 
-    if(!fd->is_cached_path) {
-        __vfs_symlink_resolve(fd->path,out0);
-        memcpy(fd->path,out0,strlen(out0));
-        fd->is_cached_path = 1;
-    } else
-        memcpy(out0,fd->path,strlen(fd->path));
-
-    if(is_fifo_exists(out0)) {
-        fifo_node_t* fifo = fifo_get(out0);
-        std::int64_t ret = 0;
-        switch (operation_type)
-        {
-        
-        case POLLIN:
-            ret = fifo->main_pipe->read_counter;
-            if(fifo->main_pipe->size != 0 && fd->read_counter == -1)
-                ret = 0;
-            if(fifo->main_pipe->size != 0 && ret == fd->read_counter) {
-                fifo->main_pipe->read_counter++;
-                ret = fifo->main_pipe->read_counter;
-            }
-            break;
-        
-        case POLLOUT:
-            ret = fifo->main_pipe->write_counter;
-            if(fifo->main_pipe->write_counter == ret && fifo->main_pipe->size != fifo->main_pipe->total_size) {
-                fifo->main_pipe->write_counter++;
-                ret = fifo->main_pipe->write_counter;
-            }
-            break;
-        
-        default:
-            break;
-        }
-        vfs_lock->unlock();
-        return ret;
-    } else if(fd->state == USERSPACE_FD_STATE_SOCKET) {
+    if(fd->state == USERSPACE_FD_STATE_SOCKET) {
         std::int64_t ret = 0;
         switch (operation_type)
         {
@@ -712,8 +666,6 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         default:
             break;
         }
-
-        vfs_lock->unlock();
         return ret;
     } else if(fd->state == USERSPACE_FD_STATE_PIPE) {
 
@@ -742,9 +694,55 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         default:
             break;
         }
-        vfs_lock->unlock();
         return ret;
     }
+
+    vfs_lock->lock();
+    char out0[2048];
+    memset(out0,0,2048);
+
+    if(!fd) {
+        vfs_lock->unlock();
+        return 0;
+    }
+
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
+
+    if(is_fifo_exists(out0)) {
+        fifo_node_t* fifo = fifo_get(out0);
+        std::int64_t ret = 0;
+        switch (operation_type)
+        {
+        
+        case POLLIN:
+            ret = fifo->main_pipe->read_counter;
+            if(fifo->main_pipe->size != 0 && fd->read_counter == -1)
+                ret = 0;
+            if(fifo->main_pipe->size != 0 && ret == fd->read_counter) {
+                fifo->main_pipe->read_counter++;
+                ret = fifo->main_pipe->read_counter;
+            }
+            break;
+        
+        case POLLOUT:
+            ret = fifo->main_pipe->write_counter;
+            if(fifo->main_pipe->write_counter == ret && fifo->main_pipe->size != fifo->main_pipe->total_size) {
+                fifo->main_pipe->write_counter++;
+                ret = fifo->main_pipe->write_counter;
+            }
+            break;
+        
+        default:
+            break;
+        }
+        vfs_lock->unlock();
+        return ret;
+    } 
 
     vfs_node_t* node = find_node(out0);
     if(!node) { vfs::vfs::unlock();

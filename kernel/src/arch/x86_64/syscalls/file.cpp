@@ -868,7 +868,9 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                 if(num_events)
                     success = false;
-                // timeout poll yield is disabled just because it can do some bad things
+                else
+                    asm volatile("int $32");
+                // w
             }
         }
     }

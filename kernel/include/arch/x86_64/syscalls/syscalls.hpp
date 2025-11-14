@@ -259,6 +259,9 @@ syscall_ret_t sys_enabledebugmode();
 syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame_t* ctx);
 syscall_ret_t sys_breakpoint(int num);
 
+syscall_ret_t sys_getpriority(int which, int who);
+syscall_ret_t sys_setpriority(int which, int who, int prio);
+
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);
 syscall_ret_t sys_futex_wake(int* pointer);
@@ -271,6 +274,8 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len);
 syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len);
 
 syscall_ret_t sys_listen(int fd, int backlog);
+
+syscall_ret_t sys_copymemory(void* src, void* dest, int len);
 
 struct pollfd {
     int fd;          

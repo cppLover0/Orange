@@ -24,6 +24,8 @@ typedef struct vmm_obj {
     uint8_t is_shared;
     uint8_t is_mapped;
 
+    uint8_t is_lazy_alloc;
+
     int* how_much_connected; // used for sharedmem
     locks::spinlock lock;
 
@@ -68,6 +70,7 @@ namespace memory {
                         vmm_obj_t* vmm_new = new vmm_obj_t;
                         vmm_new->base = prev_end;
                         vmm_new->len = align_length;
+                        vmm_new->is_lazy_alloc = 0;
                         prev->next = vmm_new;
                         vmm_new->next = current;
 
@@ -255,9 +258,16 @@ namespace memory {
             proc->ctx.cr3 = memory::pmm::_physical::alloc(4096);
             proc->original_cr3 = proc->ctx.cr3;
             std::uint64_t cr3 = proc->ctx.cr3;
-            memory::paging::mapkernel(cr3,*proc->vmm_id);
-            memory::paging::alwaysmappedmap(cr3,*proc->vmm_id);
-            memory::paging::maprangeid(cr3,Other::toPhys(proc->syscall_stack),(std::uint64_t)proc->syscall_stack,SYSCALL_STACK_SIZE,PTE_USER | PTE_PRESENT | PTE_RW,*proc->vmm_id);
+            
+            for(int i = 255; i < 512; i++) {
+                std::uint64_t* virt_usrcr3 = (std::uint64_t*)Other::toVirt(proc->ctx.cr3);
+                std::uint64_t* virt_kercr3 = (std::uint64_t*)Other::toVirt(memory::paging::kernelget());
+                virt_usrcr3[i] = virt_kercr3[i];
+            }
+            
+            //memory::paging::mapkernel(cr3,*proc->vmm_id);
+            //memory::paging::alwaysmappedmap(cr3,*proc->vmm_id);
+            //memory::paging::maprangeid(cr3,Other::toPhys(proc->syscall_stack),(std::uint64_t)proc->syscall_stack,SYSCALL_STACK_SIZE,PTE_USER | PTE_PRESENT | PTE_RW,*proc->vmm_id);
             while(current) {
 
                 if(current->phys) {
@@ -306,7 +316,7 @@ namespace memory {
                 if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     next = 0;
 
-                if(!current->is_mapped && !current->is_shared) {
+                if(!current->is_mapped && !current->is_shared && !current->is_lazy_alloc) {
                     memory::pmm::_physical::free(current->phys);
                 } else if(current->is_shared && !current->is_mapped) {
                     if(*current->how_much_connected == 1) {
@@ -349,6 +359,18 @@ namespace memory {
             }
 
             paging::maprangeid(proc->original_cr3,new_vmm->phys,new_vmm->base,new_vmm->len,flags,*proc->vmm_id);
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+            return (void*)new_vmm->base;
+        }
+
+        inline static void* lazy_alloc(arch::x86_64::process_t* proc, std::uint64_t len, std::uint64_t flags, int is_shared) {
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
+            vmm_obj_t* new_vmm = v_alloc(current,len);
+            new_vmm->flags = flags;
+            new_vmm->src_len = len;
+            new_vmm->is_mapped = 0;
+            new_vmm->is_lazy_alloc = 1;
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
         }

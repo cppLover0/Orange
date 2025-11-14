@@ -43,6 +43,7 @@ namespace memory {
         static void enablepaging(std::uint64_t cr3);
         static void alwaysmappedadd(std::uint64_t phys, std::uint64_t len);
         static void alwaysmappedmap(std::uint64_t cr3,std::uint32_t id);
+        static std::uint64_t kernelget();
     };
 
 };

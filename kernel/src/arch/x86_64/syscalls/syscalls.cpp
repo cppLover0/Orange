@@ -65,7 +65,10 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {53,(void*)sys_enabledebugmode},
     {54,(void*)sys_clone},
     {56,(void*)sys_ttyname},
-    {57,(void*)sys_breakpoint}
+    {57,(void*)sys_breakpoint},
+    {58,(void*)sys_copymemory},
+    {59,(void*)sys_setpriority},
+    {60,(void*)sys_getpriority}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -78,7 +81,6 @@ arch::x86_64::syscall_item_t* __syscall_find(int rax) {
 }
 
 extern "C" void syscall_handler_c(int_frame_t* ctx) {
-    memory::paging::enablekernel();
 
     arch::x86_64::syscall_item_t* item = __syscall_find(ctx->rax);
 
