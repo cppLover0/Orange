@@ -83,10 +83,14 @@ char * __vfs__strtok(char *str, const char *delim) {
 
 void __vfs_symlink_resolve(char* path, char* out) {
     char buffer[2048];
+    memset(buffer,0,2048);
+
     int e = vfs::vfs::readlink(path,buffer,2048);
 
     if(!vfs_lock->test())
         Log::Display(LEVEL_MESSAGE_WARN,"vfs_lock didnt set lock in symlink resolve");
+
+    memset(out,0,2048);
 
     if(e == ENOSYS) 
         memcpy(out,path,strlen(path));
@@ -309,6 +313,7 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
 
     if(!fd->is_cached_path) {
         __vfs_symlink_resolve(fd->path,out);
+        memset(fd->path,0,2048);
         memcpy(fd->path,out,strlen(out));
         fd->is_cached_path = 1;
     } else
@@ -575,6 +580,43 @@ void vfs::vfs::close(userspace_fd_t* fd) {
     return;
 }
 
+std::int32_t vfs::vfs::rename(char* path, char* new_path) {
+    vfs_lock->lock();
+
+    char out0[2048];
+    char new_path0[2048];
+
+    __vfs_symlink_resolve(path,out0);
+    __vfs_symlink_resolve(new_path,new_path0);
+
+    if(is_fifo_exists(out0)) {
+        return ENOSYS;
+    }
+
+    vfs_node_t* node = find_node(out0);
+    if(!node) { vfs::vfs::unlock();
+        return ENOENT; }
+
+    vfs_node_t* new_node = find_node(new_path0);
+    if(new_node != node) {
+        vfs::vfs::unlock();
+        return EXDEV;
+    }
+
+    char* fs_love_name = out0 + strlen(node->path) - 1;
+    char* fs_love_name0 = new_path0 + strlen(node->path) - 1;
+    if(!node->rename) { vfs::vfs::unlock();
+        return ENOSYS; }
+
+    int status = node->rename(fs_love_name,fs_love_name0);
+
+    if(status != 0)
+        Log::SerialDisplay(LEVEL_MESSAGE_WARN,"non zero ret %d from rename %s to %s\n",status,path,new_path);
+
+    vfs_lock->unlock();
+    return 0;
+}
+
 std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
     if(is_fifo_exists(path)) {
         return EINVAL;
@@ -639,6 +681,7 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
                 fd->read_socket_pipe->lock.unlock();
             }
 
+
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
             
                 
@@ -697,12 +740,10 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         return ret;
     }
 
-    vfs_lock->lock();
     char out0[2048];
     memset(out0,0,2048);
 
     if(!fd) {
-        vfs_lock->unlock();
         return 0;
     }
 
@@ -740,20 +781,18 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         default:
             break;
         }
-        vfs_lock->unlock();
         return ret;
     } 
 
     vfs_node_t* node = find_node(out0);
-    if(!node) { vfs::vfs::unlock();
+    if(!node) { 
         return -ENOENT; }
 
     char* fs_love_name = out0 + strlen(node->path) - 1;
-    if(!node->poll) { vfs::vfs::unlock();
+    if(!node->poll) { 
         return -ENOSYS ; }
 
     std::int64_t ret = node->poll(fd,fs_love_name,operation_type);
-    vfs_lock->unlock();
     return ret;
 }
 

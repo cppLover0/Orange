@@ -1,6 +1,9 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <poll.h>
+#include <unistd.h>
+#include <termios.h>
 
 // Function to be executed by the thread
 void* print_message(void* thread_id) {
@@ -10,24 +13,19 @@ void* print_message(void* thread_id) {
 }
 
 int main() {
-    pthread_t threads[2];
-    int rc;
-    long t;
-
-    for(t = 0; t < 2; t++) {
-        printf("Creating thread %ld\n", t);
-        rc = pthread_create(&threads[t], NULL, print_message, (void *)t);
-        if (rc) {
-            printf("ERROR; return code from pthread_create() is %d\n", rc);
-            exit(-1);
+    struct pollfd fd;
+    fd.events = POLLIN;
+    fd.fd = STDIN_FILENO;
+    struct termios t;
+    tcgetattr(STDIN_FILENO,&t);
+    t.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO,TCSANOW,&t);
+    while(1) {
+        if(poll(&fd,1,100) > 0) {
+            if(fd.revents & POLLIN) {
+                printf("got key %c\n",getchar());
+            }
         }
     }
-
-    // Wait for all threads to complete
-    for(t = 0; t < 2; t++) {
-        pthread_join(threads[t], NULL);
-    }
-
-    printf("All threads completed.\n");
     return 0;
 }

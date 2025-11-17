@@ -7,6 +7,8 @@
 #include <etc/logging.hpp>
 #include <etc/assembly.hpp>
 
+extern "C" void yield0();
+
 namespace locks {
     class spinlock {
     private:
@@ -18,12 +20,18 @@ namespace locks {
         }
 
         void lock() {
-            while(flag.test_and_set(std::memory_order_acquire))
-                asm volatile("pause");
+            while(flag.test_and_set(std::memory_order_acquire)) {
+                if(!is_cli) {
+                    asm volatile("pause");
+                } else {
+                    yield0();
+                } 
+                
+            }
         }
 
         void enable_scheduling_optimization() {
-            
+            is_cli = 1;
         }
 
         std::uint8_t test_and_set() {

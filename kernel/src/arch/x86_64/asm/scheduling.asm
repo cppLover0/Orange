@@ -2,6 +2,32 @@
 extern schedulingSchedule
 global schedulingEnter
 global schedulingEnd
+global yield
+
+yield:
+    pop rax
+    mov rdx, rsp
+    mov rsp,[gs:16]
+    push qword 0
+    push rdx
+    pushfq
+    push qword 0x08
+    push qword rax
+    jmp schedulingEnter
+
+global yield0
+
+yield0:
+    pop rax
+    mov rdx, rsp
+    mov rsp,[gs:16]
+    push qword 0
+    push rdx
+    pushfq
+    push qword 0x08
+    push qword rax
+    jmp schedulingEnter
+
 
 schedulingEnter:
     cli

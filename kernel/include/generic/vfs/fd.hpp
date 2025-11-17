@@ -31,6 +31,7 @@ namespace vfs {
             current->write_counter = -1;
             current->can_be_closed = 0;
             current->is_cached_path = 0;
+            current->is_debug = 0;
 
             memset(current->path,0,2048);
 

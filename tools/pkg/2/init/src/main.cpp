@@ -25,6 +25,12 @@
 
 #include <sys/wait.h>
 
+#if defined(__orange__)
+#define hi
+#else
+#error "its orange tool only"
+#endif
+
 int ends_with(const char *str, const char *suffix) {
     if (!str || !suffix)
         return 0;
@@ -404,7 +410,7 @@ void* refresh(void * arg) {
     void* real_fb = liborange_map_phys(fb.address, PTE_WC, fb.pitch * fb.height);
 
     while(1) {
-        asm volatile("syscall" : : "a"(58), "D"(ptr), "S"(real_fb), "d"(fb.pitch * fb.height) : "rcx","r11");
+        memcpy(real_fb,ptr,fb.pitch * fb.height);
     }
 }
 
@@ -418,10 +424,7 @@ void init_fbdev() {
 
     ptr = mapped_dma;
 
-    pthread_t pth;
-    pthread_create(&pth,NULL,refresh,0);
-
-    liborange_setup_mmap("/fb0",doublebuffer_dma,fb.pitch * fb.height,PTE_WC);
+    liborange_setup_mmap("/fb0",fb.address,fb.pitch * fb.height,PTE_WC);
     struct fb_var_screeninfo vinfo;
     struct fb_fix_screeninfo finfo;
     liborange_setup_ioctl("/fb0",sizeof(struct fb_var_screeninfo),FBIOGET_VSCREENINFO,0x1);
@@ -475,7 +478,7 @@ int main() {
         system("/bin/bash /etc/init.sh");
     else {
         while(1) {
-            asm volatile("nop"); // nothing
+            sched_yield();
         }
     }
 } 

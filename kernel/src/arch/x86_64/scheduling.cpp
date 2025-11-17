@@ -193,7 +193,8 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
     zeromem(&stat);
 
     memcpy(fd.path,path,strlen(path));
-    memcpy(proc->name,path,strlen(path));
+
+    memcpy(proc->name,path,strlen(path) + 1);
 
     int status = vfs::vfs::stat(&fd,&stat);
     if(status) {
@@ -358,7 +359,7 @@ void __scheduling_balance_cpus() {
     while(proc) {
         if(!proc->kill_lock.test()) {
             proc->target_cpu.store(cpu_ptr++,std::memory_order_release);
-            //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"cpu %d to proc %d cpu_count %d\n",cpu_ptr,proc->id,how_much_cpus);
+            //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"cpu %d to proc %s (%d) cpu_count %d\n",cpu_ptr,proc->name,proc->id,how_much_cpus);
             if(cpu_ptr == how_much_cpus) 
                 cpu_ptr = 0;
         }
@@ -494,6 +495,9 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
                     data->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
                     data->user_stack = current->user_stack;
                     data->temp.proc = current;
+
+                    int prio_div = current->prio < 0 ? (current->prio * -1) : 1;
+                    prio_div++;
 
                     arch::x86_64::cpu::lapic::eoi();
                     schedulingEnd(ctx);

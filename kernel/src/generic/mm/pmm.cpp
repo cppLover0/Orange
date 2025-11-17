@@ -282,13 +282,10 @@ void memory::pmm::_physical::init() {
 }
 
 void memory::pmm::_physical::free(std::uint64_t phys) {
-    int is_interrupts = is_sti();
     asm volatile("cli");
     pmm_lock.lock();
     memory::buddy::free(phys);
     pmm_lock.unlock();
-    if(is_interrupts)
-        asm volatile("sti");
 }
 
 void memory::pmm::_physical::fullfree(std::uint32_t id) {
@@ -298,24 +295,18 @@ void memory::pmm::_physical::fullfree(std::uint32_t id) {
 }
 
 std::int64_t memory::pmm::_physical::alloc(std::size_t size) {
-    int is_interrupts = is_sti();
     asm volatile("cli");
     pmm_lock.lock();
     std::int64_t p = memory::buddy::alloc(size);
     pmm_lock.unlock();
-    if(is_interrupts)
-        asm volatile("sti");
     return p;
 }
 
 std::int64_t memory::pmm::_physical::allocid(std::size_t size, std::uint32_t id) {
-    int is_interrupts = is_sti();
     asm volatile("cli");
     pmm_lock.lock();
     std::int64_t p = memory::buddy::allocid(size,id);
     pmm_lock.unlock();
-    if(is_interrupts)
-        asm volatile("sti");
     return p;
 }
 
@@ -337,14 +328,11 @@ void* memory::pmm::_virtual::alloc(std::size_t size) {
 }
 
 alloc_t memory::pmm::_physical::alloc_ext(std::size_t size) {
-    int is_interrupts = is_sti();
     asm volatile("cli");
     pmm_lock.lock();
     alloc_t result = memory::buddy::alloc_ext(size);
     result.virt = (std::uint64_t)Other::toVirt(result.virt);
     pmm_lock.unlock();
-    if(is_interrupts)
-        asm volatile("sti");
     return result;
 }
 

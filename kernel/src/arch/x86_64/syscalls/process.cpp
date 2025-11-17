@@ -452,8 +452,6 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
 
     int parent_id = proc->id;
 
-    SYSCALL_ENABLE_PREEMPT();
-
     current = arch::x86_64::scheduling::head_proc_();
     while(1) {
         while (current)
@@ -480,15 +478,26 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
             DEBUG(proc->is_debug,"Waitpid return WNOHAND from proc %d",proc->id);
             return {1,0,0};
         }
-
+        yield();
         current = arch::x86_64::scheduling::head_proc_();
     }
 
 }
 
 syscall_ret_t sys_sleep(long us) {
-    SYSCALL_ENABLE_PREEMPT();
-    drivers::tsc::sleep(us);
+
+    int enable_optimization = 0;
+
+    if(!enable_optimization)
+        SYSCALL_ENABLE_PREEMPT();
+
+    std::uint64_t current = drivers::tsc::currentnano();
+    std::uint64_t end = us * 1000;
+    while((drivers::tsc::currentnano() - current) < end);
+        if(enable_optimization)
+            yield();
+        else
+            asm volatile("pause");
     return {0,0,0};
 }
 
@@ -542,10 +551,10 @@ syscall_ret_t sys_breakpoint(int num) {
     return {0,0,0};
 }
 
-// will do copying memory with disabled interrupts
 syscall_ret_t sys_copymemory(void* src, void* dest, int len) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     copy_in_userspace(proc,dest,src,len);
+    yield();
     return {0,0,0};
 }
 
@@ -555,7 +564,6 @@ syscall_ret_t sys_copymemory(void* src, void* dest, int len) {
 
 syscall_ret_t sys_setpriority(int which, int who, int prio) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    DEBUG(1,"Setpriority %d to proc %d (who %d) which %d from proc %d",prio,0,who,which,proc->id);
     if(which == PRIO_PROCESS) { 
         
         arch::x86_64::process_t* need_proc = arch::x86_64::scheduling::head_proc_();
@@ -568,6 +576,7 @@ syscall_ret_t sys_setpriority(int which, int who, int prio) {
         if(!need_proc)
             return {0,ESRCH,0};
 
+        DEBUG(proc->is_debug,"Setpriority %d to proc %d (who %d) which %d from proc %d",prio,need_proc->id,who,which,proc->id);
         need_proc->prio = prio;
         
     } else
@@ -591,8 +600,13 @@ syscall_ret_t sys_getpriority(int which, int who) {
             return {1,ESRCH,0};
 
         prio = need_proc->prio;
-        DEBUG(1,"Getpriority %d to proc %d (who %d) from proc %d",prio,need_proc->id,who,proc->id);
+        DEBUG(proc->is_debug,"Getpriority %d to proc %d (who %d) from proc %d",prio,need_proc->id,who,proc->id);
     } else
         return {1,ENOSYS,0};
     return {1,0,prio};
+}
+
+syscall_ret_t sys_yield() {
+    yield();
+    return {0,0,0};
 }

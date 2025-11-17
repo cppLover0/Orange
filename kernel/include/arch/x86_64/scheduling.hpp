@@ -21,6 +21,8 @@
 #define MIN2(a, b) ((a) < (b) ? (a) : (b))
 #define MAX2(a, b) ((a) > (b) ? (a) : (b))
 
+extern "C" void yield();
+
 typedef struct {
     unsigned char e_ident[16];
     uint16_t e_type;

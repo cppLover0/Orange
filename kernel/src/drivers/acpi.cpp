@@ -12,6 +12,8 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/uacpi.h>
 
+#include <arch/x86_64/cpu/data.hpp>
+
 #include <drivers/io.hpp>
 
 #include <generic/locks/spinlock.hpp>
@@ -53,7 +55,7 @@ void drivers::acpi::init() {
     drivers::ioapic::init();
     Log::Display(LEVEL_MESSAGE_OK,"IOAPIC initializied\n");
 
-    arch::x86_64::cpu::lapic::init(500);
+    arch::x86_64::cpu::data()->lapic_block = arch::x86_64::cpu::lapic::init(1000);
 
     ret = uacpi_namespace_load();
 

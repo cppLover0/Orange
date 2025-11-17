@@ -11,7 +11,7 @@ syscall_ret_t sys_futex_wait(int* pointer, int excepted) {
     copy_in_userspace(proc,&copied_pointer_val,pointer,sizeof(int));
     //DEBUG(proc->is_debug,"Waiting for futex, pointer: 0x%p excepted: %d, pointer_value %d in proc %d",pointer,excepted,copied_pointer_val,proc->id);
     arch::x86_64::scheduling::futexwait(proc,&copied_pointer_val,excepted,pointer);
-    asm volatile("int $32"); // yield
+    yield();
     return {0,0,0};
 }
 

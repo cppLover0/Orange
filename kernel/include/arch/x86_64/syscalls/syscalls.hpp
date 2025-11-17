@@ -219,6 +219,7 @@ syscall_ret_t sys_mkdirat(int dirfd, char* path, int mode);
 syscall_ret_t sys_chmod(char* path, int mode);
 
 syscall_ret_t sys_ttyname(int fd, char *buf, size_t size);
+syscall_ret_t sys_rename(char* old, char* newp);
 
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
@@ -261,6 +262,8 @@ syscall_ret_t sys_breakpoint(int num);
 
 syscall_ret_t sys_getpriority(int which, int who);
 syscall_ret_t sys_setpriority(int which, int who, int prio);
+
+syscall_ret_t sys_yield();
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);

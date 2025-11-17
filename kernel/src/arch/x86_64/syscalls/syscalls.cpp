@@ -9,6 +9,8 @@
 
 #include <arch/x86_64/cpu/data.hpp>
 
+#include <etc/errno.hpp>
+
 arch::x86_64::syscall_item_t sys_table[] = {
     {1,(void*)sys_futex_wake},
     {2,(void*)sys_futex_wait},
@@ -68,7 +70,9 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {57,(void*)sys_breakpoint},
     {58,(void*)sys_copymemory},
     {59,(void*)sys_setpriority},
-    {60,(void*)sys_getpriority}
+    {60,(void*)sys_getpriority},
+    {61,(void*)sys_yield},
+    {62,(void*)sys_rename}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -106,8 +110,8 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
 
     DEBUG(0,"sys ret %d from proc %d ",ret.ret,proc->id);
 
-    if(ret.ret != 0)
-        DEBUG(0,"Syscall %d from proc %d fails with code %d",ctx->rax,proc->id,ret.ret);
+    if(ret.ret != 0 && ret.ret != EAGAIN)
+        DEBUG(proc->is_debug,"Syscall %d from proc %d fails with code %d",ctx->rax,proc->id,ret.ret);
 
     ctx->rax = ret.ret;
     return;

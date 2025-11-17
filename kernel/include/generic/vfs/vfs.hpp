@@ -10,6 +10,8 @@
 #include <generic/locks/spinlock.hpp>
 #include <etc/libc.hpp>
 
+extern "C" void yield();
+
 #include <etc/logging.hpp>
 
 #include <algorithm>
@@ -234,14 +236,12 @@ namespace vfs {
         std::uint64_t write(const char* src_buffer, std::uint64_t count) {
             std::uint64_t written = 0;
             while (written < count) {
-                asm volatile("cli");
                 this->lock.lock();
 
                 std::uint64_t space_left = this->total_size - this->size;
                 if (space_left == 0) {
                     this->lock.unlock();
-                    asm volatile("sti");
-                    asm volatile("int $32"); // yield
+                    yield();
                     continue;
                 }
 
@@ -258,8 +258,6 @@ namespace vfs {
                 this->read_counter++;
 
                 this->lock.unlock();
-                asm volatile("sti");
-                asm volatile("pause");
             }
             return written;
         }
@@ -270,35 +268,25 @@ namespace vfs {
             int tries = 0;
 
             while (true) {
-                asm volatile("cli");
                 this->lock.lock();
 
                 if (this->size == 0) {
                     if (this->is_closed.test(std::memory_order_acquire)) {
                         this->lock.unlock();
-                        asm volatile("sti");
                         return 0; 
                     }
                     if (flags & O_NONBLOCK || is_block) {
                         this->lock.unlock();
-                        asm volatile("sti");
                         return 0;
                     }
                     if(ttyflags) {
                         if(!(ttyflags->c_lflag & ICANON) && ttyflags->c_cc[VMIN] == 0) {
                             this->lock.unlock();
-                            asm volatile("sti");
                             return 0;
                         }
                     }
                     this->lock.unlock();
-                    asm volatile("sti");
-                    tries++;
-                    if(tries == 50) {
-                        tries = 0;
-                        asm volatile("int $32");
-                    } else
-                        asm volatile("pause");
+                    yield();
                     continue;
                 }
 
@@ -315,8 +303,7 @@ namespace vfs {
                     if(ttyflags->c_lflag & ICANON) {
                         if(!tty_ret) {
                             this->lock.unlock();
-                            asm volatile("sti");
-                            asm volatile("pause");
+                            yield();
                             continue;
                         }
                     }
@@ -334,8 +321,6 @@ namespace vfs {
                     tty_ret = 0;
                 } else
                     this->read_counter++;
-
-                
 
                 this->lock.unlock();
                 break;
@@ -402,6 +387,7 @@ typedef struct userspace_fd {
     std::int64_t read_counter;
 
     int is_cached_path;
+    int is_debug;
 
     vfs::pipe* pipe;
     char path[2048];
@@ -627,6 +613,7 @@ namespace vfs {
         std::int64_t (*poll)   (userspace_fd_t* fd, char* path, int request);
 
         std::int32_t (*readlink) (char* path, char* out, std::uint32_t out_len);
+        std::int32_t (*rename) (char* path, char* new_path);
 
         void (*close)(userspace_fd_t* fd, char* path);
 
@@ -662,6 +649,8 @@ namespace vfs {
         static std::int32_t create (char* path, std::uint8_t type                                 );
         static std::int32_t touch  (char* path                                                    );
 
+
+        static std::int32_t rename (char* path, char* new_path);
         static std::int32_t readlink(char* path, char* out, std::uint32_t out_len); /* Lock-less, vfs lock should be already locked */
 
         static std::uint32_t create_fifo(char* path);

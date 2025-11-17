@@ -72,12 +72,9 @@ int sockets::bind(userspace_fd_t* fd, struct sockaddr_un* path) {
     memset(fd->path,0,2048);
     memcpy(fd->path,path->sun_path,strlen(path->sun_path));
 
-    SYSCALL_DISABLE_PREEMPT();
     vfs::stat_t stat;
     if(vfs::vfs::stat(fd,&stat) == 0) /* Check is there vfs object with some name */
         return EEXIST; 
-
-    SYSCALL_ENABLE_PREEMPT();
 
     socket_spinlock.lock();
 
@@ -119,7 +116,7 @@ int sockets::connect(userspace_fd_t* fd, struct sockaddr_un* path) {
 
     node->socket_counter++;
 
-    while(!pending->is_accepted.test()) { socket_spinlock.unlock(); asm volatile("pause"); socket_spinlock.lock(); }
+    while(!pending->is_accepted.test()) { socket_spinlock.unlock(); yield(); socket_spinlock.lock(); }
 
     socket_spinlock.unlock();
     return 0;
@@ -183,7 +180,7 @@ int sockets::accept(userspace_fd_t* fd, struct sockaddr_un* path) {
             pending_connections = pending_connections->next;
         }
         socket_spinlock.unlock();
-        asm volatile("pause");
+        yield();
         socket_spinlock.lock();
         pending_connections = node->pending_list;
     }
@@ -214,9 +211,7 @@ syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len) {
 
     DEBUG(proc->is_debug,"Trying to connect to socket %s from proc %d",spath.sun_path,proc->id);
 
-    SYSCALL_ENABLE_PREEMPT();
     int status = sockets::connect(fd_s,&spath);
-    SYSCALL_DISABLE_PREEMPT();
 
     DEBUG(proc->is_debug,"Socket is connected %s from proc %d",spath.sun_path,proc->id);
 
@@ -241,9 +236,7 @@ syscall_ret_t sys_bind(int fd, struct sockaddr_un* path, int len) {
 
     DEBUG(proc->is_debug,"Binding socket from fd %d to %s from proc %d",fd,spath.sun_path,proc->id);
 
-    SYSCALL_ENABLE_PREEMPT();
     int status = sockets::bind(fd_s,&spath);
-    SYSCALL_DISABLE_PREEMPT();
 
     return {0,status,0};
 }
@@ -263,9 +256,7 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
     if(!fd_s)
         return {1,EBADF,0};
 
-    SYSCALL_ENABLE_PREEMPT();
     int status = sockets::accept(fd_s,path != 0 ? &spath : 0);
-    SYSCALL_DISABLE_PREEMPT();
 
     DEBUG(proc->is_debug,"Accepting socket %s on fd %d from proc %d",fd_s->path,fd,proc->id);
 

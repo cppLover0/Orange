@@ -277,7 +277,7 @@ syscall_ret_t sys_stat(int fd, void* out, int flags) {
     if(!fd_s)
         return {0,EBADF,0};
 
-    //DEBUG(proc->is_debug,"Trying to stat %s (fd %d) from proc %d",fd_s->path,fd,proc->id);
+    DEBUG(proc->is_debug,"Trying to stat %s (fd %d) from proc %d",fd_s->path,fd,proc->id);
 
     if(fd_s->state == USERSPACE_FD_STATE_FILE) {
         vfs::stat_t stat;
@@ -429,6 +429,9 @@ syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg) {
 
     if(!fd_s)
         return {0,EBADF,0};
+
+    if(arg == 0)
+        return {0,0,0};
 
     int res = 0;
     std::int64_t ioctl_size = vfs::vfs::ioctl(fd_s,request,0,&res);
@@ -725,13 +728,16 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
     int total_events = 0;
 
+    vfs::vfs::lock();
+
     for(int i = 0;i < count; i++) {
         userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
 
         fd[i].revents = 0;
+        
 
-        if(!fd0)
-            return {1,EBADF,0};
+        if(!fd0) { vfs::vfs::unlock();
+            return {1,EBADF,0}; }
 
         if(fd[i].events & POLLIN)
             total_events++;
@@ -766,7 +772,9 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     int success = true;
     int something_bad = 0;
 
-    if(timeout == -1) {
+    int retry = 0;
+
+    if(1) {
         for(int i = 0;i < count; i++) {
             userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
             if(fd[i].events & POLLIN) {
@@ -795,22 +803,29 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     }
 
     if(success == false) {
-        DEBUG(proc->is_debug,"Poll done from proc %d",proc->id);
+        DEBUG(proc->is_debug,"Poll done (optimization) from proc %d",proc->id);
         copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
+        vfs::vfs::unlock();
         return {1,0,num_events};
     }
 
     success = true;
     num_events = 0;
 
-    if(timeout == -1) {
+    int is_first = 1;
+
+    if(timeout == -1 || proc->is_debug) {
         while(success) {
+
+            if(is_first)
+                is_first = 0;
+            else
+                vfs::vfs::lock();
+
             for(int i = 0;i < count; i++) {
                 userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
                 if(fd[i].events & POLLIN) {
-                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                    SYSCALL_ENABLE_PREEMPT();
                         
                     if(ret > fd0->read_counter) {
                         fd0->read_counter = ret;
@@ -821,9 +836,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                 }
 
                 if(fd[i].events & POLLOUT) {
-                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->write_counter || ret == 0) {
                         fd0->write_counter = ret;
                         num_events++;
@@ -834,30 +847,35 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                 if(num_events)
                     success = false;
-                else
-                    asm volatile("int $32");
             }
+
+            vfs::vfs::unlock();
+            if(success)
+                yield();
         }
     } else {
+        int tries = 0;
         while(drivers::tsc::currentus() < (current_timestamp + (timeout * 1000)) && success) {
+            SYSCALL_DISABLE_PREEMPT();
+            if(is_first)
+                is_first = 0;
+            else
+                vfs::vfs::lock();
             for(int i = 0;i < count; i++) {
                 userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
                 if(fd[i].events & POLLIN) {
-                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->read_counter) {
                         fd0->read_counter = ret;
                         num_events++;
                         fd[i].revents |= POLLIN;
+                        DEBUG(proc->is_debug,"pollin ev %s",fd0->path);
                     }
 
                 }
 
                 if(fd[i].events & POLLOUT) {
-                    SYSCALL_DISABLE_PREEMPT();
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                    SYSCALL_ENABLE_PREEMPT();
                     if(ret > fd0->write_counter) {
                         fd0->write_counter = ret;
                         num_events++;
@@ -868,14 +886,18 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                 if(num_events)
                     success = false;
-                else
-                    asm volatile("int $32");
                 // w
             }
+            vfs::vfs::unlock();
+            if(success)
+                yield();
         }
     }
 
-    DEBUG(proc->is_debug,"Poll done from proc %d",proc->id);
+    if(is_first)
+        vfs::vfs::unlock();
+
+    DEBUG(proc->is_debug,"Poll done timeout %d from proc %d num_ev %d",timeout,proc->id,num_events);
     copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
     return {1,0,num_events};
 
@@ -1033,4 +1055,41 @@ syscall_ret_t sys_ttyname(int fd, char *buf, size_t size) {
 
     copy_in_userspace(proc,buf,fd_s->path,strlen(fd_s->path));
     return {0,0,0};
+}
+
+syscall_ret_t sys_rename(char* old, char* newp) {
+    SYSCALL_IS_SAFEA((void*)old,0);
+    SYSCALL_IS_SAFEA((void*)newp,0);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    char first_path[2048];
+    memset(first_path,0,2048);
+    memcpy(first_path,proc->cwd,strlen(proc->cwd));  
+    char kpath[2048];
+    memset(kpath,0,2048);
+    copy_in_userspace_string(proc,kpath,(void*)old,2048);
+    char old_path[2048];
+    memset(old_path,0,2048);
+    vfs::resolve_path(kpath,first_path,old_path,1,0);
+    if(old_path[0] == '\0') {
+        old_path[0] = '/';
+        old_path[1] = '\0';
+    }
+
+    memset(first_path,0,2048);
+    memcpy(first_path,proc->cwd,strlen(proc->cwd));  
+    memset(kpath,0,2048);
+    copy_in_userspace_string(proc,kpath,(void*)newp,2048);
+    char new_path[2048];
+    memset(new_path,0,2048);
+    vfs::resolve_path(kpath,first_path,new_path,1,0);
+    if(new_path[0] == '\0') {
+        new_path[0] = '/';
+        new_path[1] = '\0';
+    }
+
+    int status = vfs::vfs::rename(old_path,new_path);
+
+    return {0,status,0};
 }

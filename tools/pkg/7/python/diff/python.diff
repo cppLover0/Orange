@@ -1,0 +1,126 @@
+diff -Naur python/configure python-patched/configure
+--- python/configure	2025-10-14 16:52:31.000000000 +0300
++++ python-patched/configure	2025-11-16 12:02:51.627810642 +0300
+@@ -4067,6 +4067,9 @@
+ 	*-*-wasi*)
+ 	    ac_sys_system=WASI
+ 	    ;;
++	*-*-mlibc*)
++	    ac_sys_system=Mlibc
++	    ;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"
+@@ -4491,7 +4494,7 @@
+ 
+ if test "$cross_compiling" = yes; then
+ 	case "$host" in
+-	*-*-linux*)
++	*-*-linux*|*-*-mlibc*)
+ 		case "$host_cpu" in
+ 		arm*)
+ 			_host_ident=arm
+@@ -7587,7 +7590,7 @@
+         PY3LIBRARY=libpython3.so
+       fi
+       ;;
+-    Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*)
++    Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*|OpenBSD*|VxWorks*|Mlibc*)
+       LDLIBRARY='libpython$(LDVERSION).so'
+       BLDLIBRARY='-L. -lpython$(LDVERSION)'
+       RUNSHARED=LD_LIBRARY_PATH=`pwd`${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+@@ -12983,7 +12986,7 @@
+ 	Emscripten*|WASI*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+-	Linux*|GNU*|QNX*|VxWorks*|Haiku*)
++	Linux*|GNU*|QNX*|VxWorks*|Haiku*|Mlibc*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+ 	FreeBSD*)
+@@ -13068,7 +13071,7 @@
+ 		 then CCSHARED="-fPIC";
+ 		 else CCSHARED="+z";
+ 		 fi;;
+-	Linux*|GNU*) CCSHARED="-fPIC";;
++	Linux*|GNU*|Mlibc*) CCSHARED="-fPIC";;
+ 	Emscripten*|WASI*)
+ 		if test "x$enable_wasm_dynamic_linking" = xyes
+ then :
+@@ -13106,7 +13109,7 @@
+ 	    LINKFORSHARED="-Wl,-E -Wl,+s";;
+ #	    LINKFORSHARED="-Wl,-E -Wl,+s -Wl,+b\$(BINLIBDEST)/lib-dynload";;
+ 	Linux-android*) LINKFORSHARED="-pie -Xlinker -export-dynamic";;
+-	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic";;
++	Linux*|GNU*|Mlibc*) LINKFORSHARED="-Xlinker -export-dynamic";;
+ 	# -u libsys_s pulls in all symbols in libsys
+ 	Darwin/*|iOS/*)
+ 		LINKFORSHARED="$extra_undefs -framework CoreFoundation"
+diff -Naur python/Lib/site.py python-patched/Lib/site.py
+--- python/Lib/site.py	2025-10-14 16:52:31.000000000 +0300
++++ python-patched/Lib/site.py	2025-11-16 12:02:51.627810642 +0300
+@@ -409,6 +409,10 @@
+                                     f"{implementation}{ver[0]}.{ver[1]}{abi_thread}",
+                                     "site-packages")
+                 sitepackages.append(path)
++                path = os.path.join(prefix, libdir,
++                                    f"{implementation}{ver[0]}.{ver[1]}{abi_thread}",
++                                    "dist-packages")
++                sitepackages.append(path)
+         else:
+             sitepackages.append(prefix)
+             sitepackages.append(os.path.join(prefix, "Lib", "site-packages"))
+diff -Naur python/Modules/timemodule.c python-patched/Modules/timemodule.c
+--- python/Modules/timemodule.c	2025-10-14 16:52:31.000000000 +0300
++++ python-patched/Modules/timemodule.c	2025-11-16 12:10:46.792330954 +0300
+@@ -185,13 +185,7 @@
+ static int
+ time_clockid_converter(PyObject *obj, clockid_t *p)
+ {
+-#ifdef _AIX
+-    long long clk_id = PyLong_AsLongLong(obj);
+-#elif defined(__DragonFly__)
+-    long clk_id = PyLong_AsLong(obj);
+-#else
+-    int clk_id = PyLong_AsInt(obj);
+-#endif
++	int clk_id = PyLong_AsInt(obj);
+     if (clk_id == -1 && PyErr_Occurred()) {
+         PyErr_Format(PyExc_TypeError,
+                      "clk_id should be integer, not %s",
+diff -Naur python/Objects/mimalloc/prim/unix/prim.c python-patched/Objects/mimalloc/prim/unix/prim.c
+--- python/Objects/mimalloc/prim/unix/prim.c	2025-10-14 16:52:31.000000000 +0300
++++ python-patched/Objects/mimalloc/prim/unix/prim.c	2025-11-16 12:02:51.627810642 +0300
+@@ -29,6 +29,10 @@
+ #include <unistd.h>    // sysconf
+ #include <fcntl.h>     // open, close, read, access
+ 
++#if defined(__orange__)
++  #define MADV_DONTNEED 1
++#endif
++
+ #if defined(__linux__)
+   #include <features.h>
+   #include <fcntl.h>
+@@ -51,11 +55,6 @@
+   #include <sys/sysctl.h>
+ #endif
+ 
+-#if !defined(__HAIKU__) && !defined(__APPLE__) && !defined(__CYGWIN__) && !defined(_AIX) && !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(__sun) && !defined(__NetBSD__)
+-  #define MI_HAS_SYSCALL_H
+-  #include <sys/syscall.h>
+-#endif
+-
+ //------------------------------------------------------------------------------------
+ // Use syscalls for some primitives to allow for libraries that override open/read/close etc.
+ // and do allocation themselves; using syscalls prevents recursion when mimalloc is
+@@ -156,6 +155,9 @@
+ static int unix_madvise(void* addr, size_t size, int advice) {
+   #if defined(__sun)
+   return madvise((caddr_t)addr, size, advice);  // Solaris needs cast (issue #520)
++  #elif defined(__orange__)
++  (void)addr; (void)size; (void)advice;
++  return 0;
+   #else
+   return madvise(addr, size, advice);
+   #endif

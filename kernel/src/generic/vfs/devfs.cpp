@@ -14,6 +14,8 @@
 #include <drivers/ioapic.hpp>
 #include <arch/x86_64/interrupts/irq.hpp>
 
+#include <etc/assembly.hpp>
+
 #include <etc/errno.hpp>
 
 vfs::devfs_node_t* __devfs_head;
@@ -113,6 +115,7 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
     if(node->is_tty && !is_slave) { // handle stdio logic from /dev/pty writing 
         vfs::vfs::unlock();
         for(int i = 0;i < size;i++) {
+
             char c = ((char*)buffer)[i];
 
             if(!(node->term_flags->c_lflag & ICANON)) {
@@ -323,13 +326,7 @@ std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
                 if(fd->read_counter == -1 && node->readpipe->size != 0)
                     ret = 0;
 
-            if(!is_slave) {
-                if(fd->read_counter < node->writepipe->read_counter && node->writepipe->size == 0) {
-                    fd->read_counter = node->writepipe->read_counter;
-                } else if(fd->read_counter < node->readpipe->read_counter && node->readpipe->size == 0)
-                    fd->read_counter = node->readpipe->read_counter;
-            }
-
+            
             break;
             
         case POLLOUT:
@@ -642,6 +639,27 @@ std::int64_t __zero_read(userspace_fd_t* fd, void* buffer, std::uint64_t count) 
     return 0;
 }
 
+std::int64_t __random_write(userspace_fd_t* fd, void* buffer, std::uint64_t size) {
+    vfs::vfs::unlock();
+    return size;
+}
+
+std::uint64_t next = 2;
+
+std::uint64_t __rand() {
+    uint64_t t = __rdtsc();
+    return t * (++next);
+}
+
+std::int64_t __random_read(userspace_fd_t* fd, void* buffer, std::uint64_t count) {
+    vfs::vfs::unlock(); // dont waste time on this
+    memset(buffer,0,count);
+    for(std::uint64_t i = 0; i < count; i++) {
+        ((char*)buffer)[i] = __rand() & 0xFF;
+    }
+    return count;
+}
+
 void vfs::devfs::mount(vfs_node_t* node) {
     __devfs_head = (devfs_node_t*)memory::pmm::_virtual::alloc(4096);
     node->open = __devfs__open;
@@ -687,5 +705,16 @@ void vfs::devfs::mount(vfs_node_t* node) {
     
     __devfs_head->write = __zero_write;
     __devfs_head->read = __zero_read;
+
+    const char* name001 = "/urandom";
+
+    packet.size = 0;
+    packet.request = DEVFS_PACKET_CREATE_DEV;
+    packet.value = (std::uint64_t)name001;
+
+    send_packet((char*)name001,&packet);
+    
+    __devfs_head->write = __random_write;
+    __devfs_head->read = __random_read;
 
 }

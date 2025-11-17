@@ -42,7 +42,11 @@ namespace arch {
                     write(0xB0,0);
                 }
 
-                static inline void init(std::uint32_t us) {
+                static inline void tick(std::uint64_t tick) {
+                    write(0x380,tick);
+                }
+
+                static inline std::uint64_t init(std::uint32_t us) {
                     __wrmsr(0x1B,__rdmsr(0x1B));
                     memory::paging::kernelmap(0,__rdmsr(0x1B) & 0xFFFFF000);
                     write(0xf0,0xff | 0x100);
@@ -53,7 +57,8 @@ namespace arch {
                     std::uint64_t ticks = 0xFFFFFFFF - read(0x390);
                     write(0x320, 32 | (1 << 17));
                     write(0x3e0,1);
-                    write(0x380,ticks);
+                    write(0x380,0);
+                    return ticks;
                 }
             };
         };

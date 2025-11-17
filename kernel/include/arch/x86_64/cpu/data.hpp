@@ -10,11 +10,11 @@
 #include <arch/x86_64/scheduling.hpp>
 
 typedef struct {
-    std::uint64_t lapic_block;
     std::uint64_t user_stack;
     std::uint64_t kernel_stack;
     std::uint64_t timer_ist_stack;
     int last_sys;
+    std::uint64_t lapic_block;
     struct {
         std::uint16_t cpu_id;
     } smp;

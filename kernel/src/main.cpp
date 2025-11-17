@@ -108,7 +108,11 @@ extern "C" void main() {
     arch::x86_64::scheduling::loadelf(init,"/usr/bin/init",argv,envp,0);
     arch::x86_64::scheduling::wakeup(init);
 
+    extern locks::spinlock* vfs_lock;
+    extern locks::spinlock pmm_lock;
+
     Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
+    arch::x86_64::cpu::lapic::tick(arch::x86_64::cpu::data()->lapic_block);
 
     asm volatile("sti");
     while(1) {

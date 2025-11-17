@@ -9,6 +9,8 @@
 #include <orange/pci.h>
 #include <orange/log.h>
 
+#include <sched.h>
+
 #include <fcntl.h>
 
 #include <string.h>
@@ -1173,6 +1175,9 @@ void __xhci_process_fetch(xhci_device_t* dev) {
         memset(buffer,0,sizeof(xhci_trb_t*) * 1024);
         if(get_trb(father,father->queue).info_s.cycle == father->cycle)
             count = __xhci_event_receive(dev,father,buffer);
+        
+        if(!count)
+            sched_yield();
 
         if(count) {
             xhci_trb_t* current = 0;
