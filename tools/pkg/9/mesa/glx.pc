@@ -1,0 +1,9 @@
+prefix=/usr
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: GLX
+Description: GLX library and headers.
+Version: 1.4
+Libs: -L${libdir} -lGL
+Cflags: -I${includedir}

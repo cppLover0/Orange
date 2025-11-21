@@ -64,11 +64,11 @@ syscall_ret_t sys_exit(int status) {
         fd = next;
     }
 
-      DEBUG(proc->is_debug,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
+      DEBUG(1,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
 
     arch::x86_64::scheduling::kill(proc);
     
-    if(!proc->is_cloned)
+    if(1)
         memory::vmm::free(proc); 
 
     memory::pmm::_virtual::free(proc->cwd);
@@ -115,6 +115,28 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
         DEBUG(proc->is_debug,"Trying to mmap %s from proc %d",fd->path,proc->id);
 
         int status = vfs::vfs::mmap(fd,&mmap_base,&mmap_size,&mmap_flags);
+
+        if(status == ENOSYS) {
+            // try to fix this and read whole file 
+            std::int64_t old_offset = fd->offset;
+            fd->offset = 0;
+
+            vfs::stat_t stat;
+            std::int32_t stat_status = vfs::vfs::stat(fd,&stat);
+
+            if(!(stat.st_mode & S_IFREG)) { mmap_lock.unlock();
+                return {1,EFAULT,0}; }
+
+            std::uint64_t new_hint_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+
+            vfs::vfs::read(fd,Other::toVirt(memory::vmm::get(proc,new_hint_hint)->phys),size <= 0 ? stat.st_size : size);
+            fd->offset = old_offset;
+
+            mmap_lock.unlock();
+            return {1,0,(std::int64_t)new_hint_hint};
+
+        }
+
         if(status != 0) { mmap_lock.unlock();
             return {1,status,0}; }
 
@@ -531,6 +553,9 @@ syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame
 
     arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::clone(proc,ctx);
     memory::paging::maprangeid(new_proc->original_cr3,Other::toPhys(new_proc->syscall_stack),(std::uint64_t)new_proc->syscall_stack,SYSCALL_STACK_SIZE,PTE_USER | PTE_PRESENT | PTE_RW,*new_proc->vmm_id);
+
+    vmm_obj_t* st = (vmm_obj_t*)new_proc->vmm_start;
+    st->pthread_count++;
 
     new_proc->ctx.rax = 0;
     new_proc->ctx.rdx = 0;

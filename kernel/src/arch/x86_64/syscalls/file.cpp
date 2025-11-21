@@ -26,6 +26,9 @@
 
 syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ctx) {
     SYSCALL_IS_SAFEA((void*)path,0);
+    if(!path)
+        return {1,EFAULT,0};
+
 
     std::uint32_t mode = ctx->r8;
     arch::x86_64::process_t* proc = CURRENT_PROC;
@@ -34,7 +37,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
     memset(first_path,0,2048);
     if(dirfd >= 0)
         memcpy(first_path,vfs::fdmanager::search(proc,dirfd)->path,strlen(vfs::fdmanager::search(proc,dirfd)->path));
-    else if(dirfd == AT_FDCWD)
+    else if(dirfd == AT_FDCWD && proc->cwd)
         memcpy(first_path,proc->cwd,strlen(proc->cwd));
 
     char kpath[2048];
@@ -45,7 +48,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
     memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
 
-    DEBUG(proc->is_debug,"Trying to open %s from proc %d",result,proc->id);
+    //DEBUG(1,"Trying to open %s from proc %d",result,proc->id);
 
     if(result[0] == '\0') {
         result[0] = '/';

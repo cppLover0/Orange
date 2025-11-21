@@ -1,0 +1,13 @@
+
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: XCB XRM library
+Description: XCB X resource manager utility functions
+Version: 52
+Requires: xcb
+Requires.private: xcb-aux
+Libs: -L${libdir} -lxcb-xrm
+Cflags: -I${includedir} 

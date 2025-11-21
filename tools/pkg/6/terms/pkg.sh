@@ -49,6 +49,26 @@ fast_install "$1" https://www.x.org/archive/individual/app/xev-1.2.5.tar.gz
 
 # cd ..
 
+git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git --depth=1
+cd libjpeg-turbo
+
+autotools_recursive_regen
+
+cd ..
+
+mkdir -p libjpeg-build
+cd libjpeg-build
+
+
+CFLAGS="-fPIC -Wno-implicit-function-declaration -O2" cmake ../libjpeg-turbo -DBUILD_SHARED_LIBS=OFF -DCMAKE_TOOLCHAIN_FILE=$(realpath ../../../../toolchain.cmake) -DCMAKE_INSTALL_PREFIX="$1/usr" 
+
+make -j$(nproc)
+make install 
+
+rm -rf "$1/lib/libjpeg.so"
+
+cd ..
+
 git clone https://github.com/stoeckmann/xwallpaper.git
 
 cd xwallpaper

@@ -41,6 +41,7 @@ T=$(realpath .)
 
 cd $1/usr/lib
 ln -sf ld.so ld64.so.1
+cp -rf $HOME/opt/cross/orange/x86_64-orange-mlibc/lib/libs*.so* .
 
 cd "$T"
 

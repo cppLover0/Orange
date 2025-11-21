@@ -89,24 +89,6 @@ DESTDIR="$1" meson install --no-rebuild
 
 cd ../..
 
-git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git --depth=1
-cd libjpeg-turbo
-
-autotools_recursive_regen
-
-cd ..
-
-mkdir -p libjpeg-build
-cd libjpeg-build
-
-
-CFLAGS="-fPIC -Wno-implicit-function-declaration -O2" cmake ../libjpeg-turbo -DCMAKE_TOOLCHAIN_FILE=$(realpath ../../../../toolchain.cmake) -DCMAKE_INSTALL_PREFIX="$1/usr" 
-
-make -j$(nproc)
-make install 
-
-cd ..
-
 wget https://github.com/GNOME/gdk-pixbuf/archive/refs/tags/2.42.10.tar.gz
 mv 2.42.10.tar.gz gdk-pixbuf-2.42.10.tar.gz
 tar -xvf gdk-pixbuf-2.42.10.tar.gz

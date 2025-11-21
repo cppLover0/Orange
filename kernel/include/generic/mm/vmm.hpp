@@ -21,6 +21,8 @@ typedef struct vmm_obj {
     uint64_t len;
     uint64_t flags;
 
+    int pthread_count;
+
     uint8_t is_shared;
     uint8_t is_mapped;
 
@@ -47,6 +49,7 @@ namespace memory {
             zeromem(end);
             start->len = 4096;
             start->next = end;
+            start->pthread_count = 1;
             end->base = (std::uint64_t)Other::toVirt(0) - 4096;
             end->next = start;
             proc->vmm_start = (char*)start;
@@ -130,6 +133,7 @@ namespace memory {
         }
 
         inline static void* map(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t length, std::uint64_t flags) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
 
@@ -156,6 +160,7 @@ namespace memory {
         }
 
         inline static void* mark(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_shared) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             vmm_obj_t* new_vmm = v_find(current,base,length);
             new_vmm->flags = flags;
@@ -169,6 +174,7 @@ namespace memory {
         }
 
         inline static vmm_obj_t* get(arch::x86_64::process_t* proc, std::uint64_t base) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
 
@@ -187,6 +193,7 @@ namespace memory {
         }
 
         inline static vmm_obj_t* getlen(arch::x86_64::process_t* proc, std::uint64_t addr) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
 
@@ -207,6 +214,7 @@ namespace memory {
         }
 
         inline static void clone(arch::x86_64::process_t* dest_proc, arch::x86_64::process_t* src_proc) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)src_proc->vmm_start;
             current->lock.lock();
             if(dest_proc && src_proc) {
@@ -250,6 +258,7 @@ namespace memory {
         }
 
         inline static void reload(arch::x86_64::process_t* proc) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             if(proc->ctx.cr3 && proc->original_cr3) { /* We should free all paging memory */
                 memory::pmm::_physical::fullfree(*proc->vmm_id);
@@ -301,9 +310,14 @@ namespace memory {
 
         inline static void free(arch::x86_64::process_t* proc) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
-            current->lock.lock();
 
-            if(!current)
+            current->lock.lock();
+            current->pthread_count--;
+
+            if(current->pthread_count != 0) { current->lock.unlock(); 
+                return; }
+
+            if(!current) 
                 return;
 
             vmm_obj_t* next = current->next;
@@ -344,6 +358,7 @@ namespace memory {
         }
 
         inline static void* alloc(arch::x86_64::process_t* proc, std::uint64_t len, std::uint64_t flags, int is_shared) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
             vmm_obj_t* new_vmm = v_alloc(current,len);
@@ -376,6 +391,7 @@ namespace memory {
         }
 
         inline static void* customalloc(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t len, std::uint64_t flags, int is_shared) {
+            asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
             std::uint64_t phys = memory::pmm::_physical::alloc(len);

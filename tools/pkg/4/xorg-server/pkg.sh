@@ -16,13 +16,25 @@ tar -xvf zlib-1.3.tar.gz
 
 cd zlib-1.3
 
-CHOST=x86_64-orange-mlibc prefix="/usr" ./configure
+CHOST=x86_64-orange-mlibc prefix="/usr" ./configure 
+make -j$(nproc)
+make install DESTDIR="$1"
+
+rm -rf "$1/lib"/libz.so*
+
+cd ..
+
+wget https://downloads.sourceforge.net/libpng/libpng-1.6.37.tar.gz
+tar -xvf libpng-1.6.37.tar.gz
+cd libpng-1.6.37
+
+autotools_recursive_regen
+
+./configure --host=x86_64-orange-mlibc --prefix=/usr --disable-shared --enable-static 
 make -j$(nproc)
 make install DESTDIR="$1"
 
 cd ..
-
-CFLAGS="-fPIC" fast_install "$1" "https://downloads.sourceforge.net/libpng/libpng-1.6.37.tar.gz"
 
 fast_install "$1" https://downloads.sourceforge.net/freetype/freetype-2.12.1.tar.gz
 

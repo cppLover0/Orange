@@ -1,5 +1,7 @@
 set -e
 
+. pkg/pkg-lib.sh
+
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 export CPPFLAGS="-fPIC"
@@ -67,6 +69,7 @@ cd binutils-2.38/ld
 automake 
 cd ../../gcc-15.1.0/libstdc++-v3
 autoconf
+autotools_recursive_regen
 cd ../../
 
 cd gcc-15.1.0
@@ -86,10 +89,14 @@ mkdir -p $1/initrd
 make -j$(nproc)
 make install -j$(nproc)
 
+export CFLAGS="-fPIC"
+export CXXFLAGS="-fPIC"
+
 cd ..
 mkdir -p gcc-build
 cd gcc-build
-../gcc-15.1.0/configure --target=x86_64-orange-mlibc --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --enable-linker-build-id --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared CFLAGS=""
+
+../gcc-15.1.0/configure --target=x86_64-orange-mlibc --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --with-pic --enable-linker-build-id --enable-threads=posix --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared 
 
 make all-gcc -j$(nproc)
 make all-target-libgcc -j$(nproc)

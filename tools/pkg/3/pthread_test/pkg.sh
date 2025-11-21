@@ -1,1 +1,1 @@
-x86_64-orange-mlibc-g++ -o "$1/usr/bin/pthread_test" main.c -lpthread
+x86_64-orange-mlibc-g++ -o "$1/usr/bin/pthread_test" main.c -lpthread -fPIC -shared

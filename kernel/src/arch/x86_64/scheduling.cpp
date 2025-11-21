@@ -213,7 +213,7 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
     proc->ctx.rsp = (std::uint64_t)memory::vmm::alloc(proc,USERSPACE_STACK_SIZE,PTE_PRESENT | PTE_USER | PTE_RW,0) + USERSPACE_STACK_SIZE - 4096;
     std::uint64_t* _stack = (std::uint64_t*)proc->ctx.rsp;
 
-    std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ};
+    std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ,0,AT_SECURE};
     std::uint64_t argv_length = __elf_get_length(argv);
     std::uint64_t envp_length = __elf_get_length(envp);
 

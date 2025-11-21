@@ -84,6 +84,9 @@ inline void copy_in_userspace_string(arch::x86_64::process_t* proc,void* dest, v
         ssrc = Other::toVirt(need_phys);
     }
 
+    if(ssrc == 0)
+        Log::SerialDisplay(LEVEL_MESSAGE_WARN,"zero ssrc\n");
+
     memcpy(ddest,ssrc,strlen((char*)ssrc) > size ? size : strlen((char*)ssrc));
 }
 
