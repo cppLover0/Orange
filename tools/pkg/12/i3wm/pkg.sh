@@ -10,16 +10,6 @@ mkdir -p pack
 
 cd pack
 
-git clone https://github.com/enki/libev.git --depth=1
-cd libev
-
-autotools_recursive_regen
-./configure --host=x86_64-orange-mlibc --prefix=/usr
-make -j$(nproc)
-DESTDIR="$1" make install 
-
-cd ..
-
 git clone https://github.com/lloyd/yajl.git --depth=1
 
 cd yajl
@@ -68,6 +58,16 @@ DESTDIR="$1" meson install --no-rebuild
 cd ../..
 
 fast_install "$1" http://www.freedesktop.org/software/startup-notification/releases/startup-notification-0.12.tar.gz "lf_cv_sane_realloc=1"
+
+git clone https://github.com/enki/libev.git --depth=1
+cd libev
+
+autotools_recursive_regen
+./configure --host=x86_64-orange-mlibc --prefix=/usr
+make -j$(nproc)
+DESTDIR="$1" make install 
+
+cd ..
 
 wget https://i3wm.org/downloads/i3-4.24.tar.xz
 tar -xvf i3-4.24.tar.xz
