@@ -1361,25 +1361,30 @@ void input_send(uint8_t key) {
     write(input0_fd,&key,1);
 }
 
+uint8_t hid_mods_to_ps2[8] = {
+    0x1D,
+    0x2A, 
+    0x38, 
+    0x5B, 
+    0x1D,
+    0x36, 
+    0x38,
+    0x5C  
+};
+
 void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
-
     uint8_t* data = usbdev->buffers[trb->info_s.ep_id - 2];
-    uint8_t add = data[0];
+    uint8_t mods = data[0];
+    uint8_t prev_mods = usbdev->add_buffer[0];
 
-    if ((add == 2 || add == 32) && usbdev->add_buffer[0] != add) {
-        input_send(0x2A);
-    } else if ((add == 1) && usbdev->add_buffer[0] != add) {
-        input_send(29);
-    }
-
-    if (usbdev->add_buffer[0] == 2 || usbdev->add_buffer[0] == 32) {
-        if (add != 2 && add != 32) {
-            input_send(0x2A | (1 << 7));
-        }
-    } else if(usbdev->add_buffer[0] == 1) {
-        if(add != 1) {
-            input_send(29 | (1 << 7));
-            input_send(0x2A | (1 << 7));
+    for (int i = 0; i < 8; i++) {
+        uint8_t mask = 1 << i;
+        if ((mods & mask) && !(prev_mods & mask)) {
+            if (i >= 4) input_send(0xE0);
+            input_send(hid_mods_to_ps2[i]);
+        } else if (!(mods & mask) && (prev_mods & mask)) {
+            if (i >= 4) input_send(0xE0); 
+            input_send(hid_mods_to_ps2[i] | 0x80);
         }
     }
 
@@ -1388,32 +1393,32 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
         for (int j = 2; j < 8; j++) {
             if (usbdev->add_buffer[j] == data[i]) {
                 isPressed = 1;
-                break; 
+                break;
             }
         }
-        if (!isPressed && data[i] != 0) { 
-            if(data[i] < 0x47) {
+        if (!isPressed && data[i] != 0) {
+            if (data[i] < 0x47) {
                 input_send(hid_to_ps2_layout[data[i]]);
             }
         }
     }
 
     for (int i = 2; i < 8; i++) {
-        int isStillPressed = 0; 
+        int isStillPressed = 0;
         for (int j = 2; j < 8; j++) {
             if (usbdev->add_buffer[i] == data[j]) {
-                isStillPressed = 1; 
-                break; 
+                isStillPressed = 1;
+                break;
             }
         }
-        if (!isStillPressed && usbdev->add_buffer[i] != 0) { 
-            input_send(hid_to_ps2_layout[usbdev->add_buffer[i]] | (1 << 7));
+        if (!isStillPressed && usbdev->add_buffer[i] != 0) {
+            input_send(hid_to_ps2_layout[usbdev->add_buffer[i]] | 0x80);
         }
     }
 
-
     memcpy(usbdev->add_buffer, data, 8);
 }
+
 
 #define MOUSE_LB (1 << 0)
 #define MOUSE_RB (1 << 1)
