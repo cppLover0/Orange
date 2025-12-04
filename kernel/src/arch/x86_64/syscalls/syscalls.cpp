@@ -72,7 +72,10 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {59,(void*)sys_setpriority},
     {60,(void*)sys_getpriority},
     {61,(void*)sys_yield},
-    {62,(void*)sys_rename}
+    {62,(void*)sys_rename},
+    {63,(void*)sys_printdebuginfo},
+    {64,(void*)sys_dmesg},
+    {65,(void*)sys_enabledebugmodepid}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -97,7 +100,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
     proc->sys = ctx->rax;
 
-    DEBUG(0,"sys %d from %d",ctx->rax,proc->id);
+   //DEBUG(proc->id == 13,"sys %d from %d",ctx->rax,proc->id);
         
 
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;

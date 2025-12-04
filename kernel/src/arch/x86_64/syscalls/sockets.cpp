@@ -102,10 +102,10 @@ int sockets::connect(userspace_fd_t* fd, struct sockaddr_un* path) {
     if(path->sun_family != AF_UNIX)
         return ENOSYS;
 
-    socket_spinlock.lock();
+    //socket_spinlock.lock();
 
     socket_node_t* node = find_node(path);
-    if(!node) { socket_spinlock.unlock();
+    if(!node) { //socket_spinlock.unlock();
         return ENOENT; }
 
     socket_pending_obj_t* pending = new socket_pending_obj_t;
@@ -116,9 +116,9 @@ int sockets::connect(userspace_fd_t* fd, struct sockaddr_un* path) {
 
     node->socket_counter++;
 
-    while(!pending->is_accepted.test()) { socket_spinlock.unlock(); yield(); socket_spinlock.lock(); }
+    while(!pending->is_accepted.test()) {  yield();  }
 
-    socket_spinlock.unlock();
+    //socket_spinlock.unlock();
     return 0;
 }
 
@@ -167,6 +167,8 @@ int sockets::accept(userspace_fd_t* fd, struct sockaddr_un* path) {
                 
                 pending_connections->son->read_socket_pipe = new_fd_s->read_socket_pipe;
                 pending_connections->son->write_socket_pipe = new_fd_s->write_socket_pipe;
+
+                //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"together fd %d fd2 %d\n",pending_connections->son->index,new_fd_s->index);
 
                 if(path)
                     memcpy(path->sun_path,node->path,strlen(node->path));
@@ -266,6 +268,9 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
     return {1,status < 0 ? +status : 0,status};
 }
 
+#define SOCK_NONBLOCK  04000
+#define SOCK_CLOEXEC   02000000
+
 syscall_ret_t sys_socket(int family, int type, int protocol) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
@@ -284,6 +289,7 @@ syscall_ret_t sys_socket(int family, int type, int protocol) {
     new_fd_s->cycle = 0;
     new_fd_s->is_a_tty = 0;
     new_fd_s->is_listen = 0;
+    new_fd_s->flags = (type & SOCK_NONBLOCK) ? O_NONBLOCK : 0;
 
     new_fd_s->state = USERSPACE_FD_STATE_SOCKET;
 

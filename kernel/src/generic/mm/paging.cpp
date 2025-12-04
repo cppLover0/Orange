@@ -22,7 +22,7 @@ void memory::paging::map(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt
     std::uint64_t align_phys = ALIGNDOWN(phys,4096);
     std::uint64_t align_virt = ALIGNDOWN(virt,4096);
     std::uint64_t* cr30 = (std::uint64_t*)Other::toVirt(cr3);
-    std::uint64_t new_flags = flags;
+    std::uint64_t new_flags = PTE_PRESENT | PTE_RW;
     if(PTE_INDEX(align_virt,39) < 256)
         new_flags |= PTE_USER;
     uint64_t* pml3 = __paging_next_level(cr30,PTE_INDEX(align_virt,39),new_flags,0);
@@ -121,8 +121,6 @@ void memory::paging::alwaysmappedmap(std::uint64_t cr3,std::uint32_t id) {
 
 void memory::paging::init() {
     kernel_cr3 = memory::pmm::_physical::alloc(4096);
-    memory::pat(1,1);
-    memory::pat(2,0);
     mapentry(kernel_cr3,LIMINE_MEMMAP_USABLE,0);
     mapentry(kernel_cr3,LIMINE_MEMMAP_FRAMEBUFFER,PTE_WC);
     mapentry(kernel_cr3,LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE,0);

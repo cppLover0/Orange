@@ -21,11 +21,7 @@ namespace locks {
 
         void lock() {
             while(flag.test_and_set(std::memory_order_acquire)) {
-                if(!is_cli) {
-                    asm volatile("pause");
-                } else {
-                    yield0();
-                } 
+                asm volatile("nop");
                 
             }
         }

@@ -9,7 +9,7 @@
 #define PTE_PRESENT (1 << 0)
 #define PTE_RW (1 << 1)
 #define PTE_USER (1 << 2)
-#define PTE_WC (1ull << 3)
+#define PTE_WC ((1 << 7) | (1 << 3))
 #define PTE_MMIO (1ull << 4)
 
 #define PTE_INDEX(address,bit) ((address & (uint64_t)0x1FF << bit) >> bit)

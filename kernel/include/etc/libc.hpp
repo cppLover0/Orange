@@ -60,12 +60,7 @@ inline int memcmp(const void *s1, const void *s2, size_t n) {
     return 0;
 }
 
-inline int strlen(const char* str) {
-    int idx = 0;
-    while(str[idx])
-        idx++;
-    return idx;
-}
+int strlen(const char* str);
 
 inline void* malloc(size_t size) {
     return memory::heap::malloc(size);

@@ -13,6 +13,9 @@ std::uint64_t time::counter() {
            return drivers::tsc::currentnano();
         case KVM_TIMER:
             return drivers::kvmclock::currentnano();
+        case HPET_TIMER:
+            return drivers::hpet::nanocurrent();
+
     }
 }
 
@@ -24,6 +27,9 @@ void time::sleep(std::uint64_t us) {
             break;
         case KVM_TIMER:
             drivers::kvmclock::sleep(us);
+            break;
+        case HPET_TIMER:
+            drivers::hpet::sleep(us);
             break;
     }
     return;

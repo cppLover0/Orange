@@ -20,33 +20,8 @@ inline void copy_in_userspace(arch::x86_64::process_t* proc,void* dest, void* sr
     void* ddest = 0;
     void* ssrc = 0;
 
-    if((std::uint64_t)dest > BootloaderInfo::AccessHHDM()) {
-        ddest = dest;
-    }
-
-    if((std::uint64_t)src > BootloaderInfo::AccessHHDM()) {
-        ssrc = src;
-    }
-
-    if((std::uint64_t)dest < BootloaderInfo::AccessHHDM()) {
-        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)dest);
-
-        if(!vmm_object)
-            return;
-
-        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)dest - vmm_object->base);
-        ddest = Other::toVirt(need_phys);
-    }
-
-    if((std::uint64_t)src < BootloaderInfo::AccessHHDM()) {
-        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)src);
-
-        if(!vmm_object)
-            return;
-
-        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)src - vmm_object->base);
-        ssrc = Other::toVirt(need_phys);
-    }
+    ddest = dest;
+    ssrc = src;
 
     memcpy(ddest,ssrc,size);
 }
@@ -56,36 +31,8 @@ inline void copy_in_userspace_string(arch::x86_64::process_t* proc,void* dest, v
     void* ddest = 0;
     void* ssrc = 0;
 
-    if((std::uint64_t)dest > BootloaderInfo::AccessHHDM()) {
-        ddest = dest;
-    }
-
-    if((std::uint64_t)src > BootloaderInfo::AccessHHDM()) {
-        ssrc = src;
-    }
-
-    if((std::uint64_t)dest < BootloaderInfo::AccessHHDM()) {
-        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)dest);
-
-        if(!vmm_object)
-            return;
-
-        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)dest - vmm_object->base);
-        ddest = Other::toVirt(need_phys);
-    }
-
-    if((std::uint64_t)src < BootloaderInfo::AccessHHDM()) {
-        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)src);
-
-        if(!vmm_object)
-            return;
-
-        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)src - vmm_object->base);
-        ssrc = Other::toVirt(need_phys);
-    }
-
-    if(ssrc == 0)
-        Log::SerialDisplay(LEVEL_MESSAGE_WARN,"zero ssrc\n");
+    ddest = dest;
+    ssrc = src;
 
     memcpy(ddest,ssrc,strlen((char*)ssrc) > size ? size : strlen((char*)ssrc));
 }
@@ -94,19 +41,7 @@ inline void zero_in_userspace(arch::x86_64::process_t* proc,void* buf, std::uint
     
     void* bbuf;
 
-    if((std::uint64_t)buf > BootloaderInfo::AccessHHDM()) {
-        bbuf = buf;
-    }
-
-    if((std::uint64_t)buf < BootloaderInfo::AccessHHDM()) {
-        vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
-
-        if(!vmm_object)
-            return;
-
-        uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
-        bbuf = Other::toVirt(need_phys);
-    }
+    bbuf = buf;
 
     memset(bbuf,0,size);
 }
@@ -267,6 +202,10 @@ syscall_ret_t sys_getpriority(int which, int who);
 syscall_ret_t sys_setpriority(int which, int who, int prio);
 
 syscall_ret_t sys_yield();
+syscall_ret_t sys_printdebuginfo(int pid);
+syscall_ret_t sys_enabledebugmodepid(int pid);
+
+syscall_ret_t sys_dmesg(char* buf,std::uint64_t count);
 
 /* Futex */
 syscall_ret_t sys_futex_wait(int* pointer, int excepted);

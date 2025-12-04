@@ -205,6 +205,7 @@ std::int64_t memory::buddy::alloc(std::size_t size) {
         return blud->phys;
     }
 
+    assert(0,"There's no memory !");
     return 0;
 
 }
@@ -237,6 +238,7 @@ alloc_t memory::buddy::alloc_ext(std::size_t size) {
         return result;
     }
 
+    assert(0,"There's no memory !");
     return {0,0};
 }
 
@@ -264,6 +266,7 @@ std::int64_t memory::buddy::allocid(std::size_t size,std::uint32_t id0) {
         return blud->phys;
     }
 
+    assert(0,"There's no memory !");
     return 0;
 }
 

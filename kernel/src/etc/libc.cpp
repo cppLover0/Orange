@@ -31,3 +31,10 @@ char *strtok(char *str, const char *delim) {
 
     return start;
 }
+
+int strlen(const char* str) {
+    int idx = 0;
+    while(str[idx])
+        idx++;
+    return idx;
+}

@@ -112,34 +112,25 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     if(fd_s->can_be_closed)
         fd_s->can_be_closed = 0;
 
-    vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
-    uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
+    DEBUG(0,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
 
-    std::uint64_t offset_start = (std::uint64_t)buf - vmm_object->base;
-    std::uint64_t end = vmm_object->base + vmm_object->len;
-
-    if(count > end - (std::uint64_t)buf) {
-        // weird try to fix
-        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"weird count %d reducing to %d\n",count,end - (std::uint64_t)buf);
-        // count = end - (std::uint64_t)buf;
-    }
-
-    char* temp_buffer = (char*)Other::toVirt(need_phys);
+    char* temp_buffer = (char*)buf;
     memset(temp_buffer,0,count);
-
-    DEBUG(proc->is_debug,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
-
     std::int64_t bytes_read;
     if(fd_s->state == USERSPACE_FD_STATE_FILE) 
         bytes_read = vfs::vfs::read(fd_s,temp_buffer,count);
     else if(fd_s->state == USERSPACE_FD_STATE_PIPE && fd_s->pipe) {
+        if(fd_s->pipe_side != PIPE_SIDE_READ)
+            return {1,EBADF,0};
+        
         bytes_read = fd_s->pipe->read(&fd_s->read_counter,temp_buffer,count,0);
+        if(bytes_read == 0 && (fd_s->pipe->flags & O_NONBLOCK || fd_s->flags & O_NONBLOCK) && !fd_s->pipe->is_closed.test()) 
+            return {1,EAGAIN,0};
+
     } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
 
         if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
             return {1,EFAULT,0};
-
-        //DEBUG(proc->is_debug,"reading socket %d from proc %d",fd,proc->id);
 
         if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
             bytes_read = fd_s->write_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,0);
@@ -167,31 +158,28 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     if(fd_s->can_be_closed)
         fd_s->can_be_closed = 0;
 
-    vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
-    uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
-
-    char* temp_buffer = (char*)Other::toVirt(need_phys);
+    char* temp_buffer = (char*)buf;   
 
     const char* _0 = "Content view is disabled in files";
+   // DEBUG(proc->id == 15,"Writing %s fd %d state %d from proc %d count %d writ sock 0x%p",fd_s->state == USERSPACE_FD_STATE_FILE ? fd_s->path : "Not file",fd,fd_s->state,proc->id,count,fd_s->write_socket_pipe);
 
-    DEBUG(proc->is_debug,"Writing %s fd %d from proc %d",fd_s->state == USERSPACE_FD_STATE_FILE ? fd_s->path : "Not file",fd,proc->id);
 
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
         bytes_written = vfs::vfs::write(fd_s,temp_buffer,count);
     else if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
-        bytes_written = fd_s->pipe->write(temp_buffer,count);
+        if(fd_s->pipe_side != PIPE_SIDE_WRITE)
+            return {1,EBADF,0};
+        bytes_written = fd_s->pipe->write(temp_buffer,count,proc->id);
     } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
 
         if(!fd_s->write_socket_pipe || !fd_s->read_socket_pipe)
             return {1,EFAULT,0};
         
-        
-
         if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-            bytes_written = fd_s->read_socket_pipe->write(temp_buffer,count);
+            bytes_written = fd_s->read_socket_pipe->write(temp_buffer,count,proc->id);
         } else {
-            bytes_written = fd_s->write_socket_pipe->write(temp_buffer,count);
+            bytes_written = fd_s->write_socket_pipe->write(temp_buffer,count,proc->id);
         }
 
         if(bytes_written == 0)
@@ -723,15 +711,18 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         return {1,EINVAL,0};
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    struct pollfd fd[count];
+    proc->debug0 = count;
+    proc->debug1 = timeout;
 
-    copy_in_userspace(proc,fd,fds,count * sizeof(struct pollfd));
-
-    std::uint64_t current_timestamp = drivers::tsc::currentus();
+    struct pollfd* fd = fds;
 
     int total_events = 0;
 
     vfs::vfs::lock();
+
+    for(int i = 0;i < count; i++) {
+        fd[i].revents = 0; 
+    }
 
     for(int i = 0;i < count; i++) {
         userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
@@ -739,19 +730,20 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         fd[i].revents = 0;
         
 
-        if(!fd0) { vfs::vfs::unlock();
-            return {1,EBADF,0}; }
+        if(!fd0) { fd[i].events = 0; fd[i].revents = POLLNVAL; }
 
         if(fd[i].events & POLLIN)
             total_events++;
 
         if(fd[i].events & POLLOUT) {
+            
             total_events++; 
         }
 
         char out[64];
         poll_to_str(fd[i].events,out);
-        DEBUG(proc->is_debug,"Trying to poll %s (%d) event %s from proc %d",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,out,proc->id);
+
+        //DEBUG(proc->id == 17,"Trying to poll %s (%d) timeout %d event %s from proc %d",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,timeout,out,proc->id);
 
         if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen && fd0->read_counter == -1) {
             fd0->read_counter = 0;
@@ -781,24 +773,87 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         for(int i = 0;i < count; i++) {
             userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
             if(fd[i].events & POLLIN) {
-                std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                    
-                if(ret > fd0->read_counter) {
-                    fd0->read_counter = ret;
-                    num_events++;
-                    fd[i].revents |= POLLIN;
+
+                if(fd0->state == USERSPACE_FD_STATE_SOCKET && !fd0->is_listen) {
+                        int if_pollin = 0;
+                        fd0->write_socket_pipe->lock.lock();
+                        fd0->read_socket_pipe->lock.lock();
+                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                            if_pollin = fd0->write_socket_pipe->size > 0 ? 1 : 0;
+                        } else {
+                            if_pollin = fd0->read_socket_pipe->size > 0 ? 1 : 0;
+                        }
+                        if(if_pollin) {
+                            //DEBUG(proc->id == 17 && fd0->index < 40,"polin done fd %d writ sock 0x%p",fd0->index,fd0->write_socket_pipe);
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
+                        fd0->write_socket_pipe->lock.unlock();
+                        fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
+                        if(fd0->pipe_side != PIPE_SIDE_READ)
+                            continue;
+                        fd0->pipe->lock.lock();
+                        if(fd0->pipe->size > 0) {
+                            num_events++;
+                            fd[i].revents |= POLLIN; 
+                        }
+                        fd0->pipe->lock.unlock();
+                    } else {
+
+                        std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                            
+                        
+
+                        if(ret > fd0->read_counter) {
+                            fd0->read_counter = ret;
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
                     }
             }
 
             if(fd[i].events & POLLOUT) {
-                std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                if(ret > fd0->write_counter || ret == 0) {
-                    fd0->write_counter = ret;
-                    num_events++;
-                    fd[i].revents |= POLLOUT;
-                }
+                    if(fd0->state == USERSPACE_FD_STATE_SOCKET) {
+                        fd0->write_socket_pipe->lock.lock();
+                        fd0->read_socket_pipe->lock.lock();
+                        int is_pollout = 0;
+                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                            if(fd0->read_socket_pipe->size < fd0->read_socket_pipe->total_size)
+                                is_pollout = 1;
+                        } else {
+                            if(fd0->write_socket_pipe->size < fd0->write_socket_pipe->total_size)
+                                is_pollout = 1;
+                        }
 
-            }
+                        if(is_pollout) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+
+                        fd0->write_socket_pipe->lock.unlock();
+                        fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
+                        if(fd0->pipe_side != PIPE_SIDE_READ)
+                            continue;
+                        fd0->pipe->lock.lock();
+                        if(fd0->pipe->size < fd0->pipe->total_size) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+                        fd0->pipe->lock.unlock();
+                    } else {
+                        std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                            
+                        if(ret > fd0->write_counter) {
+                            
+                            fd0->write_counter = ret;
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+                    }
+
+                }
 
             if(num_events)
                 success = false;
@@ -806,8 +861,8 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     }
 
     if(success == false) {
-        DEBUG(proc->is_debug,"Poll done (optimization) from proc %d",proc->id);
-        copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
+        //DEBUG(proc->id == 17,"Poll done (optimization) from proc %d",proc->id);
+        //copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
         vfs::vfs::unlock();
         return {1,0,num_events};
     }
@@ -817,7 +872,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
     int is_first = 1;
 
-    if(timeout == -1 || proc->is_debug) {
+    if(timeout == -1) {
         while(success) {
 
             if(is_first)
@@ -828,25 +883,87 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
             for(int i = 0;i < count; i++) {
                 userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
                 if(fd[i].events & POLLIN) {
-                    std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                        
-                    if(ret > fd0->read_counter) {
-                        fd0->read_counter = ret;
-                        num_events++;
-                        fd[i].revents |= POLLIN;
-                    }
 
+                    if(fd0->state == USERSPACE_FD_STATE_SOCKET && !fd0->is_listen) {
+                        int if_pollin = 0;
+                        fd0->write_socket_pipe->lock.lock();
+                        fd0->read_socket_pipe->lock.lock();
+                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                            if_pollin = fd0->write_socket_pipe->size > 0 ? 1 : 0;
+                        } else {
+                            if_pollin = fd0->read_socket_pipe->size > 0 ? 1 : 0;
+                        }
+                        if(if_pollin) {
+                            //DEBUG(fd0->index == 18 || fd0->index == 19 || fd0->index == 20,"polin done fd %d writ sock 0x%p pip 0x%p",fd0->index,fd0->write_socket_pipe,fd0->pipe);
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
+                        fd0->write_socket_pipe->lock.unlock();
+                        fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
+                        if(fd0->pipe_side != PIPE_SIDE_READ)
+                            continue;
+                        fd0->pipe->lock.lock();
+                        if(fd0->pipe->size > 0) {
+                            num_events++;
+                            fd[i].revents |= POLLIN; 
+                        }
+                        fd0->pipe->lock.unlock();
+                    } else {
+
+                        std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                            
+                        if(ret > fd0->read_counter) {
+                            fd0->read_counter = ret;
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
+                    }
                 }
 
                 if(fd[i].events & POLLOUT) {
-                    std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                    if(ret > fd0->write_counter || ret == 0) {
-                        fd0->write_counter = ret;
-                        num_events++;
-                        fd[i].revents |= POLLOUT;
+                    if(fd0->state == USERSPACE_FD_STATE_SOCKET) {
+                        fd0->write_socket_pipe->lock.lock();
+                        fd0->read_socket_pipe->lock.lock();
+                        int is_pollout = 0;
+                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                            if(fd0->read_socket_pipe->size < fd0->read_socket_pipe->total_size)
+                                is_pollout = 1;
+                        } else {
+                            if(fd0->write_socket_pipe->size < fd0->write_socket_pipe->total_size)
+                                is_pollout = 1;
+                        }
+
+                        if(is_pollout) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+
+                        fd0->write_socket_pipe->lock.unlock();
+                        fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
+                        if(fd0->pipe_side != PIPE_SIDE_READ)
+                            continue;
+                        fd0->pipe->lock.lock();
+                        if(fd0->pipe->size < fd0->pipe->total_size) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+                        fd0->pipe->lock.unlock();
+                    } else {
+                        std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                            
+                        if(ret > fd0->write_counter) {
+                            
+                            fd0->write_counter = ret;
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
                     }
 
                 }
+
+
 
                 if(num_events)
                     success = false;
@@ -855,10 +972,13 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
             vfs::vfs::unlock();
             if(success)
                 yield();
+            asm volatile("pause");
         }
     } else {
         int tries = 0;
-        while(drivers::tsc::currentus() < (current_timestamp + (timeout * 1000)) && success) {
+        std::uint64_t current_timestamp = drivers::tsc::currentus();
+        std::uint64_t end_timestamp = (current_timestamp + (timeout * 1000));
+        while(drivers::tsc::currentus() < end_timestamp && success) {
             SYSCALL_DISABLE_PREEMPT();
             if(is_first)
                 is_first = 0;
@@ -868,21 +988,81 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                 userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
                 if(fd[i].events & POLLIN) {
                     std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                    if(ret > fd0->read_counter) {
-                        fd0->read_counter = ret;
-                        num_events++;
-                        fd[i].revents |= POLLIN;
-                        DEBUG(proc->is_debug,"pollin ev %s",fd0->path);
+                    if(fd[i].events & POLLIN) {
+
+                        if(fd0->state == USERSPACE_FD_STATE_SOCKET && !fd0->is_listen) {
+                        int if_pollin = 0;
+                        fd0->write_socket_pipe->lock.lock();
+                        fd0->read_socket_pipe->lock.lock();
+                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                            if_pollin = fd0->write_socket_pipe->size > 0 ? 1 : 0;
+                        } else {
+                            if_pollin = fd0->read_socket_pipe->size > 0 ? 1 : 0;
+                        }
+                        if(if_pollin) {
+                            //DEBUG(fd0->index == 18 || fd0->index == 19 || fd0->index == 20,"polin done fd %d writ sock 0x%p pip 0x%p",fd0->index,fd0->write_socket_pipe,fd0->pipe);
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
+                        fd0->write_socket_pipe->lock.unlock();
+                        fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
+                        fd0->pipe->lock.lock();
+                        if(fd0->pipe->size > 0) {
+                            num_events++;
+                            fd[i].revents |= POLLIN; 
+                        }
+                        fd0->pipe->lock.unlock();
+                    } else {
+
+                        std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
+                            
+                        if(ret > fd0->read_counter) {
+                            fd0->read_counter = ret;
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
+                    }
                     }
 
                 }
 
                 if(fd[i].events & POLLOUT) {
-                    std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                    if(ret > fd0->write_counter) {
-                        fd0->write_counter = ret;
-                        num_events++;
-                        fd[i].revents |= POLLOUT;
+                    if(fd0->state == USERSPACE_FD_STATE_SOCKET) {
+                        fd0->write_socket_pipe->lock.lock();
+                        fd0->read_socket_pipe->lock.lock();
+                        int is_pollout = 0;
+                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
+                            if(fd0->read_socket_pipe->size < fd0->read_socket_pipe->total_size)
+                                is_pollout = 1;
+                        } else {
+                            if(fd0->write_socket_pipe->size < fd0->write_socket_pipe->total_size)
+                                is_pollout = 1;
+                        }
+
+                        if(is_pollout) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+
+                        fd0->write_socket_pipe->lock.unlock();
+                        fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
+                        fd0->pipe->lock.lock();
+                        if(fd0->pipe->size < fd0->pipe->total_size) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+                        fd0->pipe->lock.unlock();
+                    } else {
+                        std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
+                            
+                        if(ret > fd0->write_counter) {
+                            
+                            fd0->write_counter = ret;
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
                     }
 
                 }
@@ -892,16 +1072,24 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                 // w
             }
             vfs::vfs::unlock();
-            if(success)
-                yield();
+
+            if(timeout == 0)
+                break;
+
+            std::uint64_t start = drivers::tsc::currentus();
+            if(drivers::tsc::currentus() < end_timestamp && success) {
+                yield(); 
+                std::uint64_t now = drivers::tsc::currentus();
+            }
+            
         }
     }
 
     if(is_first)
         vfs::vfs::unlock();
 
-    DEBUG(proc->is_debug,"Poll done timeout %d from proc %d num_ev %d",timeout,proc->id,num_events);
-    copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
+    //DEBUG(proc->id == 17,"Poll done timeout %d from proc %d num_ev %d",timeout,proc->id,num_events);
+    //copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
     return {1,0,num_events};
 
 

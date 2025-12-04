@@ -167,6 +167,9 @@ namespace arch {
 
             std::uint32_t parent_id;
 
+            int debug0;
+            int debug1;
+
             int is_debug;
 
             struct process* next;

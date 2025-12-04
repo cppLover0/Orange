@@ -68,10 +68,10 @@ diff -Naur xf86-input-mouse-1.9.5/src/orange_mouse.c xf86-input-mouse-patched/sr
 +    int x = 0;
 +    int y = 0;
 +    int z = 0;
-+    unsigned char buttons = 0;
++    unsigned char buttons = 0; 
 +    while(read(pInfo->fd, &packet, sizeof(packet)) == sizeof(packet)){
 +		x += (char)packet.x;
-+		y += (char)packet.y;
++		y += (char)packet.y; 
 +		z += (char)packet.z;
 +		buttons |= packet.buttons;
 +		
@@ -139,7 +139,7 @@ diff -Naur xf86-input-mouse-1.9.5/src/orange_mouse.c xf86-input-mouse-patched/sr
 +OSMouseInfoPtr OSMouseInit(int flag) {
 +    OSMouseInfoPtr p;
 +
-+    p = calloc(sizeof(OSMouseInfoRec), 1);
++    p = calloc(sizeof(OSMouseInfoRec), 1); 
 +
 +    if (p == NULL)
 +        return NULL;

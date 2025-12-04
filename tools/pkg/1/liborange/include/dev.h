@@ -92,7 +92,7 @@ struct limine_framebuffer {
 #define PTE_PRESENT (1 << 0)
 #define PTE_RW (1 << 1)
 #define PTE_USER (1 << 2)
-#define PTE_WC (1ull << 3)
+#define PTE_WC ((1 << 7) | (1 << 3))
 #define PTE_MMIO (1ull << 4)
 
 inline void liborange_create_dev(unsigned long long request, char* slave_path, char* master_path) {

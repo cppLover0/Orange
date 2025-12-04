@@ -42,7 +42,7 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
+    DEBUG(0,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
@@ -64,7 +64,7 @@ syscall_ret_t sys_exit(int status) {
         fd = next;
     }
 
-      DEBUG(1,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
+      DEBUG(proc->is_debug,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
 
     arch::x86_64::scheduling::kill(proc);
     
@@ -214,10 +214,8 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
 
-    memory::paging::enablepaging(ctx->cr3);
     argv_length = __elf_get_length2((char**)argv);
     envp_length = __elf_get_length2((char**)envp);
-    memory::paging::enablekernel();
 
     char** argv0 = (char**)memory::heap::malloc(8 * (argv_length + 2));
     char** envp0 = (char**)memory::heap::malloc(8 * (envp_length + 1));
@@ -228,8 +226,6 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     char stack_path[2048];
 
     memset(stack_path,0,2048);
-
-    memory::paging::enablepaging(ctx->cr3);
 
     for(int i = 0;i < argv_length; i++) {
 
@@ -254,8 +250,6 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
         envp0[i] = new_str;
 
     }
-
-    memory::paging::enablekernel();
 
     copy_in_userspace_string(proc,stack_path,path,2048);
 
@@ -285,6 +279,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
             memset(&proc->ctx,0,sizeof(int_frame_t));
 
+            memory::paging::enablekernel();
             memory::vmm::free(proc);
 
             memory::vmm::initproc(proc);
@@ -537,14 +532,46 @@ syscall_ret_t sys_map_phys(std::uint64_t phys, std::uint64_t flags, std::uint64_
     return {1,0,(std::int64_t)memory::vmm::map(proc,phys,size,PTE_PRESENT | PTE_USER | PTE_RW | flags)};
 }
 
+std::uint64_t timestamp = 0;
+
 syscall_ret_t sys_timestamp() {
-    return {1,0,(std::int64_t)drivers::tsc::currentnano()};
+    timestamp = drivers::tsc::currentnano() > timestamp ? drivers::tsc::currentnano() : timestamp;
+    return {1,0,(std::int64_t)timestamp};
 }
 
 syscall_ret_t sys_enabledebugmode() {
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    proc->is_debug = 1;
-    DEBUG(proc->is_debug,"Enabling debug mode for proc %d",proc->id);
+    proc->is_debug = !proc->is_debug;
+    DEBUG(proc->is_debug,"Enabling/Disabling debug mode for proc %d",proc->id);
+    return {0,0,0};
+}
+
+syscall_ret_t sys_enabledebugmodepid(int pid) {
+    arch::x86_64::process_t* proc = arch::x86_64::scheduling::head_proc_();
+    while(proc) {
+        if(proc->id == pid)
+            break;
+        proc = proc->next;
+    }
+    if(!proc)
+        return {0,ECHILD};
+
+    DEBUG(proc->is_debug,"Enabling/Disabling debug mode for proc %d",proc->id);
+    proc->is_debug = !proc->is_debug;
+    return {0,0,0};
+}
+
+syscall_ret_t sys_printdebuginfo(int pid) {
+    arch::x86_64::process_t* proc = arch::x86_64::scheduling::head_proc_();
+    while(proc) {
+        if(proc->id == pid)
+            break;
+        proc = proc->next;
+    }
+    if(!proc)
+        return {0,ECHILD};
+
+    DEBUG(1,"Process %d rip is 0x%p debug0 %d debug1 %d",proc->id,proc->ctx.rip,proc->debug0,proc->debug1);
     return {0,0,0};
 }
 
@@ -579,7 +606,6 @@ syscall_ret_t sys_breakpoint(int num) {
 syscall_ret_t sys_copymemory(void* src, void* dest, int len) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     copy_in_userspace(proc,dest,src,len);
-    yield();
     return {0,0,0};
 }
 
@@ -634,4 +660,26 @@ syscall_ret_t sys_getpriority(int which, int who) {
 syscall_ret_t sys_yield() {
     yield();
     return {0,0,0};
+}
+
+syscall_ret_t sys_dmesg(char* buf,std::uint64_t count) {
+    SYSCALL_IS_SAFEA(buf,count);
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    if(!buf) {
+        return {1,0,(std::int64_t)dmesg_bufsize()};
+    }
+
+    vmm_obj_t* vmm_object = memory::vmm::getlen(proc,(std::uint64_t)buf);
+    uint64_t need_phys = vmm_object->phys + ((std::uint64_t)buf - vmm_object->base);
+
+    std::uint64_t offset_start = (std::uint64_t)buf - vmm_object->base;
+    std::uint64_t end = vmm_object->base + vmm_object->len;
+
+    char* temp_buffer = (char*)Other::toVirt(need_phys);
+    memset(temp_buffer,0,count);
+
+    dmesg_read(temp_buffer,count);
+
+    return {1,0,0};
 }

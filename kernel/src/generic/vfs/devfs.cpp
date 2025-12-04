@@ -124,11 +124,11 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
 
             if((node->term_flags->c_lflag & ECHO) && (is_printable(c) || c == 13)) {
                 if(c == 13) {
-                    node->writepipe->write("\n",1);
+                    node->writepipe->write("\n",1,0);
                 } else if(c == '\n') 
-                    node->writepipe->write("\r",1);
+                    node->writepipe->write("\r",1,0);
                 asm volatile("cli");
-                node->writepipe->write(&((char*)buffer)[i],1);
+                node->writepipe->write(&((char*)buffer)[i],1,0);
                 asm volatile("cli"); 
             }
 
@@ -136,7 +136,7 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
                 if(node->readpipe->size > 0) {
                     if(node->term_flags->c_lflag & ECHO) {
                         const char* back = "\b \b";
-                        node->writepipe->write(back,strlen(back));
+                        node->writepipe->write(back,strlen(back),0);
                         asm volatile("cli");
                     }
                     node->readpipe->lock.lock();
@@ -147,10 +147,10 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
             }
 
             if(is_printable(c) || !(node->term_flags->c_lflag & ICANON)) {
-                node->readpipe->write(&c,1);
+                node->readpipe->write(&c,1,0);
                 asm volatile("cli");
             } else if(c == 13) {
-                node->readpipe->write("\n",1);
+                node->readpipe->write("\n",1,0);
                 asm volatile("cli");
             }
 
@@ -165,9 +165,9 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
         for(int i = 0;i < size;i++) {
             char c = ((char*)buffer)[i]; 
             if(c == '\n') {
-                node->writepipe->write("\r\n",2);
+                node->writepipe->write("\r\n",2,0);
             } else
-                node->writepipe->write(&c,1);
+                node->writepipe->write(&c,1,0);
             asm volatile("cli");
         }
         return size;
@@ -177,7 +177,7 @@ std::int64_t __devfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
     int is_master = !is_slave;
     if(node->open_flags.is_pipe_rw) {
         vfs::vfs::unlock();
-        status = is_master ? node->readpipe->write((char*)buffer,size) : node->writepipe->write((char*)buffer,size);
+        status = is_master ? node->readpipe->write((char*)buffer,size,0) : node->writepipe->write((char*)buffer,size,0);
     } else {
         if(!is_master) {
             if(node->writering->ring.bytelen == 1) {

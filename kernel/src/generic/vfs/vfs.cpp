@@ -206,7 +206,7 @@ std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t siz
         fifo_node_t* fifo = fifo_get(out);
         vfs_lock->unlock();
         asm volatile("sti");
-        return fifo->main_pipe->write((const char*)buffer,size);
+        return fifo->main_pipe->write((const char*)buffer,size,0);
     }
 
     vfs_node_t* node = find_node(out);
@@ -645,8 +645,11 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
     if(fd->state == USERSPACE_FD_STATE_SOCKET) {
         if(fd->is_listen) {
                 uint64_t counter = 0;
-                if(operation_type == POLLIN)
-                    counter = sockets::find(fd->path)->socket_counter;
+                if(operation_type == POLLIN) {
+                    if(sockets::find(fd->path)->socket_counter > fd->read_counter) {
+                        counter = fd->read_counter + 1;
+                    }
+                }
                 return counter; 
             }
     }
@@ -657,6 +660,8 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         {
         
         case POLLIN:
+            fd->write_socket_pipe->lock.lock();
+            fd->read_socket_pipe->lock.lock();
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER)
                 if(fd->write_socket_pipe->size != 0 && fd->read_counter == -1)
@@ -666,44 +671,46 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
                     ret = 0;
 
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-                fd->write_socket_pipe->lock.lock();
                 if(fd->write_socket_pipe->read_counter == ret && fd->write_socket_pipe->size != 0) {
                     fd->write_socket_pipe->read_counter++;
                 }
-                fd->write_socket_pipe->lock.unlock();
             }
 
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
-                fd->read_socket_pipe->lock.lock();
                 if(fd->read_socket_pipe->read_counter == ret && fd->read_socket_pipe->size != 0) {
                     fd->read_socket_pipe->read_counter++;
                 }
-                fd->read_socket_pipe->lock.unlock();
             }
 
 
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
-            
+            fd->write_socket_pipe->lock.unlock();
+            fd->read_socket_pipe->lock.unlock();
                 
             break;
         
         case POLLOUT:
+            fd->write_socket_pipe->lock.lock();
+            fd->read_socket_pipe->lock.lock();
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
             
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-                if(fd->read_socket_pipe->write_counter == ret && fd->read_socket_pipe->size != fd->read_socket_pipe->total_size) {
+                if(1) {
                     fd->read_socket_pipe->write_counter++;
                 }
             }
 
             if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
-                if(fd->write_socket_pipe->write_counter == ret && fd->write_socket_pipe->size != fd->write_socket_pipe->total_size) {
+                if(1) {
                     fd->write_socket_pipe->write_counter++;
                 }
             }
 
             ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
             
+            fd->write_socket_pipe->lock.unlock();
+            fd->read_socket_pipe->lock.unlock();
+
             break;
         
         default:
@@ -806,6 +813,7 @@ void vfs::vfs::lock() {
 }
 
 void vfs::vfs::init() {
+
     memset(vfs_nodes,0,sizeof(vfs_nodes));
 
     vfs_lock = new locks::spinlock;

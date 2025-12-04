@@ -86,11 +86,11 @@ void Log::SerialDisplay(int level,char* msg,...) {
 void Log::Display(int level,char* msg,...) {
     va_list val;
     va_start(val, msg);
-    char buffer[512];
-    memset(buffer,0,512);
+    char buffer[4096];
+    memset(buffer,0,4096);
     log_lock.lock();
     LogObject.Write((char*)level_messages[level],strlen(level_messages[level]));
-    int len = __snprintf(buffer,512,msg,val);
+    int len = __snprintf(buffer,4096,msg,val);
     LogObject.Write(buffer,len);
 
     drivers::serial serial(DEFAULT_SERIAL_PORT);
@@ -107,11 +107,91 @@ void Log::Raw(char* msg,...) {
     va_start(val, msg);
     char buffer[4096];
     memset(buffer,0,4096);
+    log_lock.lock();
     int len = __snprintf(buffer,4096,msg,val);
+    LogObject.Write(buffer,len);
 
     drivers::serial serial(DEFAULT_SERIAL_PORT);
 
     serial.write((uint8_t*)buffer,len);
 
+    log_lock.unlock();
+    va_end(val);
+}
+
+#include <generic/mm/pmm.hpp>
+
+char* dmesg_buf = 0;
+std::uint64_t dmesg_size = 0;
+std::uint64_t dmesg_real_size = 0;
+
+std::uint64_t dmesg_bufsize() {
+    return dmesg_size;
+}
+
+void dmesg_read(char* buffer,std::uint64_t count) {
+    memset(buffer,0,count);
+    memcpy(buffer,dmesg_buf,dmesg_size > count ? count : dmesg_size);
+}
+
+void dmesg0(char* msg,...) {
+
+    if(!dmesg_buf) {
+        dmesg_buf = (char*)memory::pmm::_virtual::alloc(4096);
+        dmesg_real_size = 4096;
+    }
+
+    log_lock.lock();
+
+    va_list val;
+    va_start(val, msg);
+    char buffer[4096];
+    memset(buffer,0,4096);
+    int len = __snprintf(buffer,4096,msg,val);
+
+    drivers::serial serial(DEFAULT_SERIAL_PORT);
+    serial.write((uint8_t*)buffer,len);
+
+    uint64_t size = len;
+
+    std::uint64_t offset = dmesg_size;
+    std::uint64_t new_size = offset + size;
+
+    if (new_size > dmesg_real_size) {
+        alloc_t new_content0 = memory::pmm::_physical::alloc_ext(new_size);
+        std::uint8_t* new_content = (std::uint8_t*)new_content0.virt;
+        memcpy(new_content, dmesg_buf, dmesg_size); 
+        memory::pmm::_physical::free((std::uint64_t)dmesg_buf);
+        dmesg_buf = (char*)new_content;
+        dmesg_real_size = new_content0.real_size;
+    }
+
+    dmesg_size = new_size;
+
+    memcpy(dmesg_buf + offset, buffer, size);
+
+    dmesg_size += size;
+
+    log_lock.unlock();
+
+    va_end(val);
+}
+
+#include <arch/x86_64/interrupts/idt.hpp>
+
+extern void panic(int_frame_t* ctx, const char* msg);
+
+void panic_wrap(const char* msg,...) {
+
+    va_list val;
+    va_start(val, msg);
+    char buffer[4096];
+    memset(buffer,0,4096);
+    log_lock.lock();
+    int len = __snprintf(buffer,4096,msg,val);
+
+    panic(0,buffer);
+
+    log_lock.unlock();
     va_end(val);
 }

@@ -124,6 +124,15 @@ typedef struct socket_pending_obj {
 	struct socket_pending_obj* next;
 } socket_pending_obj_t;
 
+class socket_controller {
+private:
+	
+public:
+	socket_controller() {
+
+	}
+};
+
 typedef struct socket_node {
 	char path[128];
 	char is_used;
@@ -141,5 +150,6 @@ public:
 	static void init();
 
 	static socket_node_t* find(char* path);
+
 
 };

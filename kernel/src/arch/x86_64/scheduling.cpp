@@ -440,7 +440,11 @@ void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val, in
 int l = 0;
 
 extern "C" void schedulingSchedule(int_frame_t* ctx) {
+    extern int is_panic;
     memory::paging::enablekernel();
+
+    if(is_panic == 1)
+        asm volatile("hlt");
 
     arch::x86_64::process_t* current = arch::x86_64::cpu::data()->temp.proc;    
 

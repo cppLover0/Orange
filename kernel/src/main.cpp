@@ -28,7 +28,7 @@
 
 #include <generic/locks/spinlock.hpp>
 
-std::uint16_t KERNEL_GOOD_TIMER = 0;
+std::uint16_t KERNEL_GOOD_TIMER = HPET_TIMER;
 
 static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
     Log::Display(LEVEL_MESSAGE_OK,"Got uacpi power_button !\n");
@@ -64,7 +64,6 @@ extern "C" void main() {
     Log::Display(LEVEL_MESSAGE_OK,"PIC initializied\n");
 
     drivers::kvmclock::init();
-
     drivers::acpi::init();
     Log::Display(LEVEL_MESSAGE_OK,"ACPI initializied\n");
     
@@ -113,6 +112,8 @@ extern "C" void main() {
 
     Log::Display(LEVEL_MESSAGE_FAIL,"\e[1;1H\e[2J");
     arch::x86_64::cpu::lapic::tick(arch::x86_64::cpu::data()->lapic_block);
+
+    dmesg("Now we are in userspace...");
 
     asm volatile("sti");
     while(1) {

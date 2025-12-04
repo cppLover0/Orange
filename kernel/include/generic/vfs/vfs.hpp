@@ -152,7 +152,7 @@ namespace vfs {
         
         std::atomic_flag is_received = ATOMIC_FLAG_INIT;
         std::atomic_flag is_n_closed = ATOMIC_FLAG_INIT;
-        std::atomic_flag is_closed = ATOMIC_FLAG_INIT;
+        
 
         int is_was_writed_ever = 0;
 
@@ -161,6 +161,8 @@ namespace vfs {
         char* buffer;
 
         locks::spinlock lock;
+
+        std::atomic_flag is_closed = ATOMIC_FLAG_INIT;
 
         std::uint64_t total_size = 0;
         std::int64_t size = 0;
@@ -233,7 +235,8 @@ namespace vfs {
             return count;
         }
 
-        std::uint64_t write(const char* src_buffer, std::uint64_t count) {
+        std::uint64_t write(const char* src_buffer, std::uint64_t count,int id) {
+
             std::uint64_t written = 0;
             while (written < count) {
                 this->lock.lock();
@@ -317,7 +320,7 @@ namespace vfs {
                 this->write_counter++; 
 
                 if(this->size <= 0) {
-                    *read_count = read_counter;
+                    
                     tty_ret = 0;
                 } else
                     this->read_counter++;

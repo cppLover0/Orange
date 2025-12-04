@@ -7,6 +7,7 @@
 
 #define TSC_TIMER 0
 #define KVM_TIMER 1
+#define HPET_TIMER 2
 
 class time {
 public:

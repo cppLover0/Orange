@@ -33,11 +33,7 @@ extern std::uint16_t KERNEL_GOOD_TIMER;
 void drivers::hpet::init() {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature("HPET",&hpet);
-    if(ret != UACPI_STATUS_OK) {
-        Log::Display(LEVEL_MESSAGE_FAIL,"Can't continue work, orange requires hpet to work");
-        while(1) {asm volatile("hlt");}
-        return;
-    }
+    assert(ret == UACPI_STATUS_OK,"HPET required to get working orange");
     struct acpi_hpet* hpet_table = ((struct acpi_hpet*)hpet.virt_addr);
     hpet_base = (std::uint64_t)Other::toVirt(hpet_table->address.address);
     memory::paging::kernelmap(0,hpet_table->address.address);
