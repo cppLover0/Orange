@@ -1,6 +1,4 @@
 
-sudo rm -rf initrd
-
 export LIBTOOL="$HOME/opt/cross/orange/bin/libtool"
 export LIBTOOLIZE="$HOME/opt/cross/orange/bin/libtoolize"
 export PATH="$HOME/opt/cross/orange/bin:$PATH"
@@ -19,22 +17,4 @@ if [ ! "$(which x86_64-orange-mlibc-gcc)" ]; then
     exit 1
 fi
 
-
-cd tools/pkg
-bash build-pkg.sh "$(realpath ../../initrd)"
-cd ../..
-
-cd initrd
-
-rm -rf lib lib64 bin
-
-ln -sf usr/lib lib
-ln -sf usr/lib lib64
-ln -sf usr/bin bin
-
-cd ../
-
-cp -rf tools/initbase/* initrd
-
-mkdir -p tools/base/boot
-tar -cf tools/base/boot/initrd.tar -C initrd .
+find initrd/usr/lib initrd/usr/bin -type f -print0 | xargs -0 -I{} x86_64-orange-mlibc-strip --strip-all {}

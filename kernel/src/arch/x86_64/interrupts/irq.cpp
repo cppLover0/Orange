@@ -21,6 +21,9 @@ extern "C" void* irqTable[];
 
 extern "C" void irqHandler(int_frame_t* ctx) {
 
+    if(ctx->cs != 0x08)
+        asm volatile("swapgs");
+
     memory::paging::enablekernel();
     if(!irq_table[ctx->vec - 1].is_userspace)
         irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
@@ -55,6 +58,9 @@ extern "C" void irqHandler(int_frame_t* ctx) {
                         
     if(ctx->ss == 0x18)
         ctx->ss |= 3;
+
+    if(ctx->cs != 0x08)
+        asm volatile("swapgs");
 
 }
 

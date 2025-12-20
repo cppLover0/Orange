@@ -404,8 +404,7 @@ std::int32_t __tmpfs__readlink(char* path, char* out, std::uint32_t out_len) {
     if(!node->content)
         return EINVAL; // symlink is not initializied now :(
 
-    memset(out,0,out_len);
-    memcpy(out,node->content,node->size);
+    memcpy(out,node->content,node->size + 1);
 
     return 0;
 }

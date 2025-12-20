@@ -70,9 +70,13 @@ void mmap_test() {
         struct timespec start;
         struct timespec end;
         clock_gettime(CLOCK_MONOTONIC,&start);
-        void* addr = mmap(0,0x80000,0,MAP_ANONYMOUS,-1,0);
+        void* addr = mmap(NULL, 4096, PROT_WRITE | PROT_READ, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+        if (addr == MAP_FAILED) {
+            perror("mmap failed");
+            continue;
+        }memset(addr,1,4096);
         clock_gettime(CLOCK_MONOTONIC,&end);
-        printf("OS pipe test %d - %d ns\n",i,end.tv_nsec - start.tv_nsec);
+        printf("OS mmap test %d - %d ns\n",i,end.tv_nsec - start.tv_nsec);
         
     }
 }

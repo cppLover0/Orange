@@ -292,7 +292,7 @@ static void tty_init() {
         NULL, &default_fg,
         NULL, &default_fg_bright,
         (void*)unifont_arr, FONT_WIDTH, FONT_HEIGHT, 0,
-        1, 1, margin
+        1, 1, margin,0
     );
     master_fd = posix_openpt(O_RDWR | O_NOCTTY);
     master_fd = posix_openpt(O_RDWR | O_NOCTTY);

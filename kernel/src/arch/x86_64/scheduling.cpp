@@ -291,7 +291,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_fra
 
     userspace_fd_t* fd = proc->fd;
     while(fd) {
-        userspace_fd_t* newfd = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
+        userspace_fd_t* newfd = new userspace_fd_t;
         memcpy(newfd,fd,sizeof(userspace_fd_t));
         
         if(newfd->state == USERSPACE_FD_STATE_PIPE) {
@@ -327,7 +327,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_fram
 
     userspace_fd_t* fd = proc->fd;
     while(fd) {
-        userspace_fd_t* newfd = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
+        userspace_fd_t* newfd = new userspace_fd_t;
         memcpy(newfd,fd,sizeof(userspace_fd_t));
         
         if(newfd->state == USERSPACE_FD_STATE_PIPE) {
@@ -344,7 +344,6 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_fram
 
     return nproc;
 }
-
 void arch::x86_64::scheduling::kill(process_t* proc) {
     proc->kill_lock.nowaitlock();
     proc->lock.nowaitlock();
@@ -443,6 +442,11 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
     extern int is_panic;
     memory::paging::enablekernel();
 
+    if(ctx) {
+        if(ctx->cs != 0x08)
+            asm volatile("swapgs");
+    }
+
     if(is_panic == 1)
         asm volatile("hlt");
 
@@ -504,6 +508,10 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
                     prio_div++;
 
                     arch::x86_64::cpu::lapic::eoi();
+
+                    if(ctx->cs != 0x08)
+                        asm volatile("swapgs");
+
                     schedulingEnd(ctx);
                 }
             }
@@ -512,6 +520,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
         current = head_proc;
     }
 }
+
 
 arch::x86_64::process_t* arch::x86_64::scheduling::head_proc_() {
     return head_proc;

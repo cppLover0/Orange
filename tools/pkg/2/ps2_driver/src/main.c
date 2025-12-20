@@ -11,6 +11,8 @@
 
 #include <stdint.h>
 
+#include <sched.h>
+
 #include <string.h>
 
 #include <unistd.h>
@@ -164,6 +166,8 @@ typedef struct {
 
 int main() {
 
+    log(LEVEL_MESSAGE_WARN,"PS/2 driver is unstable and can be broken on some HW/VM, use USB instead of it\n");
+
     int pid = fork();
 
     if(pid > 0)
@@ -220,91 +224,55 @@ int main() {
         
     ps2_flush();
 
-    int irq1 = open("/dev/irq1",O_RDWR);
-    int irq12 = open("/dev/irq12",O_RDWR);
-
-    struct pollfd irq_fds[2];
-
-    irq_fds[0].events = POLLIN;
-    irq_fds[0].fd = irq1;
-    irq_fds[1].events = POLLIN;
-    irq_fds[1].fd = irq12;
-
     int mouse_seq = 0;
-
     
     if(1) {
 
         uint8_t mouse_buffer[4] = {0,0,0,0};
 
         while(1) {
-            int num_events = poll(irq_fds,2,200);
-            if(num_events < 0) {
-                perror("Failed to poll irq fds");
-                exit(-1);
-            }
 
-            if(num_events == 0) {
-                mouse_seq = 0;
-                ps2_flush();
+            if(1) {
+
                 int val = 1;
-                write(irq1,&val,1);
-                write(irq12,&val,1);
-            }
 
-            if(irq_fds[1].revents & POLLIN) {
-                char val = 0;
-                int count = read(irq12,&val,1);
-                if(count && val == 1) {
-                    
-                    mouse_buffer[mouse_seq++] = inb(DATA); 
-                    
-                    if(mouse_seq != 3) { 
-                        write(irq1,&val,1);
-                        write(irq12,&val,1);
-                        continue; }
+                uint8_t status = inb(0x64);
+                while(status & 1) { 
+                    int data = inb(DATA);
 
-                    mouse_packet_t packet = {0,0,0,0};
+                    if(status & (1 << 5)) {
+                        mouse_buffer[mouse_seq++] = data;
+                        
+                        if(mouse_seq == 3) { 
+                            mouse_packet_t packet = {0,0,0,0};
 
-                    packet.x = mouse_buffer[1] - (mouse_buffer[0] & 0x10 ? 0x100 : 0);
-                    packet.y = mouse_buffer[2] - (mouse_buffer[0] & 0x20 ? 0x100 : 0);
-                    packet.z = (mouse_buffer[3] & 0x7) * (mouse_buffer[3] & 0x8 ? -1 : 1);
-                    
-                    packet.buttons |= (mouse_buffer[0] & 1) ? MOUSE_LB : 0;
-                    packet.buttons |= (mouse_buffer[0] & 2) ? MOUSE_RB : 0;
-                    packet.buttons |= (mouse_buffer[0] & 4) ? MOUSE_MB : 0;
+                            packet.x = mouse_buffer[1] - (mouse_buffer[0] & 0x10 ? 0x100 : 0);
+                            packet.y = mouse_buffer[2] - (mouse_buffer[0] & 0x20 ? 0x100 : 0);
+                            packet.z = (mouse_buffer[3] & 0x7) * (mouse_buffer[3] & 0x8 ? -1 : 1);
+                            
+                            packet.buttons |= (mouse_buffer[0] & 1) ? MOUSE_LB : 0;
+                            packet.buttons |= (mouse_buffer[0] & 2) ? MOUSE_RB : 0;
+                            packet.buttons |= (mouse_buffer[0] & 4) ? MOUSE_MB : 0;
 
-                    packet.buttons |= (mouse_buffer[0] & 0x10) ? MOUSE_B4 : 0;
-                    packet.buttons |= (mouse_buffer[0] & 0x20) ? MOUSE_B5 : 0; 
+                            packet.buttons |= (mouse_buffer[0] & 0x10) ? MOUSE_B4 : 0;
+                            packet.buttons |= (mouse_buffer[0] & 0x20) ? MOUSE_B5 : 0; 
 
-                    write(mastermouse,&packet,4);
+                            write(mastermouse,&packet,4);
 
-                    mouse_seq = 0;
-                    
-                    write(irq1,&val,1); 
-                    write(irq12,&val,1);
-                    
-                }
-            }
+                            mouse_seq = 0;
 
-            if(irq_fds[0].revents & POLLIN) { 
-                char val = 0;
-                int count = read(irq1,&val,1);
-                if(count && val == 1) {
-                    uint8_t scancodes[64];
-                    int i = 0;
-                    memset(scancodes,0, 64);
-                    while((inb(0x64) & 1)) { 
-                        uint8_t scancode = inb(0x60);
-                        if(i < 64)
-                            scancodes[i++] = scancode;
+                        }
+
+                        
+                        
+                    } else {
+                        write(masterinput,&data,1);
                     }
-                    write(masterinput,scancodes,i);
-                    write(irq1,&val,1); /* Ask kernel to unmask this irq */
-                    write(irq12,&val,1); /* irq 12 and irq 1 are connected */
-                }
-            }
 
+                    status = inb(0x64);
+                }
+                sched_yield();
+            }
         }
     }
     exit(0);

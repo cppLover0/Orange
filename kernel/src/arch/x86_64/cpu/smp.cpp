@@ -57,12 +57,13 @@ void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {
 
     arch::x86_64::cpu::data()->smp.cpu_id = balance_how_much_cpus++;
 
-    arch::x86_64::cpu::data()->lapic_block = arch::x86_64::cpu::lapic::init(15000);
+    arch::x86_64::cpu::data()->lapic_block = arch::x86_64::cpu::lapic::init(2500);
     arch::x86_64::cpu::sse::init();
     arch::x86_64::syscall::init();
     Log::Display(LEVEL_MESSAGE_OK,"Cpu %d is online \n",arch::x86_64::cpu::data()->smp.cpu_id);
     arch::x86_64::cpu::lapic::tick(arch::x86_64::cpu::data()->lapic_block);
     mp_lock.unlock();
+    setwp();
     mp::sync(0);
     mp::sync(1);
     asm volatile("sti");

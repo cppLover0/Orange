@@ -83,35 +83,29 @@ char * __vfs__strtok(char *str, const char *delim) {
 
 void __vfs_symlink_resolve(char* path, char* out) {
     char buffer[2048];
-    memset(buffer,0,2048);
 
     int e = vfs::vfs::readlink(path,buffer,2048);
 
     if(!vfs_lock->test())
         Log::Display(LEVEL_MESSAGE_WARN,"vfs_lock didnt set lock in symlink resolve");
 
-    memset(out,0,2048);
-
     if(e == ENOSYS) 
-        memcpy(out,path,strlen(path));
+        memcpy(out,path,strlen(path) + 1);
 
     if(e == EINVAL)
-        memcpy(out,path,strlen(path));
+        memcpy(out,path,strlen(path) + 1);
     else if(e == 0) {
         
         char result[2048];
-        memset(result,0,2048);
         vfs::resolve_path(buffer,path,result,0,1);
         __vfs_symlink_resolve(result,out);
     } else if(e == ENOENT) {
-        memcpy(out,path,strlen(path));
+        memcpy(out,path,strlen(path) + 1);
         // maybe it wants directory symlink ?
         char path0[2048];
-        memset(path0,0,2048);
-        memcpy(path0,path,strlen(path));
+        memcpy(path0,path,strlen(path) + 1);
 
         char result[2048];
-        memset(result,0,2048);
 
         int c = 0;
 
@@ -132,7 +126,6 @@ void __vfs_symlink_resolve(char* path, char* out) {
             e = vfs::vfs::readlink(result,buffer,2048);
             if(e == 0) {
                 char buffer2[2048];
-                memset(buffer2,0,2048);
                 vfs::resolve_path(buffer,result,buffer2,0,1);
                 c = strlen(buffer2);
                 buffer2[c++] = '/';
@@ -140,12 +133,12 @@ void __vfs_symlink_resolve(char* path, char* out) {
                 __vfs_symlink_resolve(buffer2,out);
                 return;
             } else if(e == ENOENT) {
-                memcpy(out,path,strlen(path));
+                memcpy(out,path,strlen(path) + 1);
             }
 
             token = __vfs__strtok(0,"/");
         }
-        memcpy(out,path,strlen(path));
+        memcpy(out,path,strlen(path) + 1);
     }
 }
 
@@ -192,14 +185,13 @@ std::int64_t vfs::vfs::write(userspace_fd_t* fd, void* buffer, std::uint64_t siz
     vfs_lock->lock();
 
     char out[2048];
-    memset(out,0,2048);
 
     if(!fd->is_cached_path) {
         __vfs_symlink_resolve(fd->path,out);
-        memcpy(fd->path,out,strlen(out));
+        memcpy(fd->path,out,strlen(out) + 1);
         fd->is_cached_path = 1;
     } else
-        memcpy(out,fd->path,strlen(fd->path));
+        memcpy(out,fd->path,strlen(fd->path) + 1);
 
 
     if(is_fifo_exists(out)) {
@@ -225,19 +217,17 @@ std::int64_t vfs::vfs::read(userspace_fd_t* fd, void* buffer, std::uint64_t coun
     vfs_lock->lock();
 
     char out[2048];
-    memset(out,0,2048);
 
     if(!fd->is_cached_path) {
         __vfs_symlink_resolve(fd->path,out);
-        memcpy(fd->path,out,strlen(out));
+        memcpy(fd->path,out,strlen(out) + 1);
         fd->is_cached_path = 1;
     } else
-        memcpy(out,fd->path,strlen(fd->path));
+        memcpy(out,fd->path,strlen(fd->path) + 1);
 
     if(is_fifo_exists(out)) {
         fifo_node_t* fifo = fifo_get(out);
         vfs_lock->unlock();
-        asm volatile("sti");
         return fifo->main_pipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
     }
 
@@ -313,8 +303,7 @@ std::int32_t vfs::vfs::open(userspace_fd_t* fd) {
 
     if(!fd->is_cached_path) {
         __vfs_symlink_resolve(fd->path,out);
-        memset(fd->path,0,2048);
-        memcpy(fd->path,out,strlen(out));
+        memcpy(fd->path,out,strlen(out) + 1);
         fd->is_cached_path = 1;
     } else
         memcpy(out,fd->path,strlen(fd->path));
@@ -642,111 +631,6 @@ std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
 
 std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
 
-    if(fd->state == USERSPACE_FD_STATE_SOCKET) {
-        if(fd->is_listen) {
-                uint64_t counter = 0;
-                if(operation_type == POLLIN) {
-                    if(sockets::find(fd->path)->socket_counter > fd->read_counter) {
-                        counter = fd->read_counter + 1;
-                    }
-                }
-                return counter; 
-            }
-    }
-
-    if(fd->state == USERSPACE_FD_STATE_SOCKET) {
-        std::int64_t ret = 0;
-        switch (operation_type)
-        {
-        
-        case POLLIN:
-            fd->write_socket_pipe->lock.lock();
-            fd->read_socket_pipe->lock.lock();
-            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
-            if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER)
-                if(fd->write_socket_pipe->size != 0 && fd->read_counter == -1)
-                    ret = 0;
-            if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE)
-                if(fd->read_socket_pipe->size != 0 && fd->read_counter == -1)
-                    ret = 0;
-
-            if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-                if(fd->write_socket_pipe->read_counter == ret && fd->write_socket_pipe->size != 0) {
-                    fd->write_socket_pipe->read_counter++;
-                }
-            }
-
-            if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
-                if(fd->read_socket_pipe->read_counter == ret && fd->read_socket_pipe->size != 0) {
-                    fd->read_socket_pipe->read_counter++;
-                }
-            }
-
-
-            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->write_socket_pipe->read_counter : fd->read_socket_pipe->read_counter;
-            fd->write_socket_pipe->lock.unlock();
-            fd->read_socket_pipe->lock.unlock();
-                
-            break;
-        
-        case POLLOUT:
-            fd->write_socket_pipe->lock.lock();
-            fd->read_socket_pipe->lock.lock();
-            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
-            
-            if(fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-                if(1) {
-                    fd->read_socket_pipe->write_counter++;
-                }
-            }
-
-            if(fd->other_state == USERSPACE_FD_OTHERSTATE_SLAVE) {
-                if(1) {
-                    fd->write_socket_pipe->write_counter++;
-                }
-            }
-
-            ret = fd->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd->read_socket_pipe->write_counter : fd->write_socket_pipe->write_counter;
-            
-            fd->write_socket_pipe->lock.unlock();
-            fd->read_socket_pipe->lock.unlock();
-
-            break;
-        
-        default:
-            break;
-        }
-        return ret;
-    } else if(fd->state == USERSPACE_FD_STATE_PIPE) {
-
-        std::int64_t ret = 0;
-        switch (operation_type)
-        {
-        
-        case POLLIN:
-            ret = fd->pipe->read_counter;
-            if(fd->pipe->read_counter == -1 && fd->pipe->size != 0)
-                ret = 0;
-            if(fd->pipe->read_counter == ret && fd->pipe->size != 0) {
-                fd->pipe->read_counter++;
-                ret = fd->pipe->read_counter;
-            }
-            break;
-        
-        case POLLOUT:
-            ret = fd->pipe->write_counter;
-            if(fd->pipe->write_counter == ret && fd->pipe->size != fd->pipe->total_size) {
-                fd->pipe->write_counter++;
-                ret = fd->pipe->write_counter;
-            }
-            break;
-        
-        default:
-            break;
-        }
-        return ret;
-    }
-
     char out0[2048];
     memset(out0,0,2048);
 
@@ -768,21 +652,15 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         {
         
         case POLLIN:
-            ret = fifo->main_pipe->read_counter;
-            if(fifo->main_pipe->size != 0 && fd->read_counter == -1)
-                ret = 0;
-            if(fifo->main_pipe->size != 0 && ret == fd->read_counter) {
-                fifo->main_pipe->read_counter++;
-                ret = fifo->main_pipe->read_counter;
-            }
+            fifo->main_pipe->lock.lock();
+            ret = fifo->main_pipe->size != 0 ? 1 : 0;
+            fifo->main_pipe->lock.lock();
             break;
         
         case POLLOUT:
-            ret = fifo->main_pipe->write_counter;
-            if(fifo->main_pipe->write_counter == ret && fifo->main_pipe->size != fifo->main_pipe->total_size) {
-                fifo->main_pipe->write_counter++;
-                ret = fifo->main_pipe->write_counter;
-            }
+            fifo->main_pipe->lock.lock();
+            ret = fifo->main_pipe->size < fifo->main_pipe->total_size ? 1 : 0;
+            fifo->main_pipe->lock.lock();
             break;
         
         default:

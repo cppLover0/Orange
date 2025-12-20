@@ -19,8 +19,8 @@ namespace vfs {
             }
 
             if(!current) {
-                current = (userspace_fd_t*)memory::pmm::_virtual::alloc(4096);
-                zeromem(current);
+                current = new userspace_fd_t;
+                memset(current,0,sizeof(userspace_fd_t));
                 current->next = proc->fd;
                 proc->fd = current;
                 current->index = proc->fd_ptr++;
@@ -32,8 +32,6 @@ namespace vfs {
             current->can_be_closed = 0;
             current->is_cached_path = 0;
             current->is_debug = 0;
-
-            memset(current->path,0,2048);
 
             return current->index;
 

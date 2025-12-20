@@ -5,22 +5,32 @@ global schedulingEnd
 global yield
 
 yield:
-    int 32
-    ret
+    pop rax
+    mov rdx, rsp
+    mov rsp,[gs:16]
+    push qword 0
+    push rdx
+    pushfq
+    push qword 0x08
+    push qword rax
+    jmp schedulingEnter
 
 global yield0
 
 yield0:
-    int 32
-    ret
+    pop rax
+    mov rdx, rsp
+    mov rsp,[gs:16]
+    push qword 0
+    push rdx
+    pushfq
+    push qword 0x08
+    push qword rax
+    jmp schedulingEnter
 
 
 schedulingEnter:
     cli
-    cmp byte [rsp + 8],0x08
-    jz .cont
-    swapgs
-.cont:
     push qword 0
     push qword 0
     push r15
@@ -105,9 +115,4 @@ schedulingEnd:
     pop r14
     pop r15
     add rsp,16
-
-    cmp byte [rsp + 8],0x08
-    jz .end
-    swapgs
-.end:
     iretq

@@ -20,7 +20,7 @@ CHOST=x86_64-orange-mlibc prefix="/usr" ./configure
 make -j$(nproc)
 make install DESTDIR="$1"
 
-rm -rf "$1/lib"/libz.so*
+rm -rf "$1/usr/lib"/libz.so*
 
 cd ..
 
@@ -87,18 +87,23 @@ meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix=/usr -Dleg
 
 cd build0
 
-ninja 
+meson compile 
 DESTDIR="$1" ninja install 
 
 cd ../..
 
+#exit 0
 fast_install "$1" https://www.x.org/releases/individual/xcb/libpthread-stubs-0.5.tar.gz 
 
 fast_install "$1" https://www.x.org/releases/individual/xcb/xcb-proto-1.15.tar.gz
 
 fast_install "$1" https://www.x.org/releases/individual/lib/libXau-1.0.9.tar.gz 
 fast_install "$1" https://www.x.org/releases/individual/xcb/libxcb-1.15.tar.gz 
-fast_install "$1" https://www.x.org/releases/individual/lib/libX11-1.8.1.tar.gz 
+
+mkdir -p "$1/usr/share/X11"
+sudo chmod 777 -R "$1/usr/share/X11"
+
+fast_install "$1" https://www.x.org/releases/individual/lib/libX11-1.8.1.tar.gz --with-keysymdefdir="$1/usr/include/X11"
 
 fast_install "$1" https://www.x.org/archive/individual/lib/libxkbfile-1.1.1.tar.gz 
 
@@ -133,11 +138,10 @@ mkdir -p build
 meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix="/usr" build -Dxorg-rules-symlinks=true
 
 cd build
-ninja 
-sudo DESTDIR="$1" ninja install
-
+meson compile
+DESTDIR="$1" meson install
 cd ../..
-
+#exit 0
 sudo chmod 777 -R "$1/usr/share/X11/xkb"
 
 fast_install "$1" https://www.x.org/releases/individual/xserver/xorg-server-21.1.4.tar.gz "--with-xkb-bin-directory=/usr/bin --disable-pciaccess --disable-libdrm --disable-glx --disable-int10-module --disable-glamor --disable-vgahw --disable-dri3 --disable-dri2 --disable-dri --disable-xephyr --disable-xwayland --disable-xnest --disable-dmx --with-fontrootdir=/usr/share/fonts/X11 --disable-strict-compilation" "../../diff/xorgserver.diff"

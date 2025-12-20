@@ -1,2 +1,1 @@
-cat /etc/orangesad
- orangeX
+orangeX

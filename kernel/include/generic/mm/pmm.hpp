@@ -42,6 +42,7 @@ typedef struct {
 
 
 namespace memory {
+
     class buddy {
     private:
         static buddy_info_t* split_maximum(buddy_info_t* blud, std::uint64_t size);
@@ -50,12 +51,19 @@ namespace memory {
         static void merge(buddy_info_t* budy);
     public:
         static void init();
-        static void free(std::uint64_t phys);
+        static int free(std::uint64_t phys);
         static void fullfree(std::uint32_t id);
         static alloc_t alloc_ext(std::size_t size);
         static std::int64_t alloc(std::size_t size);
         static std::int64_t allocid(std::size_t size, std::uint32_t id);
     };
+
+    class freelist {
+    public:
+        static int free(std::uint64_t phys);
+        static std::int64_t alloc();
+    };
+
     namespace pmm {
 
         

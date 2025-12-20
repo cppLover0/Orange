@@ -112,10 +112,9 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
     if(fd_s->can_be_closed)
         fd_s->can_be_closed = 0;
 
-    DEBUG(0,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
+    DEBUG(proc->is_debug,"Trying to read %s (fd %d) with state %d from proc %d",fd_s->path,fd,fd_s->state,proc->id);
 
     char* temp_buffer = (char*)buf;
-    memset(temp_buffer,0,count);
     std::int64_t bytes_read;
     if(fd_s->state == USERSPACE_FD_STATE_FILE) 
         bytes_read = vfs::vfs::read(fd_s,temp_buffer,count);
@@ -143,6 +142,8 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
 
     } else
         return {1,EBADF,0};
+
+    DEBUG(proc->is_debug,"Read done from proc %d\n",proc->id);
 
     return {1,bytes_read >= 0 ? 0 : (int)(+bytes_read), bytes_read};
 }
@@ -741,25 +742,12 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         }
 
         char out[64];
-        poll_to_str(fd[i].events,out);
+        if(proc->is_debug) {
+            poll_to_str(fd[i].events,out);
 
-        //DEBUG(proc->id == 17,"Trying to poll %s (%d) timeout %d event %s from proc %d",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,timeout,out,proc->id);
-
-        if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen && fd0->read_counter == -1) {
-            fd0->read_counter = 0;
-            fd0->write_counter = 0;
-        }
-
-        if(fd0->write_counter == -1) {
-            std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-            fd0->write_counter = ret < 0 ? 0 : ret;
-        } 
-
-        if(fd0->read_counter == -1) {
-            std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-            fd0->read_counter = ret < 0 ? 0 : ret;
-        }
-            
+            DEBUG(proc->is_debug,"Trying to poll %s (%d) timeout %d event %s from proc %d",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,timeout,out,proc->id);
+         
+        }   
     }
 
     int num_events = 0;
@@ -790,6 +778,14 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                         }
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen) {
+                        if(fd0->read_counter == -1)
+                            fd0->read_counter = 0;
+                        if(sockets::find(fd0->path)->socket_counter > fd0->read_counter) {
+                            fd0->read_counter++;
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
                     } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
                         if(fd0->pipe_side != PIPE_SIDE_READ)
                             continue;
@@ -802,11 +798,8 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                     } else {
 
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                            
-                        
 
-                        if(ret > fd0->read_counter) {
-                            fd0->read_counter = ret;
+                        if(ret != 0) {
                             num_events++;
                             fd[i].revents |= POLLIN;
                         }
@@ -845,9 +838,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                     } else {
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
                             
-                        if(ret > fd0->write_counter) {
-                            
-                            fd0->write_counter = ret;
+                        if(ret != 0) {
                             num_events++;
                             fd[i].revents |= POLLOUT;
                         }
@@ -861,7 +852,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     }
 
     if(success == false) {
-        //DEBUG(proc->id == 17,"Poll done (optimization) from proc %d",proc->id);
+        DEBUG(proc->is_debug,"Poll done (optimization) from proc %d",proc->id);
         //copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
         vfs::vfs::unlock();
         return {1,0,num_events};
@@ -900,6 +891,14 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                         }
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen) {
+                        if(fd0->read_counter == -1)
+                            fd0->read_counter = 0;
+                        if(sockets::find(fd0->path)->socket_counter > fd0->read_counter) {
+                            fd0->read_counter++;
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
                     } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
                         if(fd0->pipe_side != PIPE_SIDE_READ)
                             continue;
@@ -912,9 +911,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                     } else {
 
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-                            
-                        if(ret > fd0->read_counter) {
-                            fd0->read_counter = ret;
+                        if(ret != 0) {
                             num_events++;
                             fd[i].revents |= POLLIN;
                         }
@@ -953,9 +950,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                     } else {
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
                             
-                        if(ret > fd0->write_counter) {
-                            
-                            fd0->write_counter = ret;
+                        if(ret != 0) {
                             num_events++;
                             fd[i].revents |= POLLOUT;
                         }
@@ -1006,6 +1001,14 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                         }
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen) {
+                        if(fd0->read_counter == -1)
+                            fd0->read_counter = 0;
+                        if(sockets::find(fd0->path)->socket_counter > fd0->read_counter) {
+                            fd0->read_counter++;
+                            num_events++;
+                            fd[i].revents |= POLLIN;
+                        }
                     } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
                         fd0->pipe->lock.lock();
                         if(fd0->pipe->size > 0) {
@@ -1017,8 +1020,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
                             
-                        if(ret > fd0->read_counter) {
-                            fd0->read_counter = ret;
+                        if(ret != 0) {
                             num_events++;
                             fd[i].revents |= POLLIN;
                         }
@@ -1056,10 +1058,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                         fd0->pipe->lock.unlock();
                     } else {
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                            
-                        if(ret > fd0->write_counter) {
-                            
-                            fd0->write_counter = ret;
+                        if(ret != 0) {
                             num_events++;
                             fd[i].revents |= POLLOUT;
                         }
@@ -1088,7 +1087,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     if(is_first)
         vfs::vfs::unlock();
 
-    //DEBUG(proc->id == 17,"Poll done timeout %d from proc %d num_ev %d",timeout,proc->id,num_events);
+    DEBUG(proc->is_debug,"%d from proc %d num_ev %d",timeout,proc->id,num_events);
     //copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
     return {1,0,num_events};
 

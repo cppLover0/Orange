@@ -141,6 +141,9 @@ namespace arch {
 
             std::uint32_t reversedforid;
             std::uint32_t* vmm_id;
+
+            userspace_fd_t* fd_pool;
+
             userspace_fd_t* fd;
 
             char* vmm_start;

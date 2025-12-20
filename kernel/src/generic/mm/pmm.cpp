@@ -172,15 +172,18 @@ void memory::buddy::init() {
 
 }
 
-void memory::buddy::free(std::uint64_t phys) {
+int memory::buddy::free(std::uint64_t phys) {
     auto blud = buddy_find_by_phys_without_split(phys);
     if(!blud || blud->is_splitted)
-        return;
+        return -1;
     blud->is_free = 1;
     blud->id = 0;
     if(blud->parent)
         merge(blud);
+    return 0;
 }
+
+int last_i = 0;
 
 std::int64_t memory::buddy::alloc(std::size_t size) {
     std::uint64_t top_size = UINT64_MAX;
@@ -193,11 +196,12 @@ std::int64_t memory::buddy::alloc(std::size_t size) {
         if(LEVEL_TO_SIZE(mem.mem[i].level) >= size && LEVEL_TO_SIZE(mem.mem[i].level) < top_size && mem.mem[i].is_free) {
             top_size = LEVEL_TO_SIZE(mem.mem[i].level);
             nearest_buddy = &mem.mem[i];
-            if(top_size == size)
-                break;
+            if(top_size == size) {
+                last_i = i; break;  }
         }
     }
 
+found:
     if(nearest_buddy) {
         auto blud = split_maximum(nearest_buddy,size);
         blud->is_free = 0;
@@ -273,21 +277,102 @@ std::int64_t memory::buddy::allocid(std::size_t size,std::uint32_t id0) {
 void memory::buddy::fullfree(std::uint32_t id) {
     for(std::uint64_t i = 0;i < mem.buddy_queue; i++) {
         if(mem.mem[i].id == id) {
-            free(mem.mem[i].phys);
+            //free(mem.mem[i].phys);
         }
     }
+}
+
+/* freelist allocator */
+
+template <int N>
+struct freelist_allocated_memory {
+    std::uint64_t arr[131072];
+};
+
+template <int N>
+struct memory_id_block {
+    std::uint64_t phys_block[N];
+    struct memory_id_block* next;
+};
+
+typedef struct memory_id_block<4> memory_id_t;
+
+typedef struct freelist_allocated_memory<1048576> freelist_allocated_memory_t;
+
+std::uint64_t freelist_page = 0;
+
+freelist_allocated_memory_t freelist_aloc_mem;
+int freelist_aloc_mem_ptr = 0;
+
+int memory::freelist::free(std::uint64_t phys) {
+    if(phys == 0)
+        return -1;
+    // sorry but my freelist free is O(n) :(
+
+    int success = 0;
+
+    //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"freelist: free 0x%p\n",phys);
+
+    for(int i = 0; i < freelist_aloc_mem_ptr; i++) {
+        if(phys >= freelist_aloc_mem.arr[i] && phys < freelist_aloc_mem.arr[i] + (1024 * 1024)) {
+            success = 1;
+            break;
+        }
+    }
+
+    if(!success) {
+        return -1; // not free list memory, ignore
+    }
+
+    memset(Other::toVirt(phys),0,4096);
+
+    *((std::uint64_t*)Other::toVirt(phys)) = freelist_page;
+    freelist_page = phys;
+    return 0;
+}
+
+std::int64_t memory::freelist::alloc() {
+    if(!freelist_page) { // request memory from buddy, 1 mb will be enough
+        std::uint64_t phys = memory::buddy::alloc(1024 * 1024);
+
+        freelist_aloc_mem.arr[freelist_aloc_mem_ptr++] = phys;
+
+        std::uint64_t ptr = phys;
+        while(1) {
+            if(ptr >= phys + (1024 * 1024))
+                break;
+            free(ptr);
+            ptr += 4096;
+        }
+    }
+    std::uint64_t freelist_mem = freelist_page;
+    freelist_page = *((std::uint64_t*)Other::toVirt(freelist_mem));
+    return freelist_mem;
 }
 
 /* pmm wrapper */
 
 void memory::pmm::_physical::init() {
+    memset(&freelist_aloc_mem,0,sizeof(freelist_aloc_mem));
     memory::buddy::init();
+}
+
+int __is_in_freelist_array(std::uint64_t phys) {
+    for(int i = 0;i < freelist_aloc_mem_ptr; i++) {
+        if(phys >= freelist_aloc_mem.arr[i] && phys < freelist_aloc_mem.arr[i] + (1024 * 1024))
+            return 1;
+    }
+    return 0;
 }
 
 void memory::pmm::_physical::free(std::uint64_t phys) {
     asm volatile("cli");
     pmm_lock.lock();
-    memory::buddy::free(phys);
+    int status = -1;
+    if(!__is_in_freelist_array(phys)) // not used by freelist ?
+        status = memory::buddy::free(phys);
+    if(status != 0) 
+        memory::freelist::free(phys);
     pmm_lock.unlock();
 }
 
@@ -300,7 +385,12 @@ void memory::pmm::_physical::fullfree(std::uint32_t id) {
 std::int64_t memory::pmm::_physical::alloc(std::size_t size) {
     asm volatile("cli");
     pmm_lock.lock();
-    std::int64_t p = memory::buddy::alloc(size);
+    std::int64_t p = 0;
+    if(size == 4096) { // sure we can do freelist optimization
+        p = memory::freelist::alloc();
+    } else {
+        p = memory::buddy::alloc(size);
+    }
     pmm_lock.unlock();
     return p;
 }
@@ -308,7 +398,12 @@ std::int64_t memory::pmm::_physical::alloc(std::size_t size) {
 std::int64_t memory::pmm::_physical::allocid(std::size_t size, std::uint32_t id) {
     asm volatile("cli");
     pmm_lock.lock();
-    std::int64_t p = memory::buddy::allocid(size,id);
+    std::int64_t p = 0;
+    if(size == 4096) { // sure we can do freelist optimization
+        p = memory::freelist::alloc();
+    } else {
+        p = memory::buddy::allocid(size,id);
+    }
     pmm_lock.unlock();
     return p;
 }

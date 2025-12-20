@@ -29,7 +29,7 @@ fast_install() {
     wget "$2"
     archive_name="$(basename $2)"
     dir_name=$(tar -tf "$archive_name" | head -1 | cut -f1 -d"/")
-    tar -xvf "$archive_name"
+    tar -xf "$archive_name"
     cd "$dir_name"
     autotools_recursive_regen
     if [ -n "$4" ]; then

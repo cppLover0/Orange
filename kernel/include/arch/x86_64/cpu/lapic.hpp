@@ -15,6 +15,8 @@
 #include <etc/assembly.hpp>
 #include <etc/etc.hpp>
 
+extern "C" void setwp();
+
 namespace arch {
     namespace x86_64 {
         namespace cpu {

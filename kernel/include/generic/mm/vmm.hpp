@@ -26,6 +26,8 @@ typedef struct vmm_obj {
     uint8_t is_shared;
     uint8_t is_mapped;
 
+    uint8_t is_free;
+
     uint8_t is_lazy_alloc;
 
     int* how_much_connected; // used for sharedmem
@@ -388,6 +390,26 @@ namespace memory {
             new_vmm->is_lazy_alloc = 1;
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
+        }
+
+        inline static vmm_obj_t* changemem(arch::x86_64::process_t* proc, std::uint64_t flags) {
+            asm volatile("cli"); // bug if they are enabled
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
+
+            while (current) {
+
+                if (current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                    break;
+
+                if(current->base != 0) {
+                    memory::paging::changerange(proc->original_cr3,current->base,current->len,flags | ((current->flags) & ~(PTE_RW)));
+                }
+
+                current = current->next;
+            }
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+            return 0;
         }
 
         inline static void* customalloc(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t len, std::uint64_t flags, int is_shared) {

@@ -39,9 +39,6 @@ patch -p1 <"$CURRENT_DIR/diffs/gcc.diff"
 cd ..
 
 echo Downloading prerequisites
-cd gcc-15.1.0
-./contrib/download_prerequisites
-cd ..
 
 echo Donwloading and installing automake and autoconf 
 
@@ -96,7 +93,7 @@ cd ..
 mkdir -p gcc-build
 cd gcc-build
 
-../gcc-15.1.0/configure --target=x86_64-orange-mlibc --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --with-pic --enable-linker-build-id --enable-threads=posix --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared 
+../gcc-15.1.0/configure --target=x86_64-orange-mlibc --prefix="$HOME/opt/cross/orange" --with-sysroot="$(realpath $1)/initrd" --enable-languages=c,c++,go --disable-nls --with-pic --enable-linker-build-id --enable-threads=posix --enable-default-pie --enable-default-ssp --disable-multilib --enable-initfini-array --enable-shared --enable-host-shared  --with-mpc --with-mpfr --with-gmp
 
 make all-gcc -j$(nproc)
 make all-target-libgcc -j$(nproc)

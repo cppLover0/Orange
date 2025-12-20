@@ -44,6 +44,12 @@ namespace memory {
         static void alwaysmappedadd(std::uint64_t phys, std::uint64_t len);
         static void alwaysmappedmap(std::uint64_t cr3,std::uint32_t id);
         static std::uint64_t kernelget();
+
+        static void change(std::uint64_t cr3, std::uint64_t virt, std::uint64_t flags);
+
+        static void changerange(std::uint64_t cr3, std::uint64_t virt, std::uint64_t len , std::uint64_t flags);
+
+
     };
 
 };

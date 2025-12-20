@@ -19,7 +19,7 @@ CXX := c++
 LD := ld
 
 # User controllable C flags.
-CFLAGS := -g -pipe -Iinclude -Isrc/lib/Flanterm/src -Isrc/lib/uACPI/include -O3 -fno-omit-frame-pointer
+CFLAGS := -g -pipe -Iinclude -Isrc/lib/Flanterm/src -Isrc/lib/uACPI/include -O3 -fno-omit-frame-pointer -ggdb3 -fno-inline-functions-called-once -fno-optimize-sibling-calls  -fno-omit-frame-pointer
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)

@@ -44,6 +44,24 @@ void memory::paging::mapid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t vi
     pml[PTE_INDEX(align_virt,12)] = align_phys | flags;
 }
 
+void memory::paging::change(std::uint64_t cr3, std::uint64_t virt, std::uint64_t flags) {
+    std::uint64_t align_virt = ALIGNDOWN(virt,4096);
+    std::uint64_t* cr30 = (std::uint64_t*)Other::toVirt(cr3);
+    std::uint64_t new_flags = PTE_PRESENT | PTE_RW;
+    if(PTE_INDEX(align_virt,39) < 256)
+        new_flags |= PTE_USER;
+    uint64_t* pml3 = __paging_next_level(cr30,PTE_INDEX(align_virt,39),new_flags,0);
+    uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(align_virt,30),new_flags,0);
+    uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(align_virt,21),new_flags,0);
+    pml[PTE_INDEX(align_virt,12)] = (pml[PTE_INDEX(align_virt,12)] & PTE_MASK_VALUE) | flags;
+}
+
+void memory::paging::changerange(std::uint64_t cr3, std::uint64_t virt, std::uint64_t len , std::uint64_t flags) {
+    for(std::uint64_t i = 0;i < len; i += 4096) {
+        change(cr3,virt + i, flags);
+    }
+}
+
 void memory::paging::maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags) {
     for(std::uint64_t i = 0; i <= len; i += 4096) {
         map(cr3,phys + i,virt + i,flags);

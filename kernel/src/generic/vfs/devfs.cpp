@@ -222,7 +222,10 @@ std::int64_t __devfs__read(userspace_fd_t* fd, char* path, void* buffer, std::ui
 
     if(node->open_flags.is_pipe_rw) {
         vfs::vfs::unlock();
-        status = is_master ? node->writepipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0) : node->readpipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
+        if(!node->is_tty)
+            status = is_master ? node->writepipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0) : node->readpipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
+        else 
+            status = is_master ? node->writepipe->read(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0) : node->readpipe->ttyread(&fd->read_counter,(char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
     } else {
         //DEBUG(1,"read %s ring count %d",path,count);
         status = is_master ? node->writering->receivevals(buffer,dev_num,count,&fd->cycle,&fd->queue) : node->readring->receivevals(buffer,dev_num,count,&fd->cycle,&fd->queue);
@@ -314,60 +317,46 @@ std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
 
     std::int64_t ret = 0;
     if(node->open_flags.is_pipe_rw) {
-        switch (operation_type)
-        {
-            
-        case POLLIN:
-            ret = !is_slave ? node->writepipe->read_counter : node->readpipe->read_counter;
-            if(!is_slave)
-                if(fd->read_counter == -1 && node->writepipe->size != 0)
-                    ret = 0;
-            else 
-                if(fd->read_counter == -1 && node->readpipe->size != 0)
-                    ret = 0;
-
-            
-            break;
-            
-        case POLLOUT:
-            ret = !is_slave ? node->readpipe->write_counter : node->writepipe->write_counter;
-            if(ret == fd->write_counter) {
-                if(!is_slave) {
-                    if(node->readpipe->size != node->readpipe->total_size) {
-                        // fix this shit
-                        node->readpipe->write_counter++;
-                    }
-                } else {
-                    if(node->writepipe->size != node->writepipe->total_size) {
-                        node->writepipe->write_counter++;
-                    }
+        node->writepipe->lock.lock();
+        node->readpipe->lock.lock();
+        if(operation_type == POLLIN) {
+            if(!is_slave) {
+                ret = node->writepipe->size != 0 ? 1 : 0;
+            } else {
+                if(!node->is_tty)
+                    ret = node->readpipe->size != 0 ? 1 : 0;
+                else {
+                    ret = (node->readpipe->tty_ret && node->readpipe->size != 0) != 0 ? 1 : 0;
                 }
-                ret = !is_slave ? node->readpipe->write_counter : node->writepipe->write_counter;
             }
-            
-            break;
-            
-        default:
-            break;
+        } else if(operation_type == POLLOUT) {
+            if(!is_slave) {
+                ret = node->writepipe->size != node->writepipe->total_size ? 1 : 0;
+            } else {
+                ret = node->readpipe->size != node->readpipe->total_size ? 1 : 0;
+            }
         }
+        node->writepipe->lock.unlock();
+        node->readpipe->lock.unlock();
     } else {
         if(operation_type == POLLIN) {
-            ret = !is_slave ? node->writering->read_counter : node->readring->read_counter;
-            if(!is_slave && ret == fd->read_counter) {
+            ret = 0;
+            if(!is_slave) {
                 if(node->writering->isnotempty((int*)&fd->queue,(char*)&fd->cycle)) {
-                    fd->read_counter--;
+                    ret = 1;
                 } 
-            } else if(ret == fd->read_counter && is_slave) {
+            } else if(is_slave) {
                 if(node->readring->isnotempty((int*)&fd->queue,(char*)&fd->cycle)) {    
-                    fd->read_counter--;
+                    ret = 1;
 
                 } 
             }
 
         } else if(operation_type == POLLOUT) {
-            ret = !is_slave ? ++node->readring->write_counter : ++node->writering->write_counter;
+            ret = 1;
         } 
     }
+    
     return ret;
 }
 

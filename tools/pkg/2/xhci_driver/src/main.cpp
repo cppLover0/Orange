@@ -254,10 +254,11 @@ xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
         if(--timeout == 0) {
             xhci_trb_t t;
             t.base = 0xDEAD;
+            t.ret_code = 0;
             return t;
         }
 
-        usleep(500);
+        usleep(5000);
         
     }
 }
@@ -322,22 +323,26 @@ int __xhci_enable_slot(xhci_device_t* dev, int portnum) {
     xhci_trb_t trb;
 
     memset(&trb,0,sizeof(xhci_trb_t));
+
+    trb.info_s.intoncompletion = 1;
     trb.info_s.type = TRB_ENABLESLOTCOMMAND_TYPE;
 
     __xhci_clear_event(dev);
 
     __xhci_command_ring_queue(dev,dev->com_ring,&trb);
     __xhci_doorbell(dev,0);
-    usleep(10000);
+    usleep(25000);
     
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
-    if(ret.base == 0xDEAD)
+    if(ret.base == 0xDEAD) {
+        log(LEVEL_MESSAGE_FAIL,"Timeout for port %d in slot enabling\n",portnum);
         return 0;
+    }
 
     xhci_slot_trb_t* slot_ret = (xhci_slot_trb_t*)&ret;
 
-    if(slot_ret->ret_code != 1)
+    if(ret.ret_code != 1)
         log(LEVEL_MESSAGE_FAIL,"Can't allocate slot for port %d (ret %d)\n",portnum,ret.ret_code);
 
     return slot_ret->info_s.slotid;
@@ -351,7 +356,6 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
     trb.info_s.bsr = 0;
     trb.info_s.type = TRB_ADDRESSDEVICECOMMAND_TYPE;
     trb.info_s.slotid = id;
-
     __xhci_clear_event(dev);
 
     usleep(20000);
@@ -364,7 +368,7 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
     
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
-    if(ret.ret_code != 1)
+    if(ret.ret_code != 1 && ret.ret_code != 0)
         log(LEVEL_MESSAGE_FAIL,"Can't set XHCI port address (ret %d)\n",ret.ret_code);
 
     return ret.ret_code;
@@ -545,7 +549,7 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
         *portsc = load_portsc;
     }
 
-    uint16_t time = 25;
+    uint16_t time = 50;
     
     if(dev->usb3ports[portnum]) {
         while(*portsc & (1 << 19)) {
@@ -866,9 +870,11 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
     }
 
+    int status_addr = __xhci_set_addr(dev,addr,id,0);
 
-
-    if(__xhci_set_addr(dev,addr,id,0) != 1)
+    if(status_addr == 0) {
+        log(LEVEL_MESSAGE_WARN,"zero ret from xhci_set_addr (broken xhci ?)\n");
+    } else if(status_addr != 1) 
         return;
 
     xhci_usb_descriptor_t* descriptor = (xhci_usb_descriptor_t*)malloc(4096);

@@ -48,6 +48,9 @@ syscall_ret_t sys_libc_log(const char* msg) {
 }
 
 syscall_ret_t sys_exit(int status) {
+
+    memory::paging::enablekernel();
+
     arch::x86_64::process_t* proc = CURRENT_PROC;
     proc->exit_code = status;
 
@@ -60,7 +63,7 @@ syscall_ret_t sys_exit(int status) {
                 vfs::vfs::close(fd);
         }
         userspace_fd_t* next = fd->next;
-        memory::pmm::_virtual::free(fd);
+        delete (void*)fd;
         fd = next;
     }
 
@@ -92,11 +95,11 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
         int is_shared = (flags & MAP_SHARED) ? 1 : 0;
         if(!new_hint) {
             if(is_shared) {
-                new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,is_shared == 1 ? 1 : 0);
+                new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
             } else 
                 new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
         } else 
-            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,is_shared == 1 ? 1 : 0);
+            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,0);
 
         memory::paging::enablepaging(ctx->cr3); // try to reset tlb
 
@@ -149,11 +152,20 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
 }
 
 syscall_ret_t sys_free(void *pointer, size_t size) {
+
     arch::x86_64::process_t* proc = CURRENT_PROC;
     std::uint64_t phys = memory::vmm::get(proc,(std::uint64_t)pointer)->phys;
-    if(!memory::vmm::get(proc,(std::uint64_t)pointer)->is_mapped && !memory::vmm::get(proc,(std::uint64_t)pointer)->is_lazy_alloc)
-        memory::pmm::_physical::free(phys);
-    memory::vmm::get(proc,(std::uint64_t)pointer)->phys = 0;
+    vmm_obj_t* current = memory::vmm::get(proc, (std::uint64_t)pointer);
+    vmm_obj_t* start = (vmm_obj_t*)proc->vmm_start;
+    
+    start->lock.lock();
+    memory::pmm::_physical::free(current->phys);
+    start->lock.unlock();
+    
+    memory::paging::maprangeid(proc->original_cr3,0,(std::uint64_t)current->base,0,0,0);
+    current->phys = 0;
+    current->is_free = 1;
+    
     return {0,0,0};
 }
 
@@ -164,10 +176,10 @@ syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
     arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::fork(proc,ctx);
     new_proc->ctx.rax = 0;
     new_proc->ctx.rdx = 0;
-    
+
     arch::x86_64::scheduling::wakeup(new_proc);
 
-    DEBUG(proc->is_debug,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
+    DEBUG(1,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
     new_proc->is_debug = proc->is_debug;
 
     return {1,0,new_proc->id};
@@ -579,10 +591,12 @@ syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
     arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::clone(proc,ctx);
-    memory::paging::maprangeid(new_proc->original_cr3,Other::toPhys(new_proc->syscall_stack),(std::uint64_t)new_proc->syscall_stack,SYSCALL_STACK_SIZE,PTE_USER | PTE_PRESENT | PTE_RW,*new_proc->vmm_id);
 
     vmm_obj_t* st = (vmm_obj_t*)new_proc->vmm_start;
+
+    st->lock.lock();
     st->pthread_count++;
+    st->lock.unlock();
 
     new_proc->ctx.rax = 0;
     new_proc->ctx.rdx = 0;

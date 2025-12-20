@@ -3,7 +3,7 @@ MAKEFLAGS += -rR
 .SUFFIXES:
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 4G -d int -no-reboot -s -M q35 -smp 2 -enable-kvm -serial stdio -device qemu-xhci -device usb-kbd -device usb-mouse -cpu host,+invtsc
+QEMUFLAGS := -m 4G -d int -no-reboot -s -M q35 -smp 1 -enable-kvm -serial stdio -cpu host,+invtsc -device qemu-xhci -device usb-kbd -device usb-mouse
 
 override IMAGE_NAME := orange
 

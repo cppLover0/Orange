@@ -115,6 +115,8 @@ extern "C" void main() {
 
     dmesg("Now we are in userspace...");
 
+    setwp();
+
     asm volatile("sti");
     while(1) {
         

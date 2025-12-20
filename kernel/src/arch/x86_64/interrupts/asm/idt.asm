@@ -1,11 +1,6 @@
 %macro isr_err_stub 1
 isr_stub_%+%1:
     cli
-    cmp byte [rsp + 8],0x08
-    jz .cont
-    swapgs
-.cont:
-
     push qword (%+%1)
     jmp asmException
     cli
@@ -15,11 +10,6 @@ isr_stub_%+%1:
 %macro isr_no_err_stub 1
 isr_stub_%+%1:
     cli
-    cmp byte [rsp + 8],0x08
-    jz .cont
-    swapgs
-.cont:
-
     push qword 0
     push qword (%+%1)
     jmp asmException
@@ -134,11 +124,6 @@ isrTable:
 %macro irq_stub 1
 irq_stub_%+%1:
     cli
-    cmp byte [rsp + 8],0x08
-    jz .cont
-    swapgs
-.cont:
-
     push qword 0
     push qword (%+%1)
     jmp irqStub
@@ -228,10 +213,4 @@ irqStub:
     pop r14
     pop r15
     add rsp,16
-
-    cmp byte [rsp + 8],0x08
-    jz .cont2
-    swapgs
-
-.cont2:
     iretq

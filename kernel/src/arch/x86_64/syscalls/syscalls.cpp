@@ -100,7 +100,12 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
     proc->sys = ctx->rax;
 
-   //DEBUG(proc->id == 13,"sys %d from %d",ctx->rax,proc->id);
+    extern int last_sys;
+    last_sys = ctx->rax;
+
+    arch::x86_64::cpu::data()->last_sys = ctx->rax;
+
+    DEBUG(0,"sys %d from %d",ctx->rax,proc->id);
         
 
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;
@@ -111,12 +116,13 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
             DEBUG(proc->is_debug,"rdx ret 0x%p smaller than zero from sys %d",ret.ret_val,ctx->rax);
     }
 
+    last_sys = 0;
     DEBUG(0,"sys ret %d from proc %d ",ret.ret,proc->id);
 
     if(ret.ret != 0 && ret.ret != EAGAIN)
         DEBUG(proc->is_debug,"Syscall %d from proc %d fails with code %d",ctx->rax,proc->id,ret.ret);
 
-    ctx->rax = ret.ret;
+    ctx->rax = ret.ret; 
     return;
 } 
 
@@ -126,3 +132,4 @@ void arch::x86_64::syscall::init() {
     __wrmsr(STAR_MASK,(1 << 9)); // syscalls will enable interrupts when gs is swapped + stack is saved
     __wrmsr(EFER,__rdmsr(EFER) | 1);
 }
+

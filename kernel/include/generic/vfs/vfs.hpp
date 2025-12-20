@@ -265,7 +265,7 @@ namespace vfs {
             return written;
         }
 
-        std::uint64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
+        std::uint64_t ttyread(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
 
             std::uint64_t read_bytes = 0;
             int tries = 0;
@@ -310,6 +310,47 @@ namespace vfs {
                             continue;
                         }
                     }
+                }
+                
+                read_bytes = (count < this->size) ? count : this->size;
+                memcpy(dest_buffer, this->buffer, read_bytes);
+                memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
+                this->size -= read_bytes;
+
+                this->write_counter++; 
+
+                if(this->size <= 0) {
+                    
+                    tty_ret = 0;
+                } else
+                    this->read_counter++;
+
+                this->lock.unlock();
+                break;
+            }
+            return read_bytes;
+        }
+
+        std::uint64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
+
+            std::uint64_t read_bytes = 0;
+            int tries = 0;
+
+            while (true) {
+                this->lock.lock();
+
+                if (this->size == 0) {
+                    if (this->is_closed.test(std::memory_order_acquire)) {
+                        this->lock.unlock();
+                        return 0; 
+                    }
+                    if (flags & O_NONBLOCK || is_block) {
+                        this->lock.unlock();
+                        return 0;
+                    }
+                    this->lock.unlock();
+                    yield();
+                    continue;
                 }
                 
                 read_bytes = (count < this->size) ? count : this->size;
@@ -459,6 +500,8 @@ namespace vfs {
 
 
     static inline int normalize_path(const char* src, char* dest, std::uint64_t dest_size) {
+        memcpy(dest,src,strlen(src) + 1);
+        return 0;
         if (!src ||!dest || dest_size < 2) return -1;
         std::uint64_t j = 0;
         int prev_slash = 0;
@@ -485,38 +528,31 @@ namespace vfs {
 
     /* I'll use path resolver from my old kernel */
     static inline void resolve_path(const char* inter0,const char* base, char *result, char spec, char is_follow_symlinks) {
-        char buffer_in_stack[2048];
         char buffer2_in_stack[2048];
         char inter[2048];
-        char* buffer = (char*)buffer_in_stack;
+        char* buffer = 0;
         char* final_buffer = (char*)buffer2_in_stack;
         std::uint64_t ptr = strlen((char*)base);
         char is_first = 1;
         char is_full = 0;
-
-        memset(inter,0,2048);
-        memset(buffer_in_stack,0,2048);
-        memset(buffer2_in_stack,0,2048);
-
-        memcpy(inter,inter0,strlen(inter0));
-        memcpy(final_buffer,base,strlen((char*)base));
+        memcpy(inter,inter0,strlen(inter0) + 1);
+        
 
         if(strlen((char*)inter) == 1 && inter[0] == '.') {
-            memset(result,0,2048);
-            memcpy(result,base,strlen((char*)base));
+            memcpy(result,base,strlen((char*)base) + 1);
             return;
         }
 
         if(!strcmp(inter,"/")) {
-            memset(result,0,2048);
-            memcpy(result,inter,strlen((char*)inter));
+            memcpy(result,inter,strlen((char*)inter) + 1);
             return;
-        }
+        } 
 
         if(inter[0] == '/') {
             ptr = 0;
-            memset(final_buffer,0,2048);
             is_full = 1;
+        } else {
+            memcpy(final_buffer,base,strlen((char*)base) + 1);
         }
 
         if(spec)
@@ -575,7 +611,6 @@ namespace vfs {
             
             buffer = strtok(0,"/");
         }
-        memset(result,0,2048);
         normalize_path(final_buffer,result,2048);
     }
 
