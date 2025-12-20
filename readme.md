@@ -45,6 +45,16 @@ Build kernel and run iso
 make run
 ```
 
+Dependencies
+```
+cmake meson (1.4.2) ninja gcc (13.3.0) libgmp3-dev libmpfr-dev libmpc-dev libglib2.0-dev-bin python3.13 python3.13-dev python3.13-venv python3.13-distutils gettext gperf rsync flex bison make nasm bash 
+```
+
+Also if you have custom python version you need to pass environment variable because python requires newest version
+```
+BUILDPYTHON=--with-build-python=python3.13 sh tar-initrd.sh
+```
+
 ## TODO
 
 - [x] Move XHCI driver from old kernel to userspace
