@@ -42,7 +42,7 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(0,"%s from proc %d",buffer,proc->id);
+    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
@@ -600,6 +600,8 @@ syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame
 
     new_proc->ctx.rax = 0;
     new_proc->ctx.rdx = 0;
+
+    //new_proc->fs_base = proc->fs_base;
     
     new_proc->ctx.rsp = stack;
     new_proc->ctx.rip = rip;

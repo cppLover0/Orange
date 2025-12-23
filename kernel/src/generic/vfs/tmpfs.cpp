@@ -311,6 +311,13 @@ again:
     }
 
     vfs::tmpfs_node_t* next = (vfs::tmpfs_node_t*)(((std::uint64_t*)node->content)[fd->offset]);
+
+    if(next == 0) { // null pointer fix 
+        out->d_reclen = 0;
+        memset(out->d_name,0,sizeof(out->d_name));
+        return 0; 
+    }
+
     memset(out->d_name,0,sizeof(out->d_name));
     memcpy(out->d_name,__tmpfs__find_name(next->name),strlen(__tmpfs__find_name(next->name)));
     out->d_reclen = sizeof(vfs::dirent_t);

@@ -346,7 +346,10 @@ std::int64_t memory::freelist::alloc() {
         }
     }
     std::uint64_t freelist_mem = freelist_page;
+
     freelist_page = *((std::uint64_t*)Other::toVirt(freelist_mem));
+
+    memset(Other::toVirt(freelist_mem),0,4096);
     return freelist_mem;
 }
 

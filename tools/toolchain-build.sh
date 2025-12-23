@@ -67,6 +67,8 @@ automake
 cd ../../gcc-15.1.0/libstdc++-v3
 autoconf
 autotools_recursive_regen
+cd ../libgcc
+autotools_recursive_regen
 cd ../../
 
 cd gcc-15.1.0

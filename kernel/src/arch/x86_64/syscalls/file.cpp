@@ -48,7 +48,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
     memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
 
-    //DEBUG(1,"Trying to open %s from proc %d",result,proc->id);
+    DEBUG(0,"Trying to open %s from proc %d",result,proc->id);
 
     if(result[0] == '\0') {
         result[0] = '/';
@@ -244,6 +244,8 @@ syscall_ret_t sys_close(int fd) {
         return {0,EBADF,0};
     else if(fd < 3 && !fd_s)
         return {0,0,0}; // ignoring
+
+    DEBUG(0,"Closing %s\n",fd_s->path);
 
     if(fd_s->can_be_closed)
         return {0,EBADF,0};

@@ -18,3 +18,4 @@ if [ ! "$(which x86_64-orange-mlibc-gcc)" ]; then
 fi
 
 find initrd/usr/lib initrd/usr/bin -type f -print0 | xargs -0 -I{} x86_64-orange-mlibc-strip --strip-all {}
+sh build-pkg.sh 0/mlibc

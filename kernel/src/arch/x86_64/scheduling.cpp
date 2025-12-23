@@ -410,14 +410,8 @@ void arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
     futex_lock.lock();
     while(proc0) {
         if((proc0->parent_id == proc->id || proc->parent_id == proc0->id)) {
-            if(!proc0->futex) {
-                proc0->futex = (std::uint64_t)lock; // now when proc doing wait() it can check and just ignore it
-            } else {
-                proc0->futex = 0;
-                proc0->futex_lock.unlock();
-            }
-            
-            //DEBUG(proc->is_debug,"Process which we can wakeup is %d",proc0->id);
+            proc0->futex = 0;
+            proc0->futex_lock.unlock();
         } 
         proc0 = proc0->next;
     }
@@ -428,11 +422,10 @@ void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val, in
     
     futex_lock.lock();
     int lock_val = *lock;
-    if(lock_val == val && proc->futex == 0) {
+    if(lock_val == val) {
         proc->futex_lock.lock();
         proc->futex = (std::uint64_t)original_lock;
-    } else if(proc->futex == (std::uint64_t)lock)
-        proc->futex = 0;
+    } 
     futex_lock.unlock();
 }
 

@@ -105,7 +105,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
 
     arch::x86_64::cpu::data()->last_sys = ctx->rax;
 
-    DEBUG(0,"sys %d from %d",ctx->rax,proc->id);
+    DEBUG(0,"sys %d from %d rip 0x%p",ctx->rax,proc->id,ctx->rip);
         
 
     syscall_ret_t (*sys)(std::uint64_t D, std::uint64_t S, std::uint64_t d, int_frame_t* frame) = (syscall_ret_t (*)(std::uint64_t, std::uint64_t, std::uint64_t, int_frame_t*))item->syscall_func;

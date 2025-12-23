@@ -33,7 +33,7 @@ void panic(int_frame_t* ctx, const char* msg) {
     }
 
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
-    if(proc && 0) {
+    if(proc && 1) {
         uint64_t cr2;
         asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
 
@@ -90,7 +90,7 @@ void panic(int_frame_t* ctx, const char* msg) {
         //     }
         // }
 
-        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx);
+        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p rbp 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx,ctx->rbp);
         
         vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
 
@@ -104,6 +104,17 @@ void panic(int_frame_t* ctx, const char* msg) {
             current = current->next;
 
         }
+
+        stackframe_t* rbp = (stackframe_t*)ctx->rbp;
+
+        memory::paging::enablepaging(ctx->cr3);
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[0] - 0x%016llX (current rip)\n",ctx->rip);
+        for (int i = 1; i < 25 && rbp; ++i) {
+            std::uint64_t ret_addr = rbp->rip;
+            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[%d] - 0x%016llX\n", i, ret_addr);
+            rbp = (stackframe_t*)rbp->rbp;
+        }
+        memory::paging::enablekernel();
 
         arch::x86_64::scheduling::kill(proc);
        schedulingSchedule(0);
