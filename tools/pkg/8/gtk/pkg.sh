@@ -42,7 +42,7 @@ diff_patch ../../diff/dbus.diff
 
 mkdir build
 
-meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix=/usr -Druntime_dir=/run -Dsystemd_system_unitdir=no -Dsystemd_user_unitdir=no -Dsystem_pid_file=/run/dbus/pid -Dsystem_socket=/run/dbus/system_bus_socket -Dselinux=disabled -Dapparmor=disabled -Dlibaudit=disabled -Dkqueue=disabled -Dlaunchd=disabled -Dsystemd=disabled -Dmodular_tests=disabled -Depoll=disabled build
+meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix=/usr -Druntime_dir=/run -Dsystemd_system_unitdir=no -Dsystemd_user_unitdir=no -Dsystem_pid_file=/run/dbus/pid -Dsystem_socket=/run/dbus/system_bus_socket -Dselinux=disabled -Dapparmor=disabled -Dlibaudit=disabled -Dkqueue=disabled -Dlaunchd=disabled -Dsystemd=disabled -Dmodular_tests=disabled -Depoll=disabled -Dverbose_mode=true build
 cd build
 
 meson compile -j$(nproc)
@@ -52,6 +52,8 @@ touch "$1/usr/share/dbus-1/session.d/.keep"
 touch "$1/var/lib/dbus/.keep"
 
 cd ../..
+
+exit 0
 
 wget https://gitlab.gnome.org/GNOME/at-spi2-core/-/archive/2.56.6/at-spi2-core-2.56.6.tar
 tar -xvf at-spi2-core-2.56.6.tar
@@ -67,11 +69,11 @@ DESTDIR="$1" meson install --no-rebuild
 
 cd ../..
 
-wget https://github.com/GNOME/gobject-introspection/archive/refs/tags/1.73.0.tar.gz
-mv 1.73.0.tar.gz intro.tar.gz
+wget https://github.com/GNOME/gobject-introspection/archive/refs/tags/1.86.0.tar.gz
+mv 1.86.0.tar.gz intro.tar.gz
 tar -xvf intro.tar.gz
 
-cd gobject-introspection-1.73.0
+cd gobject-introspection-1.86.0
 
 mkdir build
 meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix=/usr -Dgtk_doc=false -Dbuild_introspection_data=false build

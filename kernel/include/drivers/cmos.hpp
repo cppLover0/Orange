@@ -57,3 +57,43 @@ namespace drivers {
         }
     };
 };
+
+inline bool isLeapYear(int year) {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+}
+
+inline int daysInMonth(int month, int year) {
+    int days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    if (month == 2 && isLeapYear(year)) {
+        return 29; 
+    }
+    return days[month - 1];
+}
+
+inline static uint64_t getUnixTime() {
+    int year = drivers::cmos::year();
+    int month = drivers::cmos::month();
+    int day = drivers::cmos::day();
+    int hour = drivers::cmos::hour();
+    int minute = drivers::cmos::minute();
+    int second = drivers::cmos::second();
+
+    long long daysSinceEpoch = 0;
+    for (int y = 1970; y < year; ++y) {
+        daysSinceEpoch += isLeapYear(y) ? 366 : 365;
+    }
+
+    for (int m = 1; m < month; ++m) {
+        daysSinceEpoch += daysInMonth(m, year);
+    }
+
+    daysSinceEpoch += (day - 1);
+
+    long long secondsSinceEpoch = daysSinceEpoch * 86400;
+
+    secondsSinceEpoch += hour * 3600;
+    secondsSinceEpoch += minute * 60;
+    secondsSinceEpoch += second;
+
+    return secondsSinceEpoch;
+}

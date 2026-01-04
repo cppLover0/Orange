@@ -14,12 +14,17 @@ extern "C" void yield();
 
 #include <etc/logging.hpp>
 
+#include <etc/errno.hpp>
+#include <etc/list.hpp>
+
 #include <algorithm>
 
 #define USERSPACE_FD_STATE_UNUSED 0
 #define USERSPACE_FD_STATE_FILE 1
 #define USERSPACE_FD_STATE_PIPE 2
 #define USERSPACE_FD_STATE_SOCKET 3
+#define USERSPACE_FD_STATE_SOCKETPAIR 4 // unused maybe in future
+#define USERSPACE_FD_STATE_EVENTFD 5
 
 #define VFS_TYPE_NONE 0
 #define VFS_TYPE_FILE 1
@@ -143,7 +148,153 @@ typedef struct {
 
 void __vfs_symlink_resolve(char* path, char* out);
 
+#define EFD_SEMAPHORE 1
+#define EFD_NONBLOCK O_NONBLOCK
+
+struct ucred {
+	int pid;
+	int uid;
+	int gid;
+};
+
 namespace vfs {
+
+    class eventfd {
+    private:
+        int used = 0;
+    public:
+        locks::spinlock lock;
+        std::uint64_t buffer = 0;
+        int flags = 0;
+    
+        eventfd(int init, int flags) {
+            this->buffer = init;
+            this->flags = flags;
+        }
+
+        void create() {
+            used++;
+        }
+
+        void close() {
+            used--;
+            if(used == 0)
+                delete this;
+        }
+
+        std::int64_t write(std::uint64_t val) {
+            this->lock.lock();
+            std::uint64_t future = buffer + val;
+            if(future >= (0xFFFFFFFFFFFFFFFF - 1)) {
+                if(flags & EFD_NONBLOCK) {
+                    this->lock.unlock();
+                    return -EAGAIN; 
+                } else {
+                    while(future >= (0xFFFFFFFFFFFFFFFF - 1)) {
+                        this->lock.unlock();
+                        yield();
+                        this->lock.lock();
+                        future = buffer + val;
+                    }
+                }
+            }
+            buffer += val;
+            this->lock.unlock();
+            return 8;
+        }
+
+        std::int64_t read(std::uint64_t* val) {
+            this->lock.lock();
+            if(this->buffer == 0) {
+                if(this->flags & EFD_NONBLOCK) {
+                    this->lock.unlock();
+                    return -EAGAIN; 
+                }
+                
+                while(this->buffer == 0) {
+                    this->lock.unlock();
+                    yield();
+                    this->lock.lock();
+                }
+            }
+            *val = this->buffer;
+            if(this->flags & EFD_SEMAPHORE)
+                this->buffer--;
+            else 
+                this->buffer = 0;
+            this->lock.unlock();
+            return 8;
+        }
+
+        ~eventfd() {
+
+        }
+    
+    };
+
+    // same as fdpassmanager but ucred
+    class ucred_manager {
+    private:
+        struct ucred* fds = 0;
+        Lists::Bitmap* bitmap = 0;
+        int fd_size = 0;
+        int current_ptr = 0;
+        
+        int allocate() {
+            for(int i = 0; i < 64; i++) {
+                if(!this->bitmap->test(i))
+                    return i;
+            }
+            return -1;
+        }
+
+        int find_free() {
+            for(int i = 0; i < 64; i++) {
+                if(this->bitmap->test(i))
+                    return i;
+            }
+            return -1;
+        }
+
+    public:
+        
+        locks::spinlock lock;
+
+        ucred_manager() {
+            this->fd_size = 64; // default to 16 passing fds 
+            this->fds = new struct ucred[this->fd_size];
+            this->bitmap = new Lists::Bitmap(this->fd_size);
+        }
+
+        ~ucred_manager() {
+            delete (void*)this->fds;
+            delete (void*)this->bitmap;
+        }
+
+        int pop(struct ucred* out) {
+            this->lock.lock();
+            int idx = find_free();
+            if(idx == -1) { this->lock.unlock();
+                return -1; } 
+            memcpy(out,&fds[idx],sizeof(struct ucred));
+            this->bitmap->clear(idx);
+            this->lock.unlock();
+            return 0;
+        }
+
+        int push(struct ucred* src) {
+            this->lock.lock();
+            int idx = allocate();
+            if(idx == -1) { this->lock.unlock();
+                return -1; }
+            memcpy(&fds[idx],src,sizeof(struct ucred));
+            this->bitmap->set(idx);
+            this->lock.unlock();
+            return 0;
+        }
+
+    };
+
 
     class pipe {
     private:
@@ -173,8 +324,15 @@ namespace vfs {
         std::uint32_t connected_to_pipe_write = 0;
         std::uint64_t flags = 0;
 
+        std::uint32_t zero_message_count = 0;
+        
+        int is_closed_socket = 0;
+
         int tty_ret = 0;
         termios_t* ttyflags = 0;
+
+        void* fd_pass = 0;
+        ucred_manager* ucred_pass = 0;
 
         pipe(std::uint64_t flags) {
             this->buffer = (char*)memory::pmm::_virtual::alloc(USERSPACE_PIPE_SIZE);
@@ -238,6 +396,14 @@ namespace vfs {
         std::uint64_t write(const char* src_buffer, std::uint64_t count,int id) {
 
             std::uint64_t written = 0;
+
+            if(count == 0) {
+                this->lock.lock();
+                this->zero_message_count = 1;
+                this->lock.unlock();
+                return 0;
+            }
+
             while (written < count) {
                 this->lock.lock();
 
@@ -261,6 +427,35 @@ namespace vfs {
                 this->read_counter++;
 
                 this->lock.unlock();
+            }
+            return written;
+        }
+
+        std::uint64_t nolock_write(const char* src_buffer, std::uint64_t count,int id) {
+
+            std::uint64_t written = 0;
+
+            if(count == 0) {
+                this->zero_message_count = 1;
+                return 0;
+            }
+
+            while (written < count) {
+
+                std::uint64_t space_left = this->total_size - this->size;
+
+                uint64_t old_size = this->size;
+
+                std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
+                if(to_write < 0)
+                    to_write = 0;
+
+
+                force_write(src_buffer + written, to_write);
+
+                written += to_write;
+                this->read_counter++;
+
             }
             return written;
         }
@@ -331,7 +526,7 @@ namespace vfs {
             return read_bytes;
         }
 
-        std::uint64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
+        std::int64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
 
             std::uint64_t read_bytes = 0;
             int tries = 0;
@@ -340,13 +535,20 @@ namespace vfs {
                 this->lock.lock();
 
                 if (this->size == 0) {
+
                     if (this->is_closed.test(std::memory_order_acquire)) {
                         this->lock.unlock();
                         return 0; 
                     }
-                    if (flags & O_NONBLOCK || is_block) {
+
+                    if(this->is_closed_socket) {
                         this->lock.unlock();
                         return 0;
+                    }
+
+                    if (flags & O_NONBLOCK || is_block) {
+                        this->lock.unlock();
+                        return -11;
                     }
                     this->lock.unlock();
                     yield();
@@ -376,6 +578,8 @@ namespace vfs {
 
         ~pipe() {
             memory::pmm::_virtual::free(this->buffer);
+            if(ucred_pass)
+                delete (void*)ucred_pass;
         }
 
     };
@@ -412,11 +616,17 @@ typedef struct userspace_fd {
     std::uint8_t state;
     std::uint8_t pipe_side;
 
+    int pid;
+    int uid;
+
     std::uint8_t can_be_closed;
 
     std::uint8_t is_listen;
     vfs::pipe* read_socket_pipe;
     vfs::pipe* write_socket_pipe;
+
+    int socket_pid;
+    int socket_uid;
 
     std::uint8_t is_a_tty;
 
@@ -433,6 +643,8 @@ typedef struct userspace_fd {
     int is_cached_path;
     int is_debug;
 
+    vfs::eventfd* eventfd;
+
     vfs::pipe* pipe;
     char path[2048];
 
@@ -441,7 +653,74 @@ typedef struct userspace_fd {
 
 } userspace_fd_t;
 
+
+
+static_assert(sizeof(userspace_fd_t) < 4096,"userspace_fd size is bigger than page size");
+
 namespace vfs {
+
+    class passingfd_manager {
+    private:
+        userspace_fd_t* fds = 0;
+        Lists::Bitmap* bitmap = 0;
+        int fd_size = 0;
+        int current_ptr = 0;
+        
+        int allocate() {
+            for(int i = 0; i < 16; i++) {
+                if(!this->bitmap->test(i))
+                    return i;
+            }
+            return -1;
+        }
+
+        int find_free() {
+            for(int i = 0; i < 16; i++) {
+                if(this->bitmap->test(i))
+                    return i;
+            }
+            return -1;
+        }
+
+    public:
+        
+        locks::spinlock lock;
+
+        passingfd_manager() {
+            this->fd_size = 16; // default to 16 passing fds 
+            this->fds = new userspace_fd_t[this->fd_size];
+            this->bitmap = new Lists::Bitmap(this->fd_size);
+        }
+
+        ~passingfd_manager() {
+            delete (void*)this->fds;
+            delete (void*)this->bitmap;
+        }
+
+        int pop(userspace_fd_t* out) {
+            this->lock.lock();
+            int idx = find_free();
+            if(idx == -1) { this->lock.unlock();
+                return -1; } 
+            memcpy(out,&fds[idx],sizeof(userspace_fd_t));
+            this->bitmap->clear(idx);
+            this->lock.unlock();
+            return 0;
+        }
+
+        int push(userspace_fd_t* src) {
+            this->lock.lock();
+            int idx = allocate();
+            if(idx == -1) { this->lock.unlock();
+                return -1; }
+            memcpy(&fds[idx],src,sizeof(userspace_fd_t));
+            this->bitmap->set(idx);
+            this->lock.unlock();
+            return 0;
+        }
+
+    };
+
     class fd {
     public:
         /* Just helper function for non userspace usage */
@@ -478,6 +757,12 @@ namespace vfs {
 #define TMPFS_VAR_UNLINK 1
 #define DEVFS_VAR_ISATTY 2
 
+typedef long time_t;
+struct timespec {
+	time_t tv_sec;
+	long tv_nsec;
+};
+
 namespace vfs {
 
     static inline std::uint64_t resolve_count(char* str,std::uint64_t sptr,char delim) {
@@ -500,8 +785,6 @@ namespace vfs {
 
 
     static inline int normalize_path(const char* src, char* dest, std::uint64_t dest_size) {
-        memcpy(dest,src,strlen(src) + 1);
-        return 0;
         if (!src ||!dest || dest_size < 2) return -1;
         std::uint64_t j = 0;
         int prev_slash = 0;
@@ -535,8 +818,8 @@ namespace vfs {
         std::uint64_t ptr = strlen((char*)base);
         char is_first = 1;
         char is_full = 0;
+
         memcpy(inter,inter0,strlen(inter0) + 1);
-        
 
         if(strlen((char*)inter) == 1 && inter[0] == '.') {
             memcpy(result,base,strlen((char*)base) + 1);
@@ -556,6 +839,9 @@ namespace vfs {
         }
 
         if(spec)
+            is_first = 0;
+
+        if(!strcmp(base,"/"))
             is_first = 0;
 
         buffer = strtok((char*)inter,"/");
@@ -618,6 +904,8 @@ namespace vfs {
         __MLIBC_DIRENT_BODY;
     } dirent_t;
 
+    
+
     typedef struct {
         unsigned long st_dev;
         unsigned long st_ino;
@@ -630,7 +918,10 @@ namespace vfs {
         long st_size;
         long st_blksize;
         long st_blocks;
-
+        struct timespec st_atim;
+        struct timespec st_mtim;
+        struct timespec st_ctim;
+        long __unused[3];
     } __attribute__((packed)) stat_t;
 
     typedef struct {

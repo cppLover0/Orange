@@ -1,4 +1,6 @@
 
+#define _XOPEN_SOURCE 700
+
 #include <linux/fb.h>
 #include <stdio.h>
 #include <stdlib.h>

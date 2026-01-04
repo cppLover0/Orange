@@ -37,6 +37,7 @@ void __ustar_fault(const char* msg) {
 }
 
 extern std::uint8_t __tmpfs__create_parent_dirs_by_default;
+extern std::uint8_t __tmpfs__dont_alloc_memory;
 
 void vfs::ustar::copy() {
     struct limine_module_response* initrd = BootloaderInfo::AccessInitrd();
@@ -54,11 +55,16 @@ void vfs::ustar::copy() {
                 int size = oct2bin((uint8_t*)current->file_size,strlen(current->file_size));
                 
                 userspace_fd_t fd;
+
                 memset(&fd,0,sizeof(userspace_fd_t));
                 memcpy(fd.path,file,strlen(file));
-                
+
+                __tmpfs__dont_alloc_memory = 1;
                 vfs::vfs::write(&fd,(char*)((std::uint64_t)current + 512),size);
-                vfs::vfs::var(&fd,(std::uint64_t)current->file_mode,TMPFS_VAR_CHMOD | (1 << 7));
+                __tmpfs__dont_alloc_memory = 0;
+
+                std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,8);
+                vfs::vfs::var(&fd,(std::uint64_t)&actual_mode,TMPFS_VAR_CHMOD | (1 << 7));
                 break;
             }
 
@@ -74,7 +80,11 @@ void vfs::ustar::copy() {
                 memset(&fd,0,sizeof(userspace_fd_t));
                 memcpy(fd.path,file,strlen(file));
                 vfs::vfs::create(file,VFS_TYPE_SYMLINK);
+
+                __tmpfs__dont_alloc_memory = 1;
                 vfs::vfs::write(&fd,current->name_linked,strlen(current->name_linked));
+                __tmpfs__dont_alloc_memory = 0;
+                
                 break;
             }
         }

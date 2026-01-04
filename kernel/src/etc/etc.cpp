@@ -77,12 +77,16 @@ extern "C" {
 
 void *operator new(size_t size)
 {
-    return memory::heap::malloc(size);
+    void* ptr = memory::heap::malloc(size);
+    memset(ptr,0,size);
+    return ptr;
 }
 
 void *operator new[](size_t size)
 {
-    return memory::heap::malloc(size);
+    void* ptr = memory::heap::malloc(size);
+    memset(ptr,0,size);
+    return ptr;
 }
 
 void operator delete(void *p)

@@ -2,6 +2,8 @@
 #include <iostream>
 #include <xhci.hpp>
 
+#define _DEFAULT_SOURCE
+
 #include <unistd.h>
 
 #include <orange/dev.h>
@@ -1405,6 +1407,18 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
         if (!isPressed && data[i] != 0) {
             if (data[i] < 0x47) {
                 input_send(hid_to_ps2_layout[data[i]]);
+            } else if(data[i] == 0x4F) {
+                input_send(0xE0);
+                input_send(0x4D); 
+            } else if(data[i] == 0x50) {
+                input_send(0xE0);
+                input_send(0x4B); 
+            } else if(data[i] == 0x51) {
+                input_send(0xE0);
+                input_send(0x50); 
+            } else if(data[i] == 0x52) {
+                input_send(0xE0);
+                input_send(0x48); 
             }
         }
     }
@@ -1419,7 +1433,19 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
         }
         if (!isStillPressed && usbdev->add_buffer[i] != 0) {
             input_send(hid_to_ps2_layout[usbdev->add_buffer[i]] | 0x80);
-        }
+        } else if(usbdev->add_buffer[i] == 0x4F) {
+                input_send(0xE0 | 0x80);
+                input_send(0x4D | 0x80); 
+            } else if(usbdev->add_buffer[i] == 0x50) {
+                input_send(0xE0 | 0x80);
+                input_send(0x4B | 0x80); 
+            } else if(usbdev->add_buffer[i] == 0x51) {
+                input_send(0xE0 | 0x80);
+                input_send(0x50 | 0x80); 
+            } else if(usbdev->add_buffer[i] == 0x52) {
+                input_send(0xE0 | 0x80);
+                input_send(0x48 | 0x80); 
+            }
     }
 
     memcpy(usbdev->add_buffer, data, 8);
@@ -1465,8 +1491,6 @@ int main() {
 
     input0_fd = open("/dev/masterps2keyboard",O_RDWR);
     mouse_fd = open("/dev/mastermouse",O_RDWR);
-
-    log(LEVEL_MESSAGE_WARN,"XHCI Driver is currently under development so it's unstable\n");
 
     xhci_hid_register(__usbkeyboard_handler,USB_TYPE_KEYBOARD);
     xhci_hid_register(__usbmouse_handler,USB_TYPE_MOUSE);

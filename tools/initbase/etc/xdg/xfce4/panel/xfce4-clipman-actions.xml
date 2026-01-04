@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE actions [
+<!ELEMENT actions (action)+>
+<!ELEMENT action (name , regex , commands)>
+<!ELEMENT commands (command)+>
+<!ELEMENT command (name , exec)>
+<!ELEMENT name (#PCDATA)>
+<!ATTLIST name xml:lang CDATA #IMPLIED>
+<!ELEMENT regex (#PCDATA)>
+<!ELEMENT exec (#PCDATA)>
+]>
+<!--
+  Copyright (c) 2009-2011 Mike Massonnet <mmassonnet@xfce.org>
+
+  Default Clipman actions configuration file, which gets installed system-wide.
+  This should act more like an example, and is therefore kept simple.
+-->
+<actions>
+  <action>
+    <name>Image</name>
+    <name xml:lang="ur">تصویر</name>
+    <name xml:lang="ur-PK">تصویر</name>
+    <name xml:lang="ug">سۈرەت</name>
+    <name xml:lang="lv">Attēls</name>
+    <name xml:lang="ast">Imaxe</name>
+    <name xml:lang="ar">صورة</name>
+    <regex>(http|ftp).+\.(jpg|png|gif)</regex>
+    <commands>
+      <command>
+        <name>Edit with Gimp</name>
+        <name xml:lang="ur">گمپ سے مدون کریں</name>
+        <name xml:lang="ur-PK">گمپ سے مدون کریں</name>
+        <name xml:lang="ug">GIMP دە تەھرىرلەش</name>
+        <name xml:lang="lv">Rediģēt ar Gimp</name>
+        <name xml:lang="ast">Editar con GIMP</name>
+        <name xml:lang="ar">تحرير باستخدام جمب</name>
+        <exec>gimp "\0"</exec>
+      </command>
+      <command>
+        <name>View with Ristretto</name>
+        <name xml:lang="ur">ریسٹریٹو کے ذریعہ دیکھیں</name>
+        <name xml:lang="ur-PK">ریسٹریٹو کے ذریعہ دیکھیں</name>
+        <name xml:lang="ug">Ristretto دە كۆرسەت</name>
+        <name xml:lang="lv">Apskatīt ar Ristretto</name>
+        <name xml:lang="ast">Ver con Ristretto</name>
+        <name xml:lang="ar">عرض مع ريستريتو</name>
+        <exec>ristretto "\0"</exec>
+      </command>
+    </commands>
+  </action>
+  <action>
+    <name>Bugz</name>
+    <name xml:lang="ur">بگز</name>
+    <name xml:lang="ur-PK">بگز</name>
+    <name xml:lang="ug">Bugz</name>
+    <name xml:lang="lv">Bugz</name>
+    <name xml:lang="ast">Bugz</name>
+    <name xml:lang="ar">Bugz</name>
+    <regex>bug\s*#?\s*([0-9]+)</regex>
+    <commands>
+      <command>
+        <name>Xfce Bug</name>
+        <name xml:lang="ur">ایکسفس بگ</name>
+        <name xml:lang="ur-PK">ایکسفس بگ</name>
+        <name xml:lang="ug">Xfce  كەمتۈكى</name>
+        <name xml:lang="lv">Xfce Bug</name>
+        <name xml:lang="ast">Fallu de Xfce</name>
+        <name xml:lang="ar">علة Xfce</name>
+        <exec>exo-open https://bugzilla.xfce.org/show_bug.cgi?id=\1</exec>
+      </command>
+      <command>
+        <name>GNOME Bug</name>
+        <name xml:lang="ur">گنوم بگ</name>
+        <name xml:lang="ur-PK">گنوم بگ</name>
+        <name xml:lang="ug">گىنوم كەمتۈكى</name>
+        <name xml:lang="lv">GNOME Bug</name>
+        <name xml:lang="ast">Fallu de GNOME</name>
+        <name xml:lang="ar">علة جنوم</name>
+        <exec>exo-open https://bugzilla.gnome.org/show_bug.cgi?id=\1</exec>
+      </command>
+    </commands>
+  </action>
+  <action>
+    <name>Long URL</name>
+    <name xml:lang="ur">طویل ربط</name>
+    <name xml:lang="ur-PK">طویل ربط</name>
+    <name xml:lang="ug">ئۇزۇن URL</name>
+    <name xml:lang="lv">Garš URL</name>
+    <name xml:lang="ast">URL llarga</name>
+    <name xml:lang="ar">المسار طويل</name>
+    <regex>https?://[^\s]{120,}</regex>
+    <commands>
+      <command>
+        <name>Shrink the URL</name>
+        <name xml:lang="ur">روابط مختصر کریں</name>
+        <name xml:lang="ur-PK">روابط مختصر کریں</name>
+        <name xml:lang="ug">URL نى قىسقارتىڭ</name>
+        <name xml:lang="lv">Saīsināt URL</name>
+        <name xml:lang="ast">Acurtiar la URL</name>
+        <name xml:lang="ar">تقليص المسار</name>
+        <exec>exo-open https://tinyurl.com/create.php?url=\0</exec>
+      </command>
+    </commands>
+  </action>
+</actions>

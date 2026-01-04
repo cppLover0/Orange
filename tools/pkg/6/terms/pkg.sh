@@ -17,6 +17,8 @@ cp -rf build/usr/local/* "$1/usr/"
 
 cd ..
 
+CFLAGS="$CFLAGS -D_XOPEN_SOURCE"
+
 fast_install "$1" https://invisible-mirror.net/archives/xterm/xterm-390.tgz "--disable-tcap-fkeys --disable-tcap-query --enable-256-color" "../../diff/xterm.diff"
 fast_install "$1" https://www.x.org/archive/individual/lib/libXrandr-1.5.3.tar.gz
 fast_install "$1" https://www.x.org/archive/individual/app/xev-1.2.5.tar.gz

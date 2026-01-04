@@ -166,8 +166,6 @@ typedef struct {
 
 int main() {
 
-    log(LEVEL_MESSAGE_WARN,"PS/2 driver is unstable and can be broken on some HW/VM, use USB instead of it\n");
-
     int pid = fork();
 
     if(pid > 0)

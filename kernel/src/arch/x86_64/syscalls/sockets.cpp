@@ -114,6 +114,8 @@ int sockets::connect(userspace_fd_t* fd, struct sockaddr_un* path) {
     pending->is_accepted.unlock();
     node->pending_list = pending;
 
+    memcpy(fd->path,node->path,strlen(node->path) + 1);
+
     node->socket_counter++;
 
     while(!pending->is_accepted.test()) {  yield();  }
@@ -164,6 +166,12 @@ int sockets::accept(userspace_fd_t* fd, struct sockaddr_un* path) {
                 new_fd_s->read_socket_pipe->create(PIPE_SIDE_WRITE);    
                 new_fd_s->write_socket_pipe->create(PIPE_SIDE_READ);   
                 new_fd_s->write_socket_pipe->create(PIPE_SIDE_WRITE);
+
+                new_fd_s->read_socket_pipe->ucred_pass = new vfs::ucred_manager;
+                new_fd_s->write_socket_pipe->ucred_pass = new vfs::ucred_manager;
+
+                new_fd_s->socket_pid = pending_connections->son->pid;
+                new_fd_s->socket_uid = pending_connections->son->uid;
                 
                 pending_connections->son->read_socket_pipe = new_fd_s->read_socket_pipe;
                 pending_connections->son->write_socket_pipe = new_fd_s->write_socket_pipe;
@@ -211,11 +219,11 @@ syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len) {
     memset(&spath,0,sizeof(spath));
     copy_in_userspace(proc,&spath,path,len > sizeof(spath) ? sizeof(spath) : len);
 
-    DEBUG(proc->is_debug,"Trying to connect to socket %s from proc %d",spath.sun_path,proc->id);
+    DEBUG(1,"Trying to connect to socket %s (fd %d) from proc %d",spath.sun_path,fd,proc->id);
 
     int status = sockets::connect(fd_s,&spath);
 
-    DEBUG(proc->is_debug,"Socket is connected %s from proc %d",spath.sun_path,proc->id);
+    DEBUG(1,"Socket is connected %s from proc %d, status %d",spath.sun_path,proc->id,status);
 
     return {0,status,0};
 }
@@ -236,7 +244,7 @@ syscall_ret_t sys_bind(int fd, struct sockaddr_un* path, int len) {
     memset(&spath,0,sizeof(spath));
     copy_in_userspace(proc,&spath,path,len > sizeof(spath) ? sizeof(spath) : len);
 
-    DEBUG(proc->is_debug,"Binding socket from fd %d to %s from proc %d",fd,spath.sun_path,proc->id);
+    DEBUG(1,"Binding socket from fd %d to %s from proc %d",fd,spath.sun_path,proc->id);
 
     int status = sockets::bind(fd_s,&spath);
 
@@ -270,13 +278,22 @@ syscall_ret_t sys_accept(int fd, struct sockaddr_un* path, int len) {
 
 #define SOCK_NONBLOCK  04000
 #define SOCK_CLOEXEC   02000000
+#define SOCK_STREAM    1
+#define SOCK_DGRAM     2
 
 syscall_ret_t sys_socket(int family, int type, int protocol) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
     if(family != AF_UNIX)
-        return {0,ENOSYS,0};
+        return {1,ENOSYS,0};
 
+    std::uint8_t socket_type = type & 0xFF;
+
+    if(socket_type != SOCK_STREAM) {
+        Log::SerialDisplay(LEVEL_MESSAGE_WARN,"Tried to open non SOCK_STREAM socket which not implemented (socket type %d)\n",socket_type);
+        //return {1,ENOSYS,0}; 
+    }
+        
     int new_fd = vfs::fdmanager::create(proc);
 
     userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
@@ -293,7 +310,7 @@ syscall_ret_t sys_socket(int family, int type, int protocol) {
 
     new_fd_s->state = USERSPACE_FD_STATE_SOCKET;
 
-    DEBUG(proc->is_debug,"Creating socket on fd %d from proc %d",new_fd,proc->id);
+    DEBUG(1,"Creating socket on fd %d from proc %d",new_fd,proc->id);
 
     return {1,0,new_fd};
 }
@@ -312,5 +329,123 @@ syscall_ret_t sys_listen(int fd, int backlog) {
     } else
         return {0,ENOTSOCK,0};
     
+    return {0,0,0};
+}
+
+syscall_ret_t sys_socketpair(int domain, int type_and_flags, int proto) {
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    int read_fd = vfs::fdmanager::create(proc);
+    int write_fd = vfs::fdmanager::create(proc);
+    userspace_fd_t* fd1 = vfs::fdmanager::search(proc,read_fd);
+    userspace_fd_t* fd2 = vfs::fdmanager::search(proc,write_fd);
+
+    vfs::pipe* first = new vfs::pipe(0);
+    vfs::pipe* second = new vfs::pipe(0);
+
+    fd1->read_socket_pipe = first;
+    fd2->write_socket_pipe = first;
+    fd1->write_socket_pipe = second;
+    fd2->read_socket_pipe = second;
+
+    fd1->other_state = USERSPACE_FD_OTHERSTATE_MASTER;
+    fd2->other_state = USERSPACE_FD_OTHERSTATE_MASTER;
+
+    fd1->read_socket_pipe->create(PIPE_SIDE_READ);
+    fd1->read_socket_pipe->create(PIPE_SIDE_WRITE);    
+    fd1->write_socket_pipe->create(PIPE_SIDE_READ);   
+    fd1->write_socket_pipe->create(PIPE_SIDE_WRITE);
+
+    fd1->state = USERSPACE_FD_STATE_SOCKET;
+    fd2->state = USERSPACE_FD_STATE_SOCKET;
+
+    return {1,read_fd,write_fd};
+}
+
+syscall_ret_t sys_getsockname(int fd, struct sockaddr_un* path, int len) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+
+    if(!fd_s)
+        return {1,EBADF,0};
+
+    if(path) {
+        path->sun_family = AF_UNIX;
+        memcpy(path->sun_path,fd_s->path,strlen(fd_s->path) + 1);
+        return {1,0,strlen(fd_s->path)};
+    } else 
+        return {1,EINVAL,0};
+    return {1,0,0};
+}
+
+#define SO_PEERCRED     17
+
+syscall_ret_t sys_getsockopt(int fd, int layer, int number, int_frame_t* ctx) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+
+    if(!fd_s)
+        return {1,EBADF,0};
+
+    void* buffer = (void*)ctx->r8;
+    if(!buffer)
+        return {1,EINVAL,0};
+
+    if(fd_s->state != USERSPACE_FD_STATE_SOCKET || !fd_s->read_socket_pipe)
+        return {1,EBADF,0};
+
+    switch(number) {
+        
+        case SO_PEERCRED: {
+            struct ucred* cred = (struct ucred*)buffer;
+            cred->pid = fd_s->socket_pid;
+            cred->uid = fd_s->socket_uid;
+            cred->gid = 0; // not implemented
+            return {1,0,sizeof(struct ucred)};
+        };
+
+        default: {
+            return {1,ENOSYS,0};
+        };
+    
+    }
+
+    return {1,0,0};
+
+}
+
+#define SHUT_RD 0
+#define SHUT_WR 1
+#define SHUT_RDWR 2
+
+syscall_ret_t sys_shutdown(int sockfd, int how) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,sockfd);
+
+    if(!fd_s)
+        return {0,EBADF,0};
+
+    if(fd_s->state != USERSPACE_FD_STATE_SOCKET)
+        return {0,ENOTSOCK,0};
+
+    if(fd_s->is_listen || fd_s->read_socket_pipe == 0)
+        return {0,ENOTCONN,0};
+
+    switch(how) {
+    case SHUT_RD:
+    case SHUT_RDWR:
+        fd_s->read_socket_pipe->lock.lock();
+        fd_s->write_socket_pipe->lock.lock();
+        fd_s->read_socket_pipe->is_closed.test_and_set();
+        fd_s->write_socket_pipe->is_closed.test_and_set();
+        fd_s->read_socket_pipe->lock.unlock();
+        fd_s->write_socket_pipe->lock.unlock();
+        break;
+    case SHUT_WR:
+        return {0,ENOSYS,0};
+    default:
+        return {0,EINVAL,0};
+    }
+
     return {0,0,0};
 }

@@ -11,6 +11,8 @@
 #include <etc/libc.hpp>
 #include <etc/errno.hpp>
 
+#include <drivers/cmos.hpp>
+
 #include <etc/logging.hpp>
 
 vfs::tmpfs_node_t* head_node;
@@ -104,10 +106,12 @@ static vfs::tmpfs_node_t* allocate_node_from_pool() {
     return node;
 }
 
+std::uint64_t __tmpfs_ptr_id = 0;
+
 std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
 
     if(__tmpfs__exists(path))
-        return EFAULT;
+        return EEXIST;
     
     char copy[2048];
     memset(copy,0,2048);
@@ -149,6 +153,10 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
     node->content = 0;
     node->size = 0;
     node->busy = 0;
+    node->id = ++__tmpfs_ptr_id;
+
+    node->create_time = getUnixTime();
+    node->access_time = getUnixTime();
     
     memcpy(node->name,path,strlen(path));
 
@@ -175,6 +183,8 @@ void __tmpfs__dealloc(vfs::tmpfs_node_t* node){
     memory::pmm::_virtual::free(node->content);
 }
 
+std::uint8_t __tmpfs__dont_alloc_memory = 0;
+
 std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t size) {
     if (!path || !buffer || !size) { vfs::vfs::unlock();
         return -EBADF; }
@@ -198,19 +208,22 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
         std::uint64_t offset = fd->offset;
         std::uint64_t new_size = offset + size;
 
-        if (new_size > node->real_size) {
+        if (new_size > node->real_size || node->is_non_allocated) {
             alloc_t new_content0 = memory::pmm::_physical::alloc_ext(new_size);
             std::uint8_t* new_content = (std::uint8_t*)new_content0.virt;
             if (node->content) {
                 memcpy(new_content, node->content, node->size); 
-                __tmpfs__dealloc(node);
+                if(!node->is_non_allocated)
+                    __tmpfs__dealloc(node);
             }
+            node->is_non_allocated = 0;
             node->content = new_content;
             node->real_size = new_content0.real_size;
         }
 
         node->size = new_size;
 
+        node->access_time = getUnixTime();
         memcpy(node->content + offset, buffer, size);
 
         fd->offset += size;
@@ -380,7 +393,21 @@ std::int32_t __tmpfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
     out->st_mode = node->type == TMPFS_TYPE_DIRECTORY ? S_IFDIR : S_IFREG;
     if(node->type == TMPFS_TYPE_SYMLINK) 
         out->st_mode = S_IFLNK;
-    out->st_mode |= (node->vars[0] & ~(S_IFDIR | S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFDIR | S_IFIFO | S_IFMT | S_IFLNK));
+    out->st_mode |= ((node->vars[0] & ~(S_IFDIR | S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFDIR | S_IFIFO | S_IFMT | S_IFLNK)) & 0xFFFFFFFF);
+    out->st_uid = 0;
+    out->st_gid = 0;
+    out->st_blksize = 4096;
+    out->st_ino = node->id;
+    out->st_nlink = 0; // unimplemented
+    out->st_dev = 0;
+    out->st_rdev = 0;
+    out->st_blocks = node->real_size / 4096;
+    out->st_atim.tv_sec = node->access_time;
+    out->st_mtim.tv_sec = node->access_time;
+    out->st_ctim.tv_sec = node->create_time;
+    out->st_atim.tv_nsec = 0;
+    out->st_mtim.tv_nsec = 0;
+    out->st_ctim.tv_nsec = 0;
 
     return 0;
 }
@@ -471,6 +498,7 @@ void vfs::tmpfs::mount(vfs_node_t* node) {
     head_node = (tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
 
     head_node->type = TMPFS_TYPE_DIRECTORY;
+    head_node->id = 0;
 
     memcpy(head_node->name,"/",1);
 

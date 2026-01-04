@@ -60,9 +60,11 @@ void arch::x86_64::interrupts::idt::set_entry(std::uint64_t base,std::uint8_t ve
 }
 
 std::uint8_t arch::x86_64::interrupts::idt::alloc() {
-    for(int i = 0;i < 255;i++)
+    for(int i = 0;i < 255;i++) {
         if(!idt_bitmap->test(i)) {
             idt_bitmap->set(i);
             return i;
-        }
+        } 
+    }
+    return 0;
 }

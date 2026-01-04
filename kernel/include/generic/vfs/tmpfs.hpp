@@ -12,10 +12,17 @@
 namespace vfs {
 
     typedef struct tmpfs_node {
+        std::uint64_t id;
         std::uint64_t size;
         std::uint64_t busy;
         std::uint64_t vars[8];
         std::uint8_t type;
+
+        std::uint64_t create_time;
+        std::uint64_t access_time;
+
+        std::uint8_t is_non_allocated;
+
         std::uint8_t* content;
         std::uint64_t real_size; // real size in ram (optimization)
         struct tmpfs_node* next;

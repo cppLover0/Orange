@@ -33,7 +33,7 @@ void panic(int_frame_t* ctx, const char* msg) {
     }
 
     arch::x86_64::process_t* proc = arch::x86_64::cpu::data()->temp.proc;
-    if(proc && 1) {
+    if(proc && 1 && ctx) {
         uint64_t cr2;
         asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
 
@@ -43,52 +43,34 @@ void panic(int_frame_t* ctx, const char* msg) {
         vmm_obj_t* obj = memory::vmm::getlen(proc,ctx->rip);
 
 
-        // if(ctx->vec == 14) {
-        //     vmm_obj_t* obj0 = memory::vmm::getlen(proc,cr2);
+        if(ctx->vec == 14) {
+            vmm_obj_t* obj0 = memory::vmm::getlen(proc,cr2);
             
-        //     if(obj0) {
-        //         if(obj0->cow_connect && !obj0->is_own_page && obj0->base != 0 ) {
-        //             Log::SerialDisplay(LEVEL_MESSAGE_INFO,"trying to cow 0x%p\n",cr2);
-        //             //memory::vmm::cow(proc,cr2);
+            if(obj0) {
+               if(obj0->is_lazy_alloc && !obj0->is_free) {
 
-        //             if(ctx->cs & 3)
-        //                 ctx->ss |= 3;
-                        
-        //             if(ctx->ss & 3)
-        //                 ctx->cs |= 3;
+                    std::uint64_t new_phys = memory::pmm::_physical::alloc(4096);
+                    memory::paging::map(proc->original_cr3,new_phys,ALIGNDOWN(cr2,4096),obj0->flags);
 
-        //             if(ctx->cs == 0x20)
-        //                 ctx->cs |= 3;
-                        
-        //             if(ctx->ss == 0x18)
-        //                 ctx->ss |= 3;
+                    if(ctx->cs & 3)
+                        ctx->ss |= 3;
+                                        
+                    if(ctx->ss & 3)
+                        ctx->cs |= 3;
 
-        //             if(ctx->cs != 0x08)
-        //                 asm volatile("swapgs");
+                    if(ctx->cs == 0x20)
+                        ctx->cs |= 3;
+                                        
+                    if(ctx->ss == 0x18)
+                        ctx->ss |= 3;
 
-        //             schedulingEnd(ctx);
-        //         } else if(obj0->is_mapped) {
-        //             obj0->flags |= PTE_RW;
-        //             memory::paging::maprangeid(proc->original_cr3,obj0->phys,obj0->base,obj0->len,obj0->flags,*proc->vmm_id);
-        //             if(ctx->cs & 3)
-        //                 ctx->ss |= 3;
-                        
-        //             if(ctx->ss & 3)
-        //                 ctx->cs |= 3;
+                    if(ctx->cs != 0x08)
+                        asm volatile("swapgs");
 
-        //             if(ctx->cs == 0x20)
-        //                 ctx->cs |= 3;
-                        
-        //             if(ctx->ss == 0x18)
-        //                 ctx->ss |= 3;
-
-        //             if(ctx->cs != 0x08)
-        //                 asm volatile("swapgs");
-
-        //             schedulingEnd(ctx);
-        //         }
-        //     }
-        // }
+                    schedulingEnd(ctx);
+               }
+            }
+        }
 
         Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p rbp 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx,ctx->rbp);
         
@@ -109,7 +91,7 @@ void panic(int_frame_t* ctx, const char* msg) {
 
         memory::paging::enablepaging(ctx->cr3);
         Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[0] - 0x%016llX (current rip)\n",ctx->rip);
-        for (int i = 1; i < 25 && rbp; ++i) {
+        for (int i = 1; i < 10 && rbp; ++i) {
             std::uint64_t ret_addr = rbp->rip;
             Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[%d] - 0x%016llX\n", i, ret_addr);
             rbp = (stackframe_t*)rbp->rbp;

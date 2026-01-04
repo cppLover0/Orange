@@ -42,7 +42,7 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
+    DEBUG(1,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
@@ -54,25 +54,15 @@ syscall_ret_t sys_exit(int status) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     proc->exit_code = status;
 
-    userspace_fd_t* fd = proc->fd;
-    while(fd) {
-        if(!fd->can_be_closed) {
-            if(fd->state == USERSPACE_FD_STATE_PIPE)
-                fd->pipe->close(fd->pipe_side);
-            else if(fd->state == USERSPACE_FD_STATE_FILE || fd->state == USERSPACE_FD_STATE_SOCKET)
-                vfs::vfs::close(fd);
-        }
-        userspace_fd_t* next = fd->next;
-        delete (void*)fd;
-        fd = next;
-    }
-
-      DEBUG(proc->is_debug,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
+    DEBUG(proc->is_debug,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
 
     arch::x86_64::scheduling::kill(proc);
     
     if(1)
         memory::vmm::free(proc); 
+
+    vfs::fdmanager* fd = (vfs::fdmanager*)proc->fd;
+    fd->free();
 
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
@@ -91,13 +81,17 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
     std::uint64_t flags = ctx->r8;
     arch::x86_64::process_t* proc = CURRENT_PROC;
     if(flags & MAP_ANONYMOUS) {
+
         std::uint64_t new_hint = hint;
         int is_shared = (flags & MAP_SHARED) ? 1 : 0;
+
+        if(is_shared) {
+            DEBUG(1,"shared mem\n");
+            asm volatile("hlt");
+        }
+
         if(!new_hint) {
-            if(is_shared) {
-                new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
-            } else 
-                new_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+            new_hint = (std::uint64_t)memory::vmm::lazy_alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
         } else 
             memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,0);
 
@@ -154,17 +148,7 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
 syscall_ret_t sys_free(void *pointer, size_t size) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    std::uint64_t phys = memory::vmm::get(proc,(std::uint64_t)pointer)->phys;
-    vmm_obj_t* current = memory::vmm::get(proc, (std::uint64_t)pointer);
-    vmm_obj_t* start = (vmm_obj_t*)proc->vmm_start;
-    
-    start->lock.lock();
-    memory::pmm::_physical::free(current->phys);
-    start->lock.unlock();
-    
-    memory::paging::maprangeid(proc->original_cr3,0,(std::uint64_t)current->base,0,0,0);
-    current->phys = 0;
-    current->is_free = 1;
+    memory::vmm::unmap(proc,(std::uint64_t)pointer);
     
     return {0,0,0};
 }
@@ -179,7 +163,7 @@ syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
 
     arch::x86_64::scheduling::wakeup(new_proc);
 
-    DEBUG(1,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
+    DEBUG(0,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
     new_proc->is_debug = proc->is_debug;
 
     return {1,0,new_proc->id};
@@ -288,13 +272,14 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
         if((stat.st_mode & S_IXUSR) && (stat.st_mode & S_IFREG)) {
 
             proc->fs_base = 0;
-
-            memset(&proc->ctx,0,sizeof(int_frame_t));
-
+ 
             memory::paging::enablekernel();
             memory::vmm::free(proc);
 
             memory::vmm::initproc(proc);
+
+            memset(&proc->ctx,0,sizeof(int_frame_t));
+
             memory::vmm::reload(proc);
             
             proc->ctx.cs = 0x20 | 3;
@@ -698,4 +683,41 @@ syscall_ret_t sys_dmesg(char* buf,std::uint64_t count) {
     dmesg_read(temp_buffer,count);
 
     return {1,0,0};
+}
+
+syscall_ret_t sys_getuid() {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    return {0,proc->uid,0};
+}
+
+syscall_ret_t sys_setuid(int uid) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    if(proc->uid > 1000)
+        return {0,EPERM,0};
+    proc->uid = uid;
+    return {0,0,0};
+}
+
+syscall_ret_t sys_kill(int pid, int sig) {
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    arch::x86_64::process_t* target_proc = arch::x86_64::scheduling::by_pid(pid);
+
+    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys_kill pid %d sig %d from proc %d\n",pid,sig,proc->id);
+
+    if(!target_proc)
+        return {0,ESRCH,0};
+
+    if(!(proc->uid == 0 || proc->uid == target_proc->uid))
+        return {0,EPERM,0};
+
+    switch(sig) {
+        case SIGKILL:
+            target_proc->exit_code = 137;
+            target_proc->_3rd_kill_lock.nowaitlock(); 
+            break;
+        default:
+            return {0,0,0};
+    }
+    return {0,0,0};
 }

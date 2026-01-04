@@ -1,0 +1,1 @@
+x86_64-orange-mlibc-g++ -o "$1/usr/bin/dbus_test" main.c -fPIC $(x86_64-orange-mlibc-pkg-config --cflags --libs dbus-1)

@@ -128,7 +128,7 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count);
 syscall_ret_t sys_read(int fd, void *buf, size_t count);
 syscall_ret_t sys_seek(int fd, long offset, int whence);
 syscall_ret_t sys_dup2(int fd, int flags, int newfd);
-syscall_ret_t sys_stat(int fd, void* out, int flags);
+syscall_ret_t sys_stat(int fd, void* out, int flags, int_frame_t* ctx);
 syscall_ret_t sys_dup(int fd, int flags);
 syscall_ret_t sys_pipe(int flags);
 syscall_ret_t sys_close(int fd);
@@ -158,6 +158,8 @@ syscall_ret_t sys_chmod(char* path, int mode);
 
 syscall_ret_t sys_ttyname(int fd, char *buf, size_t size);
 syscall_ret_t sys_rename(char* old, char* newp);
+
+syscall_ret_t sys_eventfd_create(unsigned int initval, int flags);
 
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
@@ -207,8 +209,13 @@ syscall_ret_t sys_enabledebugmodepid(int pid);
 
 syscall_ret_t sys_dmesg(char* buf,std::uint64_t count);
 
+syscall_ret_t sys_getuid();
+syscall_ret_t sys_setuid(int uid);
+
+syscall_ret_t sys_kill(int pid, int sig);
+
 /* Futex */
-syscall_ret_t sys_futex_wait(int* pointer, int excepted);
+syscall_ret_t sys_futex_wait(int* pointer, int excepted, struct timespec* ts);
 syscall_ret_t sys_futex_wake(int* pointer);
 
 /* Socket */
@@ -221,6 +228,23 @@ syscall_ret_t sys_connect(int fd, struct sockaddr_un* path, int len);
 syscall_ret_t sys_listen(int fd, int backlog);
 
 syscall_ret_t sys_copymemory(void* src, void* dest, int len);
+
+syscall_ret_t sys_socketpair(int domain, int type_and_flags, int proto);
+syscall_ret_t sys_getsockname(int fd, struct sockaddr_un* path, int len);
+
+syscall_ret_t sys_getsockopt(int fd, int layer, int number, int_frame_t* ctx);
+
+syscall_ret_t sys_msg_recv(int fd, struct msghdr *hdr, int flags);
+syscall_ret_t sys_msg_send(int fd, struct msghdr* hdr, int flags);
+
+syscall_ret_t sys_shutdown(int sockfd, int how);
+
+/* Shm stuff */
+
+syscall_ret_t sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
+syscall_ret_t sys_shmat(int shmid, std::uint64_t hint, int shmflg);
+syscall_ret_t sys_shmget(int key, size_t size, int shmflg);
+syscall_ret_t sys_shmdt(std::uint64_t base);
 
 struct pollfd {
     int fd;          

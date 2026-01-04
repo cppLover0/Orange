@@ -11,7 +11,7 @@ if [ ! "$(which x86_64-orange-mlibc-gcc)" ]; then
     echo 'Also you should have host gcc ~13 or ~ 14'
 fi
 
-for dir in {0..12}; do
+for dir in {0..14}; do
 	cd "$dir"
 	for pkg_dir in */; do
 		cd "$pkg_dir"

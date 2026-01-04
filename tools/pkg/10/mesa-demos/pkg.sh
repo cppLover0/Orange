@@ -12,6 +12,8 @@ tar -xvf mesa-demos-9.0.0.tar.xz
 
 cd mesa-demos-9.0.0
 
+export CFLAGS="$CFLAGS -D_DEFAULT_SOURCE"
+
 mkdir build
 meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix=/usr -Dgles1=disabled -Dosmesa=disabled -Dlibdrm=disabled -Dx11=enabled -Dwith-system-data-files=true build
 

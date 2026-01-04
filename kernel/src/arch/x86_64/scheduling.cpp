@@ -14,6 +14,8 @@
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 
+#include <generic/vfs/fd.hpp>
+
 #include <etc/libc.hpp>
 #include <etc/list.hpp>
 
@@ -264,6 +266,16 @@ void arch::x86_64::scheduling::wakeup(process_t* proc) {
     proc->lock.unlock(); /* Just clear */
 }
 
+arch::x86_64::process_t* arch::x86_64::scheduling::by_pid(int pid) {
+    process_t* proc = head_proc_();
+    while(proc) {
+        if(proc->id == pid)
+            return proc;
+        proc = proc->next;
+    }
+    return 0;
+}
+
 arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_frame_t* ctx) {
     process_t* nproc = create();
     memory::vmm::free(nproc);
@@ -271,6 +283,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_fra
     nproc->is_cloned = 1;
     nproc->ctx.cr3 = ctx->cr3;
     nproc->original_cr3 = ctx->cr3;
+    nproc->uid = proc->uid;
 
     nproc->vmm_end = proc->vmm_end;
     nproc->vmm_start = proc->vmm_start;
@@ -287,21 +300,30 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_fra
 
     memcpy(nproc->sse_ctx,proc->sse_ctx,arch::x86_64::cpu::sse::size());
 
+    nproc->is_shared_fd = 1;
     nproc->fd_ptr = proc->fd_ptr;
+    nproc->fd = proc->fd;
 
-    userspace_fd_t* fd = proc->fd;
-    while(fd) {
-        userspace_fd_t* newfd = new userspace_fd_t;
-        memcpy(newfd,fd,sizeof(userspace_fd_t));
+    vfs::fdmanager* fd = (vfs::fdmanager*)proc->fd;
+
+    proc->fd_lock.lock();
+    fd->used_counter++;
+    proc->fd_lock.unlock();
+
+    // userspace_fd_t* fd = proc->fd;
+    // while(fd) {
+    //     userspace_fd_t* newfd = new userspace_fd_t;
+    //     memcpy(newfd,fd,sizeof(userspace_fd_t));
         
-        if(newfd->state == USERSPACE_FD_STATE_PIPE) {
-            newfd->pipe->create(newfd->pipe_side);
-        }
+    //     if(newfd->state == USERSPACE_FD_STATE_PIPE) {
+    //         newfd->pipe->create(newfd->pipe_side);
+    //     } else if(newfd->state == USERSPACE_FD_STATE_EVENTFD)
+    //         newfd->eventfd->create();
 
-        newfd->next = nproc->fd;
-        nproc->fd = newfd;
-        fd = fd->next;
-    }
+    //     newfd->next = nproc->fd;
+    //     nproc->fd = newfd;
+    //     fd = fd->next;
+    // }
 
     memcpy(&nproc->ctx,ctx,sizeof(int_frame_t));
 
@@ -311,10 +333,10 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_fra
 arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_frame_t* ctx) {
     process_t* nproc = create();
     memory::vmm::clone(nproc,proc);
-    memory::vmm::reload(nproc);
 
     nproc->parent_id = proc->id;
     nproc->fs_base = proc->fs_base;
+    nproc->uid = proc->uid;
 
     memset(nproc->cwd,0,4096);
     memset(nproc->name,0,4096);
@@ -323,22 +345,11 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_fram
 
     memcpy(nproc->sse_ctx,proc->sse_ctx,arch::x86_64::cpu::sse::size());
 
-    nproc->fd_ptr = proc->fd_ptr;
+    *nproc->fd_ptr = *proc->fd_ptr;
 
-    userspace_fd_t* fd = proc->fd;
-    while(fd) {
-        userspace_fd_t* newfd = new userspace_fd_t;
-        memcpy(newfd,fd,sizeof(userspace_fd_t));
-        
-        if(newfd->state == USERSPACE_FD_STATE_PIPE) {
-            newfd->pipe->create(newfd->pipe_side);
-        }
-
-        newfd->next = nproc->fd;
-        nproc->fd = newfd;
-        fd = fd->next;
-    }
-
+    vfs::fdmanager* fd = (vfs::fdmanager*)proc->fd;
+    fd->duplicate((vfs::fdmanager*)nproc->fd);
+    
     memcpy(&nproc->ctx,ctx,sizeof(int_frame_t));
     nproc->ctx.cr3 = nproc->original_cr3;
 
@@ -349,6 +360,7 @@ void arch::x86_64::scheduling::kill(process_t* proc) {
     proc->lock.nowaitlock();
     proc->status = PROCESS_STATE_ZOMBIE;
     proc->exit_timestamp = time::counter();
+    delete proc->pass_fd;
 }
 
 void __scheduling_balance_cpus() {
@@ -373,8 +385,6 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     proc->name = (char*)memory::pmm::_virtual::alloc(4096);
     proc->sse_ctx = (char*)memory::pmm::_virtual::alloc(arch::x86_64::cpu::sse::size());
 
-    proc->fd_ptr = 3;
-
     proc->syscall_stack = (std::uint64_t)memory::pmm::_virtual::alloc(SYSCALL_STACK_SIZE);
 
     fpu_head_t* head = (fpu_head_t*)proc->sse_ctx;
@@ -386,12 +396,19 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     proc->status = PROCESS_STATE_RUNNING;
     proc->lock.nowaitlock();
     proc->kill_lock.unlock();
+    proc->fd_ptr = &proc->alloc_fd;
+    *proc->fd_ptr = 3;
+
+    vfs::fdmanager* z = new vfs::fdmanager(proc);
+    proc->fd = (void*)z;
 
     proc->next = head_proc;
     head_proc = proc;
 
     proc->id = id_ptr++;
     proc->vmm_id = &proc->id;
+
+    proc->pass_fd = new vfs::passingfd_manager;
 
     memory::vmm::initproc(proc);
     memory::vmm::reload(proc);
@@ -405,35 +422,37 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
 
 locks::spinlock futex_lock;
 
-void arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
+int arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
     process_t* proc0 = head_proc;
     futex_lock.lock();
     while(proc0) {
-        if((proc0->parent_id == proc->id || proc->parent_id == proc0->id)) {
+        // if process vmm is same then they are connected
+        if(((proc0->parent_id == proc->id || proc->parent_id == proc0->id) || (proc->vmm_start == proc0->vmm_start)) && (proc0->futex == (std::uint64_t)lock || proc->futex == (std::uint64_t)lock)) {
             proc0->futex = 0;
             proc0->futex_lock.unlock();
-        } 
+            DEBUG(proc->is_debug,"futex_wakeup proccess %d from proc %d, futex 0x%p",proc0->id,proc->id,lock);
+        } else if((proc0->futex == (std::uint64_t)lock || proc->futex == (std::uint64_t)lock)) {
+            DEBUG(proc->is_debug,"same futex 0x%p but calling proc %d is not connected to proc %d",lock,proc->id,proc0->id);
+        }
         proc0 = proc0->next;
     }
     futex_lock.unlock();
+    return 0;
 }
 
-void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val, int* original_lock) {
+void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val, int* original_lock,std::uint64_t ts) {
     
     futex_lock.lock();
     int lock_val = *lock;
-    if(lock_val == val) {
-        proc->futex_lock.lock();
-        proc->futex = (std::uint64_t)original_lock;
-    } 
+    proc->futex_lock.lock();
+    proc->futex = (std::uint64_t)original_lock;
+    proc->ts = ts;
     futex_lock.unlock();
 }
-
 int l = 0;
 
 extern "C" void schedulingSchedule(int_frame_t* ctx) {
     extern int is_panic;
-    memory::paging::enablekernel();
 
     if(ctx) {
         if(ctx->cs != 0x08)
@@ -449,7 +468,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
 
     if(ctx) {
         if(current) {
-            if(!current->kill_lock.test()) {
+            if(!current->kill_lock.test() && !current->_3rd_kill_lock.test()) {
                 current->ctx = *ctx;
                 current->fs_base = __rdmsr(0xC0000100);
                 arch::x86_64::cpu::sse::save((std::uint8_t*)current->sse_ctx);
@@ -459,7 +478,22 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
     }
 
     if(current) { 
-        current->lock.unlock();
+        if(current->_3rd_kill_lock.test() && !current->kill_lock.test()) {
+            memory::paging::enablekernel();
+            arch::x86_64::scheduling::kill(current);
+            
+            if(1)
+                memory::vmm::free(current); 
+
+            vfs::fdmanager* fd = (vfs::fdmanager*)current->fd;
+            fd->free();
+
+            memory::pmm::_virtual::free(current->cwd);
+            memory::pmm::_virtual::free(current->name);
+            memory::pmm::_virtual::free(current->sse_ctx);
+        } else
+            current->lock.unlock();
+        
         current = current->next; 
     } 
 
@@ -468,44 +502,58 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
     while (true) {
         while (current) {
 
-            if (!current->kill_lock.test() && current->id != 0 && current_cpu == current->target_cpu && !current->futex_lock.test()) {
-                if(!current->lock.test_and_set()) {
+            if (!current->kill_lock.test() && current->id != 0 && current_cpu == current->target_cpu) {
+            
+                futex_lock.lock();
+                if(current->futex_lock.test()) {
+                     if(current->ts != 0) {
+                         if(current->ts < drivers::tsc::currentus()) {
+                             current->ts = 0;
+                             current->futex_lock.unlock(); 
+                         }
+                     }
+                }
+                futex_lock.unlock();
 
-                    if(!ctx) {
-                        int_frame_t temp_ctx;
-                        ctx = &temp_ctx;
+                if(!current->futex_lock.test()) {
+                    if(!current->lock.test_and_set()) {
+
+                        if(!ctx) {
+                            int_frame_t temp_ctx;
+                            ctx = &temp_ctx;
+                        }
+
+                        memcpy(ctx, &current->ctx, sizeof(int_frame_t));
+
+                        __wrmsr(0xC0000100, current->fs_base);
+                        arch::x86_64::cpu::sse::load((std::uint8_t*)current->sse_ctx);
+
+                        if(ctx->cs & 3)
+                            ctx->ss |= 3;
+                            
+                        if(ctx->ss & 3)
+                            ctx->cs |= 3;
+
+                        if(ctx->cs == 0x20)
+                            ctx->cs |= 3;
+                            
+                        if(ctx->ss == 0x18)
+                            ctx->ss |= 3;
+
+                        data->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
+                        data->user_stack = current->user_stack;
+                        data->temp.proc = current;
+
+                        int prio_div = current->prio < 0 ? (current->prio * -1) : 1;
+                        prio_div++;
+
+                        arch::x86_64::cpu::lapic::eoi();
+
+                        if(ctx->cs != 0x08)
+                            asm volatile("swapgs");
+
+                        schedulingEnd(ctx);
                     }
-
-                    memcpy(ctx, &current->ctx, sizeof(int_frame_t));
-
-                    __wrmsr(0xC0000100, current->fs_base);
-                    arch::x86_64::cpu::sse::load((std::uint8_t*)current->sse_ctx);
-
-                    if(ctx->cs & 3)
-                        ctx->ss |= 3;
-                        
-                    if(ctx->ss & 3)
-                        ctx->cs |= 3;
-
-                    if(ctx->cs == 0x20)
-                        ctx->cs |= 3;
-                        
-                    if(ctx->ss == 0x18)
-                        ctx->ss |= 3;
-
-                    data->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
-                    data->user_stack = current->user_stack;
-                    data->temp.proc = current;
-
-                    int prio_div = current->prio < 0 ? (current->prio * -1) : 1;
-                    prio_div++;
-
-                    arch::x86_64::cpu::lapic::eoi();
-
-                    if(ctx->cs != 0x08)
-                        asm volatile("swapgs");
-
-                    schedulingEnd(ctx);
                 }
             }
             current = current->next;

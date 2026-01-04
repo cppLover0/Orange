@@ -135,16 +135,23 @@ namespace arch {
             locks::spinlock lock;
             locks::spinlock kill_lock; /* Never should be setup by not kill() function */
 
+            locks::spinlock _3rd_kill_lock;
             locks::spinlock futex_lock;
 
-            std::uint32_t fd_ptr;
+            locks::spinlock fd_lock;
+
+            std::uint32_t alloc_fd;
+            std::uint32_t* fd_ptr;
+
+            int is_shared_fd;
 
             std::uint32_t reversedforid;
             std::uint32_t* vmm_id;
 
             userspace_fd_t* fd_pool;
+            vfs::passingfd_manager* pass_fd;
 
-            userspace_fd_t* fd;
+            void* fd;
 
             char* vmm_start;
             char* vmm_end;
@@ -156,6 +163,8 @@ namespace arch {
             int sys;
 
             int prio;
+
+            std::uint64_t ts;
 
             int exit_code;
             int is_cloned;
@@ -169,6 +178,8 @@ namespace arch {
             std::uint64_t exit_timestamp;
 
             std::uint32_t parent_id;
+
+            int uid;
 
             int debug0;
             int debug1;
@@ -191,10 +202,11 @@ namespace arch {
             static process_t* create();
             static process_t* fork(process_t* proc,int_frame_t* ctx);
             static process_t* clone(process_t* proc,int_frame_t* ctx);
+            static process_t* by_pid(int pid);
             static void kill(process_t* proc);
             static void wakeup(process_t* proc);
-            static void futexwake(process_t* proc, int* lock);
-            static void futexwait(process_t* proc, int* lock, int val, int* original_lock);
+            static int futexwake(process_t* proc, int* lock);
+            static void futexwait(process_t* proc, int* lock, int val, int* original_lock, std::uint64_t ts);
             static int loadelf(process_t* proc,char* path,char** argv,char** envp,int free_mem);
             static process_t* head_proc_();
 

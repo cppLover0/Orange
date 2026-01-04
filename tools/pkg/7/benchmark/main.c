@@ -70,11 +70,11 @@ void mmap_test() {
         struct timespec start;
         struct timespec end;
         clock_gettime(CLOCK_MONOTONIC,&start);
-        void* addr = mmap(NULL, 4096, PROT_WRITE | PROT_READ, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+        void* addr = mmap(NULL, 0x80000, PROT_WRITE | PROT_READ, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
         if (addr == MAP_FAILED) {
             perror("mmap failed");
             continue;
-        }memset(addr,1,4096);
+        }memset(addr,1,0x80000);
         clock_gettime(CLOCK_MONOTONIC,&end);
         printf("OS mmap test %d - %d ns\n",i,end.tv_nsec - start.tv_nsec);
         

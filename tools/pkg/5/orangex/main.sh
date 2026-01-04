@@ -6,7 +6,8 @@ while true; do
     echo "Select program to start:"
     echo "1) i3wm"
     echo "2) twm"
-    echo "3) bash"
+    echo "3) xfce4"
+    echo "4) bash"
     read -p "Select number: " choice
 
     stty -echo
@@ -19,6 +20,9 @@ while true; do
             xinit /etc/X11/twmrc > /dev/null 2> /dev/null
             ;;
         3)
+            xinit /etc/X11/xfcerc > /dev/null 2> /dev/null
+            ;;
+        4)
             stty echo
             bash
             ;;

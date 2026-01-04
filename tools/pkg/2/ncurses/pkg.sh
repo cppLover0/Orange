@@ -17,7 +17,7 @@ patch_config_sub "$(realpath $1/..)"
 cd ..
 
 cd ncurses-build
-../ncurses-6.5/configure --host=x86_64-orange-mlibc --prefix="/usr" --with-shared --without-ada CFLAGS="-std=gnu17"
+../ncurses-6.5/configure --host=x86_64-orange-mlibc --prefix="/usr" --with-shared --without-ada CFLAGS="-std=gnu17 -Wno-implicit-function-declaration"
 make -j$(nproc)
 make install -j$(nproc) DESTDIR="$1"
 

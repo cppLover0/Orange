@@ -48,7 +48,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
     memset(result,0,2048);
     vfs::resolve_path(kpath,first_path,result,1,0);
 
-    DEBUG(0,"Trying to open %s from proc %d",result,proc->id);
+    DEBUG(proc->is_debug,"Trying to open %s from proc %d",result,proc->id);
 
     if(result[0] == '\0') {
         result[0] = '/';
@@ -93,7 +93,7 @@ syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ct
         new_fd_s->state = USERSPACE_FD_STATE_UNUSED;
 
     if(status != 0)
-        DEBUG(proc->is_debug,"Failed to open %s from proc %d",result,proc->id);
+        DEBUG(proc->is_debug,"Failed to open %s (%s + %s) from proc %d",result,first_path,path,proc->id);
     
     new_fd_s->offset = 0;
 
@@ -122,8 +122,8 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
         if(fd_s->pipe_side != PIPE_SIDE_READ)
             return {1,EBADF,0};
         
-        bytes_read = fd_s->pipe->read(&fd_s->read_counter,temp_buffer,count,0);
-        if(bytes_read == 0 && (fd_s->pipe->flags & O_NONBLOCK || fd_s->flags & O_NONBLOCK) && !fd_s->pipe->is_closed.test()) 
+        bytes_read = fd_s->pipe->read(&fd_s->read_counter,temp_buffer,count,(fd_s->flags & O_NONBLOCK) ? 1 : 0);
+        if(bytes_read == -EAGAIN && (fd_s->pipe->flags & O_NONBLOCK || fd_s->flags & O_NONBLOCK) && !fd_s->pipe->is_closed.test()) 
             return {1,EAGAIN,0};
 
     } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
@@ -132,18 +132,26 @@ syscall_ret_t sys_read(int fd, void *buf, size_t count) {
             return {1,EFAULT,0};
 
         if(fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-            bytes_read = fd_s->write_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,0);
+            bytes_read = fd_s->write_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,(fd_s->flags & O_NONBLOCK) ? 1 : 0);
         } else {
-            bytes_read = fd_s->read_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,0);
+            bytes_read = fd_s->read_socket_pipe->read(&fd_s->read_counter,temp_buffer,count,(fd_s->flags & O_NONBLOCK) ? 1 : 0);
         }
 
-        if(bytes_read == 0)
+        if(bytes_read == -EAGAIN)
             return {1,EAGAIN,0};
 
+        if(bytes_read == 0)
+            return {1,0,0};
+
+    } else if(fd_s->state == USERSPACE_FD_STATE_EVENTFD) {
+        if(count != 8)
+            return {1,EINVAL,0};
+        std::uint64_t* _8sizebuf = (std::uint64_t*)buf;
+        bytes_read = fd_s->eventfd->read(_8sizebuf);
     } else
         return {1,EBADF,0};
 
-    DEBUG(proc->is_debug,"Read done from proc %d\n",proc->id);
+    DEBUG(proc->is_debug,"Read done from proc %d bytes-read %d\n",proc->id,bytes_read);
 
     return {1,bytes_read >= 0 ? 0 : (int)(+bytes_read), bytes_read};
 }
@@ -153,8 +161,10 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
-    if(!fd_s)
+    if(!fd_s) {
+        DEBUG(proc->is_debug,"fail write fd %d from proc %d, proc->fd is 0x%p\n",fd,proc->id,proc->fd);
         return {1,EBADF,0};
+    }
 
     if(fd_s->can_be_closed)
         fd_s->can_be_closed = 0;
@@ -162,8 +172,11 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
     char* temp_buffer = (char*)buf;   
 
     const char* _0 = "Content view is disabled in files";
-   // DEBUG(proc->id == 15,"Writing %s fd %d state %d from proc %d count %d writ sock 0x%p",fd_s->state == USERSPACE_FD_STATE_FILE ? fd_s->path : "Not file",fd,fd_s->state,proc->id,count,fd_s->write_socket_pipe);
+    DEBUG(proc->is_debug && fd != 1 && fd != 2,"Writing %s with content %s fd %d state %d from proc %d count %d writ sock 0x%p",fd_s->state == USERSPACE_FD_STATE_FILE ? fd_s->path : "Not file",buf,fd,fd_s->state,proc->id,count,fd_s->write_socket_pipe);
 
+    if(fd == 1) {
+        //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"%s\n",buf);
+    }
 
     std::int64_t bytes_written;
     if(fd_s->state == USERSPACE_FD_STATE_FILE)
@@ -184,10 +197,16 @@ syscall_ret_t sys_write(int fd, const void *buf, size_t count) {
         }
 
         if(bytes_written == 0)
-            return {1,EAGAIN,0};
+            return {1,0,0};
 
+    } else if(fd_s->state == USERSPACE_FD_STATE_EVENTFD) {
+        if(count != 8)
+            return {1,EINVAL,0};
+        std::uint64_t* _8sizebuf = (std::uint64_t*)buf;
+        bytes_written = fd_s->eventfd->write(*_8sizebuf);
     } else
         return {1,EBADF,0};
+        
 
     return {1,bytes_written >= 0 ? 0 : (int)(+bytes_written), bytes_written};
 }
@@ -207,6 +226,8 @@ syscall_ret_t sys_seek(int fd, long offset, int whence) {
     if(fd_s->state == USERSPACE_FD_STATE_PIPE || fd_s->is_a_tty)
         return {1,0,0};
 
+    proc->fd_lock.lock();
+
     switch (whence)
     {
         case SEEK_SET:
@@ -221,17 +242,21 @@ syscall_ret_t sys_seek(int fd, long offset, int whence) {
             vfs::stat_t stat;
             int res = vfs::vfs::stat(fd_s,&stat);
 
-            if(res != 0)
+            if(res != 0) {
+                proc->fd_lock.unlock();
                 return {1,res,0};
-        
+            }
+
             fd_s->offset = stat.st_size + offset;
             break;
         }
 
         default:
+            proc->fd_lock.unlock();
             return {1,EINVAL,0};
     }
 
+    proc->fd_lock.unlock();
     return {1,0,(std::int64_t)fd_s->offset};
 
 }
@@ -245,10 +270,12 @@ syscall_ret_t sys_close(int fd) {
     else if(fd < 3 && !fd_s)
         return {0,0,0}; // ignoring
 
-    DEBUG(0,"Closing %s\n",fd_s->path);
+    DEBUG(proc->is_debug,"closing %d from proc %d",fd,proc->id);
 
     if(fd_s->can_be_closed)
         return {0,EBADF,0};
+
+    proc->fd_lock.lock();
 
     if(fd < 3)
         fd_s->can_be_closed = 1;
@@ -256,15 +283,24 @@ syscall_ret_t sys_close(int fd) {
     if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
         fd_s->pipe->close(fd_s->pipe_side);
     } else if(fd_s->state == USERSPACE_FD_STATE_FILE || fd_s->state == USERSPACE_FD_STATE_SOCKET)
-        vfs::vfs::close(fd_s);
+        vfs::vfs::close(fd_s); 
+    else if(fd_s->state == USERSPACE_FD_STATE_EVENTFD)
+        fd_s->eventfd->close();
 
     if(!fd_s->is_a_tty && fd_s->index > 2)
         fd_s->state = USERSPACE_FD_STATE_UNUSED;
 
+    proc->fd_lock.unlock();
+
     return {0,0,0};
 }
 
-syscall_ret_t sys_stat(int fd, void* out, int flags) {
+typedef struct stackframe {
+    struct stackframe* rbp;
+    uint64_t rip;
+} __attribute__((packed)) stackframe_t;
+
+syscall_ret_t sys_stat(int fd, void* out, int flags, int_frame_t* ctx) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
@@ -274,6 +310,7 @@ syscall_ret_t sys_stat(int fd, void* out, int flags) {
     DEBUG(proc->is_debug,"Trying to stat %s (fd %d) from proc %d",fd_s->path,fd,proc->id);
 
     if(fd_s->state == USERSPACE_FD_STATE_FILE) {
+
         vfs::stat_t stat;
         int status;
         if(flags & AT_SYMLINK_NOFOLLOW) 
@@ -326,11 +363,16 @@ syscall_ret_t sys_dup(int fd, int flags) {
     if(!fd_s)
         return {0,EBADF,0};
     
+    proc->fd_lock.lock();
+
+    int i = 0;
     userspace_fd_t* nfd_s = vfs::fdmanager::searchlowest(proc,0);
 
     if(!nfd_s) {
+        proc->fd_lock.unlock();
         int new_fd = vfs::fdmanager::create(proc);
         nfd_s = vfs::fdmanager::search(proc,new_fd);
+        i = 1;
     }
 
     DEBUG(proc->is_debug,"dup from %d to %d",fd,nfd_s->index);
@@ -348,11 +390,17 @@ syscall_ret_t sys_dup(int fd, int flags) {
     nfd_s->can_be_closed = 0;
     nfd_s->write_socket_pipe = fd_s->write_socket_pipe;
     nfd_s->read_socket_pipe = fd_s->read_socket_pipe;
+    nfd_s->eventfd = fd_s->eventfd;
 
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
 
-    if(nfd_s->state ==USERSPACE_FD_STATE_PIPE)
+    if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
         nfd_s->pipe->create(nfd_s->pipe_side);
+    else if(nfd_s->state == USERSPACE_FD_STATE_EVENTFD)
+        nfd_s->eventfd->create();
+
+    if(i == 0)
+        proc->fd_lock.unlock();
 
     return {1,0,nfd_s->index};
 }
@@ -372,6 +420,8 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     } else {
         if(nfd_s->state == USERSPACE_FD_STATE_PIPE) 
             nfd_s->pipe->close(nfd_s->pipe_side);
+        else if(nfd_s->state == USERSPACE_FD_STATE_EVENTFD)
+            nfd_s->eventfd->close();
     }
 
     nfd_s->index = newfd;
@@ -388,9 +438,12 @@ syscall_ret_t sys_dup2(int fd, int flags, int newfd) {
     nfd_s->can_be_closed = fd_s->can_be_closed;
     nfd_s->read_socket_pipe = fd_s->read_socket_pipe;
     nfd_s->write_socket_pipe = fd_s->write_socket_pipe;
+    nfd_s->eventfd = fd_s->eventfd;
 
     if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
         nfd_s->pipe->create(nfd_s->pipe_side);
+    else if(nfd_s->state == USERSPACE_FD_STATE_EVENTFD)
+        nfd_s->eventfd->create();
 
     memcpy(nfd_s->path,fd_s->path,sizeof(fd_s->path));
 
@@ -589,7 +642,7 @@ syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
     arch::x86_64::process_t* pproc = CURRENT_PROC;
     switch(request) {
         case F_DUPFD: {
-            return sys_dup(fd,arg);
+            return sys_dup(fd,0);
         }
 
         case F_GETFL: {
@@ -610,21 +663,9 @@ syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg) {
 
             fd_s->flags &= ~(O_APPEND | O_ASYNC | O_NONBLOCK);
             fd_s->flags |= (arg & (O_APPEND | O_ASYNC | O_NONBLOCK));
-
-            if(fd_s->state == USERSPACE_FD_STATE_PIPE) {
-                fd_s->pipe->flags & ~(O_NONBLOCK);
-                fd_s->pipe->flags |= (arg & O_NONBLOCK);
-            } else if(fd_s->state == USERSPACE_FD_STATE_SOCKET) {
-                if(fd_s->read_socket_pipe) {
-                    fd_s->read_socket_pipe->flags & ~(O_NONBLOCK);
-                    fd_s->read_socket_pipe->flags |= (arg & O_NONBLOCK);
-                }
-
-                if(fd_s->write_socket_pipe) {
-                    fd_s->write_socket_pipe->flags & ~(O_NONBLOCK);
-                    fd_s->write_socket_pipe->flags |= (arg & O_NONBLOCK);
-                }
-
+            if(fd_s->state == USERSPACE_FD_STATE_EVENTFD) {
+                fd_s->eventfd->flags &= ~(O_NONBLOCK);
+                fd_s->eventfd->flags |= (arg & O_NONBLOCK);
             }
 
             return {1,0,0};
@@ -733,7 +774,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         fd[i].revents = 0;
         
 
-        if(!fd0) { fd[i].events = 0; fd[i].revents = POLLNVAL; }
+        if(!fd0) { return {1,EBADF,0};}
 
         if(fd[i].events & POLLIN)
             total_events++;
@@ -747,7 +788,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
         if(proc->is_debug) {
             poll_to_str(fd[i].events,out);
 
-            DEBUG(proc->is_debug,"Trying to poll %s (%d) timeout %d event %s from proc %d",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,timeout,out,proc->id);
+            DEBUG(proc->is_debug,"Trying to poll %s (%d) timeout %d event %s with state %d from proc %d (%s)",fd0->state == USERSPACE_FD_STATE_FILE ? fd0->path : "Not file",fd0->index,timeout,out,fd0->state,proc->id,proc->name);
          
         }   
     }
@@ -758,110 +799,6 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
     int something_bad = 0;
 
     int retry = 0;
-
-    if(1) {
-        for(int i = 0;i < count; i++) {
-            userspace_fd_t* fd0 = vfs::fdmanager::search(proc,fd[i].fd);
-            if(fd[i].events & POLLIN) {
-
-                if(fd0->state == USERSPACE_FD_STATE_SOCKET && !fd0->is_listen) {
-                        int if_pollin = 0;
-                        fd0->write_socket_pipe->lock.lock();
-                        fd0->read_socket_pipe->lock.lock();
-                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-                            if_pollin = fd0->write_socket_pipe->size > 0 ? 1 : 0;
-                        } else {
-                            if_pollin = fd0->read_socket_pipe->size > 0 ? 1 : 0;
-                        }
-                        if(if_pollin) {
-                            //DEBUG(proc->id == 17 && fd0->index < 40,"polin done fd %d writ sock 0x%p",fd0->index,fd0->write_socket_pipe);
-                            num_events++;
-                            fd[i].revents |= POLLIN;
-                        }
-                        fd0->write_socket_pipe->lock.unlock();
-                        fd0->read_socket_pipe->lock.unlock();
-                    } else if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen) {
-                        if(fd0->read_counter == -1)
-                            fd0->read_counter = 0;
-                        if(sockets::find(fd0->path)->socket_counter > fd0->read_counter) {
-                            fd0->read_counter++;
-                            num_events++;
-                            fd[i].revents |= POLLIN;
-                        }
-                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
-                        if(fd0->pipe_side != PIPE_SIDE_READ)
-                            continue;
-                        fd0->pipe->lock.lock();
-                        if(fd0->pipe->size > 0) {
-                            num_events++;
-                            fd[i].revents |= POLLIN; 
-                        }
-                        fd0->pipe->lock.unlock();
-                    } else {
-
-                        std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
-
-                        if(ret != 0) {
-                            num_events++;
-                            fd[i].revents |= POLLIN;
-                        }
-                    }
-            }
-
-            if(fd[i].events & POLLOUT) {
-                    if(fd0->state == USERSPACE_FD_STATE_SOCKET) {
-                        fd0->write_socket_pipe->lock.lock();
-                        fd0->read_socket_pipe->lock.lock();
-                        int is_pollout = 0;
-                        if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
-                            if(fd0->read_socket_pipe->size < fd0->read_socket_pipe->total_size)
-                                is_pollout = 1;
-                        } else {
-                            if(fd0->write_socket_pipe->size < fd0->write_socket_pipe->total_size)
-                                is_pollout = 1;
-                        }
-
-                        if(is_pollout) {
-                            num_events++;
-                            fd[i].revents |= POLLOUT;
-                        }
-
-                        fd0->write_socket_pipe->lock.unlock();
-                        fd0->read_socket_pipe->lock.unlock();
-                    } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
-                        if(fd0->pipe_side != PIPE_SIDE_READ)
-                            continue;
-                        fd0->pipe->lock.lock();
-                        if(fd0->pipe->size < fd0->pipe->total_size) {
-                            num_events++;
-                            fd[i].revents |= POLLOUT;
-                        }
-                        fd0->pipe->lock.unlock();
-                    } else {
-                        std::int64_t ret = vfs::vfs::poll(fd0,POLLOUT);
-                            
-                        if(ret != 0) {
-                            num_events++;
-                            fd[i].revents |= POLLOUT;
-                        }
-                    }
-
-                }
-
-            if(num_events)
-                success = false;
-        }
-    }
-
-    if(success == false) {
-        DEBUG(proc->is_debug,"Poll done (optimization) from proc %d",proc->id);
-        //copy_in_userspace(proc,fds,fd,count * sizeof(struct pollfd));
-        vfs::vfs::unlock();
-        return {1,0,num_events};
-    }
-
-    success = true;
-    num_events = 0;
 
     int is_first = 1;
 
@@ -881,6 +818,7 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                         int if_pollin = 0;
                         fd0->write_socket_pipe->lock.lock();
                         fd0->read_socket_pipe->lock.lock();
+
                         if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
                             if_pollin = fd0->write_socket_pipe->size > 0 ? 1 : 0;
                         } else {
@@ -891,6 +829,12 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                             num_events++;
                             fd[i].revents |= POLLIN;
                         }
+
+                        if(fd0->write_socket_pipe->is_closed.test() && !if_pollin) {
+                            num_events++;
+                            fd[i].revents |= POLLHUP;
+                        }
+
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
                     } else if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen) {
@@ -910,6 +854,13 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                             fd[i].revents |= POLLIN; 
                         }
                         fd0->pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_EVENTFD) {
+                        fd0->eventfd->lock.lock();
+                        if(fd0->eventfd->buffer > 0) {
+                            num_events++;
+                            fd[i].revents |= POLLIN; 
+                        }
+                        fd0->eventfd->lock.unlock();
                     } else {
 
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
@@ -940,6 +891,13 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_EVENTFD) {
+                        fd0->eventfd->lock.lock();
+                        if(fd0->eventfd->buffer <= (0xFFFFFFFFFFFFFFFF - 1)) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+                        fd0->eventfd->lock.unlock();
                     } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
                         if(fd0->pipe_side != PIPE_SIDE_READ)
                             continue;
@@ -991,6 +949,8 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                         int if_pollin = 0;
                         fd0->write_socket_pipe->lock.lock();
                         fd0->read_socket_pipe->lock.lock();
+
+                        
                         if(fd0->other_state == USERSPACE_FD_OTHERSTATE_MASTER) {
                             if_pollin = fd0->write_socket_pipe->size > 0 ? 1 : 0;
                         } else {
@@ -1001,6 +961,12 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                             num_events++;
                             fd[i].revents |= POLLIN;
                         }
+
+                        if(fd0->write_socket_pipe->is_closed.test() && !if_pollin) {
+                            num_events++;
+                            fd[i].revents |= POLLHUP;
+                        }
+
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
                     } else if(fd0->state == USERSPACE_FD_STATE_SOCKET && fd0->is_listen) {
@@ -1018,6 +984,13 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
                             fd[i].revents |= POLLIN; 
                         }
                         fd0->pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_EVENTFD) {
+                        fd0->eventfd->lock.lock();
+                        if(fd0->eventfd->buffer > 0) {
+                            num_events++;
+                            fd[i].revents |= POLLIN; 
+                        }
+                        fd0->eventfd->lock.unlock();
                     } else {
 
                         std::int64_t ret = vfs::vfs::poll(fd0,POLLIN);
@@ -1051,6 +1024,13 @@ syscall_ret_t sys_poll(struct pollfd *fds, int count, int timeout) {
 
                         fd0->write_socket_pipe->lock.unlock();
                         fd0->read_socket_pipe->lock.unlock();
+                    } else if(fd0->state == USERSPACE_FD_STATE_EVENTFD) {
+                        fd0->eventfd->lock.lock();
+                        if(fd0->eventfd->buffer <= (0xFFFFFFFFFFFFFFFF - 1)) {
+                            num_events++;
+                            fd[i].revents |= POLLOUT;
+                        }
+                        fd0->eventfd->lock.unlock();
                     } else if(fd0->state == USERSPACE_FD_STATE_PIPE) {
                         fd0->pipe->lock.lock();
                         if(fd0->pipe->size < fd0->pipe->total_size) {
@@ -1189,6 +1169,8 @@ syscall_ret_t sys_mkdirat(int dirfd, char* path, int mode) {
 
     int ret = vfs::vfs::create(result,VFS_TYPE_DIRECTORY);
 
+    //DEBUG(1,"mkdir %s %d\n",result,ret);
+
     userspace_fd_t fd;
     fd.is_cached_path = 0;
     memcpy(fd.path,result,2048);
@@ -1211,6 +1193,8 @@ syscall_ret_t sys_chmod(char* path, int mode) {
     fd.is_cached_path = 0;
     memset(&fd,0,sizeof(fd));
     memcpy(fd.path,result,2048);
+
+    DEBUG(1,"chmod %s %d\n",path,mode);
 
     uint64_t value;
     int ret = vfs::vfs::var(&fd,(uint64_t)&value,TMPFS_VAR_CHMOD);
@@ -1284,4 +1268,294 @@ syscall_ret_t sys_rename(char* old, char* newp) {
     int status = vfs::vfs::rename(old_path,new_path);
 
     return {0,status,0};
+}
+
+typedef __SIZE_TYPE__    __mlibc_size;
+
+struct iovec {
+	void *iov_base;
+	__mlibc_size iov_len;
+};
+
+typedef unsigned socklen_t;
+
+struct msghdr {
+	void *msg_name;
+	socklen_t msg_namelen;
+	struct iovec *msg_iov;
+#if __INTPTR_WIDTH__ == 64 && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	int __pad0;
+#endif
+	int msg_iovlen;
+#if __INTPTR_WIDTH__ == 64 && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	int __pad0;
+#endif
+	void *msg_control;
+#if __INTPTR_WIDTH__ == 64 && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	int __pad1;
+#endif
+	socklen_t msg_controllen;
+#if __INTPTR_WIDTH__ == 64 && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	int __pad1;
+#endif
+	int msg_flags;
+};
+
+struct cmsghdr {
+#if __INTPTR_WIDTH__ == 64 && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	int __pad;
+#endif
+	socklen_t cmsg_len;
+#if __INTPTR_WIDTH__ == 64 && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	int __pad;
+#endif
+	int cmsg_level;
+	int cmsg_type;
+};
+
+#define SOL_SOCKET      1
+
+#define SCM_RIGHTS 1
+#define SCM_CREDENTIALS 2
+
+#define __CMSG_ALIGN(s) (((s) + __alignof__(size_t) - 1) & \
+		~(__alignof__(size_t) - 1))
+
+#if defined(_DEFAULT_SOURCE)
+#define CMSG_ALIGN(s) __CMSG_ALIGN(s)
+#endif /* defined(_DEFAULT_SOURCE) */
+
+/* Basic macros to return content and padding size of a control message. */
+#define CMSG_LEN(s) (__CMSG_ALIGN(sizeof(struct cmsghdr)) + (s))
+#define CMSG_SPACE(s) (__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(s))
+
+/* Provides access to the data of a control message. */
+#define CMSG_DATA(c) ((unsigned char *)(c) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
+
+#define __MLIBC_CMSG_NEXT(c) ((char *)(c) + __CMSG_ALIGN((c)->cmsg_len))
+#define __MLIBC_MHDR_LIMIT(m) ((char *)(m)->msg_control + (m)->msg_controllen)
+
+/* For parsing control messages only. */
+/* Returns a pointer to the first header or nullptr if there is none. */
+#define CMSG_FIRSTHDR(m) ((size_t)(m)->msg_controllen <= sizeof(struct cmsghdr) \
+	? (struct cmsghdr *)0 : (struct cmsghdr *) (m)->msg_control)
+
+/* For parsing control messages only. */
+/* Returns a pointer to the next header or nullptr if there is none. */
+#define CMSG_NXTHDR(m, c) \
+	((c)->cmsg_len < sizeof(struct cmsghdr) || \
+		(std::int64_t)(sizeof(struct cmsghdr) + __CMSG_ALIGN((c)->cmsg_len)) \
+			>= __MLIBC_MHDR_LIMIT(m) - (char *)(c) \
+	? (struct cmsghdr *)0 : (struct cmsghdr *)__MLIBC_CMSG_NEXT(c))
+
+syscall_ret_t sys_msg_send(int fd, struct msghdr* hdr, int flags) {
+    struct msghdr* msg = hdr;
+    SYSCALL_IS_SAFEA(hdr,sizeof(struct msghdr));
+    
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {1,EBADF,0};
+
+    vfs::pipe* target_pipe = fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd_s->read_socket_pipe : fd_s->write_socket_pipe;
+    if(!target_pipe)
+        return {1,EBADF,0};
+
+    std::uint64_t total_size = 0;
+    for (int i = 0; i < hdr->msg_iovlen; i++) {
+        SYSCALL_IS_SAFEA(hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len);
+        total_size += hdr->msg_iov[i].iov_len;
+    }
+
+    if(total_size > target_pipe->total_size)
+        return {1,EMSGSIZE,0};
+
+    target_pipe->lock.lock();
+    std::uint64_t space_left = target_pipe->total_size - target_pipe->size;
+    target_pipe->lock.unlock();
+    while(space_left < total_size) {
+        yield();
+        target_pipe->lock.lock();
+        space_left = target_pipe->total_size - target_pipe->size;
+        target_pipe->lock.unlock();
+    }
+
+    target_pipe->lock.lock();
+
+    struct cmsghdr *cmsg = 0;
+
+    for (cmsg = CMSG_FIRSTHDR(msg);
+        cmsg != NULL;
+        cmsg = CMSG_NXTHDR(msg, cmsg)) {
+             Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"hello %d\n",cmsg->cmsg_type);
+        
+        if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS) {
+            DEBUG(1,"scm\n");
+            int new_fd = 0;
+            memcpy(&new_fd, CMSG_DATA(cmsg), sizeof(int));
+
+            userspace_fd_t* fd_s1 = vfs::fdmanager::search(proc,new_fd);
+
+            if(!fd_s1) {
+                break;
+            }
+
+            proc->pass_fd->push(fd_s1);
+            target_pipe->fd_pass = (void*)proc->pass_fd; // transfer
+        
+        } else if(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_CREDENTIALS) {
+            target_pipe->ucred_pass->push((struct ucred*)CMSG_DATA(cmsg));
+        }
+    }
+
+    std::int64_t total_written = 0;
+
+    for (int i = 0; i < hdr->msg_iovlen; i++) {
+        std::int64_t sent_bytes = target_pipe->nolock_write((const char*)hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len,0);
+        if(sent_bytes < 0) {
+            target_pipe->lock.unlock();
+            return {1,+sent_bytes,0};
+        }
+        total_written += sent_bytes;
+        if (sent_bytes < hdr->msg_iov[i].iov_len) {
+            break; 
+        }
+    }
+
+    DEBUG(proc->is_debug,"msg_send fd %d total_written %lli flags %d from proc %d\n",fd,total_written,flags,proc->id);
+
+    target_pipe->lock.unlock();
+    return {1,0,total_written};
+}
+
+syscall_ret_t sys_msg_recv(int fd, struct msghdr *hdr, int flags) {
+    struct msghdr* msg = hdr;
+    SYSCALL_IS_SAFEA(hdr,4096);
+    
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
+    if(!fd_s)
+        return {1,EBADF,0};
+
+    vfs::pipe* target_pipe = fd_s->other_state == USERSPACE_FD_OTHERSTATE_MASTER ? fd_s->write_socket_pipe : fd_s->read_socket_pipe;
+    if(!target_pipe)
+        return {1,EBADF,0};
+
+    std::uint64_t total_size = 0;
+    for (int i = 0; i < hdr->msg_iovlen; i++) {
+        SYSCALL_IS_SAFEA(hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len);
+        total_size += hdr->msg_iov[i].iov_len;
+    }
+
+    std::int64_t total_read = 0;
+
+    for (int i = 0; i < hdr->msg_iovlen; i++) {
+        std::int64_t recv_bytes = 0;
+        recv_bytes = target_pipe->read(&fd_s->read_counter,(char*)hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len,((fd_s->flags & O_NONBLOCK) ? 1 : 0));
+        if(recv_bytes == -EAGAIN) {
+            return {1,EAGAIN,0}; 
+        } else if(recv_bytes == -EAGAIN)
+            break; // just dont continue 
+        total_read += recv_bytes;
+    }
+
+    socklen_t new_msglen = 0;
+    socklen_t src_msglen = hdr->msg_controllen;
+
+    struct cmsghdr* cmsg = 0;
+
+    target_pipe->lock.lock();
+    for (cmsg = CMSG_FIRSTHDR(msg);
+        cmsg != 0;
+        cmsg = CMSG_NXTHDR(msg, cmsg)) {
+        if (1) {
+            int *fd_ptr = (int *) CMSG_DATA(cmsg);
+            userspace_fd_t fd_s1;
+            memset(&fd_s1,0,sizeof(userspace_fd_t));
+            vfs::passingfd_manager* pasfd = (vfs::passingfd_manager*)target_pipe->fd_pass;
+            if(pasfd != 0) {
+                if(pasfd->pop(&fd_s1) == 0) {
+                    cmsg->cmsg_level = SOL_SOCKET;
+                    cmsg->cmsg_type = SCM_RIGHTS;
+                    cmsg->cmsg_len = 24;
+                    new_msglen += 24;
+                    int new_fd = vfs::fdmanager::create(proc);
+                    userspace_fd_t* nfd_s = vfs::fdmanager::search(proc,new_fd);
+
+                    nfd_s->cycle = fd_s1.cycle;
+                    nfd_s->offset = fd_s1.offset;
+                    nfd_s->state = fd_s1.state;
+                    nfd_s->other_state = fd_s1.other_state;
+                    nfd_s->pipe = fd_s1.pipe;
+                    nfd_s->pipe_side = fd_s1.pipe_side;
+                    nfd_s->queue = fd_s1.queue;
+                    nfd_s->is_a_tty = fd_s1.is_a_tty;
+                    nfd_s->read_counter = fd_s1.read_counter;
+                    nfd_s->write_counter = fd_s1.write_counter;
+                    nfd_s->can_be_closed = 0;
+                    nfd_s->write_socket_pipe = fd_s1.write_socket_pipe;
+                    nfd_s->read_socket_pipe = fd_s1.read_socket_pipe;
+                    nfd_s->eventfd = fd_s1.eventfd;
+
+                   
+                    memcpy(nfd_s->path,fd_s1.path,sizeof(fd_s1.path));
+
+                    memcpy(CMSG_DATA(cmsg), &new_fd, sizeof(int));
+                    if(nfd_s->state == USERSPACE_FD_STATE_PIPE)
+                        nfd_s->pipe->create(nfd_s->pipe_side);
+                    else if(nfd_s->state == USERSPACE_FD_STATE_EVENTFD)
+                        nfd_s->eventfd->create();
+                } 
+            } else {
+                // fd pass is more important than ucred
+                if(target_pipe->ucred_pass->pop((struct ucred*)CMSG_DATA(cmsg)) == 0) {
+                    DEBUG(1,"ucred pass");
+                    cmsg->cmsg_level = SOL_SOCKET;
+                    cmsg->cmsg_type = SCM_CREDENTIALS;
+                    cmsg->cmsg_len = 28;
+                    new_msglen += 28;
+                }
+            }
+
+        }
+    }
+
+    if(new_msglen != 0) {
+        target_pipe->fd_pass = 0; // clear
+        target_pipe->lock.unlock();
+    } else
+        target_pipe->lock.unlock();
+
+    target_pipe->lock.unlock();
+    hdr->msg_controllen = new_msglen;
+
+    DEBUG(proc->is_debug,"msg_recv fd %d total_read %lli flags %d from proc %d, controllen %d srclen %d\n",fd,total_read,flags,proc->id,hdr->msg_controllen,src_msglen);
+    return {1,0,total_read};
+}
+
+syscall_ret_t sys_eventfd_create(unsigned int initval, int flags) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    int new_fd = vfs::fdmanager::create(proc);
+
+    userspace_fd_t* new_fd_s = vfs::fdmanager::search(proc,new_fd);
+    memset(new_fd_s->path,0,2048);
+
+    new_fd_s->offset = 0;
+    new_fd_s->queue = 0;
+    new_fd_s->pipe = 0;
+    new_fd_s->pipe_side = 0;
+    new_fd_s->cycle = 0;
+    new_fd_s->is_a_tty = 0;
+
+    new_fd_s->state = USERSPACE_FD_STATE_EVENTFD;
+    new_fd_s->eventfd = new vfs::eventfd(initval,flags);
+
+    new_fd_s->eventfd->create();
+
+    DEBUG(proc->is_debug,"Creating eventfd %d from proc %d, proc->fd 0x%p",new_fd,proc->id,proc->fd);
+
+    return {1,0,new_fd};
 }

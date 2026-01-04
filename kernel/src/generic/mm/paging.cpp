@@ -8,6 +8,8 @@
 #include <limine.h>
 #include <etc/etc.hpp>
 
+#include <etc/libc.hpp>
+
 static void init();
 std::uint64_t kernel_cr3;
 alwaysmapped_t* alwmap = 0;
@@ -15,6 +17,12 @@ alwaysmapped_t* alwmap = 0;
 uint64_t* __paging_next_level(std::uint64_t* table,std::uint16_t idx,std::uint64_t flags,std::uint32_t id) {
     if(!(table[idx] & PTE_PRESENT))
         table[idx] = memory::pmm::_physical::allocid(4096,id) | flags;
+    return (uint64_t*)Other::toVirt(table[idx] & PTE_MASK_VALUE);
+}
+
+uint64_t* __paging_next_level_noalloc(std::uint64_t* table,std::uint16_t idx,std::uint64_t flags,std::uint32_t id) {
+    if(!(table[idx] & PTE_PRESENT))
+        return 0;
     return (uint64_t*)Other::toVirt(table[idx] & PTE_MASK_VALUE);
 }
 
@@ -50,10 +58,57 @@ void memory::paging::change(std::uint64_t cr3, std::uint64_t virt, std::uint64_t
     std::uint64_t new_flags = PTE_PRESENT | PTE_RW;
     if(PTE_INDEX(align_virt,39) < 256)
         new_flags |= PTE_USER;
-    uint64_t* pml3 = __paging_next_level(cr30,PTE_INDEX(align_virt,39),new_flags,0);
-    uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(align_virt,30),new_flags,0);
-    uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(align_virt,21),new_flags,0);
+    uint64_t* pml3 = __paging_next_level(cr30,PTE_INDEX(align_virt,39),new_flags,0);//1
+    uint64_t* pml2 = __paging_next_level(pml3,PTE_INDEX(align_virt,30),new_flags,0); // 2
+    uint64_t* pml = __paging_next_level(pml2,PTE_INDEX(align_virt,21),new_flags,0); // 3
     pml[PTE_INDEX(align_virt,12)] = (pml[PTE_INDEX(align_virt,12)] & PTE_MASK_VALUE) | flags;
+}
+
+std::int64_t __memory_paging_getphys(std::uint64_t cr3, std::uint64_t virt) {
+    std::uint64_t align_virt = virt;
+    std::uint64_t* cr30 = (std::uint64_t*)Other::toVirt(cr3);
+    if(cr30[PTE_INDEX(virt,39)] & PTE_PRESENT) {
+        std::uint64_t* pml3 = __paging_next_level_noalloc(cr30,PTE_INDEX(align_virt,39),0,0);//1
+        if(pml3[PTE_INDEX(virt,30)] & PTE_PRESENT) {
+            std::uint64_t* pml2 = __paging_next_level_noalloc(pml3,PTE_INDEX(align_virt,30),0,0); // 2
+            if(pml2[PTE_INDEX(virt,21)] & PTE_PRESENT) {
+                uint64_t* pml = __paging_next_level_noalloc(pml2,PTE_INDEX(align_virt,21),0,0); // 3
+                if(pml[PTE_INDEX(align_virt,12)] & PTE_PRESENT) {
+                    return pml[PTE_INDEX(virt,12)] & PTE_MASK_VALUE;
+                } else {
+                    return -1;
+                }
+            } else {
+                return -1;
+            }
+        } else {
+            return -1;
+        }
+    } else {
+        return -1;
+    }
+}
+
+void memory::paging::destroyrange(std::uint64_t cr3, std::uint64_t virt, std::uint64_t len) {
+    for(std::uint64_t i = 0;i < len; i += 4096) {
+        std::int64_t phys = __memory_paging_getphys(cr3,virt + i);
+        if(phys != -1 && phys != 0) {
+            memory::pmm::_physical::free((std::uint64_t)phys);
+            map(cr3,0,virt + i,0);
+        } 
+    }
+}
+
+void memory::paging::duplicaterangeifexists(std::uint64_t src_cr3, std::uint64_t dest_cr3, std::uint64_t virt, std::uint64_t len, std::uint64_t flags) {
+    zerorange(dest_cr3,virt,len);
+    for(std::uint64_t i = 0;i < len; i += 4096) {
+        std::int64_t phys = __memory_paging_getphys(src_cr3,virt + i);
+        if(phys != -1) {
+            std::uint64_t new_phys = memory::pmm::_physical::alloc(4096);
+            memcpy(Other::toVirt(new_phys),Other::toVirt(phys),4096);
+            map(dest_cr3,new_phys,virt + i,flags);
+        } 
+    }
 }
 
 void memory::paging::changerange(std::uint64_t cr3, std::uint64_t virt, std::uint64_t len , std::uint64_t flags) {
@@ -65,6 +120,12 @@ void memory::paging::changerange(std::uint64_t cr3, std::uint64_t virt, std::uin
 void memory::paging::maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags) {
     for(std::uint64_t i = 0; i <= len; i += 4096) {
         map(cr3,phys + i,virt + i,flags);
+    }
+}
+
+void memory::paging::zerorange(std::uint64_t cr3,std::uint64_t virt,std::uint64_t len) {
+    for(std::uint64_t i = 0; i <= len; i += 4096) {
+        map(cr3,0,virt + i,0);
     }
 }
 
@@ -135,6 +196,34 @@ void memory::paging::alwaysmappedmap(std::uint64_t cr3,std::uint32_t id) {
         __map_range_id(cr3,current->phys,(std::uint64_t)Other::toVirt(current->phys),current->len,PTE_RW | PTE_PRESENT,id);  
         current = current->next;
     }
+}
+
+void __paging_destroy_table(std::uint64_t phys_table, int level) {
+    std::uint64_t* table = (std::uint64_t*)Other::toVirt(phys_table);
+    if(level != 3) { 
+        if(level == 0) { 
+            for(int i = 0; i < 256; i++) {
+                if(table[i] & PTE_PRESENT) {
+                    __paging_destroy_table(table[i] & PTE_MASK_VALUE,level + 1);
+                }
+            }
+        } else {
+            for(int i = 0;i < 512; i++) {
+                if(table[i] & PTE_PRESENT) {
+                    __paging_destroy_table(table[i] & PTE_MASK_VALUE,level + 1);
+                }
+            } 
+        }
+    }
+
+    if(level != 0)
+        memory::pmm::_physical::free(phys_table);
+}
+
+void memory::paging::destroy(std::uint64_t cr3) {
+    if(cr3 == kernel_cr3)
+        return;
+    __paging_destroy_table(cr3,0);
 }
 
 void memory::paging::init() {

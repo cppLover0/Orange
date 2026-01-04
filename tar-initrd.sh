@@ -7,7 +7,7 @@ export PATH="$HOME/opt/cross/orange/bin:$PATH"
 
 sysroot_path="$(realpath initrd)"
 
-export CFLAGS="-fPIC -Wno-error -O2 -Wno-incompatible-pointer-types"
+export CFLAGS="-fPIC -Wno-error -O2 -Wno-incompatible-pointer-types -Wno-implicit-function-declaration"
 export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
 export PKG_CONFIG_PATH="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig:$sysroot_path/usr/local/lib/pkgconfig:$sysroot_path/usr/local/share/pkgconfig:$HOME/opt/cross/orange/lib/pkgconfig:$HOME/opt/cross/orange/share/pkgconfig"
 if [ ! "$(which x86_64-orange-mlibc-gcc)" ]; then

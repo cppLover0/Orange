@@ -10,6 +10,9 @@
 
 #include <generic/mm/paging.hpp>
 #include <generic/mm/pmm.hpp>
+#include <arch/x86_64/syscalls/shm.hpp>
+
+#include <drivers/cmos.hpp>
 
 #include <config.hpp>
 
@@ -27,13 +30,17 @@ typedef struct vmm_obj {
     uint8_t is_mapped;
 
     uint8_t is_free;
-
     uint8_t is_lazy_alloc;
+    uint8_t is_lazy_allocated;
+
+    uint8_t is_even_need_to_free;
 
     int* how_much_connected; // used for sharedmem
     locks::spinlock lock;
 
     uint64_t src_len;
+
+    shm_seg_t* shm;
 
     struct vmm_obj* next;
 } __attribute__((packed)) vmm_obj_t;
@@ -57,6 +64,10 @@ namespace memory {
             proc->vmm_start = (char*)start;
             proc->vmm_end = (char*)end;
         }
+
+        inline static vmm_obj_t* find_free(vmm_obj_t* start, std::uint64_t len) {
+            return 0;
+        }
         
         inline static vmm_obj_t* v_alloc(vmm_obj_t* start,std::uint64_t len) {
             vmm_obj_t* current = start->next;
@@ -64,6 +75,16 @@ namespace memory {
             uint64_t found = 0;
 
             uint64_t align_length = ALIGNUP(len,4096);
+
+            vmm_obj_t* top = find_free(start,len);
+            if(top) {
+                top->is_lazy_alloc = 0;
+                top->is_lazy_allocated = 0;
+                top->is_free = 0;
+                top->is_shared = 0;
+                top->is_mapped = 0;
+                return top;
+            }
             
             while(current) {
 
@@ -76,6 +97,9 @@ namespace memory {
                         vmm_new->base = prev_end;
                         vmm_new->len = align_length;
                         vmm_new->is_lazy_alloc = 0;
+                        vmm_new->is_lazy_allocated = 0;
+                        vmm_new->is_shared = 0;
+                        vmm_new->is_free = 0;
                         prev->next = vmm_new;
                         vmm_new->next = current;
 
@@ -118,6 +142,10 @@ namespace memory {
 
                         vmm_new->base = base;
                         vmm_new->len = align_length;
+
+                        vmm_new->is_lazy_alloc = 0;
+                        vmm_new->is_lazy_allocated = 0;
+                        vmm_new->is_shared = 0;
                         
                         prev->next = vmm_new;
                         vmm_new->next = current;
@@ -159,6 +187,61 @@ namespace memory {
             paging::maprangeid(proc->original_cr3,base,new_vmm->base,length,flags,*proc->vmm_id);
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
+        }
+
+        inline static void* custom_map(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t phys, std::uint64_t length, std::uint64_t flags) {
+            asm volatile("cli"); // bug if they are enabled
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
+            void* new_virt = mark(proc,virt,phys,length,flags,0);
+            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,length,flags,*proc->vmm_id);
+            current->lock.unlock();
+            vmm_obj_t* new_vmm = get(proc,virt);
+            new_vmm->is_mapped = 1;
+            new_vmm->src_len = length;
+
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+
+            return (void*)virt;
+        } 
+
+        inline static std::uint64_t shm_map(arch::x86_64::process_t* proc, shm_seg_t* shm, std::uint64_t base) {
+            
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            current->lock.lock();
+            
+            if(base == 0) {
+                vmm_obj_t* new_vmm = v_alloc(current,shm->len);
+                new_vmm->flags = PTE_PRESENT | PTE_RW | PTE_USER;
+                new_vmm->phys = shm->phys;
+                new_vmm->src_len = shm->len;
+                new_vmm->is_mapped = 1;
+                new_vmm->shm = shm;
+                paging::maprangeid(proc->original_cr3,shm->phys,new_vmm->base,shm->len,PTE_PRESENT | PTE_RW | PTE_USER,*proc->vmm_id);
+                new_vmm->shm->ctl.shm_atime = getUnixTime();
+                new_vmm->shm->ctl.shm_lpid = proc->id;
+                new_vmm->shm->ctl.shm_nattch++;
+                ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+                return (std::uint64_t)new_vmm->base;
+            } else {
+
+                void* new_virt = mark(proc,base,shm->phys,shm->len,PTE_PRESENT | PTE_RW | PTE_USER,0);
+                paging::maprangeid(proc->original_cr3,shm->phys,(std::uint64_t)base,shm->len,PTE_PRESENT | PTE_RW | PTE_USER,*proc->vmm_id);
+                current->lock.unlock();
+                vmm_obj_t* new_vmm = get(proc,base);
+                new_vmm->is_mapped = 1;
+                new_vmm->src_len = shm->len;
+                new_vmm->shm = shm;
+
+                new_vmm->shm->ctl.shm_atime = getUnixTime();
+                new_vmm->shm->ctl.shm_lpid = proc->id;
+                new_vmm->shm->ctl.shm_nattch++;
+                ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+                return (std::uint64_t)base;
+            }
+
+            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
+            return 0;
         }
 
         inline static void* mark(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_shared) {
@@ -219,6 +302,19 @@ namespace memory {
             asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)src_proc->vmm_start;
             current->lock.lock();
+
+            arch::x86_64::process_t* proc = dest_proc;
+
+            proc->ctx.cr3 = memory::pmm::_physical::alloc(4096);
+            proc->original_cr3 = proc->ctx.cr3;
+            std::uint64_t cr3 = proc->ctx.cr3;
+            
+            for(int i = 255; i < 512; i++) {
+                std::uint64_t* virt_usrcr3 = (std::uint64_t*)Other::toVirt(proc->ctx.cr3);
+                std::uint64_t* virt_kercr3 = (std::uint64_t*)Other::toVirt(memory::paging::kernelget());
+                virt_usrcr3[i] = virt_kercr3[i];
+            }
+
             if(dest_proc && src_proc) {
 
                 vmm_obj_t* src_current = (vmm_obj_t*)src_proc->vmm_start;
@@ -227,25 +323,34 @@ namespace memory {
 
                     uint64_t phys;
 
-                    if(src_current->phys) {
+                    if(!src_current->is_free && src_current->base != 0 && src_current->base != (std::uint64_t)Other::toVirt(0) - 4096) {
 
-                        if(src_current->is_shared) {
-                            *src_current->how_much_connected = *src_current->how_much_connected + 1;
-                            phys = src_current->phys;
-                        } else {
-                            if(src_current->src_len <= 4096 && !src_current->is_mapped)
-                                phys = memory::pmm::_physical::alloc(4096);
-                            else if(src_current->src_len > 4096 && !src_current->is_mapped)
-                                phys = memory::pmm::_physical::alloc(src_current->src_len);
-                            else if(src_current->is_mapped)
+                        if(!src_current->is_lazy_allocated && !src_current->is_lazy_alloc && src_current->phys) {
+                            if(src_current->is_shared) {
+                                *src_current->how_much_connected = *src_current->how_much_connected + 1;
                                 phys = src_current->phys;
+                            } else {
+                                if(src_current->src_len <= 4096 && !src_current->is_mapped)
+                                    phys = memory::pmm::_physical::alloc(4096);
+                                else if(src_current->src_len > 4096 && !src_current->is_mapped)
+                                    phys = memory::pmm::_physical::alloc(src_current->src_len);
+                                else if(src_current->is_mapped)
+                                    phys = src_current->phys;
 
-                            if(!src_current->is_mapped)
-                                memcpy((void*)Other::toVirt(phys),(void*)Other::toVirt(src_current->phys),src_current->len);
+                                if(!src_current->is_mapped)
+                                    memcpy((void*)Other::toVirt(phys),(void*)Other::toVirt(src_current->phys),src_current->len);
+                            }
+                            memory::paging::maprangeid(cr3,phys,src_current->base,src_current->len,src_current->flags,*proc->vmm_id);
+                        } else {
+                            phys = 0;
+                            memory::paging::duplicaterangeifexists(src_proc->original_cr3,dest_proc->original_cr3,src_current->base,src_current->len,src_current->flags);
                         }
 
                         mark(dest_proc,src_current->base,phys,src_current->src_len,src_current->flags,src_current->is_shared);
                         get(dest_proc,src_current->base)->is_mapped = src_current->is_mapped;
+
+                        get(dest_proc,src_current->base)->is_lazy_alloc = src_current->is_lazy_alloc;
+                        get(dest_proc,src_current->base)->is_lazy_allocated = src_current->is_lazy_allocated;
 
                     }
 
@@ -310,6 +415,43 @@ namespace memory {
             }
         }
 
+        inline static void unmap(arch::x86_64::process_t* proc, std::uint64_t virt) {
+            vmm_obj_t* current = getlen(proc,virt);
+            if(!current)
+                return;
+            vmm_obj_t* start = (vmm_obj_t*)proc->vmm_start;
+            start->lock.lock();
+            vmm_obj_t* prev = start;
+            while(prev) {
+                if(prev->next == current)
+                    break;
+                prev = prev->next;
+            }
+            prev->next = current->next;
+
+            if(!current->shm) {
+                if(current->is_lazy_alloc) {
+                    memory::paging::destroyrange(proc->original_cr3,current->base,current->len);
+                    memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+                } else {
+                    memory::pmm::_physical::free(current->phys);
+                    memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+                }
+            } else {
+                current->shm->ctl.shm_dtime = getUnixTime();
+                current->shm->ctl.shm_lpid = proc->id;
+                current->shm->ctl.shm_nattch--;
+                memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+                current->shm = 0;
+            }
+
+            current->is_free = 1;
+
+            delete current;
+            
+            start->lock.unlock();
+        }
+
         inline static void free(arch::x86_64::process_t* proc) {
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
 
@@ -332,14 +474,22 @@ namespace memory {
                 if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     next = 0;
 
-                if(!current->is_mapped && !current->is_shared && !current->is_lazy_alloc) {
-                    memory::pmm::_physical::free(current->phys);
-                } else if(current->is_shared && !current->is_mapped) {
-                    if(*current->how_much_connected == 1) {
-                        memory::pmm::_physical::free(current->phys);
-                        delete (void*)current->how_much_connected;
-                    } else
-                        *current->how_much_connected = *current->how_much_connected - 1;
+                if(!current->is_free) {
+                    if(current->base != 0 && current->base != (std::uint64_t)Other::toVirt(0) - 4096) {
+                        if(!current->is_lazy_allocated && !current->is_lazy_alloc) {
+                            if(!current->is_mapped && !current->is_shared && !current->is_lazy_alloc) {
+                                memory::pmm::_physical::free(current->phys);
+                            } else if(current->is_shared && !current->is_mapped) {
+                                if(*current->how_much_connected == 1) {
+                                    memory::pmm::_physical::free(current->phys);
+                                    delete (void*)current->how_much_connected;
+                                } else
+                                    *current->how_much_connected = *current->how_much_connected - 1;
+                            }
+                        } else {
+                            memory::paging::destroyrange(proc->original_cr3,current->base,current->len);
+                        }
+                    }
                 }
  
                 delete current;
@@ -350,8 +500,7 @@ namespace memory {
                 current = next;
             }
 
-            memory::pmm::_physical::fullfree(*proc->vmm_id);
-            memory::pmm::_physical::free(proc->original_cr3);
+            memory::paging::destroy(proc->original_cr3);
 
             proc->original_cr3 = 0;
 
@@ -388,6 +537,9 @@ namespace memory {
             new_vmm->src_len = len;
             new_vmm->is_mapped = 0;
             new_vmm->is_lazy_alloc = 1;
+            new_vmm->is_lazy_allocated = 1;
+            new_vmm->phys = 0;
+            memory::paging::zerorange(proc->original_cr3,(std::uint64_t)new_vmm->base,new_vmm->len);
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
         }

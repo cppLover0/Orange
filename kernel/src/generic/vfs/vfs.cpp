@@ -397,6 +397,16 @@ std::int32_t vfs::vfs::var(userspace_fd_t* fd, std::uint64_t value, std::uint8_t
     } else
         memcpy(out,fd->path,strlen(fd->path));
 
+    if((sockets::is_exists(out))) {
+        socket_node_t* node = sockets::find(out);
+        if(request & (1 << 7))
+            node->vars[request & ~(1 << 7)] = value;
+        else
+            *(std::uint64_t*)value = node->vars[request & ~(1 << 7)];
+        vfs_lock->unlock();
+        return 0;
+    }
+
     vfs_node_t* node = find_node(out);
     if(!node) { vfs::vfs::unlock();
         return ENOENT; }
@@ -541,6 +551,15 @@ void vfs::vfs::close(userspace_fd_t* fd) {
 
     char out0[2048];
     memset(out0,0,2048);
+
+    if(fd->state == USERSPACE_FD_STATE_SOCKET && !fd->is_listen && fd->read_socket_pipe) {
+        // fd->read_socket_pipe->lock.lock();
+        // fd->write_socket_pipe->lock.lock();
+        // fd->read_socket_pipe->is_closed.test_and_set();
+        // fd->write_socket_pipe->is_closed.test_and_set();
+        // fd->read_socket_pipe->lock.unlock();
+        // fd->write_socket_pipe->lock.unlock();
+    }
 
     if(!fd->is_cached_path) {
         __vfs_symlink_resolve(fd->path,out0);
