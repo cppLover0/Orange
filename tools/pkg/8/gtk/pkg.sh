@@ -52,9 +52,6 @@ touch "$1/usr/share/dbus-1/session.d/.keep"
 touch "$1/var/lib/dbus/.keep"
 
 cd ../..
-
-exit 0
-
 wget https://gitlab.gnome.org/GNOME/at-spi2-core/-/archive/2.56.6/at-spi2-core-2.56.6.tar
 tar -xvf at-spi2-core-2.56.6.tar
 cd at-spi2-core-2.56.6

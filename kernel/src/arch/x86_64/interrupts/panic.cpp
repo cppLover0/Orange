@@ -20,6 +20,7 @@ typedef struct stackframe {
 
 int is_panic = 0;
 int last_sys = 0;
+extern std::int64_t __memory_paging_getphys(std::uint64_t cr3, std::uint64_t virt);
 
 void panic(int_frame_t* ctx, const char* msg) {
 
@@ -49,9 +50,30 @@ void panic(int_frame_t* ctx, const char* msg) {
             if(obj0) {
                if(obj0->is_lazy_alloc && !obj0->is_free) {
 
-                    std::uint64_t new_phys = memory::pmm::_physical::alloc(4096);
-                    memory::paging::map(proc->original_cr3,new_phys,ALIGNDOWN(cr2,4096),obj0->flags);
+                    if(__memory_paging_getphys(proc->original_cr3,cr2) == -1) {
+                        std::uint64_t new_phys = memory::pmm::_physical::alloc(4096);
+                        memory::paging::map(proc->original_cr3,new_phys,ALIGNDOWN(cr2,4096),obj0->flags);
+                    }
 
+                    if(ctx->cs & 3)
+                        ctx->ss |= 3;
+                                        
+                    if(ctx->ss & 3)
+                        ctx->cs |= 3;
+
+                    if(ctx->cs == 0x20)
+                        ctx->cs |= 3;
+                                        
+                    if(ctx->ss == 0x18)
+                        ctx->ss |= 3;
+
+                    if(ctx->cs != 0x08)
+                        asm volatile("swapgs");
+
+                    schedulingEnd(ctx);
+               } else if(!obj0->is_free && cr2 > 0x1000) {
+                    Log::SerialDisplay(LEVEL_MESSAGE_WARN,"tlb invalid :( 0x%p is_mapped %d phys 0x%p base 0x%p\n",cr2,obj0->is_mapped,obj0->phys,obj0->base);
+                    memory::paging::maprange(proc->original_cr3,obj0->phys,obj0->base,obj0->len,obj0->flags);
                     if(ctx->cs & 3)
                         ctx->ss |= 3;
                                         
@@ -74,6 +96,17 @@ void panic(int_frame_t* ctx, const char* msg) {
 
         Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p rbp 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx,ctx->rbp);
         
+        Log::Raw("RAX: 0x%016llX RBX: 0x%016llX RDX: 0x%016llX RCX: 0x%016llX RDI: 0x%016llX\n"
+         "RSI: 0x%016llX  R8: 0x%016llX  R9: 0x%016llX R10: 0x%016llX R11: 0x%016llX\n"
+         "R12: 0x%016llX R13: 0x%016llX R14: 0x%016llX R15: 0x%016llX RBP: 0x%016llX\n"
+         "RSP: 0x%016llX CR2: 0x%016llX CR3: 0x%016llX\n"
+         "CPU: %d Vec: %d Err: %d Last Syscall: %d cs %d\n",
+         ctx->rax, ctx->rbx, ctx->rdx, ctx->rcx, ctx->rdi,
+         ctx->rsi, ctx->r8, ctx->r9, ctx->r10, ctx->r11,
+         ctx->r12, ctx->r13, ctx->r14, ctx->r15, ctx->rbp,
+         ctx->rsp, cr2, ctx->cr3,
+         arch::x86_64::cpu::data()->smp.cpu_id, ctx->vec, ctx->err_code,arch::x86_64::cpu::data()->last_sys,ctx->cs);
+
         vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
 
         while(1) {
@@ -134,12 +167,12 @@ void panic(int_frame_t* ctx, const char* msg) {
          "RSI: 0x%016llX  R8: 0x%016llX  R9: 0x%016llX R10: 0x%016llX R11: 0x%016llX\n"
          "R12: 0x%016llX R13: 0x%016llX R14: 0x%016llX R15: 0x%016llX RBP: 0x%016llX\n"
          "RSP: 0x%016llX CR2: 0x%016llX CR3: 0x%016llX\n"
-         "CPU: %d Vec: %d Err: %d Last Syscall: %d\n",
+         "CPU: %d Vec: %d Err: %d Last Syscall: %d cs: %p ss: %p\n",
          ctx->rax, ctx->rbx, ctx->rdx, ctx->rcx, ctx->rdi,
          ctx->rsi, ctx->r8, ctx->r9, ctx->r10, ctx->r11,
          ctx->r12, ctx->r13, ctx->r14, ctx->r15, ctx->rbp,
          ctx->rsp, cr2, ctx->cr3,
-         arch::x86_64::cpu::data()->smp.cpu_id, ctx->vec, ctx->err_code,arch::x86_64::cpu::data()->last_sys);
+         arch::x86_64::cpu::data()->smp.cpu_id, ctx->vec, ctx->err_code,arch::x86_64::cpu::data()->last_sys,ctx->cs,ctx->ss);
     Log::Raw("\n    Stacktrace\n\n");
 
     stackframe_t* rbp = (stackframe_t*)ctx->rbp;

@@ -18,6 +18,8 @@
 
 #include <etc/logging.hpp>
 
+void shm_rm(shm_seg_t* seg);
+
 typedef struct vmm_obj {
     uint64_t base;
     uint64_t phys;
@@ -442,11 +444,19 @@ namespace memory {
                 current->shm->ctl.shm_lpid = proc->id;
                 current->shm->ctl.shm_nattch--;
                 memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+
+                if(current->shm->ctl.shm_nattch == 0 && current->shm->is_pending_rm) {
+                    shm_rm(current->shm);
+                }
+
                 current->shm = 0;
+
             }
 
             current->is_free = 1;
 
+            if(current->how_much_connected)
+                delete current->how_much_connected;
             delete current;
             
             start->lock.unlock();

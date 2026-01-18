@@ -66,6 +66,6 @@ DESTDIR="$1" meson install --no-rebuild
 
 cd ../..
 
-fast_install "$1" https://archive.xfce.org/src/art/xfwm4-themes/4.10/xfwm4-themes-4.10.0.tar.bz2 "--sysconfdir=/etc"
+#fast_install "$1" https://archive.xfce.org/src/art/xfwm4-themes/4.10/xfwm4-themes-4.10.0.tar.bz2 "--sysconfdir=/etc"
 
 cd ..

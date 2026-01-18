@@ -38,6 +38,8 @@ ln -sf pkg-config x86_64-orange-mlibc-pkg-config
 
 cd "$c"
 
+fast_install "$1" https://ftp.gnu.org/gnu/libtool/libtool-2.5.4.tar.xz
+
 # wget https://ftpmirror.gnu.org/gnu/libtool/libtool-2.5.4.tar.gz
 # tar -xvf libtool-2.5.4.tar.gz
 # cd libtool-2.5.4

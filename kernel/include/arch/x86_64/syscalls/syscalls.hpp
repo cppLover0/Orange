@@ -121,11 +121,13 @@ typedef struct {
 
 extern "C" void syscall_handler();
 
+extern "C" {
+
 /* File,Pipes and etc. */
 syscall_ret_t sys_openat(int dirfd, const char* path, int flags, int_frame_t* ctx);
 syscall_ret_t sys_ioctl(int fd, unsigned long request, void *arg);
 syscall_ret_t sys_write(int fd, const void *buf, size_t count);
-syscall_ret_t sys_read(int fd, void *buf, size_t count);
+syscall_ret_t sys_read(int fd, void *buf, size_t count, int_frame_t* ctx);
 syscall_ret_t sys_seek(int fd, long offset, int whence);
 syscall_ret_t sys_dup2(int fd, int flags, int newfd);
 syscall_ret_t sys_stat(int fd, void* out, int flags, int_frame_t* ctx);
@@ -145,7 +147,7 @@ syscall_ret_t sys_ptsname(int fd, void* out, int max_size);
 syscall_ret_t sys_setup_ring_bytelen(char* path, int bytelen);
 syscall_ret_t sys_read_dir(int fd, void* buffer);
 
-syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg);
+syscall_ret_t sys_fcntl(int fd, int request, std::uint64_t arg,int_frame_t* ctx);
 
 syscall_ret_t sys_fchdir(int fd);
 
@@ -160,6 +162,13 @@ syscall_ret_t sys_ttyname(int fd, char *buf, size_t size);
 syscall_ret_t sys_rename(char* old, char* newp);
 
 syscall_ret_t sys_eventfd_create(unsigned int initval, int flags);
+syscall_ret_t sys_getentropy(char* buffer, std::uint64_t len);
+
+syscall_ret_t sys_pwrite(int fd, void* buf, std::uint64_t n, int_frame_t* ctx);
+syscall_ret_t sys_fstatfs(int fd, struct statfs *buf);
+
+syscall_ret_t sys_fchmod(int fd, int mode);
+syscall_ret_t sys_fchmodat(int dirfd, const char* path, int mode, int_frame_t* ctx);
 
 /* Process */
 syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx);
@@ -198,7 +207,7 @@ syscall_ret_t sys_mkfifoat(int dirfd, const char *path, int mode);
 syscall_ret_t sys_enabledebugmode();
 
 syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame_t* ctx);
-syscall_ret_t sys_breakpoint(int num);
+syscall_ret_t sys_breakpoint(int num, int b, int c, int_frame_t* ctx);
 
 syscall_ret_t sys_getpriority(int which, int who);
 syscall_ret_t sys_setpriority(int which, int who, int prio);
@@ -245,6 +254,100 @@ syscall_ret_t sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
 syscall_ret_t sys_shmat(int shmid, std::uint64_t hint, int shmflg);
 syscall_ret_t sys_shmget(int key, size_t size, int shmflg);
 syscall_ret_t sys_shmdt(std::uint64_t base);
+
+/* Signals */
+
+typedef long clock_t;
+
+union sigval {
+	int sival_int;
+	void *sival_ptr;
+};
+
+typedef struct {
+	unsigned long __sig[1024 / (8 * sizeof(long))];
+} sigset_t;
+
+typedef struct {
+	int si_signo, si_errno, si_code;
+	union {
+		char __pad[128 - 2*sizeof(int) - sizeof(long)];
+		struct {
+			union {
+				struct {
+					int si_pid;
+					int si_uid;
+				} __piduid;
+				struct {
+					int si_timerid;
+					int si_overrun;
+				} __timer;
+			} __first;
+			union {
+				union sigval si_value;
+				struct {
+					int si_status;
+					clock_t si_utime, si_stime;
+				} __sigchld;
+			} __second;
+		} __si_common;
+		struct {
+			void *si_addr;
+			short si_addr_lsb;
+			union {
+				struct {
+					void *si_lower;
+					void *si_upper;
+				} __addr_bnd;
+				unsigned si_pkey;
+			} __first;
+		} __sigfault;
+		struct {
+			long si_band;
+			int si_fd;
+		} __sigpoll;
+		struct {
+			void *si_call_addr;
+			int si_syscall;
+			unsigned si_arch;
+		} __sigsys;
+	} __si_fields;
+} siginfo_t;
+
+struct sigaction {
+	union {
+		void (*sa_handler)(int);
+		void (*sa_sigaction)(int, siginfo_t *, void *);
+	} __sa_handler;
+	unsigned long sa_flags;
+	void (*sa_restorer)(void);
+	sigset_t sa_mask;
+};
+
+typedef unsigned long __cpu_mask;
+
+#define __CPU_SETSIZE 1024
+#define __NCPUBITS (8 * sizeof(__cpu_mask))
+
+typedef struct {
+	__cpu_mask __bits[__CPU_SETSIZE / __NCPUBITS];
+} cpu_set_t;
+
+#define sa_handler __sa_handler.sa_handler
+#define sa_sigaction __sa_handler.sa_sigaction
+
+syscall_ret_t sys_sigaction(int signum, struct sigaction* hnd, struct sigaction* old);
+syscall_ret_t sys_orangesigreturn(mcontext_t* mctx, int b, int c, int_frame_t* ctx);
+syscall_ret_t sys_orangedefaulthandler(void* handler);
+syscall_ret_t sys_pause();
+
+typedef int pid_t;
+
+syscall_ret_t sys_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask);
+
+syscall_ret_t sys_cpucount();
+
+}
 
 struct pollfd {
     int fd;          

@@ -109,7 +109,7 @@ void Log::Raw(char* msg,...) {
     memset(buffer,0,4096);
     log_lock.lock();
     int len = __snprintf(buffer,4096,msg,val);
-    LogObject.Write(buffer,len);
+    //LogObject.Write(buffer,len);
 
     drivers::serial serial(DEFAULT_SERIAL_PORT);
 

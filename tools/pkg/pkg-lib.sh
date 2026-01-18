@@ -1,5 +1,6 @@
 
 GNU_MIRROR=https://mirror.dogado.de/
+CFLAGS="$CFLAGS -lstdc++"
 
 cachedownload() {
     if [ ! -f "../cached/$1" ]; then

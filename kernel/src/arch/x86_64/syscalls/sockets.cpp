@@ -87,6 +87,8 @@ int sockets::bind(userspace_fd_t* fd, struct sockaddr_un* path) {
     new_node->is_used = 1;
     new_node->socket_counter = 0;
     new_node->next = head;
+
+    fd->binded_socket = (void*)new_node;
     head = new_node;
     socket_spinlock.unlock();
 
@@ -359,6 +361,8 @@ syscall_ret_t sys_socketpair(int domain, int type_and_flags, int proto) {
     fd1->state = USERSPACE_FD_STATE_SOCKET;
     fd2->state = USERSPACE_FD_STATE_SOCKET;
 
+    DEBUG(proc->is_debug,"Creating socketpair %d:%d from proc %d",read_fd,write_fd,proc->id);
+
     return {1,read_fd,write_fd};
 }
 
@@ -440,6 +444,7 @@ syscall_ret_t sys_shutdown(int sockfd, int how) {
         fd_s->write_socket_pipe->is_closed.test_and_set();
         fd_s->read_socket_pipe->lock.unlock();
         fd_s->write_socket_pipe->lock.unlock();
+        DEBUG(proc->is_debug,"shutdown %d from proc %d",sockfd,proc->id);
         break;
     case SHUT_WR:
         return {0,ENOSYS,0};

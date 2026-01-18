@@ -170,10 +170,6 @@ syscall_ret_t sys_shmdt(std::uint64_t base) {
     shm_seg_t* seg = vmm_new->shm;
     memory::vmm::unmap(proc,vmm_new->base);
 
-    if(seg->ctl.shm_nattch == 0 && seg->is_pending_rm) {
-        shm_rm(seg);
-    }
-
     DEBUG(proc->is_debug,"Removing shm %d, base 0x%p from proc %d",seg->id,base,proc->id);
 
     shm_lock.unlock();

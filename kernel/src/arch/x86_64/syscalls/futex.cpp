@@ -1,6 +1,7 @@
 
 #include <cstdint>
 #include <arch/x86_64/syscalls/syscalls.hpp>
+#include <arch/x86_64/syscalls/signal.hpp>
 #include <arch/x86_64/cpu/data.hpp>
 #include <arch/x86_64/scheduling.hpp>
 #include <generic/vfs/vfs.hpp>
@@ -25,13 +26,21 @@ syscall_ret_t sys_futex_wait(int* pointer, int excepted, struct timespec* ts) {
     
     arch::x86_64::scheduling::futexwait(proc,&copied_pointer_val,excepted,pointer,t);
     yield();
-
-    if(ts) {
-        if(proc->ts == 0) {
-            proc->ts = 0;
-            Log::SerialDisplay(LEVEL_MESSAGE_WARN,"futexwait timeout\n");
-            return {0,ETIMEDOUT,0};
+    
+    while(proc->futex_lock.test()) {
+        if(ts) {
+            if(proc->ts < drivers::tsc::currentus()) {
+                proc->futex_lock.unlock(); 
+                return {0,ETIMEDOUT,0};
+            }
         }
+
+        PREPARE_SIGNAL(proc) {
+            proc->futex_lock.unlock();
+            signal_ret();
+        }
+
+        yield();
     }
 
     return {0,0,0};

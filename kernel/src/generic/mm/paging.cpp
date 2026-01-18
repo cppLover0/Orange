@@ -65,7 +65,7 @@ void memory::paging::change(std::uint64_t cr3, std::uint64_t virt, std::uint64_t
 }
 
 std::int64_t __memory_paging_getphys(std::uint64_t cr3, std::uint64_t virt) {
-    std::uint64_t align_virt = virt;
+    std::uint64_t align_virt = ALIGNDOWN(virt,4096);
     std::uint64_t* cr30 = (std::uint64_t*)Other::toVirt(cr3);
     if(cr30[PTE_INDEX(virt,39)] & PTE_PRESENT) {
         std::uint64_t* pml3 = __paging_next_level_noalloc(cr30,PTE_INDEX(align_virt,39),0,0);//1
@@ -118,19 +118,19 @@ void memory::paging::changerange(std::uint64_t cr3, std::uint64_t virt, std::uin
 }
 
 void memory::paging::maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags) {
-    for(std::uint64_t i = 0; i <= len; i += 4096) {
+    for(std::uint64_t i = 0; i < len; i += 4096) {
         map(cr3,phys + i,virt + i,flags);
     }
 }
 
 void memory::paging::zerorange(std::uint64_t cr3,std::uint64_t virt,std::uint64_t len) {
-    for(std::uint64_t i = 0; i <= len; i += 4096) {
+    for(std::uint64_t i = 0; i < len; i += 4096) {
         map(cr3,0,virt + i,0);
     }
 }
 
 void memory::paging::maprangeid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags, std::uint32_t id) {
-    for(std::uint64_t i = 0; i <= len; i += 4096) {
+    for(std::uint64_t i = 0; i < len; i += 4096) {
         mapid(cr3,phys + i,virt + i,flags,id);
     }
 }

@@ -47,7 +47,7 @@ make run
 
 Dependencies
 ```
-cmake meson (1.4.2) ninja gcc (13.3.0) libgmp3-dev libmpfr-dev libmpc-dev libglib2.0-dev-bin python3.13 python3.13-dev python3.13-venv python3.13-distutils gettext gperf rsync flex bison make nasm bash 
+cmake meson (1.4.2) ninja gcc (13.3.0) libgmp3-dev libmpfr-dev libmpc-dev libglib2.0-dev-bin python3.13 python3.13-dev python3.13-venv python3.13-distutils gettext gperf rsync flex bison make nasm bash xsltproc docbook-xsl itstool zenity intltool
 ```
 
 Host python dependencies

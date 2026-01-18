@@ -49,12 +49,17 @@ syscall_ret_t sys_libc_log(const char* msg) {
 
 syscall_ret_t sys_exit(int status) {
 
+    cpudata_t* cpdata = arch::x86_64::cpu::data();
+
     memory::paging::enablekernel();
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     proc->exit_code = status;
 
-    DEBUG(proc->is_debug,"Process %s (%d) exited with code %d",proc->name,proc->id,status);
+    DEBUG(1,"Process %s (%d) exited with code %d sys %d",proc->name,proc->id,status,proc->sys);
+
+    if(proc->is_debug)
+        assert(status == 0,"debug: proc exit status is not 0");
 
     arch::x86_64::scheduling::kill(proc);
     
@@ -67,6 +72,7 @@ syscall_ret_t sys_exit(int status) {
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
     memory::pmm::_virtual::free(proc->sse_ctx);
+    cpdata->temp.temp_ctx = 0;
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
 }
@@ -153,6 +159,12 @@ syscall_ret_t sys_free(void *pointer, size_t size) {
     return {0,0,0};
 }
 
+
+typedef struct stackframe {
+    struct stackframe* rbp;
+    uint64_t rip;
+} __attribute__((packed)) stackframe_t;
+
 syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
@@ -163,8 +175,17 @@ syscall_ret_t sys_fork(int D, int S, int d, int_frame_t* ctx) {
 
     arch::x86_64::scheduling::wakeup(new_proc);
 
-    DEBUG(0,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
+    DEBUG(proc->is_debug,"Fork from proc %d, new proc %d",proc->id,new_proc->id);
     new_proc->is_debug = proc->is_debug;
+    if(proc->is_debug) {
+        stackframe_t* rbp = (stackframe_t*)ctx->rbp;
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[0] - 0x%016llX (current rip)\n",ctx->rip);
+        for (int i = 1; i < 10 && rbp; ++i) {
+            std::uint64_t ret_addr = rbp->rip;
+            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[%d] - 0x%016llX (0x%016llX)\n", i, ret_addr,ret_addr - memory::vmm::getlen(proc,ret_addr)->base);
+            rbp = (stackframe_t*)rbp->rbp;
+        }
+    }
 
     return {1,0,new_proc->id};
 }
@@ -200,6 +221,8 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     if(!path || !argv || !envp)
         return {0,EINVAL,0};
+
+    cpudata_t* cpdata = arch::x86_64::cpu::data();
 
     SYSCALL_IS_SAFEA(path,4096);
     SYSCALL_IS_SAFEA(argv,4096);
@@ -254,6 +277,9 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     vfs::stat_t stat;
 
+    vfs::fdmanager* fd_m = (vfs::fdmanager*)proc->fd;
+    fd_m->cloexec();
+
     userspace_fd_t fd;
     fd.is_cached_path = 0;
     memset(fd.path,0,2048);
@@ -262,7 +288,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     int status = vfs::vfs::stat(&fd,&stat); 
 
     DEBUG(proc->is_debug,"Exec file %s from proc %d",fd.path,proc->id);
-    if(proc->is_debug) {
+    if(1) {
         for(int i = 0;i < argv_length;i++) {
             DEBUG(proc->is_debug,"Argv %d: %s",i,argv0[i]);
         }
@@ -272,7 +298,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
         if((stat.st_mode & S_IXUSR) && (stat.st_mode & S_IFREG)) {
 
             proc->fs_base = 0;
- 
+
             memory::paging::enablekernel();
             memory::vmm::free(proc);
 
@@ -301,6 +327,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
                 memory::heap::free(argv0);
                 memory::heap::free(envp0);
 
+                cpdata->temp.temp_ctx = 0;
                 schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
                 __builtin_unreachable();
             } 
@@ -355,6 +382,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
                     memory::heap::free(argv0);
                     memory::heap::free(envp0);
 
+                    cpdata->temp.temp_ctx = 0;
                     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
                     __builtin_unreachable();
                 } 
@@ -377,6 +405,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::free(argv0);
     memory::heap::free(envp0);
 
+    cpdata->temp.temp_ctx = 0;
     arch::x86_64::scheduling::kill(proc);
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
@@ -492,6 +521,7 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
             DEBUG(proc->is_debug,"Waitpid return WNOHAND from proc %d",proc->id);
             return {1,0,0};
         }
+        signal_ret();
         yield();
         current = arch::x86_64::scheduling::head_proc_();
     }
@@ -500,18 +530,15 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
 
 syscall_ret_t sys_sleep(long us) {
 
-    int enable_optimization = 0;
-
-    if(!enable_optimization)
-        SYSCALL_ENABLE_PREEMPT();
-
     std::uint64_t current = drivers::tsc::currentnano();
     std::uint64_t end = us * 1000;
-    while((drivers::tsc::currentnano() - current) < end);
-        if(enable_optimization)
-            yield();
-        else
+    while((drivers::tsc::currentnano() - current) < end) {
+        if((drivers::tsc::currentnano() - current) < 15000) {
             asm volatile("pause");
+        } else
+            yield();
+        signal_ret();
+    }
     return {0,0,0};
 }
 
@@ -568,7 +595,14 @@ syscall_ret_t sys_printdebuginfo(int pid) {
     if(!proc)
         return {0,ECHILD};
 
-    DEBUG(1,"Process %d rip is 0x%p debug0 %d debug1 %d",proc->id,proc->ctx.rip,proc->debug0,proc->debug1);
+    DEBUG(1,"Process %d rip is 0x%p debug0 %d debug1 %d, sys %d",proc->id,proc->ctx.rip,proc->debug0,proc->debug1,proc->sys);
+    stackframe_t* rbp = (stackframe_t*)proc->ctx.rbp;
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[0] - 0x%016llX (current rip)\n",proc->ctx.rip);
+        for (int i = 1; i < 10 && rbp; ++i) {
+            std::uint64_t ret_addr = rbp->rip;
+            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[%d] - 0x%016llX (0x%016llX)\n", i, ret_addr,0);
+            rbp = (stackframe_t*)rbp->rbp;
+        }
     return {0,0,0};
 }
 
@@ -599,8 +633,19 @@ syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame
     return {1,0,new_proc->id};
 }
 
-syscall_ret_t sys_breakpoint(int num) {
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"breakpoint %d\n",num);
+syscall_ret_t sys_breakpoint(int num, int b, int c, int_frame_t* ctx) {
+    
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    if(proc->is_debug) {
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"breakpoint 0x%p\n",num);
+        stackframe_t* rbp = (stackframe_t*)ctx->rbp;
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[0] - 0x%016llX (current rip)\n",ctx->rip);
+        for (int i = 1; i < 10 && rbp; ++i) {
+            std::uint64_t ret_addr = rbp->rip;
+            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"[%d] - 0x%016llX (0x%016llX)\n", i, ret_addr,ret_addr - memory::vmm::getlen(proc,ret_addr)->base);
+            rbp = (stackframe_t*)rbp->rbp;
+        }
+    }
     return {0,0,0};
 }
 
@@ -698,26 +743,83 @@ syscall_ret_t sys_setuid(int uid) {
     return {0,0,0};
 }
 
-syscall_ret_t sys_kill(int pid, int sig) {
+// used from mlibc source, why not 
 
-    arch::x86_64::process_t* proc = CURRENT_PROC;
-    arch::x86_64::process_t* target_proc = arch::x86_64::scheduling::by_pid(pid);
+#define CHAR_BIT 8
+#define CPU_MASK_BITS (CHAR_BIT * sizeof(__cpu_mask))
 
-    Log::SerialDisplay(LEVEL_MESSAGE_INFO,"sys_kill pid %d sig %d from proc %d\n",pid,sig,proc->id);
+std::uint64_t __mlibc_cpu_alloc_size(int num_cpus) {
+	/* calculate the (unaligned) remainder that doesn't neatly fit in one __cpu_mask; 0 or 1 */
+	std::uint64_t remainder = ((num_cpus % CPU_MASK_BITS) + CPU_MASK_BITS - 1) / CPU_MASK_BITS;
+	return sizeof(__cpu_mask) * (num_cpus / CPU_MASK_BITS + remainder);
+}
 
-    if(!target_proc)
-        return {0,ESRCH,0};
+#define CPU_ALLOC_SIZE(n) __mlibc_cpu_alloc_size((n))
 
-    if(!(proc->uid == 0 || proc->uid == target_proc->uid))
-        return {0,EPERM,0};
+void __mlibc_cpu_zero(const std::uint64_t setsize, cpu_set_t *set) {
+	memset(set, 0, CPU_ALLOC_SIZE(setsize));
+}
 
-    switch(sig) {
-        case SIGKILL:
-            target_proc->exit_code = 137;
-            target_proc->_3rd_kill_lock.nowaitlock(); 
-            break;
-        default:
-            return {0,0,0};
+void __mlibc_cpu_set(const int cpu, const std::uint64_t setsize, cpu_set_t *set) {
+	if(cpu >= static_cast<int>(setsize * CHAR_BIT)) {
+		return;
+	}
+
+	unsigned char *ptr = reinterpret_cast<unsigned char *>(set);
+	std::uint64_t off = cpu / CHAR_BIT;
+	std::uint64_t mask = 1 << (cpu % CHAR_BIT);
+
+	ptr[off] |= mask;
+}
+
+#define CPU_ZERO_S(setsize, set) __mlibc_cpu_zero((setsize), (set))
+#define CPU_ZERO(set) CPU_ZERO_S(sizeof(cpu_set_t), set)
+#define CPU_SET_S(cpu, setsize, set) __mlibc_cpu_set((cpu), (setsize), (set))
+#define CPU_SET(cpu, set) CPU_SET_S(cpu, sizeof(cpu_set_t), set)
+
+void __fill_cpu_set(cpu_set_t* cpuset) {
+
+    extern int how_much_cpus;
+    
+    CPU_ZERO(cpuset);
+    
+    for(int i = 0; i < how_much_cpus; i++) {
+        CPU_SET(i, cpuset); 
     }
+}
+
+syscall_ret_t sys_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask) {
+
+    arch::x86_64::process_t* proc = 0;
+
+    if(cpusetsize > sizeof(cpu_set_t))
+        cpusetsize = sizeof(cpu_set_t);
+
+    SYSCALL_IS_SAFEA(mask,cpusetsize);
+    if(!mask)
+        return {0,EINVAL,0};
+
+    if(pid == 0) {
+        proc = CURRENT_PROC;
+    } else if(pid > 0) {
+        proc = arch::x86_64::scheduling::by_pid(pid);
+        if(!proc)
+            return {0,ESRCH,0};
+    } else 
+        return {0,EINVAL,0};
+
+    cpu_set_t temp_set;
+    memset(&temp_set,0,sizeof(cpu_set_t));
+
+    __fill_cpu_set(&temp_set);
+
+    memset(mask,0,cpusetsize);
+    memcpy(mask,&temp_set,cpusetsize);
+
     return {0,0,0};
+}
+
+syscall_ret_t sys_cpucount() {
+    extern int how_much_cpus;
+    return {0,how_much_cpus,0};
 }

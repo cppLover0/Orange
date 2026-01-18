@@ -56,7 +56,7 @@ void __xhci_reset(xhci_device_t* dev) {
         timeout = timeout - 1;
     }
 
-    usleep(50000);
+    usleep(5000);
 
 }
 
@@ -73,7 +73,7 @@ void __xhci_enable(xhci_device_t* dev) {
         timeout = timeout - 1;
     }
 
-    usleep(50000);
+    usleep(5000);
 
 }
 
@@ -360,13 +360,13 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
     trb.info_s.slotid = id;
     __xhci_clear_event(dev);
 
-    usleep(20000);
+    usleep(5000);
 
     __xhci_clear_event(dev);
 
     __xhci_command_ring_queue(dev,dev->com_ring,(xhci_trb_t*)&trb);
     __xhci_doorbell(dev,0);
-    usleep(20000);
+    usleep(5000);
     
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
 
@@ -431,7 +431,7 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
     __xhci_clear_event(dev);
 
     __xhci_doorbell_id(dev,usbdev->slotid,1);
-    usleep(10000);
+    usleep(5000);
 
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_TRANSFEREVENT_TYPE);
 
@@ -446,7 +446,7 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
         return ret;
     }
 
-    usleep(10000);
+    usleep(5000);
 
     memcpy(out,desc_buf,len);
 
@@ -481,7 +481,7 @@ xhci_trb_t __xhci_send_usb_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,x
     __xhci_clear_event(dev);
 
     __xhci_doorbell_id(dev,usbdev->slotid,1);
-    usleep(10000);
+    usleep(5000);
 
     xhci_trb_t ret = __xhci_event_wait(dev,TRB_TRANSFEREVENT_TYPE);
 
@@ -535,7 +535,7 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
     if(!(*portsc & (1 << 9))) {
         load_portsc |= (1 << 9);
         *portsc = load_portsc;
-        usleep(50000);
+        usleep(5000);
         if(!(*portsc & (1 << 9))) {
             return 0;
         }
@@ -559,7 +559,7 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
                 log(LEVEL_MESSAGE_FAIL,"Can't reset USB 3.0 device with port %d, ignoring\n",portnum);
                 return 0;
             }
-            usleep(50000);
+            usleep(5000);
         }
     } else {
         while((*portsc & (1 << 1)) == old_bit) {
@@ -567,11 +567,11 @@ int __xhci_reset_dev(xhci_device_t* dev,uint32_t portnum) {
                 log(LEVEL_MESSAGE_FAIL,"Can't reset USB 2.0 device with port %d, ignoring\n",portnum);
                 return 1;
             }
-            usleep(50000);
+            usleep(5000);
         }
     }
     
-    usleep(500000);
+    usleep(5000);
     return 1;
  
 }

@@ -1,0 +1,13 @@
+[binaries]
+c = 'x86_64-orange-mlibc-gcc'
+cpp = 'x86_64-orange-mlibc-g++'
+ar = 'x86_64-orange-mlibc-ar'
+nm = 'x86_64-orange-mlibc-nm'
+ld = 'x86_64-orange-mlibc-ld'
+pkg-config = 'x86_64-orange-mlibc-pkg-config'
+
+[host_machine]
+system = 'orange'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

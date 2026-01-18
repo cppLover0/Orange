@@ -41,10 +41,22 @@ locks::spinlock process_lock;
 uint64_t __elf_get_length(char** arr) {
     uint64_t counter = 0;
 
-    while(arr[counter]) 
+    while(arr[counter]) {
         counter++;
+        char* t = (char*)(arr[counter - 1]);
+        if(*t == '\0')
+            return counter - 1; // invalid
+    } 
 
     return counter;
+}
+
+uint64_t __stack_memcpy(std::uint64_t stack, void* src, uint64_t len) {
+    std::uint64_t _stack = stack;
+    _stack -= 8;
+    _stack -= ALIGNUP(len,8);
+    memcpy((void*)_stack,src,len);
+    return (std::uint64_t)_stack;
 }
 
 uint64_t* __elf_copy_to_stack(char** arr,uint64_t* stack,char** out, uint64_t len) {
@@ -227,6 +239,9 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
     memset(stack_argv,0,8 * (argv_length + 1));
     memset(stack_envp,0,8 * (envp_length + 1));
 
+    PUT_STACK(_stack,0);
+    PUT_STACK(_stack,0);
+
     _stack = __elf_copy_to_stack(argv,_stack,stack_argv,argv_length);
 
     for(int i = 0; i < argv_length / 2; ++i) {
@@ -269,8 +284,8 @@ void arch::x86_64::scheduling::wakeup(process_t* proc) {
 arch::x86_64::process_t* arch::x86_64::scheduling::by_pid(int pid) {
     process_t* proc = head_proc_();
     while(proc) {
-        if(proc->id == pid)
-            return proc;
+        if(proc->id == pid) { 
+            return proc; }
         proc = proc->next;
     }
     return 0;
@@ -292,6 +307,8 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_fra
     nproc->fs_base = proc->fs_base;
     nproc->reversedforid = *proc->vmm_id;
     nproc->vmm_id = &nproc->reversedforid;
+    nproc->default_sig_handler = proc->default_sig_handler;
+    memcpy(nproc->sig_handlers,proc->sig_handlers,sizeof(proc->sig_handlers));
 
     memset(nproc->cwd,0,4096);
     memset(nproc->name,0,4096);
@@ -337,6 +354,8 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_fram
     nproc->parent_id = proc->id;
     nproc->fs_base = proc->fs_base;
     nproc->uid = proc->uid;
+    nproc->default_sig_handler = proc->default_sig_handler;
+    memcpy(nproc->sig_handlers,proc->sig_handlers,sizeof(proc->sig_handlers));
 
     memset(nproc->cwd,0,4096);
     memset(nproc->name,0,4096);
@@ -399,11 +418,14 @@ arch::x86_64::process_t* arch::x86_64::scheduling::create() {
     proc->fd_ptr = &proc->alloc_fd;
     *proc->fd_ptr = 3;
 
+    proc->sig = new signalmanager;
+
     vfs::fdmanager* z = new vfs::fdmanager(proc);
     proc->fd = (void*)z;
 
     proc->next = head_proc;
     head_proc = proc;
+
 
     proc->id = id_ptr++;
     proc->vmm_id = &proc->id;
@@ -441,7 +463,6 @@ int arch::x86_64::scheduling::futexwake(process_t* proc, int* lock) {
 }
 
 void arch::x86_64::scheduling::futexwait(process_t* proc, int* lock, int val, int* original_lock,std::uint64_t ts) {
-    
     futex_lock.lock();
     int lock_val = *lock;
     proc->futex_lock.lock();
@@ -497,30 +518,83 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
         current = current->next; 
     } 
 
+    ctx = 0;
+
     int current_cpu = data->smp.cpu_id;
 
     while (true) {
         while (current) {
 
             if (!current->kill_lock.test() && current->id != 0 && current_cpu == current->target_cpu) {
-            
-                futex_lock.lock();
-                if(current->futex_lock.test()) {
-                     if(current->ts != 0) {
-                         if(current->ts < drivers::tsc::currentus()) {
-                             current->ts = 0;
-                             current->futex_lock.unlock(); 
-                         }
-                     }
-                }
-                futex_lock.unlock();
 
-                if(!current->futex_lock.test()) {
+                if(1) { // signals are only for user mode, or they must be handled by process itself
                     if(!current->lock.test_and_set()) {
 
                         if(!ctx) {
                             int_frame_t temp_ctx;
                             ctx = &temp_ctx;
+                        }
+
+                        int is_possible = 1;
+                        if(current->ctx.cs == 0x08) {
+                            is_possible = 0;
+                        }
+
+                        if(is_possible) {
+                            pending_signal_t new_sig;
+                            int status = current->sig->pop(&new_sig);
+                            if(status != -1 && current->default_sig_handler) {
+
+                                mcontext_t temp_mctx = {0};
+                                int_frame_to_mcontext(&current->ctx,&temp_mctx);
+
+                                std::uint64_t mctx = 0;
+
+                                memory::paging::enablepaging(current->original_cr3);
+
+                                mctx = __stack_memcpy(current->ctx.rsp,&temp_mctx,sizeof(mcontext_t)); 
+
+                                // now setup new registers and stack
+
+                                current->ctx.rdi = (std::uint64_t)current->sig_handlers[new_sig.sig];
+                                current->ctx.rsi = new_sig.sig;
+                                current->ctx.rdx = mctx;
+                                current->ctx.rsp = mctx - 8;
+                                current->ctx.rip = (std::uint64_t)current->default_sig_handler;
+                                current->ctx.cs = 0x20 | 3;
+                                current->ctx.ss = 0x18 | 3;
+                                current->ctx.rflags = (1 << 9);
+
+                                memcpy(ctx, &current->ctx, sizeof(int_frame_t));
+
+                                __wrmsr(0xC0000100, current->fs_base);
+                                arch::x86_64::cpu::sse::load((std::uint8_t*)current->sse_ctx);
+
+                                if(ctx->cs & 3)
+                                    ctx->ss |= 3;
+                                    
+                                if(ctx->ss & 3)
+                                    ctx->cs |= 3;
+
+                                if(ctx->cs == 0x20)
+                                    ctx->cs |= 3;
+                                    
+                                if(ctx->ss == 0x18)
+                                    ctx->ss |= 3;
+
+                                data->kernel_stack = current->syscall_stack + SYSCALL_STACK_SIZE;
+                                data->user_stack = current->user_stack;
+                                data->temp.proc = current;
+
+                                int prio_div = current->prio < 0 ? (current->prio * -1) : 1;
+                                prio_div++;
+
+                                arch::x86_64::cpu::lapic::eoi();
+
+                                if(ctx->cs != 0x08)
+                                    asm volatile("swapgs");
+                                schedulingEnd(ctx);
+                            }
                         }
 
                         memcpy(ctx, &current->ctx, sizeof(int_frame_t));
@@ -551,6 +625,7 @@ extern "C" void schedulingSchedule(int_frame_t* ctx) {
 
                         if(ctx->cs != 0x08)
                             asm volatile("swapgs");
+
 
                         schedulingEnd(ctx);
                     }

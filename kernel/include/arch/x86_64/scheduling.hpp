@@ -3,8 +3,12 @@
 
 #pragma once
 
+#include <arch/x86_64/syscalls/signal.hpp>
+
 #include <arch/x86_64/interrupts/idt.hpp>
 #include <generic/vfs/vfs.hpp>
+
+#include <etc/logging.hpp>
 
 #include <generic/locks/spinlock.hpp>
 
@@ -22,6 +26,9 @@
 #define MAX2(a, b) ((a) > (b) ? (a) : (b))
 
 extern "C" void yield();
+
+#define PREPARE_SIGNAL(proc) if(proc->sig->is_not_empty() && 1)
+#define PROCESS_SIGNAL(proc) yield();
 
 typedef struct {
     unsigned char e_ident[16];
@@ -59,6 +66,120 @@ typedef struct {
     std::uint64_t phentsize;
     int status;
 } elfloadresult_t;
+
+#define __NGREG 23
+
+#define __pollution(n) n
+
+struct _fpxreg {
+	unsigned short __pollution(significand)[4];
+	unsigned short __pollution(exponent);
+	unsigned short __padding[3];
+};
+
+struct _xmmreg {
+	uint32_t __pollution(element)[4];
+};
+
+struct _fpstate {
+	uint16_t __pollution(cwd);
+	uint16_t __pollution(swd);
+	uint16_t __pollution(ftw);
+	uint16_t __pollution(fop);
+	uint64_t __pollution(rip);
+	uint64_t __pollution(rdp);
+	uint32_t __pollution(mxcsr);
+	uint32_t __pollution(mxcr_mask);
+	struct _fpxreg _st[8];
+	struct _xmmreg _xmm[16];
+	uint32_t __padding[24];
+};
+
+typedef struct {
+	unsigned long __pollution(gregs)[__NGREG];
+	struct _fpstate *__pollution(fpregs);
+	unsigned long __reserved1[8];
+} mcontext_t;
+
+#define REG_R8 0
+#define REG_R9 1
+#define REG_R10 2
+#define REG_R11 3
+#define REG_R12 4
+#define REG_R13 5
+#define REG_R14 6
+#define REG_R15 7
+#define REG_RDI 8
+#define REG_RSI 9
+#define REG_RBP 10
+#define REG_RBX 11
+#define REG_RDX 12
+#define REG_RAX 13
+#define REG_RCX 14
+#define REG_RSP 15
+#define REG_RIP 16
+#define REG_EFL 17
+#define REG_CSGSFS 18
+#define REG_ERR 19
+#define REG_TRAPNO 20
+#define REG_OLDMASK 21
+#define REG_CR2 22
+
+inline void mcontext_to_int_frame(mcontext_t* out, int_frame_t* src) {
+    src->r8 = out->gregs[REG_R8];
+    src->r9 = out->gregs[REG_R9];
+    src->r10 = out->gregs[REG_R10]; 
+    src->r11 = out->gregs[REG_R11];
+    src->r12 = out->gregs[REG_R12];
+    src->r13 = out->gregs[REG_R13];
+    src->r14 = out->gregs[REG_R14];
+    src->r15 = out->gregs[REG_R15];
+    src->rdi = out->gregs[REG_RDI];
+    src->rsi = out->gregs[REG_RSI];
+    src->rbp = out->gregs[REG_RBP];
+    src->rbx = out->gregs[REG_RBX];
+    src->rdx = out->gregs[REG_RDX];
+    src->rax = out->gregs[REG_RAX];
+    src->rcx = out->gregs[REG_RCX];
+    src->rsp = out->gregs[REG_RSP];
+    src->rip = out->gregs[REG_RIP];
+    src->rflags = out->gregs[REG_EFL];
+    src->cs = out->gregs[REG_CSGSFS]; // todo: implement SMEP
+    src->ss = out->gregs[REG_ERR]; // why not
+    if(src->cs > 0x30) {
+        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"broken src->cs for mcontext to int frame");
+        asm volatile("hlt");
+    }
+}
+
+inline void int_frame_to_mcontext(int_frame_t* src, mcontext_t* out) {
+    out->gregs[REG_R8] = src->r8;
+    out->gregs[REG_R9] = src->r9;
+    out->gregs[REG_R10] = src->r10;
+    out->gregs[REG_R11] = src->r11;
+    out->gregs[REG_R12] = src->r12;
+    out->gregs[REG_R13] = src->r13;
+    out->gregs[REG_R14] = src->r14;
+    out->gregs[REG_R15] = src->r15;
+    out->gregs[REG_RDI] = src->rdi;
+    out->gregs[REG_RSI] = src->rsi;
+    out->gregs[REG_RBP] = src->rbp;
+    out->gregs[REG_RBX] = src->rbx;
+    out->gregs[REG_RDX] = src->rdx;
+    out->gregs[REG_RAX] = src->rax;
+    out->gregs[REG_RCX] = src->rcx;
+    out->gregs[REG_RSP] = src->rsp;
+    out->gregs[REG_RIP] = src->rip;
+    out->gregs[REG_EFL] = src->rflags;
+    out->gregs[REG_CSGSFS] = src->cs; 
+    out->gregs[REG_ERR] = src->ss;
+    if(!src->cs > 0x30) {
+        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"broken src->cs for int frame to mcontext");
+        asm volatile("hlt");
+    } 
+
+    /* Other registers must be untouched (not implemented) */
+}
 
 enum ELF_Type {
     PT_NULL,
@@ -127,6 +248,9 @@ namespace arch {
 
             std::uint64_t original_cr3;
             int_frame_t ctx;
+            int_frame_t sig_ctx;
+
+            int_frame_t* sys_ctx;
 
             std::atomic<int> target_cpu;
 
@@ -140,8 +264,14 @@ namespace arch {
 
             locks::spinlock fd_lock;
 
+            void* default_sig_handler;
+            void* sig_handlers[31];
+
+            std::uint8_t is_sig_real;
             std::uint32_t alloc_fd;
             std::uint32_t* fd_ptr;
+
+            std::uint64_t old_stack;
 
             int is_shared_fd;
 
@@ -150,6 +280,9 @@ namespace arch {
 
             userspace_fd_t* fd_pool;
             vfs::passingfd_manager* pass_fd;
+            signalmanager* sig;
+
+            int is_cloexec;
 
             void* fd;
 
@@ -189,6 +322,8 @@ namespace arch {
             struct process* next;
 
         } process_t;
+
+static_assert(sizeof(process_t) < 4096,"process_t is bigger than page size");
 
         typedef struct process_queue_run_list {
             struct process_queue_run_list* next;

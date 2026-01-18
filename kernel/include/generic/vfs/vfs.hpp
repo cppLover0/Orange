@@ -316,7 +316,7 @@ namespace vfs {
         std::atomic_flag is_closed = ATOMIC_FLAG_INIT;
 
         std::uint64_t total_size = 0;
-        std::int64_t size = 0;
+        std::atomic<std::int64_t> size = 0;
         std::int64_t write_counter = 0;
         std::int64_t read_counter = 0;
 
@@ -507,7 +507,7 @@ namespace vfs {
                     }
                 }
                 
-                read_bytes = (count < this->size) ? count : this->size;
+                read_bytes = (count < (std::uint64_t)this->size) ? count : (std::uint64_t)this->size;
                 memcpy(dest_buffer, this->buffer, read_bytes);
                 memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
                 this->size -= read_bytes;
@@ -555,7 +555,7 @@ namespace vfs {
                     continue;
                 }
                 
-                read_bytes = (count < this->size) ? count : this->size;
+                read_bytes = (count < (std::uint64_t)this->size) ? count : (std::uint64_t)this->size;
                 memcpy(dest_buffer, this->buffer, read_bytes);
                 memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
                 this->size -= read_bytes;
@@ -619,6 +619,8 @@ typedef struct userspace_fd {
     int pid;
     int uid;
 
+    int is_cloexec;
+
     std::uint8_t can_be_closed;
 
     std::uint8_t is_listen;
@@ -639,6 +641,8 @@ typedef struct userspace_fd {
 
     std::int64_t write_counter;
     std::int64_t read_counter;
+
+    void* binded_socket;
 
     int is_cached_path;
     int is_debug;

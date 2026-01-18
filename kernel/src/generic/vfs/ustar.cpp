@@ -55,6 +55,7 @@ void vfs::ustar::copy() {
                 int size = oct2bin((uint8_t*)current->file_size,strlen(current->file_size));
                 
                 userspace_fd_t fd;
+                fd.is_cached_path = 1;
 
                 memset(&fd,0,sizeof(userspace_fd_t));
                 memcpy(fd.path,file,strlen(file));
@@ -63,8 +64,8 @@ void vfs::ustar::copy() {
                 vfs::vfs::write(&fd,(char*)((std::uint64_t)current + 512),size);
                 __tmpfs__dont_alloc_memory = 0;
 
-                std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,8);
-                vfs::vfs::var(&fd,(std::uint64_t)&actual_mode,TMPFS_VAR_CHMOD | (1 << 7));
+                std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
+                vfs::vfs::var(&fd,actual_mode,TMPFS_VAR_CHMOD | (1 << 7));
                 break;
             }
 
@@ -82,6 +83,7 @@ void vfs::ustar::copy() {
                 vfs::vfs::create(file,VFS_TYPE_SYMLINK);
 
                 __tmpfs__dont_alloc_memory = 1;
+                fd.is_cached_path = 1;
                 vfs::vfs::write(&fd,current->name_linked,strlen(current->name_linked));
                 __tmpfs__dont_alloc_memory = 0;
                 

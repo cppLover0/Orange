@@ -650,10 +650,13 @@ std::int32_t vfs::vfs::readlink(char* path, char* out, std::uint32_t out_len) {
 
 std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
 
+    vfs::vfs::lock();
+
     char out0[2048];
     memset(out0,0,2048);
 
     if(!fd) {
+        vfs::vfs::unlock();
         return 0;
     }
 
@@ -685,18 +688,20 @@ std::int64_t vfs::vfs::poll(userspace_fd_t* fd, int operation_type) {
         default:
             break;
         }
+        vfs::vfs::unlock();
         return ret;
     } 
 
     vfs_node_t* node = find_node(out0);
-    if(!node) { 
+    if(!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
     char* fs_love_name = out0 + strlen(node->path) - 1;
-    if(!node->poll) { 
+    if(!node->poll) {  vfs::vfs::unlock();
         return -ENOSYS ; }
 
     std::int64_t ret = node->poll(fd,fs_love_name,operation_type);
+    vfs::vfs::unlock();
     return ret;
 }
 

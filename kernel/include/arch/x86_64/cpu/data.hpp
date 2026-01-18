@@ -22,7 +22,8 @@ typedef struct {
         std::uint64_t freq;
     } tsc;
     struct {
-        int_frame_t temp_ctx;
+        int_frame_t* temp_ctx;
+        int_frame_t sys_ctx;
         arch::x86_64::process_t* proc;
         arch::x86_64::process_queue_run_list_t* next;
     } temp;

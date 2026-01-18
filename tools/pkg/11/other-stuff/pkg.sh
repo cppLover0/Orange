@@ -11,6 +11,8 @@ mkdir -p pack
 
 cd pack
 
+fast_install "$1" https://github.com/scop/bash-completion/releases/download/2.17.0/bash-completion-2.17.0.tar.xz
+
 fast_install "$1" https://www.x.org/releases/individual/xcb/xcb-util-renderutil-0.3.10.tar.gz
 fast_install "$1" https://www.x.org/releases/individual/xcb/xcb-util-cursor-0.1.6.tar.gz
 fast_install "$1" https://www.x.org/releases/individual/xcb/xcb-util-keysyms-0.4.1.tar.gz
