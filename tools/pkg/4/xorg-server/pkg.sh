@@ -4,19 +4,38 @@ export PKG_CONFIG_PATh
 
 mkdir -p cached
 
+cd pack
+
+tar -xvf xkeyboard-config-2.36.tar.xz
+
+pushd xkeyboard-config-2.36
+sed -i -E "s/(ln -s)/\1f/" rules/meson.build
+popd
+
+cd xkeyboard-config-2.36
+
+mkdir -p build
+meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix="/usr" build -Dxorg-rules-symlinks=true
+
+cd build
+meson compile
+DESTDIR="$1" meson install
+cd ../..
+exit 0
+
 rm -rf pack
 
 mkdir -p pack
 
 cd pack
 
-wget https://www.zlib.net/fossils/zlib-1.3.tar.gz
+ wget https://www.zlib.net/fossils/zlib-1.3.tar.gz
 
-tar -xvf zlib-1.3.tar.gz
+ tar -xvf zlib-1.3.tar.gz
 
-cd zlib-1.3
+ cd zlib-1.3
 
-CHOST=x86_64-orange-mlibc prefix="/usr" ./configure 
+CHOST=x86_64-linux-gnu prefix="/usr" ./configure 
 make -j$(nproc)
 make install DESTDIR="$1"
 
@@ -30,7 +49,7 @@ cd libpng-1.6.37
 
 autotools_recursive_regen
 
-./configure --host=x86_64-orange-mlibc --prefix=/usr --disable-shared --enable-static 
+./configure --host=x86_64-linux-gnu --prefix=/usr --disable-shared --enable-static 
 make -j$(nproc)
 make install DESTDIR="$1"
 
@@ -55,7 +74,7 @@ tar -xvf openssl-1.1.1q.tar.gz
 cd openssl-1.1.1q
 diff_patch ../../diff/openssl.diff
 
-CFLAGS="-Wno-implicit-function-declaration" CC=x86_64-orange-mlibc-gcc CXX=x86_64-orange-mlibc-gcc ./Configure --prefix=/usr --openssldir=/etc/ssl --libdir=lib "x86_64-orange-mlibc" shared zlib-dynamic no-afalgeng
+CFLAGS="-Wno-implicit-function-declaration" CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-gcc ./Configure --prefix=/usr --openssldir=/etc/ssl --libdir=lib "linux-x86_64" shared zlib-dynamic no-afalgeng
 
 make -j$(nproc)
 
@@ -141,7 +160,7 @@ cd build
 meson compile
 DESTDIR="$1" meson install
 cd ../..
-#exit 0
+exit 0
 sudo chmod 777 -R "$1/usr/share/X11/xkb"
 
 fast_install "$1" https://www.x.org/releases/individual/xserver/xorg-server-21.1.4.tar.gz "--with-xkb-bin-directory=/usr/bin --disable-pciaccess --disable-libdrm --disable-glx --disable-int10-module --disable-glamor --disable-vgahw --disable-dri3 --disable-dri2 --disable-dri --disable-xephyr --disable-xwayland --disable-xnest --disable-dmx --with-fontrootdir=/usr/share/fonts/X11 --disable-strict-compilation" "../../diff/xorgserver.diff"

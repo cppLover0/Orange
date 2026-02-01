@@ -43,19 +43,6 @@ cd ../..
 
 fast_install "$1" https://archive.xfce.org/src/xfce/xfwm4/4.19/xfwm4-4.19.0.tar.bz2 "--disable-introspection"
 
-wget https://icon-theme.freedesktop.org/releases/hicolor-icon-theme-0.18.tar.xz
-tar -xvf hicolor-icon-theme-0.18.tar.xz
-cd hicolor-icon-theme-0.18
-
-mkdir build
-meson --cross-file="$1/../tools/pkg/x86_64-orange.crossfile" --prefix=/usr build
-
-cd build
-
-meson compile -j$(nproc)
-DESTDIR="$1" meson install --no-rebuild
-
-cd ../..
 
 wget https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/2.4/shared-mime-info-2.4.tar.gz
 tar -xvf shared-mime-info-2.4.tar.gz

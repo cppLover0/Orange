@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <drivers/io.hpp>
 
+
+#pragma once
+
 /* Copypasted from old kernel :) */
 
 typedef struct {

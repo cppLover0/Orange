@@ -149,8 +149,6 @@ void memory::buddy::init() {
 
     mem.buddy_queue = 0;
 
-    Log::Display(LEVEL_MESSAGE_INFO,"buddy_struct 0x%p-0x%p, max_blocks: %d\n",mem.mem,mem.mem + buddy_size,total_pages);
-
     for(int i = 0;i < mmap->entry_count; i++) {
         current = mmap->entries[i];
         if(current->type == LIMINE_MEMMAP_USABLE) {
@@ -369,6 +367,7 @@ int __is_in_freelist_array(std::uint64_t phys) {
 }
 
 void memory::pmm::_physical::free(std::uint64_t phys) {
+    return;
     asm volatile("cli");
     pmm_lock.lock();
     int status = -1;
@@ -389,7 +388,7 @@ std::int64_t memory::pmm::_physical::alloc(std::size_t size) {
     asm volatile("cli");
     pmm_lock.lock();
     std::int64_t p = 0;
-    if(size == 4096) { // sure we can do freelist optimization
+    if(size <= 4096) { // sure we can do freelist optimization
         p = memory::freelist::alloc();
     } else {
         p = memory::buddy::alloc(size);
@@ -402,7 +401,7 @@ std::int64_t memory::pmm::_physical::allocid(std::size_t size, std::uint32_t id)
     asm volatile("cli");
     pmm_lock.lock();
     std::int64_t p = 0;
-    if(size == 4096) { // sure we can do freelist optimization
+    if(size <= 4096) { // sure we can do freelist optimization
         p = memory::freelist::alloc();
     } else {
         p = memory::buddy::allocid(size,id);
@@ -431,7 +430,12 @@ void* memory::pmm::_virtual::alloc(std::size_t size) {
 alloc_t memory::pmm::_physical::alloc_ext(std::size_t size) {
     asm volatile("cli");
     pmm_lock.lock();
-    alloc_t result = memory::buddy::alloc_ext(size);
+    alloc_t result;
+    if(size <= 4096) {
+        result.real_size = 4096;
+        result.virt = memory::freelist::alloc();
+    } else
+        result = memory::buddy::alloc_ext(size);
     result.virt = (std::uint64_t)Other::toVirt(result.virt);
     pmm_lock.unlock();
     return result;

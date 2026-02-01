@@ -39,7 +39,7 @@ cd ../..
 
 fast_install "$1" https://downloads.xiph.org/releases/ogg/libogg-1.3.6.tar.xz
 fast_install "$1" https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz
-fast_install "$1" https://0pointer.de/lennart/projects/libcanberra/libcanberra-0.30.tar.xz "--disable-oss --disable-gtk --disable-gstreamer --disable-pulse --disable-alsa"
+fast_install "$1" https://github.com/Distrotech/libcanberra/archive/refs/tags/v0.30.tar.gz "--disable-oss --disable-gtk --disable-gstreamer --disable-pulse --disable-alsa"
 fast_install "$1" https://salsa.debian.org/iso-codes-team/iso-codes/-/archive/v4.19.0/iso-codes-v4.19.0.tar.gz
 fast_install "$1" https://www.x.org/releases/individual/lib/libXres-1.2.3.tar.gz
 fast_install "$1" https://github.com/mate-desktop/mate-desktop/releases/download/v1.28.2/mate-desktop-1.28.2.tar.xz "--disable-introspection"

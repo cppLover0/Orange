@@ -17,7 +17,7 @@ patch_config_sub "$(realpath $1/..)"
 cd ..
 
 cd nano-build
-../nano-8.4/configure --host=x86_64-orange-mlibc --prefix="/usr" gl_cv_func_strcasecmp_works=yes CFLAGS="-std=gnu17"
+../nano-8.4/configure --host=x86_64-linux-gnu --prefix="/usr" gl_cv_func_strcasecmp_works=yes CFLAGS="-std=gnu17"
 make install -j$(nproc) DESTDIR="$1"
 
 cd ..

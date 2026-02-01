@@ -14,6 +14,14 @@
 int __snprintf(char *buffer, size_t bufsz, char const *fmt, va_list vlist);
 int __printfbuf(char* buffer, size_t bufsf, char const* fmt, ...);
 
+struct	winsizez {
+ 	unsigned short	 	ws_row;	 
+ 	unsigned short	 	ws_col;	 
+ 	unsigned short	 	ws_xpixel;	
+/* unused */
+ 	unsigned short	 	ws_ypixel;	
+/* unused */
+};
 
 class Log {
 private:
@@ -30,8 +38,10 @@ public:
 
     static void Raw(char* msg,...);
     static void Init();
+    static void RawDisp(char* buffer, int len);
     static void Display(int level,char* msg,...);
     static void SerialDisplay(int level,char* msg,...);
+    static winsizez GetDimensions();
 };
 
 void dmesg0(char* msg,...);

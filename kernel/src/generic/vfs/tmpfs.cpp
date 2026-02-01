@@ -8,25 +8,85 @@
 
 #include <etc/etc.hpp>
 
+#include <etc/hash.hpp>
+
 #include <etc/libc.hpp>
 #include <etc/errno.hpp>
 
 #include <drivers/cmos.hpp>
+#include <drivers/tsc.hpp>
 
 #include <etc/logging.hpp>
 
-vfs::tmpfs_node_t* head_node;
+std::uint64_t __tmpfs_ptr_id = 0;
 
-vfs::tmpfs_node_t* __tmpfs__find(char* path) {
-    vfs::tmpfs_node_t* current = head_node;
-    while(current) {
-        if(current->type != TMPFS_TYPE_NONE && current->name[0] != '\0') {
-            if(!strcmp(path,current->name)) {
-                return current;
+vfs::tmpfs_node_t* head_node = 0;
+vfs::tmpfs_node_t* root_node = 0; 
+
+vfs::tmpfs_node_t* __tmpfs__find(const char* path) {
+
+    extern locks::spinlock* vfs_lock;
+
+    if(path[0] == '/' && path[1] == '\0')
+        return root_node;
+
+    if(path[0] == '\0')
+        return root_node;
+
+    char built_path[2048];
+    char copied_path[2048];
+    memcpy(copied_path,path,strlen(path) + 1);
+    memset(built_path,0,2048);
+    char* next = 0;
+    char* token = __vfs__strtok(&next, copied_path, "/");
+
+    std::uint64_t need_hash = hash_fnv1(path);
+    std::uint64_t ptr = 0;
+        
+    vfs::tmpfs_node_t* current = root_node;
+    while(token) {
+
+        built_path[ptr] = '/';
+        ptr++;
+
+        memcpy((char*)((uint64_t)built_path + ptr),token,strlen(token));
+        ptr += strlen(token);
+        built_path[ptr] = '\0';
+
+        std::uint64_t rehashed = hash_fnv1(built_path);
+        if(current->type != VFS_TYPE_DIRECTORY) {
+            return 0;
+        } else if(current->path_hash == need_hash)
+            return current;
+
+        int is_cont = 1;
+
+        std::uint64_t* cont = (std::uint64_t*)current->content;
+        if(current->content) {
+            for(std::uint64_t i = 0; (i < (current->size / 8)) && is_cont; i++) { 
+                vfs::tmpfs_node_t* chld = (vfs::tmpfs_node_t*)cont[i];
+                if(chld) {
+                    if(chld->path_hash == rehashed) {
+                        current = chld;
+                        is_cont = 0;
+                        goto end;
+                    } 
+                }
             }
         }
-        current = current->next;
+end:
+        if(is_cont)
+            return 0;
+        
+        if(current->path_hash == need_hash)
+            return current;
+
+        token = __vfs__strtok(&next,0,"/");
     }
+
+    if(current->path_hash == need_hash)
+        return current;
+
     return 0;
 }
 
@@ -94,31 +154,46 @@ static void allocate_node_pool_block() {
 }
 
 static vfs::tmpfs_node_t* allocate_node_from_pool() {
-    if (!node_pool_current || node_pool_offset >= node_pool_capacity) {
-        allocate_node_pool_block();
-        if (!node_pool_current) {
-            return 0; 
-        }
-    }
-    vfs::tmpfs_node_t* node = node_pool_current + node_pool_offset;
-    node_pool_offset++;
-    memset(node, 0, sizeof(vfs::tmpfs_node_t));
-    return node;
+    return (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
 }
 
-std::uint64_t __tmpfs_ptr_id = 0;
+int __tmpfs__is_busy(vfs::tmpfs_node_t* node) {
+
+    if(!node)
+        return 0;
+
+    if(node->busy != 0)
+        return 1;
+
+    for(std::uint64_t i = 0; i < (node->size / 8); i++) {
+        if(node->content[i] != 0) {
+            vfs::tmpfs_node_t* chld_node = (vfs::tmpfs_node_t*)(((std::uint64_t*)node->content)[i]);
+            if(chld_node->busy != 0)
+                return 1;
+
+            if(chld_node->type == TMPFS_TYPE_DIRECTORY) {
+                int c = __tmpfs__is_busy(chld_node);
+                if(c == 1)
+                    return c;
+            }
+ 
+        }
+    }
+
+    return 0;
+}
 
 std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
 
     if(__tmpfs__exists(path))
-        return EEXIST;
+        return -EEXIST;
     
     char copy[2048];
     memset(copy,0,2048);
     memcpy(copy,path,strlen(path));
 
     if(path[0] == '\0')
-        return EINVAL;
+        return -EINVAL;
 
     __tmpfs__find_dir(copy);
 
@@ -129,25 +204,33 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
 
     if(!__tmpfs__exists(copy)) {
         if(!__tmpfs__create_parent_dirs_by_default)
-            return ENOENT;
+            return -ENOENT;
         else {
             __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
         }
     }
 
     if(__tmpfs__find(copy)->type != VFS_TYPE_DIRECTORY)
-        return ENOTDIR;
+        return -ENOTDIR;
 
     vfs::tmpfs_node_t* node = head_node;
 
+    int is_success_find = 0;
+
     while(node) {
-        if(node->type == TMPFS_TYPE_NONE)
+        if(node->name[0] == '\0') {
+            vfs::tmpfs_node_t* nex = node->next;
+            memset(node,0,sizeof(vfs::tmpfs_node_t));
+            node->next = nex;
+            is_success_find = 1;
             break;
+        }
+
         node = node->next;
     }
 
     if(!node)
-        node = (vfs::tmpfs_node_t*)allocate_node_from_pool();
+        node = (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
 
     node->type = type;
     node->content = 0;
@@ -160,17 +243,44 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
     
     memcpy(node->name,path,strlen(path));
 
-    node->next = head_node;
-    head_node = node;
+    node->path_hash = hash_fnv1(node->name);
+
+    if(!is_success_find) {
+        node->next = head_node;
+        head_node = node;
+    }
 
     vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
-    if(parent->size <= DIRECTORY_LIST_SIZE) {
-        ((std::uint64_t*)parent->content)[parent->size / 8] = (std::uint64_t)node;
-        parent->size += 8;
+
+    if(!(parent->size <= parent->real_size)) {
+        // overflow ! increase size
+        parent->content = (std::uint8_t*)memory::pmm::_virtual::realloc(parent->content,parent->real_size,parent->real_size + PAGE_SIZE);
+        parent->real_size += PAGE_SIZE;
+    }
+
+    if(parent->size <= parent->real_size) {
+        // first: find free entry
+
+        std::uint64_t* free_entry = 0;
+        for(std::uint64_t i = 0; i < (parent->size / 8); i++) {
+            if(((std::uint64_t*)parent->content)[i] == 0) {
+                free_entry = &(((std::uint64_t*)parent->content)[i]);
+                break;
+            }
+        }
+
+        if(!free_entry) {
+            free_entry = &((std::uint64_t*)parent->content)[parent->size / 8];
+            parent->size += 8;
+        }
+
+        *free_entry = (std::uint64_t)node;
+        
     }
 
     if(node->type == VFS_TYPE_DIRECTORY) {
         node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
+        node->real_size = DIRECTORY_LIST_SIZE;
         node->size = 0;
     }
 
@@ -189,10 +299,11 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
     if (!path || !buffer || !size) { vfs::vfs::unlock();
         return -EBADF; }
 
-    if (!__tmpfs__exists(path)) { vfs::vfs::unlock();
+        vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if (!node) { vfs::vfs::unlock();
         return -ENOENT;  }
 
-    vfs::tmpfs_node_t* node = __tmpfs__find(path);
     if (!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
@@ -234,13 +345,17 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
 }
 
 std::int64_t __tmpfs__read(userspace_fd_t* fd, char* path, void* buffer, std::uint64_t count) {
-    if (!path || !buffer || !count) { vfs::vfs::unlock();
+    if (!path || !buffer) { vfs::vfs::unlock();
         return -EBADF; }
 
-    if (!__tmpfs__exists(path)) { vfs::vfs::unlock();
-        return -ENOENT; }
+    if(!count) { vfs::vfs::unlock();
+        return 0; }
 
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if (!node) { vfs::vfs::unlock();
+        return -ENOENT; }
+
     if (!node) { vfs::vfs::unlock();
         return -ENOENT; }
 
@@ -269,14 +384,110 @@ std::int64_t __tmpfs__read(userspace_fd_t* fd, char* path, void* buffer, std::ui
     }
 }
 
+void __tmpfs__opt_create_and_write(char* path, int type, char* content, std::uint64_t content_len, int chmod) {
+    
+    char copy[2048];
+    memcpy(copy,path,strlen(path) + 1);
+
+    if(path[0] == '\0')
+        return;
+
+    __tmpfs__find_dir(copy);
+
+    if(copy[0] == '\0') {
+        copy[0] = '/';
+        copy[1] = '\0';
+    }
+
+    if(!__tmpfs__exists(copy)) {
+        if(!__tmpfs__create_parent_dirs_by_default)
+            return;
+        else {
+            int status = __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
+            assert(__tmpfs__exists(copy),"error creating parent %s, status %d",copy,status);
+        }
+    }
+
+    vfs::tmpfs_node_t* node = 0;
+
+    if(!node)
+        node = (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
+
+    node->type = type;
+    node->content = 0;
+    node->size = 0;
+    node->busy = 0;
+    node->id = ++__tmpfs_ptr_id;
+
+    node->create_time = getUnixTime();
+    node->access_time = getUnixTime();
+    
+    memcpy(node->name,path,strlen(path) + 1);
+
+    node->path_hash = hash_fnv1(node->name);
+
+    node->next = head_node;
+    head_node = node;
+
+    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
+
+    parent = __tmpfs__find(copy);
+
+    assert(parent,"parent is null %s (%d)",copy,__tmpfs__create_parent_dirs_by_default);
+
+    if(!parent->content) {
+        node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
+        node->real_size = DIRECTORY_LIST_SIZE;
+        node->size = 0;
+    }
+
+    if(!(parent->size <= parent->real_size)) {
+        // overflow ! increase size
+        parent->content = (std::uint8_t*)memory::pmm::_virtual::realloc(parent->content,parent->real_size,parent->real_size + PAGE_SIZE);
+        parent->real_size += PAGE_SIZE;
+    }
+
+    if(parent->size <= parent->real_size) {
+        std::uint64_t* free_entry = &((std::uint64_t*)parent->content)[parent->size / 8];
+        parent->size += 8;
+
+        *free_entry = (std::uint64_t)node;
+    } 
+
+    if(node->type == VFS_TYPE_DIRECTORY) {
+        node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
+        node->real_size = DIRECTORY_LIST_SIZE;
+        node->size = 0;
+    } else {
+        alloc_t new_content0 = memory::pmm::_physical::alloc_ext(content_len);
+        std::uint8_t* new_content = (std::uint8_t*)new_content0.virt;
+        if (node->content) {
+            memcpy(new_content, node->content, node->size); 
+            if(!node->is_non_allocated)
+                __tmpfs__dealloc(node);
+        }
+        node->is_non_allocated = 0;
+        node->content = new_content;
+        node->real_size = new_content0.real_size;
+        node->size = content_len;
+        memcpy(node->content,content,content_len);
+    }
+
+    node->vars[TMPFS_VAR_CHMOD] = chmod;
+
+    return;
+
+}
+
 std::int32_t __tmpfs__open(userspace_fd_t* fd, char* path) {
     if(!path)
         return EFAULT;
 
-    if(!__tmpfs__exists(path))
-        return ENOENT;
-
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
+        return ENOENT;
+    
     node->busy++;
     
     /* TmpFS doesnt need to change something in fd */
@@ -287,14 +498,15 @@ std::int32_t __tmpfs__open(userspace_fd_t* fd, char* path) {
 std::int32_t __tmpfs__var(userspace_fd_t* fd, char* path, std::uint64_t value, std::uint8_t request) {
     if(!path)
         return EFAULT;
+
+        vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
     
-    if(!__tmpfs__exists(path))
+    if(!node)
         return ENOENT;
 
     if(request == DEVFS_VAR_ISATTY)
         return ENOTTY;
 
-    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
     if(request & (1 << 7))
         node->vars[request & ~(1 << 7)] = value;
     else
@@ -309,11 +521,12 @@ std::int32_t __tmpfs__ls(userspace_fd_t* fd, char* path, vfs::dirent_t* out) {
     if(!path)
         return EFAULT;
 
-    if(!__tmpfs__exists(path))
+vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
         return ENOENT;
 
 again:
-    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
     if(node->type != VFS_TYPE_DIRECTORY)
         return ENOTDIR;
 
@@ -333,7 +546,15 @@ again:
 
     memset(out->d_name,0,sizeof(out->d_name));
     memcpy(out->d_name,__tmpfs__find_name(next->name),strlen(__tmpfs__find_name(next->name)));
+
+    std::uint64_t mod = next->type == TMPFS_TYPE_DIRECTORY ? DT_DIR : DT_REG;
+    if(next->type == TMPFS_TYPE_SYMLINK) 
+        mod = DT_LNK;
+
     out->d_reclen = sizeof(vfs::dirent_t);
+    out->d_ino = next->id;
+    out->d_off = 0;
+    out->d_type = mod;
     fd->offset++;
 
     if(out->d_name[0] == 0)
@@ -344,12 +565,32 @@ again:
 
 std::int32_t __tmpfs__remove(userspace_fd_t* fd, char* path) {
     if(!path)
-        return EFAULT;
-
-    if(!__tmpfs__exists(path))
-        return ENOENT;
+        return -EFAULT;
 
     vfs::tmpfs_node_t* node = __tmpfs__find(path);
+
+    if(!node)
+        return -ENOENT;
+
+    char copy[2048];
+    memset(copy,0,2048);
+    memcpy(copy,path,strlen(path));
+
+    if(path[0] == '\0')
+        return -EINVAL;
+
+    __tmpfs__find_dir(copy);
+
+    if(copy[0] == '\0') {
+        copy[0] = '/';
+        copy[1] = '\0';
+    }
+
+    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
+
+    if(__tmpfs__is_busy(node))
+        return -EBUSY;
+
     if(node->type != TMPFS_TYPE_DIRECTORY) {
 
     } else {
@@ -358,33 +599,105 @@ std::int32_t __tmpfs__remove(userspace_fd_t* fd, char* path) {
         }
     }
 
+    if(parent) {
+        for(std::uint64_t i = 0; i < (node->size / 8);i++) {
+            std::uint64_t* entry = &(((std::uint64_t*)node->content)[i]);
+            *entry = 0;
+        }
+    }
+
     memset(node->name,0,2048);
     __tmpfs__dealloc(node);
+
     return 0;
 }
 
-std::int32_t __tmpfs__touch(char* path) {
+std::int32_t __tmpfs__touch(char* path, int mode) {
     if(!path)
         return EFAULT;
 
-    if(!__tmpfs__exists(path))
-        return __tmpfs__create(path,VFS_TYPE_FILE);
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node) {
+        int status =  __tmpfs__create(path,VFS_TYPE_FILE);
+        node = __tmpfs__symfind(path);
+        if(node)
+            node->vars[TMPFS_VAR_CHMOD] |= (mode & ~(S_IFDIR | S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFDIR | S_IFIFO | S_IFMT | S_IFLNK));
+    }
 
     return 0;
 
+}
+
+#define STATX_BASIC_STATS 0x7ff
+#define STATX_BTIME 0x800
+
+
+
+std::int32_t __tmpfs__statx(userspace_fd_t* fd, char* path, int flags, int mask, statx_t* out) {
+    if(!path)
+        return -EFAULT;
+
+    if(!__tmpfs__exists(path))
+        return -ENOENT;
+
+    if(!out)
+        return -EINVAL;
+
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    memset(out,0,sizeof(statx_t));
+
+    out->stx_mask = STATX_BASIC_STATS | STATX_BTIME;
+    out->stx_blksize = 4096;
+    out->stx_nlink = 0;
+    out->stx_uid = 0;
+    out->stx_gid =  0;
+    out->stx_mode = 0;
+    switch(node->type) {
+        case TMPFS_TYPE_DIRECTORY:
+            out->stx_mode |= S_IFDIR;
+            break;
+        case TMPFS_TYPE_FILE:
+            out->stx_mode |= S_IFREG;
+            break;
+        case TMPFS_TYPE_SYMLINK:
+            out->stx_mode |= S_IFLNK;
+            break;
+        default:
+            out->stx_mode |= S_IFREG;
+            break;
+    }
+    out->stx_ino = node->id;
+    out->stx_size = node->size;
+    out->stx_blocks = node->real_size / 512;
+    out->stx_atime.tv_sec = node->access_time;
+    out->stx_atime.tv_nsec = 0;
+    out->stx_btime.tv_sec = node->create_time;
+    out->stx_btime.tv_nsec = 0;
+    out->stx_ctime.tv_sec = node->access_time;
+    out->stx_ctime.tv_nsec = 0;
+    out->stx_mtime.tv_sec = node->access_time;
+    out->stx_mtime.tv_nsec = 0;
+    out->stx_rdev_major = 0;
+    out->stx_rdev_minor = 0;
+    out->stx_dev_major = 0;
+    out->stx_dev_minor = 0;
+    return 0;
 }
 
 std::int32_t __tmpfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
     if(!path)
         return EFAULT;
 
-    if(!__tmpfs__exists(path))
+vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
         return ENOENT;
 
     if(!out)
         return EINVAL;
 
-    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
 
     if(!node)
         return ENOENT;
@@ -412,17 +725,18 @@ std::int32_t __tmpfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
     return 0;
 }
 
+// note for me never touch this in future
 std::int32_t __tmpfs__readlink(char* path, char* out, std::uint32_t out_len) {
     if(!path)
         return EFAULT;
 
-    if(!__tmpfs__exists(path))
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
         return ENOENT;
 
     if(!out)
         return EINVAL;
-
-    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
 
     if(!node)
         return ENOENT;
@@ -443,47 +757,213 @@ std::int32_t __tmpfs__readlink(char* path, char* out, std::uint32_t out_len) {
     return 0;
 }
 
-std::int32_t __tmpfs__rename(char* path, char* new_path) {
+void __tmpfs_build_newfile(char* path, char* new_path, int path_start_len, char* result) {
+    char temp_path[2048]; // /usr/bin -> /bin
+    memset(temp_path,0,2048);
+    memcpy(temp_path,path + path_start_len,strlen(path + path_start_len));
+    memcpy(result,new_path,strlen(new_path)); 
+    memcpy(result + strlen(new_path),temp_path,strlen(temp_path) + 1);
+    if(result[0] == '/' && result[1] == '/') {
+        // fix
+        memset(temp_path,0,2048);
+        memcpy(temp_path,result + 1, strlen(result + 1));
+        memcpy(result,temp_path,strlen(temp_path) + 1);
+    }
+}
+
+void __tmpfs__rename_dirents(char* path, char* new_path, int path_start_len) {
     if(!__tmpfs__exists(path))
-        return ENOENT;
+        return;
 
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
 
     if(!node)
-        return ENOENT;
-
-    if(node->type == TMPFS_TYPE_DIRECTORY)
-        return EFAULT; // not implemented in tmpfs
+        return;
 
     if(node->busy != 0)
-        return EBUSY;
+        return;
+
+    char old_node_path[2048];
+    memcpy(old_node_path,node->name,strlen(node->name) + 1);
+
+    if(node->type == TMPFS_TYPE_DIRECTORY) {
+
+        std::uint64_t* cont = (std::uint64_t*)node->content;
+        for(std::uint64_t i = 0; i < (node->size / 8); i++) {
+            if(cont[i] != 0) {
+                vfs::tmpfs_node_t* chld_node = (vfs::tmpfs_node_t*)cont[i];
+                char old_name[2048];
+                memset(old_name,0,2048);
+                memcpy(old_name,chld_node->name,strlen(chld_node->name) + 1);
+                memset(chld_node->name,0,sizeof(chld_node->name));
+                __tmpfs_build_newfile(old_name,node->name,path_start_len,chld_node->name);
+                chld_node->path_hash = hash_fnv1(chld_node->name);
+                DEBUG(1,"new_path %s\n",chld_node->name);
+                if(chld_node->type == TMPFS_TYPE_DIRECTORY) {
+                    __tmpfs__rename_dirents(chld_node->name,new_path,path_start_len);
+                }
+            }
+        }
+    }
+    return;
+}
+
+std::int32_t __tmpfs__rename(char* path, char* new_path) {
+    if(!__tmpfs__exists(path))
+        return -ENOENT;
+
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
+        return -ENOENT;
+
+    if(node->busy != 0)
+        return -EBUSY;
+
+    if(__tmpfs__is_busy(node))
+        return -EBUSY;
+
+    char old_node_path[2048];
+    memcpy(old_node_path,node->name,strlen(node->name) + 1);
 
     vfs::tmpfs_node_t* node2 = __tmpfs__symfind(new_path);
 
     if(node2) {
 
         if(node2->busy != 0)
-            return EBUSY;
+            return -EBUSY;
 
-        if(node2->type == TMPFS_TYPE_DIRECTORY)
-            return EFAULT; // not implemented in tmpfs
+        if(node2->type == TMPFS_TYPE_DIRECTORY) {
+            // man says it shoudl return error only if its non empty
+            int is_non_empty = 1;
+            for(std::uint64_t i = 0;i < node2->size / 8; i++) {
+                if((node2->content[i]))
+                    return ENOTEMPTY;
+            }
+        }
 
         userspace_fd_t fd;
         memset(&fd,0,sizeof(fd));
         __tmpfs__remove(&fd,new_path);
     }
 
+    char copy[2048];
+    memset(copy,0,2048);
+    memcpy(copy,path,strlen(path));
+
+    __tmpfs__find_dir(copy);
+
+    if(copy[0] == '\0') {
+        copy[0] = '/';
+        copy[1] = '\0';
+    }
+
+    if(!__tmpfs__exists(copy)) {
+        if(!__tmpfs__create_parent_dirs_by_default)
+            return ENOENT;
+        else {
+            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
+        }
+    }
+
+    if(__tmpfs__find(copy)->type != VFS_TYPE_DIRECTORY)
+        return -ENOTDIR;
+
+    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
+    if(parent->size <= DIRECTORY_LIST_SIZE) {
+        // first: find free entry
+
+        std::uint64_t* free_entry = 0;
+        for(std::uint64_t i = 0; i < (parent->size / 8); i++) {
+            if(((std::uint64_t*)parent->content)[i] == (std::uint64_t)node) {
+                free_entry = &(((std::uint64_t*)parent->content)[i]);
+                *free_entry = 0;
+            }
+        }
+        
+    }
+
+    int path_start_len = strlen(node->name);
+    if(node->name[0] == '/' && node->name[1] == '\0')
+        path_start_len = 0;
+
     memset(node->name,0,2048);
     memcpy(node->name,new_path,strlen(new_path));
+
+    node->path_hash = hash_fnv1(node->name);
+
+    if(node->type == TMPFS_TYPE_DIRECTORY) {
+
+        std::uint64_t* cont = (std::uint64_t*)node->content;
+        for(std::uint64_t i = 0; i < (node->size / 8); i++) {
+            if(cont[i] != 0) {
+                vfs::tmpfs_node_t* chld_node = (vfs::tmpfs_node_t*)cont[i];
+                char old_name[2048];
+                memset(old_name,0,2048);
+                memcpy(old_name,chld_node->name,strlen(chld_node->name) + 1);
+                memset(chld_node->name,0,sizeof(chld_node->name));
+                __tmpfs_build_newfile(old_name,node->name,path_start_len,chld_node->name);
+                chld_node->path_hash = hash_fnv1(chld_node->name);
+                DEBUG(1,"new_path %s\n",chld_node->name);
+                if(chld_node->type == TMPFS_TYPE_DIRECTORY) {
+                    __tmpfs__rename_dirents(chld_node->name,new_path,path_start_len);
+                }
+            }
+        }
+    }
+ 
+    memset(copy,0,2048);
+    memcpy(copy,path,strlen(path));
+
+    __tmpfs__find_dir(copy);
+
+    if(copy[0] == '\0') {
+        copy[0] = '/';
+        copy[1] = '\0';
+    }
+
+    if(!__tmpfs__exists(copy)) {
+        if(!__tmpfs__create_parent_dirs_by_default)
+            return ENOENT;
+        else {
+            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
+        }
+    }
+
+    if(__tmpfs__find(copy)->type != VFS_TYPE_DIRECTORY)
+        return ENOTDIR;
+
+    parent = __tmpfs__find(copy);
+    if(parent->size <= DIRECTORY_LIST_SIZE) {
+        // first: find free entry
+
+        std::uint64_t* free_entry = 0;
+        for(std::uint64_t i = 0; i < (parent->size / 8); i++) {
+            if(((std::uint64_t*)parent->content)[i] == 0) {
+                free_entry = &(((std::uint64_t*)parent->content)[i]);
+                break;
+            }
+        }
+
+        if(!free_entry) {
+            free_entry = &((std::uint64_t*)parent->content)[parent->size / 8];
+            parent->size += 8;
+        }
+
+        *free_entry = (std::uint64_t)node;
+        
+    }
+
     return 0;
 
 }
 
 void __tmpfs__close(userspace_fd_t* fd, char* path) {
-    if(!__tmpfs__exists(path))
-        return;
 
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+
+    if(!node)
+        return;
 
     if(!node)
         return;
@@ -495,12 +975,17 @@ void __tmpfs__close(userspace_fd_t* fd, char* path) {
 }
 
 void vfs::tmpfs::mount(vfs_node_t* node) {
+
     head_node = (tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
 
     head_node->type = TMPFS_TYPE_DIRECTORY;
     head_node->id = 0;
 
+    root_node = head_node;
+
     memcpy(head_node->name,"/",1);
+
+    head_node->path_hash = hash_fnv1(head_node->name);
 
     head_node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
 
@@ -516,5 +1001,9 @@ void vfs::tmpfs::mount(vfs_node_t* node) {
     node->stat = __tmpfs__stat;
     node->var = __tmpfs__var;
     node->ls = __tmpfs__ls;
+
+    node->statx = __tmpfs__statx;
+
+    node->opt_create_and_write = __tmpfs__opt_create_and_write;
 
 }

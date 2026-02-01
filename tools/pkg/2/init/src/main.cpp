@@ -1,6 +1,6 @@
 
+#define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 700
-
 #include <linux/fb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,12 +26,6 @@
 #include <etc.hpp>
 
 #include <sys/wait.h>
-
-#if defined(__orange__)
-#define hi
-#else
-#error "its orange tool only"
-#endif
 
 int ends_with(const char *str, const char *suffix) {
     if (!str || !suffix)
@@ -167,6 +161,27 @@ struct flanterm_context* ft_ctx;
 
 void* ptr; // fbdev target 
 
+static int set_fd_nonblock(int fd, int nonblock) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl F_GETFL");
+        return -1;
+    }
+    
+    if (nonblock) {
+        flags |= O_NONBLOCK;
+    } else {
+        flags &= ~O_NONBLOCK;
+    }
+    
+    if (fcntl(fd, F_SETFL, flags) == -1) {
+        perror("fcntl F_SETFL");
+        return -1;
+    }
+    
+    return 0;
+}
+
 void* tty_work(void* arg) {
 
     dup2(slave_fd,STDOUT_FILENO);
@@ -192,8 +207,6 @@ void* tty_work(void* arg) {
 
     ioctl(STDIN_FILENO, TCSETS, &t);
 
-    liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_DEV << 32) | 0, "/ps2keyboard", "/masterps2keyboard");
-    liborange_setup_ring_bytelen("/ps2keyboard0",1);
     int master_input = open("/dev/masterps2keyboard0", O_RDWR);
     int slave_input = open("/dev/ps2keyboard0", O_RDWR);
     keybuffer = (char*)malloc(1024);
@@ -203,6 +216,14 @@ void* tty_work(void* arg) {
     pfd[0].events = POLLIN;
     pfd[1].fd = master_fd;
     pfd[1].events = POLLIN;
+
+    // flush 
+    char zbuffer[1024*128];
+    memset(zbuffer,0,1024*128);
+
+    set_fd_nonblock(master_fd,1);
+    read(master_fd,zbuffer,1024 * 128);
+    set_fd_nonblock(master_fd,0);
 
     while(1) {
         int ret = poll(pfd, 2, -1); 
@@ -219,9 +240,9 @@ void* tty_work(void* arg) {
             }
 
             if(pfd[1].revents & POLLIN) {
-                char buffer[256];
-                memset(buffer,0,256);
-                int count = read(master_fd,buffer,256);
+                char buffer[1024*128];
+                memset(buffer,0,1024*128);
+                int count = read(master_fd,buffer,1024*128);
                 if(count) flanterm_write(ft_ctx,buffer,count);
             }
         }
@@ -302,6 +323,7 @@ static void tty_init() {
     grantpt(master_fd);
     unlockpt(master_fd);
     char* name = ptsname(master_fd);
+    
     slave_fd = open(name,O_RDWR);
 
     dup2(slave_fd,STDOUT_FILENO);
@@ -326,12 +348,6 @@ static void tty_init() {
     t.c_cflag |= (CS8);   
 
     ioctl(STDIN_FILENO, TCSETS, &t);
-
-    liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_DEV << 32) | 0, "/ps2keyboard", "/masterps2keyboard");
-    liborange_setup_ring_bytelen("/ps2keyboard0",1);
-
-    liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_DEV << 32) | 0, "/mouse", "/mastermouse");
-    liborange_setup_ring_bytelen("/mouse0",4);
 
     int master_input = open("/dev/masterps2keyboard0", O_RDWR);
     int slave_input = open("/dev/ps2keyboard0", O_RDWR);
@@ -408,7 +424,7 @@ void get_cpu(char* out) {
 
 void* refresh(void * arg) {
     struct limine_framebuffer fb;
-    liborange_access_framebuffer(&fb);
+
     void* real_fb = liborange_map_phys(fb.address, PTE_WC, fb.pitch * fb.height);
 
     while(1) {
@@ -417,6 +433,7 @@ void* refresh(void * arg) {
 }
 
 void init_fbdev() {
+    return;
     struct limine_framebuffer fb;
     liborange_access_framebuffer(&fb);
     liborange_create_dev(((uint64_t)DEVFS_PACKET_CREATE_PIPE_DEV << 32) | 0, "/fb", "/masterfb");
@@ -461,26 +478,24 @@ void init_fbdev() {
 }
 
 int main() {
-    init_fbdev();
     tty_init();
 
     char cpu[13];
     get_cpu(cpu);
 
-    log(LEVEL_MESSAGE_INFO,"Current vendor: %s",cpu);
-    log(LEVEL_MESSAGE_OK,"Trying to start drivers");
-    start_all_drivers();
-    log(LEVEL_MESSAGE_OK,"Initialization done");
-    printf("\n");
+    //log(LEVEL_MESSAGE_OK,"Trying to start drivers");
+    //start_all_drivers();
+    //log(LEVEL_MESSAGE_OK,"Initialization done");
+    //printf("\n");
     putenv("TERM=linux");
     putenv("SHELL=/bin/bash");
     putenv("PATH=/usr/bin");
     int pid = fork();
-    if(pid == 0)
-        system("/bin/bash /etc/init.sh");
-    else {
+    if(pid == 0) {
+        execl("/bin/bash", "/bin/bash", (char *)NULL);
+    } else {
         while(1) {
-            sched_yield();
+
         }
     }
 } 

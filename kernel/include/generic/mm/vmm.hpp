@@ -118,51 +118,77 @@ namespace memory {
             return 0;
         }
 
-        inline static vmm_obj_t* v_find(vmm_obj_t* start, std::uint64_t base, std::uint64_t len) {
-            vmm_obj_t* current = start->next;
-            vmm_obj_t* prev = start;
-            uint64_t found = 0;
+        inline static vmm_obj_t* v_find(arch::x86_64::process_t* proc,vmm_obj_t* start, std::uint64_t base, std::uint64_t len, int is_fixed) {
+        uint64_t align_length = ALIGNUP(len, 4096);
+        uint64_t end = base + align_length;
 
-            uint64_t align_length = ALIGNUP(len,4096);
-            
-            vmm_obj_t* vmm_new = new vmm_obj_t;
+        vmm_obj_t* current = start->next;
+        vmm_obj_t* prev = start;
 
-            while(current) {
+        is_fixed = 0;
 
-                if(prev) {
+        if (is_fixed) {
 
-                    uint64_t prev_end = (prev->base + prev->len);
-                    uint64_t current_end = base + len;
+            while (current) {
+                uint64_t curr_start = current->base;
+                uint64_t curr_end = current->base + current->len;
 
-                    if(current->base == base) {
-                        delete (void*)vmm_new;
-                        vmm_new = current;
-                        break;
-                    }
+                if (!(curr_end <= base || curr_start >= end)) {
+                    vmm_obj_t* to_delete = current;
+                    prev->next = current->next;
+                    current = current->next;
+                    
+                    //nolockunmap(proc,current->base);
+                    continue; 
+                }
 
-                    if(current->base >= current_end && prev_end <= base) {
-
-                        vmm_new->base = base;
-                        vmm_new->len = align_length;
-
-                        vmm_new->is_lazy_alloc = 0;
-                        vmm_new->is_lazy_allocated = 0;
-                        vmm_new->is_shared = 0;
-                        
-                        prev->next = vmm_new;
-                        vmm_new->next = current;
-
-                        break;
-
-                    } 
+                if (curr_start >= end) {
+                    break;
                 }
 
                 prev = current;
                 current = current->next;
             }
 
+            vmm_obj_t* vmm_new = new vmm_obj_t;
+            vmm_new->base = base;
+            vmm_new->len = align_length;
+            vmm_new->is_lazy_alloc = 0;
+            vmm_new->is_lazy_allocated = 0;
+            vmm_new->is_shared = 0;
+
+            vmm_new->next = current;
+            prev->next = vmm_new;
             return vmm_new;
+
+        } else {
+
+            while (current) {
+                uint64_t gap_start = prev->base + prev->len;
+                uint64_t gap_end = current->base;
+
+                uint64_t actual_start = (gap_start < base) ? base : gap_start;
+
+                if (gap_end >= actual_start + align_length) {
+                    vmm_obj_t* vmm_new = new vmm_obj_t;
+                    vmm_new->base = actual_start;
+                    vmm_new->len = align_length;
+                    vmm_new->is_lazy_alloc = 0;
+                    vmm_new->is_lazy_allocated = 0;
+                    vmm_new->is_shared = 0;
+
+                    vmm_new->next = current;
+                    prev->next = vmm_new;
+                    return vmm_new;
+                }
+
+                prev = current;
+                current = current->next;
+            }
         }
+
+        return nullptr;
+    }
 
         inline static void* map(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t length, std::uint64_t flags) {
             asm volatile("cli"); // bug if they are enabled
@@ -195,7 +221,7 @@ namespace memory {
             asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
-            void* new_virt = mark(proc,virt,phys,length,flags,0);
+            void* new_virt = mark(proc,virt,phys,length,flags,0,0);
             paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,length,flags,*proc->vmm_id);
             current->lock.unlock();
             vmm_obj_t* new_vmm = get(proc,virt);
@@ -227,7 +253,7 @@ namespace memory {
                 return (std::uint64_t)new_vmm->base;
             } else {
 
-                void* new_virt = mark(proc,base,shm->phys,shm->len,PTE_PRESENT | PTE_RW | PTE_USER,0);
+                void* new_virt = mark(proc,base,shm->phys,shm->len,PTE_PRESENT | PTE_RW | PTE_USER,0,0);
                 paging::maprangeid(proc->original_cr3,shm->phys,(std::uint64_t)base,shm->len,PTE_PRESENT | PTE_RW | PTE_USER,*proc->vmm_id);
                 current->lock.unlock();
                 vmm_obj_t* new_vmm = get(proc,base);
@@ -246,15 +272,16 @@ namespace memory {
             return 0;
         }
 
-        inline static void* mark(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_shared) {
+        inline static void* mark(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_shared, int is_fixed) {
             asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
-            vmm_obj_t* new_vmm = v_find(current,base,length);
+            vmm_obj_t* new_vmm = v_find(proc,current,base,length,is_fixed);
             new_vmm->flags = flags;
             new_vmm->phys = phys;
             new_vmm->src_len = length;
             new_vmm->base = base;
             new_vmm->is_mapped = 0;
+            new_vmm->is_free = 0;
             new_vmm->len = ALIGNUP(length,4096);
             new_vmm->is_shared = is_shared;
             return (void*)new_vmm->base;
@@ -278,6 +305,25 @@ namespace memory {
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return 0;
         }
+
+        inline static vmm_obj_t* nolockgetlen(arch::x86_64::process_t* proc, std::uint64_t addr) {
+            asm volatile("cli"); // bug if they are enabled
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+
+            while (current) {
+
+                if (addr >= current->base && addr < current->base + current->len) {
+                    return current;
+                }
+
+                if (current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                    break;
+
+                current = current->next;
+            }
+            return 0;
+        }
+
 
         inline static vmm_obj_t* getlen(arch::x86_64::process_t* proc, std::uint64_t addr) {
             asm volatile("cli"); // bug if they are enabled
@@ -348,7 +394,7 @@ namespace memory {
                             memory::paging::duplicaterangeifexists(src_proc->original_cr3,dest_proc->original_cr3,src_current->base,src_current->len,src_current->flags);
                         }
 
-                        mark(dest_proc,src_current->base,phys,src_current->src_len,src_current->flags,src_current->is_shared);
+                        mark(dest_proc,src_current->base,phys,src_current->src_len,src_current->flags,src_current->is_shared,1);
                         get(dest_proc,src_current->base)->is_mapped = src_current->is_mapped;
 
                         get(dest_proc,src_current->base)->is_lazy_alloc = src_current->is_lazy_alloc;
@@ -574,15 +620,15 @@ namespace memory {
             return 0;
         }
 
-        inline static void* customalloc(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t len, std::uint64_t flags, int is_shared) {
+        inline static void* customalloc(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t len, std::uint64_t flags, int is_shared, int is_fixed) {
             asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
             std::uint64_t phys = memory::pmm::_physical::alloc(len);
-            void* new_virt = mark(proc,virt,phys,len,flags,is_shared);
-            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,len,flags,*proc->vmm_id);
+            void* new_virt = mark(proc,virt,phys,len,flags,is_shared,is_fixed);
+            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)new_virt,len,flags,*proc->vmm_id);
             current->lock.unlock();
-            vmm_obj_t* new_vmm = get(proc,virt);
+            vmm_obj_t* new_vmm = get(proc,(std::uint64_t)new_virt);
             if(is_shared) {
                 new_vmm->is_shared = 1;
                 new_vmm->how_much_connected = new int;
@@ -590,7 +636,7 @@ namespace memory {
 
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
 
-            return (void*)virt;
+            return (void*)new_virt;
         } 
 
     };

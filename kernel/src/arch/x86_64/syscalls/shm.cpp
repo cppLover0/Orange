@@ -61,8 +61,12 @@ void shm_rm(shm_seg_t* seg) {
             break;
         prev = prev->next;
     }
-    if(prev)
+
+    if(shm_head == seg)
+        shm_head = seg->next;
+    else if(prev)
         prev->next = seg->next;
+        
     memory::pmm::_physical::free(seg->phys);
     delete (void*)seg;
 }

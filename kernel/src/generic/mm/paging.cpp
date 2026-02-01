@@ -123,6 +123,14 @@ void memory::paging::maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t
     }
 }
 
+void* memory::paging::maprangeret(std::uint64_t phys,std::uint64_t len,std::uint64_t flags) {
+    std::uint64_t virt = (std::uint64_t)Other::toVirt(phys);
+    for(std::uint64_t i = 0; i < len; i += 4096) {
+        map(kernel_cr3,phys + i,virt + i,flags);
+    }
+    return (void*)Other::toVirt(phys);
+}
+
 void memory::paging::zerorange(std::uint64_t cr3,std::uint64_t virt,std::uint64_t len) {
     for(std::uint64_t i = 0; i < len; i += 4096) {
         map(cr3,0,virt + i,0);

@@ -133,7 +133,12 @@ typedef unsigned char cc_t;
 typedef unsigned int speed_t;
 typedef unsigned int tcflag_t;
 
-#define NCCS     32
+#define NCCS     19
+
+#define TCGETS2 0x802c542a
+#define TCSETS2 0x402c542b
+#define TCSETSW2 0x402c542c
+#define TCSETSF2 0x402c542d
 
 typedef struct {
 	tcflag_t c_iflag;
@@ -146,7 +151,17 @@ typedef struct {
 	speed_t obaud;
 } __attribute__((packed)) termios_t;
 
+typedef struct {
+	tcflag_t c_iflag;
+	tcflag_t c_oflag;
+	tcflag_t c_cflag;
+	tcflag_t c_lflag;
+	cc_t c_line;
+	cc_t c_cc[NCCS];
+} __attribute__((packed)) termiosold_t;
+
 void __vfs_symlink_resolve(char* path, char* out);
+char * __vfs__strtok(char **next,char *str, const char *delim);
 
 #define EFD_SEMAPHORE 1
 #define EFD_NONBLOCK O_NONBLOCK
@@ -601,6 +616,8 @@ namespace vfs {
 #define USERSPACE_FD_OTHERSTATE_MASTER 1
 #define USERSPACE_FD_OTHERSTATE_SLAVE  2
 
+char * __vfs__strtok(char **next,char *str, const char *delim);
+
 /* It should be restored in dup2 syscall when oldfd is 0 */
 typedef struct {
     std::int32_t index;
@@ -608,6 +625,36 @@ typedef struct {
     std::uint8_t pipe_side;
     vfs::pipe* pipe;
 } userspace_old_fd_t;
+
+enum
+  {
+    DT_UNKNOWN = 0,
+# define DT_UNKNOWN	DT_UNKNOWN
+    DT_FIFO = 1,
+# define DT_FIFO	DT_FIFO
+    DT_CHR = 2,
+# define DT_CHR		DT_CHR
+    DT_DIR = 4,
+# define DT_DIR		DT_DIR
+    DT_BLK = 6,
+# define DT_BLK		DT_BLK
+    DT_REG = 8,
+# define DT_REG		DT_REG
+    DT_LNK = 10,
+# define DT_LNK		DT_LNK
+    DT_SOCK = 12,
+# define DT_SOCK	DT_SOCK
+    DT_WHT = 14
+# define DT_WHT		DT_WHT
+  };
+
+struct linux_dirent64 {
+    long long        d_ino;    
+    long long       d_off;    
+    unsigned short d_reclen; 
+    unsigned char  d_type;   
+    char           d_name[]; 
+};
 
 typedef struct userspace_fd {
     std::uint64_t offset;
@@ -767,6 +814,76 @@ struct timespec {
 	long tv_nsec;
 };
 
+typedef long long __mlibc_int64;
+typedef unsigned int __mlibc_uint32;
+typedef unsigned short __mlibc_uint16;
+typedef unsigned long long __mlibc_uint64;
+
+struct statx_timestamp {
+	__mlibc_int64 tv_sec;
+	__mlibc_uint32 tv_nsec;
+	__mlibc_uint32 __padding;
+};
+
+#define STATX_TYPE 0x1
+#define STATX_MODE 0x2
+#define STATX_NLINK 0x4
+#define STATX_UID 0x8
+#define STATX_GID 0x10
+#define STATX_ATIME 0x20
+#define STATX_MTIME 0x40
+#define STATX_CTIME 0x80
+#define STATX_INO 0x100
+#define STATX_SIZE 0x200
+#define STATX_BLOCKS 0x400
+#define STATX_BASIC_STATS 0x7ff
+#define STATX_BTIME 0x800
+#define STATX_MNT_ID 0x1000
+#define STATX_DIOALIGN 0x2000
+#define STATX_ALL 0xfff
+
+#define STATX_ATTR_COMPRESSED 0x4
+#define STATX_ATTR_IMMUTABLE 0x10
+#define STATX_ATTR_APPEND 0x20
+#define STATX_ATTR_NODUMP 0x40
+#define STATX_ATTR_ENCRYPTED 0x800
+#define STATX_ATTR_AUTOMOUNT 0x1000
+#define STATX_ATTR_MOUNT_ROOT 0x2000
+#define STATX_ATTR_VERITY 0x100000
+#define STATX_ATTR_DAX 0x200000
+
+typedef struct statx {
+	__mlibc_uint32 stx_mask;
+
+	__mlibc_uint32 stx_blksize;
+	__mlibc_uint64 stx_attributes;
+	__mlibc_uint32 stx_nlink;
+	__mlibc_uint32 stx_uid;
+	__mlibc_uint32 stx_gid;
+	__mlibc_uint16 stx_mode;
+	__mlibc_uint16 __padding;
+	__mlibc_uint64 stx_ino;
+	__mlibc_uint64 stx_size;
+	__mlibc_uint64 stx_blocks;
+	__mlibc_uint64 stx_attributes_mask;
+
+	struct statx_timestamp stx_atime;
+	struct statx_timestamp stx_btime;
+	struct statx_timestamp stx_ctime;
+	struct statx_timestamp stx_mtime;
+
+	__mlibc_uint32 stx_rdev_major;
+	__mlibc_uint32 stx_rdev_minor;
+	__mlibc_uint32 stx_dev_major;
+	__mlibc_uint32 stx_dev_minor;
+
+	__mlibc_uint64 stx_mnt_id;
+	__mlibc_uint32 stx_dio_mem_align;
+	__mlibc_uint32 stx_dio_offset_align;
+
+	__mlibc_uint64 __padding1[12];
+} statx_t;
+
 namespace vfs {
 
     static inline std::uint64_t resolve_count(char* str,std::uint64_t sptr,char delim) {
@@ -815,6 +932,7 @@ namespace vfs {
 
     /* I'll use path resolver from my old kernel */
     static inline void resolve_path(const char* inter0,const char* base, char *result, char spec, char is_follow_symlinks) {
+        char* next = 0;
         char buffer2_in_stack[2048];
         char inter[2048];
         char* buffer = 0;
@@ -827,11 +945,19 @@ namespace vfs {
 
         if(strlen((char*)inter) == 1 && inter[0] == '.') {
             memcpy(result,base,strlen((char*)base) + 1);
+            if(result[0] == '\0') {
+                result[0] = '/';
+                result[1] = '\0';
+            }
             return;
         }
 
         if(!strcmp(inter,"/")) {
             memcpy(result,inter,strlen((char*)inter) + 1);
+            if(result[0] == '\0') {
+                result[0] = '/';
+                result[1] = '\0';
+            }
             return;
         } 
 
@@ -845,10 +971,10 @@ namespace vfs {
         if(spec)
             is_first = 0;
 
-        if(!strcmp(base,"/"))
+        if(!strcmp(base,"/"))                               
             is_first = 0;
 
-        buffer = strtok((char*)inter,"/");
+        buffer = __vfs__strtok(&next,(char*)inter,"/");
         while(buffer) {
 
             if(is_first && !is_full) {
@@ -870,7 +996,7 @@ namespace vfs {
                 std::uint64_t mm = resolve_count(final_buffer,ptr,'/');
 
                 if(!strcmp(final_buffer,"/\0")) {
-                    buffer = strtok(0,"/");
+                    buffer = __vfs__strtok(&next,0,"/");
                     continue;
                 }
                     
@@ -899,9 +1025,16 @@ namespace vfs {
                 final_buffer[ptr] = '\0';
             } 
             
-            buffer = strtok(0,"/");
+            buffer = __vfs__strtok(&next,0,"/");
         }
         normalize_path(final_buffer,result,2048);
+
+        if(result[0] == '\0') {
+            result[0] = '/';
+            result[1] = '\0';
+        }
+
+
     }
 
     typedef struct {
@@ -941,12 +1074,16 @@ namespace vfs {
         std::int32_t (*ioctl)  (userspace_fd_t* fd, char* path, unsigned long req, void *arg, int *res    );
         std::int32_t (*mmap)   (userspace_fd_t* fd, char* path, std::uint64_t* outp, std::uint64_t* outsz, std::uint64_t* outflags );
         std::int32_t (*create) (char* path, std::uint8_t type                                             );
-        std::int32_t (*touch)  (char* path                                                                );
+        std::int32_t (*touch)  (char* path, int mode                                                                );
+
+        std::int32_t (*statx)  (userspace_fd_t* fd, char* path, int flags, int mask, statx_t* out);
 
         std::int64_t (*poll)   (userspace_fd_t* fd, char* path, int request);
 
         std::int32_t (*readlink) (char* path, char* out, std::uint32_t out_len);
         std::int32_t (*rename) (char* path, char* new_path);
+
+        void (*opt_create_and_write)(char* path, int type, char* content, std::uint64_t content_len, int chmod);
 
         void (*close)(userspace_fd_t* fd, char* path);
 
@@ -980,13 +1117,18 @@ namespace vfs {
         static void close(userspace_fd_t* fd);
 
         static std::int32_t create (char* path, std::uint8_t type                                 );
-        static std::int32_t touch  (char* path                                                    );
+        static std::int32_t touch  (char* path, int mode                                                    );
 
 
         static std::int32_t rename (char* path, char* new_path);
         static std::int32_t readlink(char* path, char* out, std::uint32_t out_len); /* Lock-less, vfs lock should be already locked */
 
         static std::uint32_t create_fifo(char* path);
+
+        static std::int32_t statx(userspace_fd_t* fd, int flags, int mask, statx_t* out);
+        static std::int32_t extern_readlink(char* path, char* out, std::uint32_t out_len);
+
+        static void opt_create_and_write(char* path, int type, char* content, std::uint64_t content_len, int chmod);
 
         static void unlock();
         static void lock();

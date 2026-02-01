@@ -2,6 +2,8 @@
 #include <generic/vfs/vfs.hpp>
 #include <arch/x86_64/scheduling.hpp>
 
+#include <etc/list.hpp>
+
 #include <cstdint>
 
 #pragma once
@@ -20,6 +22,72 @@ namespace vfs {
             this->used_counter++;
         }
 
+        int find_min_free_index() {
+            int max_index = -1;
+            
+            userspace_fd_t* current = fd_list;
+            while(current) {
+                if(current->index > max_index) {
+                    max_index = current->index;
+                }
+                current = current->next;
+            }
+            
+            if(max_index < 3) {
+                return 3;
+            }
+            
+            bool used_indices[max_index + 2];
+            memset(used_indices, 0, max_index + 2);
+            
+            current = fd_list;
+            while(current) {
+                if(current->index >= 0 && current->index <= max_index && 
+                   current->state != USERSPACE_FD_STATE_UNUSED) {
+                    used_indices[current->index] = true;
+                }
+                current = current->next;
+            }
+            
+            int free_index = 3;
+            for(; free_index <= max_index + 1; free_index++) {
+                if(!used_indices[free_index]) {
+                    break;
+                }
+            }
+            
+            return free_index;
+        }
+
+        void close(int idx) {
+            proc->fd_lock.lock();
+            fdmanager* fd = (fdmanager*)proc->fd;
+            userspace_fd_t* current = fd->fd_list;
+            userspace_fd_t* prev = 0;
+            while(current) {
+                if(current->index == idx && current->state != USERSPACE_FD_STATE_UNUSED) { //proc->fd_lock.unlock();
+                    break; }
+                prev = current;
+                current = current->next;
+            }
+
+            if(!current) {
+                
+                proc->fd_lock.unlock();
+                return; 
+            }
+
+            if(current == fd->fd_list) 
+                fd->fd_list = current->next;
+            else if(prev)
+                prev->next = current->next;
+
+            // current->next = 0;
+            // memory::pmm::_virtual::free((void*)current);
+
+            proc->fd_lock.unlock();
+        }
+
         int create() {
             proc->fd_lock.lock();
             userspace_fd_t* current = fd_list;
@@ -34,6 +102,12 @@ namespace vfs {
                 memset(current,0,sizeof(userspace_fd_t));
                 current->next = fd_list;
                 fd_list = current;
+                while(1) {
+                    if(search(proc,*proc->fd_ptr)) {
+                        *proc->fd_ptr = *proc->fd_ptr + 1;
+                    } else
+                        break;
+                }
                 current->index = *proc->fd_ptr;
                 *proc->fd_ptr = *proc->fd_ptr + 1;
             }

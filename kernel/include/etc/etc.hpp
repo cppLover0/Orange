@@ -6,6 +6,8 @@
 
 #define ALIGNUP(VALUE,c) ((VALUE + c - 1) & ~(c - 1))
 #define ALIGNDOWN(VALUE,c) ((VALUE / c) * c)
+#define ALIGNPAGEUP(VALUE) (ALIGNUP(VALUE,4096))
+#define PAGE_SIZE 4096
 
 static inline uint64_t get_rflags() {
     uint64_t rflags;

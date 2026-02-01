@@ -2,9 +2,9 @@
 set(CMAKE_SYSTEM_NAME Orange)
 set(CMAKE_SYSTEM_PROCESSOR x86_64) 
 
-set(CMAKE_C_COMPILER x86_64-orange-mlibc-gcc)
-set(CMAKE_CXX_COMPILER x86_64-orange-mlibc-g++)
-set(CMAKE_LINKER x86_64-orange-mlibc-ld)
+set(CMAKE_C_COMPILER x86_64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER x86_64-linux-gnu-g++)
+set(CMAKE_LINKER x86_64-linux-gnu-ld)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

@@ -35,6 +35,7 @@ namespace memory {
         static void map(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t flags);
         static void mapid(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t flags,std::uint32_t id);
         static void maprange(std::uint64_t cr3,std::uint64_t phys,std::uint64_t virt,std::uint64_t len,std::uint64_t flags);
+        static void* maprangeret(std::uint64_t phys,std::uint64_t len,std::uint64_t flags);
         static void zerorange(std::uint64_t cr3,std::uint64_t virt,std::uint64_t len);
         static void destroyrange(std::uint64_t cr3, std::uint64_t virt, std::uint64_t len);
         static void duplicaterangeifexists(std::uint64_t src_cr3, std::uint64_t dest_cr3, std::uint64_t virt, std::uint64_t len, std::uint64_t flags);

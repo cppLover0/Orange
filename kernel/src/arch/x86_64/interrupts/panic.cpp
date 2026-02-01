@@ -11,6 +11,8 @@
 
 #include <arch/x86_64/scheduling.hpp>
 
+#include <generic/vfs/fd.hpp>
+
 #include <generic/mm/paging.hpp>
 
 typedef struct stackframe {
@@ -47,6 +49,10 @@ void panic(int_frame_t* ctx, const char* msg) {
         if(ctx->vec == 14) {
             vmm_obj_t* obj0 = memory::vmm::getlen(proc,cr2);
             
+            if(proc && cr2 == 0 && proc->sigtrace_obj && ctx->err_code == 0x14) {
+                arch::x86_64::scheduling::sigreturn(proc);
+            }
+
             if(obj0) {
                if(obj0->is_lazy_alloc && !obj0->is_free) {
 
@@ -72,7 +78,7 @@ void panic(int_frame_t* ctx, const char* msg) {
 
                     schedulingEnd(ctx);
                } else if(!obj0->is_free && cr2 > 0x1000) {
-                    Log::SerialDisplay(LEVEL_MESSAGE_WARN,"tlb invalid :( 0x%p is_mapped %d phys 0x%p base 0x%p\n",cr2,obj0->is_mapped,obj0->phys,obj0->base);
+                    Log::SerialDisplay(LEVEL_MESSAGE_WARN,"tlb invalid :( 0x%p is_mapped %d phys 0x%p base 0x%p ",cr2,obj0->is_mapped,obj0->phys,obj0->base);
                     memory::paging::maprange(proc->original_cr3,obj0->phys,obj0->base,obj0->len,obj0->flags);
                     if(ctx->cs & 3)
                         ctx->ss |= 3;
@@ -90,11 +96,14 @@ void panic(int_frame_t* ctx, const char* msg) {
                         asm volatile("swapgs");
 
                     schedulingEnd(ctx);
+               } else if(1) {
+                Log::SerialDisplay(LEVEL_MESSAGE_INFO,"aaa\n");
                }
             }
+
         }
 
-        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"process %d fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p rbp 0x%p\n",proc->id,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx,ctx->rbp);
+        Log::Display(LEVEL_MESSAGE_FAIL,"process %d (%s) fired cpu exception with vec %d, rip 0x%p (offset 0x%p), cr2 0x%p, error code 0x%p, lastsys %d, rdx 0x%p rbp 0x%p\n",proc->id,proc->name,ctx->vec,ctx->rip,ctx->rip - 0x41400000,cr2,ctx->err_code,proc->sys,ctx->rdx,ctx->rbp);
         
         Log::Raw("RAX: 0x%016llX RBX: 0x%016llX RDX: 0x%016llX RCX: 0x%016llX RDI: 0x%016llX\n"
          "RSI: 0x%016llX  R8: 0x%016llX  R9: 0x%016llX R10: 0x%016llX R11: 0x%016llX\n"
@@ -130,6 +139,18 @@ void panic(int_frame_t* ctx, const char* msg) {
             rbp = (stackframe_t*)rbp->rbp;
         }
         memory::paging::enablekernel();
+
+        arch::x86_64::scheduling::kill(proc);
+    
+    if(1)
+        memory::vmm::free(proc); 
+
+    vfs::fdmanager* fd = (vfs::fdmanager*)proc->fd;
+    fd->free();
+
+    memory::pmm::_virtual::free(proc->cwd);
+    memory::pmm::_virtual::free(proc->name);
+    memory::pmm::_virtual::free(proc->sse_ctx);
 
         arch::x86_64::scheduling::kill(proc);
        schedulingSchedule(0);

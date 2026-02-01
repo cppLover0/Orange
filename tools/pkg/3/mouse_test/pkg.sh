@@ -1,2 +1,2 @@
 
-x86_64-orange-mlibc-gcc main.c -o "$1/usr/bin/mouse_test"
+x86_64-linux-gnu-gcc main.c -o "$1/usr/bin/mouse_test"

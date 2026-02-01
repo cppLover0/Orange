@@ -29,7 +29,6 @@ void memory::heap::init() {
     current = (heap_block_t*)heap_pool;
     heap_end = block;
     
-    Log::Display(LEVEL_MESSAGE_OK,"heap_pool: 0x%p\n",heap_pool);
     memory::paging::alwaysmappedadd(Other::toPhys(heap_pool),KHEAP_SIZE);
 }
 

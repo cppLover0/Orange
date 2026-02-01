@@ -42,24 +42,77 @@ syscall_ret_t sys_libc_log(const char* msg) {
     char buffer[2048];
     memset(buffer,0,2048);
     copy_in_userspace_string(proc,buffer,(void*)msg,2048);
-    DEBUG(1,"%s from proc %d",buffer,proc->id);
+    DEBUG(proc->is_debug,"%s from proc %d",buffer,proc->id);
 
     return {0,0,0};
 }
 
-syscall_ret_t sys_exit(int status) {
+long long sys_exit_group(int status) {
+    cpudata_t* cpdata = arch::x86_64::cpu::data();
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    DEBUG(1,"Process %d exited with status %d (exit_group)",proc->id,status);
+    char* vm_start = proc->vmm_start;
+    arch::x86_64::process_t* current = arch::x86_64::scheduling::head_proc_();
+    memory::paging::enablekernel();
+    DEBUG(proc->is_debug,"a");
+    while(current) {
+        if(proc->id == current->id) {
+            current->exit_code = 0;
+            DEBUG(proc->is_debug,"sh %d",current->id);
+            arch::x86_64::scheduling::kill(current);
+            
+            if(1)
+                memory::vmm::free(current); 
+
+            vfs::fdmanager* fd = (vfs::fdmanager*)current->fd;
+            fd->free();
+
+            memory::pmm::_virtual::free(current->cwd);
+            memory::pmm::_virtual::free(current->name);
+            memory::pmm::_virtual::free(current->sse_ctx);
+            cpdata->temp.temp_ctx = 0;
+        } else if(proc->vmm_start == current->vmm_start && proc->thread_group == current->thread_group) {
+            // send sigkill
+            if(current->sig) {
+                pending_signal_t sig;
+                sig.sig = SIGKILL;
+                current->sig->push(&sig);
+            }
+        }
+        current = current->next;
+    }
+    schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
+    __builtin_unreachable();
+}
+
+long long sys_exit(int status) {
 
     cpudata_t* cpdata = arch::x86_64::cpu::data();
-
-    memory::paging::enablekernel();
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     proc->exit_code = status;
 
+    if(proc->tidptr) {
+        *proc->tidptr = 0;
+        arch::x86_64::scheduling::futexwake(proc,proc->tidptr,1);
+    }
+
+
+    memory::paging::enablekernel();
+
     DEBUG(1,"Process %s (%d) exited with code %d sys %d",proc->name,proc->id,status,proc->sys);
 
     if(proc->is_debug)
-        assert(status == 0,"debug: proc exit status is not 0");
+        assert(1,"debug: proc exit status is not 0");
+
+    if(proc->exit_signal != 0) {
+        arch::x86_64::process_t* target_proc = arch::x86_64::scheduling::by_pid(proc->parent_id);
+        if(target_proc) {
+            pending_signal_t pend_sig;
+            pend_sig.sig = proc->exit_signal;
+            target_proc->sig->push(&pend_sig);
+        }
+    }
 
     arch::x86_64::scheduling::kill(proc);
     
@@ -79,13 +132,89 @@ syscall_ret_t sys_exit(int status) {
 
 locks::spinlock mmap_lock; // memory access should be locked anyway 
 
-syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_frame_t* ctx) {
+#define PROT_READ	0x1		/* page can be read */
+#define PROT_WRITE	0x2		/* page can be written */
+#define PROT_EXEC	0x4		/* page can be executed */
+#define PROT_SEM	0x8		/* page may be used for atomic ops */
+/*			0x10		   reserved for arch-specific use */
+/*			0x20		   reserved for arch-specific use */
+#define PROT_NONE	0x0		/* page can not be accessed */
+#define PROT_GROWSDOWN	0x01000000	/* mprotect flag: extend change to start of growsdown vma */
+#define PROT_GROWSUP	0x02000000	/* mprotect flag: extend change to end of growsup vma */
+
+// unimplemented just return errors if not valid
+long long sys_mprotect(std::uint64_t start, size_t len, std::uint64_t prot) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    if(!start)
+        return -EINVAL;
+
+    vmm_obj_t* vmm_ = memory::vmm::getlen(proc,start);
+    
+    if(!vmm_)
+        return -EINVAL;
+
+    DEBUG(proc->is_debug,"trying to mprotect 0x%p",start);
+
+    std::uint64_t new_flags = PTE_USER | PTE_PRESENT;
+    new_flags |= (prot & PROT_WRITE) ? PTE_RW : 0;
+
+    return 0;
+}
+
+long long sys_prlimit64(int pid, int res, rlimit64* new_rlimit, int_frame_t* ctx) {
+    rlimit64* old_rlimit = (rlimit64*)ctx->r10;
+    
+    if(new_rlimit || !old_rlimit)
+        return 0;
+
+    switch(res) {
+        case RLIMIT_NOFILE:
+            old_rlimit->rlim_cur = 512*1024;
+            old_rlimit->rlim_max = 512*1024;
+            return 0;
+        case RLIMIT_STACK:
+            old_rlimit->rlim_cur = USERSPACE_STACK_SIZE;
+            old_rlimit->rlim_max = USERSPACE_STACK_SIZE;
+            return 0;
+        case RLIMIT_NPROC:
+            old_rlimit->rlim_cur = 0xffffffff;
+            old_rlimit->rlim_max = 0xffffffff;
+            return 0;
+        case RLIMIT_AS:
+        case RLIMIT_LOCKS:
+        case RLIMIT_MEMLOCK:
+        case RLIMIT_CPU:
+        case RLIMIT_RSS:
+        case RLIMIT_FSIZE:
+        case RLIMIT_DATA:
+            old_rlimit->rlim_cur = RLIM_INFINITY;
+            old_rlimit->rlim_max = RLIM_INFINITY;
+            return 0;
+        case RLIMIT_CORE:
+            old_rlimit->rlim_cur = 0;
+            old_rlimit->rlim_max = 0;
+            return 0;
+    default:
+        return -EINVAL;
+    }
+    return 0;
+}
+
+long long sys_mmap(std::uint64_t hint, std::uint64_t size, unsigned long prot, int_frame_t* ctx) {
 
     SYSCALL_DISABLE_PREEMPT(); // ensure interrupts disabled
     mmap_lock.lock();
 
-    std::uint64_t flags = ctx->r8;
+    std::uint64_t flags = ctx->r10;
+    int fd0 = ctx->r8;
+    std::uint64_t off = ctx->r9;
+
+    size = ALIGNPAGEUP(size);
+
     arch::x86_64::process_t* proc = CURRENT_PROC;
+    
+    DEBUG(proc->is_debug,"trying to mmap 0x%p-0x%p sz %lli, prot %lli, flags %lli fd %d off %lli from proc %d",hint,hint + size,size,prot,flags,fd0,off,proc->id);
+    
     if(flags & MAP_ANONYMOUS) {
 
         std::uint64_t new_hint = hint;
@@ -99,66 +228,79 @@ syscall_ret_t sys_mmap(std::uint64_t hint, std::uint64_t size, int fd0, int_fram
         if(!new_hint) {
             new_hint = (std::uint64_t)memory::vmm::lazy_alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
         } else 
-            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,0);
+            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,0,0);
 
         memory::paging::enablepaging(ctx->cr3); // try to reset tlb
 
         mmap_lock.unlock();
-        return {1,0,(std::int64_t)new_hint};
+        DEBUG(proc->is_debug,"return 0x%p",new_hint);
+        return (std::int64_t)new_hint;
     } else {
         
         std::uint64_t mmap_base = 0;
         std::uint64_t mmap_size = 0;
         std::uint64_t mmap_flags = 0;
         userspace_fd_t* fd = vfs::fdmanager::search(proc,fd0);
-
-        DEBUG(proc->is_debug,"Trying to mmap fd %d from proc %d",fd0,proc->id);
         if(!fd) { mmap_lock.unlock();
-            return {1,EBADF,0}; }
-        DEBUG(proc->is_debug,"Trying to mmap %s from proc %d",fd->path,proc->id);
+            return -EBADF; }
 
         int status = vfs::vfs::mmap(fd,&mmap_base,&mmap_size,&mmap_flags);
 
         if(status == ENOSYS) {
             // try to fix this and read whole file 
             std::int64_t old_offset = fd->offset;
-            fd->offset = 0;
+            fd->offset = off;
 
             vfs::stat_t stat;
             std::int32_t stat_status = vfs::vfs::stat(fd,&stat);
 
             if(!(stat.st_mode & S_IFREG)) { mmap_lock.unlock();
-                return {1,EFAULT,0}; }
+                return -EFAULT; }
 
-            std::uint64_t new_hint_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+            std::uint64_t new_hint_hint;
+
+            if(!hint) {
+                new_hint_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+            } else {
+                new_hint_hint = (std::uint64_t)memory::vmm::customalloc(proc,hint,size,PTE_PRESENT | PTE_USER | PTE_RW,0,0);
+            }
 
             vfs::vfs::read(fd,Other::toVirt(memory::vmm::get(proc,new_hint_hint)->phys),size <= 0 ? stat.st_size : size);
             fd->offset = old_offset;
 
             mmap_lock.unlock();
-            return {1,0,(std::int64_t)new_hint_hint};
+            DEBUG(proc->is_debug,"returna 0x%p, is_fixed %d",new_hint_hint,flags & 0x100000);
+            return (std::int64_t)new_hint_hint;
 
         }
 
         if(status != 0) { mmap_lock.unlock();
-            return {1,status,0}; }
+            return -status; }
 
         std::uint64_t new_hint_hint = (std::uint64_t)memory::vmm::map(proc,mmap_base,mmap_size,PTE_PRESENT | PTE_USER | PTE_RW | mmap_flags);
         memory::paging::enablepaging(ctx->cr3); // try to reset tlb
         
         mmap_lock.unlock();
-        return {1,0,(std::int64_t)new_hint_hint};
+        return (std::int64_t)new_hint_hint;
     }
 }
 
-syscall_ret_t sys_free(void *pointer, size_t size) {
+long long sys_free(void *pointer, size_t size) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     memory::vmm::unmap(proc,(std::uint64_t)pointer);
     
-    return {0,0,0};
+    return 0;
 }
 
+long long sys_set_tid_address(int* tidptr) {
+    SYSCALL_IS_SAFEZ((void*)tidptr,4096);
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    proc->tidptr = tidptr;
+    
+    return 0;
+}
 
 typedef struct stackframe {
     struct stackframe* rbp;
@@ -217,16 +359,16 @@ std::uint64_t __elf_get_length2(char** arr) {
     return counter;
 }
 
-syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
+long long sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     if(!path || !argv || !envp)
-        return {0,EINVAL,0};
+        return -EINVAL;
 
     cpudata_t* cpdata = arch::x86_64::cpu::data();
 
-    SYSCALL_IS_SAFEA(path,4096);
-    SYSCALL_IS_SAFEA(argv,4096);
-    SYSCALL_IS_SAFEA(envp,4096);
+    SYSCALL_IS_SAFEZ(path,4096);
+    SYSCALL_IS_SAFEZ(argv,4096);
+    SYSCALL_IS_SAFEZ(envp,4096);
 
     std::uint64_t argv_length = 0;
     std::uint64_t envp_length = 0;
@@ -236,7 +378,7 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     argv_length = __elf_get_length2((char**)argv);
     envp_length = __elf_get_length2((char**)envp);
 
-    char** argv0 = (char**)memory::heap::malloc(8 * (argv_length + 2));
+    char** argv0 = (char**)memory::heap::malloc(8 * (argv_length + 3));
     char** envp0 = (char**)memory::heap::malloc(8 * (envp_length + 1));
 
     memset(argv0,0,8 * (envp_length + 2));
@@ -277,15 +419,22 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
 
     vfs::stat_t stat;
 
-    vfs::fdmanager* fd_m = (vfs::fdmanager*)proc->fd;
-    fd_m->cloexec();
-
     userspace_fd_t fd;
     fd.is_cached_path = 0;
     memset(fd.path,0,2048);
     memcpy(fd.path,result,strlen(result));
 
     int status = vfs::vfs::stat(&fd,&stat); 
+
+    if(status != 0)
+        return -status;
+
+    vfs::fdmanager* fd_m = (vfs::fdmanager*)proc->fd;
+    fd_m->cloexec();
+
+    memset(proc->ret_handlers,0,sizeof(proc->ret_handlers));
+    memset(proc->sig_handlers,0,sizeof(proc->sig_handlers));
+    arch::x86_64::free_sigset_from_list(proc);
 
     DEBUG(proc->is_debug,"Exec file %s from proc %d",fd.path,proc->id);
     if(1) {
@@ -361,14 +510,22 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
                     }
                 } 
                 argv_length++;
-                memcpy(&argv0[1], argv0,sizeof(std::uint64_t) * argv_length);
+                memcpy(&argv0[2], argv0,sizeof(std::uint64_t) * argv_length);
                 char* t1 = (char*)malloc(2048);
                 memset(t1,0,2048);
-                memcpy(t1,result,strlen(result));
+                memcpy(t1,interp,strlen(interp));
+                char* t2 = (char*)malloc(2048);
+                memset(t2,0,2048);
+                memcpy(t2,result,strlen(result));
                 argv0[0] = t1;
-                
+                argv0[1] = t2;
+
+                DEBUG(1,"interp %s to %s",argv0[0],argv0[1]);
 
                 status = arch::x86_64::scheduling::loadelf(proc,interp,argv0,envp0,0);
+                free((void*)t1);
+                free((void*)t2);
+
                 if(status == 0) {
 
                     for(int i = 0;i < argv_length; i++) {
@@ -405,20 +562,22 @@ syscall_ret_t sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::free(argv0);
     memory::heap::free(envp0);
 
+    proc->exit_code = -1;
+
     cpdata->temp.temp_ctx = 0;
     arch::x86_64::scheduling::kill(proc);
     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
     __builtin_unreachable();
 }
 
-syscall_ret_t sys_getpid() {
+long long sys_getpid() {
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    return {0,(int)proc->id,0};
+    return proc->id;
 }
 
-syscall_ret_t sys_getppid() {
+long long sys_getppid() {
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    return {0,(int)proc->parent_id,0};
+    return proc->parent_id;
 }
 
 syscall_ret_t sys_gethostname(void* buffer, std::uint64_t bufsize) {
@@ -437,9 +596,9 @@ syscall_ret_t sys_gethostname(void* buffer, std::uint64_t bufsize) {
     return {0,0,0};
 }
 
-syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize) {
+long long sys_getcwd(void* buffer, std::uint64_t bufsize) {
 
-    SYSCALL_IS_SAFEA(buffer,bufsize);
+    SYSCALL_IS_SAFEZ(buffer,bufsize);
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
@@ -450,10 +609,10 @@ syscall_ret_t sys_getcwd(void* buffer, std::uint64_t bufsize) {
 
     copy_in_userspace(proc,buffer,buffer0,strlen((const char*)buffer0) > bufsize ? bufsize : strlen((const char*)buffer0));
 
-    return {0,0,0};
+    return 0;
 }
 
-syscall_ret_t sys_waitpid(int pid,int flags) {
+long long sys_wait4(int pid,int* status,int flags) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
@@ -462,7 +621,9 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
     DEBUG(proc->is_debug,"Trying to waitpid with pid %d from proc %d",pid,proc->id);
     
     if(pid < -1 || pid == 0)
-        return {0,ENOSYS,0};
+        return -EINVAL;
+
+    SYSCALL_IS_SAFEZ(status,4096);
 
     int success = 0;
 
@@ -491,7 +652,7 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
     }
 
     if(!success) 
-        return {0,ECHILD,0};
+        return -ECHILD;
 
     int parent_id = proc->id;
 
@@ -505,7 +666,9 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
                     std::int64_t bro = (std::int64_t)(((std::uint64_t)current->exit_code) << 32) | current->id;
                     current->status = PROCESS_STATE_KILLED;
                     DEBUG(proc->is_debug,"Waitpid done pid %d from proc %d",pid,proc->id);
-                    return {1,0,bro};
+                    if(status)  
+                        *status = current->exit_code;
+                    return bro;
                 }
             }
             current = current->next;
@@ -519,7 +682,7 @@ syscall_ret_t sys_waitpid(int pid,int flags) {
                 pro = pro->next;
             }
             DEBUG(proc->is_debug,"Waitpid return WNOHAND from proc %d",proc->id);
-            return {1,0,0};
+            return 0;
         }
         signal_ret();
         yield();
@@ -606,31 +769,33 @@ syscall_ret_t sys_printdebuginfo(int pid) {
     return {0,0,0};
 }
 
-syscall_ret_t sys_clone(std::uint64_t stack, std::uint64_t rip, int c, int_frame_t* ctx) {
+
+long long sys_clone3(clone_args* clargs, size_t size, int c, int_frame_t* ctx) {
+    // size is ignored 
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
-    arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::clone(proc,ctx);
-
-    vmm_obj_t* st = (vmm_obj_t*)new_proc->vmm_start;
-
-    st->lock.lock();
-    st->pthread_count++;
-    st->lock.unlock();
-
+    arch::x86_64::process_t* new_proc = arch::x86_64::scheduling::clone3(proc,clargs,ctx);
     new_proc->ctx.rax = 0;
-    new_proc->ctx.rdx = 0;
-
-    //new_proc->fs_base = proc->fs_base;
-    
-    new_proc->ctx.rsp = stack;
-    new_proc->ctx.rip = rip;
 
     arch::x86_64::scheduling::wakeup(new_proc);
 
-    DEBUG(proc->is_debug,"Clone from proc %d, new proc %d (new syscall_stack: 0x%p)",proc->id,new_proc->id,new_proc->syscall_stack);
+    DEBUG(proc->is_debug,"clone3 from proc %d, new proc %d (new syscall_stack: 0x%p)",proc->id,new_proc->id,new_proc->syscall_stack);
     new_proc->is_debug = proc->is_debug;
 
-    return {1,0,new_proc->id};
+    return new_proc->id;
+}
+
+// convert clone to clone3
+long long sys_clone(unsigned long clone_flags, unsigned long newsp, int *parent_tidptr, int_frame_t* ctx) {
+    std::uint64_t child_tidptr = ctx->r10;
+    std::uint64_t tls = ctx->r8;
+    clone_args arg = {0};
+    arg.flags = clone_flags;
+    arg.stack = newsp;
+    arg.parent_tid = (std::uint64_t)parent_tidptr;
+    arg.tls = tls;
+    arg.child_tid = child_tidptr;
+    return sys_clone3(&arg,sizeof(clone_args),0,ctx);
 }
 
 syscall_ret_t sys_breakpoint(int num, int b, int c, int_frame_t* ctx) {
@@ -659,7 +824,7 @@ syscall_ret_t sys_copymemory(void* src, void* dest, int len) {
 #define PRIO_PGRP 2
 #define PRIO_USER 3
 
-syscall_ret_t sys_setpriority(int which, int who, int prio) {
+long long sys_setpriority(int which, int who, int prio) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     if(which == PRIO_PROCESS) { 
         
@@ -671,17 +836,17 @@ syscall_ret_t sys_setpriority(int which, int who, int prio) {
         }
 
         if(!need_proc)
-            return {0,ESRCH,0};
+            return -ESRCH;
 
         DEBUG(proc->is_debug,"Setpriority %d to proc %d (who %d) which %d from proc %d",prio,need_proc->id,who,which,proc->id);
         need_proc->prio = prio;
         
     } else
-        return {0,ENOSYS,0};
-    return {0,0,0};
+        return -ENOSYS;
+    return 0;
 }
 
-syscall_ret_t sys_getpriority(int which, int who) {
+long long sys_getpriority(int which, int who) {
     int prio = 0;
     if(which == 0) { // PRIO_PROCESS
         arch::x86_64::process_t* proc = CURRENT_PROC;
@@ -694,13 +859,12 @@ syscall_ret_t sys_getpriority(int which, int who) {
         }
 
         if(!need_proc)
-            return {1,ESRCH,0};
-
+            return -ESRCH;
         prio = need_proc->prio;
         DEBUG(proc->is_debug,"Getpriority %d to proc %d (who %d) from proc %d",prio,need_proc->id,who,proc->id);
     } else
-        return {1,ENOSYS,0};
-    return {1,0,prio};
+        return -ENOSYS;
+    return prio;
 }
 
 syscall_ret_t sys_yield() {
@@ -730,17 +894,58 @@ syscall_ret_t sys_dmesg(char* buf,std::uint64_t count) {
     return {1,0,0};
 }
 
-syscall_ret_t sys_getuid() {
+long long sys_getuid() {
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    return {0,proc->uid,0};
+    return proc->uid;
 }
 
-syscall_ret_t sys_setuid(int uid) {
+long long sys_getpgrp() {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    return proc->thread_group;
+}
+
+long long sys_setpgid(int pid, int pgid) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    if(pid > 0) {
+        proc = arch::x86_64::scheduling::by_pid(pid);
+        if(!proc)
+            return -ESRCH;
+    }
+    proc->thread_group = pgid;
+    return 0;
+}
+
+long long sys_getpgid(int pid) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    if(pid > 0) {
+        proc = arch::x86_64::scheduling::by_pid(pid);
+        if(!proc)
+            return -ESRCH;
+    }
+    return proc->thread_group;
+}
+
+long long sys_getresuid(int* ruid, int* euid, int *suid) {
+
+    SYSCALL_IS_SAFEZ(ruid,4096);
+    SYSCALL_IS_SAFEZ(euid,4096);
+    SYSCALL_IS_SAFEZ(suid,4096);
+
+    if(!ruid || !euid || !suid)
+        return -EINVAL;
+
+    *ruid = sys_getuid();
+    *euid = sys_getuid();
+    *suid = sys_getuid();
+    return 0;
+}
+
+long long sys_setuid(int uid) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     if(proc->uid > 1000)
-        return {0,EPERM,0};
+        return -EPERM;
     proc->uid = uid;
-    return {0,0,0};
+    return 0;
 }
 
 // used from mlibc source, why not 
@@ -822,4 +1027,39 @@ syscall_ret_t sys_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask) {
 syscall_ret_t sys_cpucount() {
     extern int how_much_cpus;
     return {0,how_much_cpus,0};
+}
+
+long long sys_brk() {
+    return 0;
+}
+
+#define ARCH_SET_GS                     0x1001
+#define ARCH_SET_FS                     0x1002
+#define ARCH_GET_FS                     0x1003
+#define ARCH_GET_GS                     0x1004
+
+#define ARCH_GET_CPUID                  0x1011
+#define ARCH_SET_CPUID                  0x1012
+
+long long sys_arch_prctl(int option, unsigned long* addr) {
+    if(!addr)
+        return -EINVAL;
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    switch(option) {
+    case ARCH_SET_FS: 
+        proc->fs_base = (std::uint64_t)addr;
+        __wrmsr(0xC0000100,(std::uint64_t)addr);
+        return 0;
+    case ARCH_GET_FS:
+        SYSCALL_IS_SAFEZ(addr,4096);
+        *addr = proc->fs_base;
+        return 0;
+    default:
+        Log::SerialDisplay(LEVEL_MESSAGE_FAIL,"unsupported arch_prctl option %p, addr 0x%p, shit %d\n",option,addr,0);
+        return -EINVAL;
+    };
+
+    return 0;
 }

@@ -40,12 +40,14 @@ std::atomic<int> temp_how_much_cpus[12];
 locks::spinlock mp_lock;
 
 void mp::sync(std::uint8_t id) {
-    temp_how_much_cpus[id].fetch_add(1, std::memory_order_acq_rel);
-    while (how_much_cpus != temp_how_much_cpus[id].load(std::memory_order_acquire)) {
-        asm volatile("nop");
+    if(how_much_cpus != 1) {
+        temp_how_much_cpus[id].fetch_add(1, std::memory_order_acq_rel);
+        while (how_much_cpus != temp_how_much_cpus[id].load(std::memory_order_acquire)) {
+            asm volatile("nop");
+        }
+        time::sleep(1000*1000); // perform 1 second sleep
+        temp_how_much_cpus[id].store(0, std::memory_order_release);
     }
-    time::sleep(1000*1000); // perform 1 second sleep
-    temp_how_much_cpus[id].store(0, std::memory_order_release);
 } 
 
 void __mp_bootstrap(struct LIMINE_MP(info)* smp_info) {

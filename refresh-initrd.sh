@@ -1,4 +1,5 @@
-cp -rf tools/initbase/* initrd
+
+echo ''
 
 chmod +x initrd/etc/
 

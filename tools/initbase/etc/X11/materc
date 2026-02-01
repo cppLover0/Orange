@@ -1,4 +1,0 @@
-
-xwallpaper --zoom /etc/twmbg.png &
-st & 
-exit

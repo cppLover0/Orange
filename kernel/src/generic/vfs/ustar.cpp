@@ -51,42 +51,23 @@ void vfs::ustar::copy() {
         switch(type) {
             case 0: {
                 char* file = (char*)((uint64_t)current->file_name + 1);
-                vfs::vfs::create(file,VFS_TYPE_FILE);
                 int size = oct2bin((uint8_t*)current->file_size,strlen(current->file_size));
-                
-                userspace_fd_t fd;
-                fd.is_cached_path = 1;
-
-                memset(&fd,0,sizeof(userspace_fd_t));
-                memcpy(fd.path,file,strlen(file));
-
-                __tmpfs__dont_alloc_memory = 1;
-                vfs::vfs::write(&fd,(char*)((std::uint64_t)current + 512),size);
-                __tmpfs__dont_alloc_memory = 0;
-
                 std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
-                vfs::vfs::var(&fd,actual_mode,TMPFS_VAR_CHMOD | (1 << 7));
+                vfs::vfs::opt_create_and_write(file,VFS_TYPE_FILE,(char*)((std::uint64_t)current + 512),size,actual_mode);
                 break;
             }
 
             case 5: {
                 char* file = (char*)((uint64_t)current->file_name + 1);
-                vfs::vfs::create(file,VFS_TYPE_DIRECTORY);
+                std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
+                vfs::vfs::opt_create_and_write(file,VFS_TYPE_DIRECTORY,0,0,actual_mode);
                 break;
             }
 
             case 2: {
                 char* file = (char*)((uint64_t)current->file_name + 1);
-                userspace_fd_t fd;
-                memset(&fd,0,sizeof(userspace_fd_t));
-                memcpy(fd.path,file,strlen(file));
-                vfs::vfs::create(file,VFS_TYPE_SYMLINK);
-
-                __tmpfs__dont_alloc_memory = 1;
-                fd.is_cached_path = 1;
-                vfs::vfs::write(&fd,current->name_linked,strlen(current->name_linked));
-                __tmpfs__dont_alloc_memory = 0;
-                
+                std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
+                vfs::vfs::opt_create_and_write(file,VFS_TYPE_SYMLINK,current->name_linked,strlen(current->name_linked),actual_mode);
                 break;
             }
         }

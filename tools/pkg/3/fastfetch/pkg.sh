@@ -17,6 +17,8 @@ diff_patch ../../diff/fastfetch.diff
 patch_config_sub "$(realpath $1/..)"
 cd ..
 
+LDFLAGS="$LDFLAGS -lm"
+
 mkdir -p fastfetch-build
 cd fastfetch-build
 cmake ../fastfetch-2.44.0 -DCMAKE_TOOLCHAIN_FILE=$(realpath ../../../../toolchain.cmake) -DCMAKE_INSTALL_PREFIX="$1/usr"

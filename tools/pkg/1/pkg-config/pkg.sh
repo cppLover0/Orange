@@ -34,7 +34,7 @@ c="$(pwd)"
 
 cd "$HOME/opt/cross/orange/bin"
 
-ln -sf pkg-config x86_64-orange-mlibc-pkg-config
+ln -sf pkg-config x86_64-linux-gnu-pkg-config
 
 cd "$c"
 

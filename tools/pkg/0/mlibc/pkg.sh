@@ -1,4 +1,5 @@
 
+exit 0
 rm -rf pack
 mkdir -p pack
 mkdir -p cached

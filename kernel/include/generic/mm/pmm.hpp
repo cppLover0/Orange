@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstddef>
 
+#include <etc/libc.hpp>
+
 #pragma once
 
 #define LEVEL_TO_SIZE(level) (1U << (level))
@@ -84,6 +86,14 @@ namespace memory {
         public:
             static void free(void* virt);
             static void* alloc(std::size_t size);
+
+            static inline void* realloc(void* virt, std::size_t old_size, std::size_t new_size) {
+                void* new_virt = alloc(new_size);
+                memcpy(new_virt,virt,old_size);
+                free(virt);
+                return new_virt;
+            }
+
         };
         class helper {
         public:

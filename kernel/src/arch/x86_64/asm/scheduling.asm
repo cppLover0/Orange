@@ -18,6 +18,9 @@ yield:
 global yield0
 
 yield0:
+    sti
+    pause
+    cli
     pop rax
     mov rdx, rsp
     mov rsp,[gs:16]

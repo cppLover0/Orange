@@ -27,7 +27,7 @@
 
 extern "C" void yield();
 
-#define PREPARE_SIGNAL(proc) if(proc->sig->is_not_empty() && 1)
+#define PREPARE_SIGNAL(proc) if(proc->sig->is_not_empty_sigset(&proc->current_sigset) && 1)
 #define PROCESS_SIGNAL(proc) yield();
 
 typedef struct {
@@ -65,41 +65,9 @@ typedef struct {
     std::uint64_t phnum;
     std::uint64_t phentsize;
     int status;
+    std::uint64_t interp_base;
+    std::uint64_t base;
 } elfloadresult_t;
-
-#define __NGREG 23
-
-#define __pollution(n) n
-
-struct _fpxreg {
-	unsigned short __pollution(significand)[4];
-	unsigned short __pollution(exponent);
-	unsigned short __padding[3];
-};
-
-struct _xmmreg {
-	uint32_t __pollution(element)[4];
-};
-
-struct _fpstate {
-	uint16_t __pollution(cwd);
-	uint16_t __pollution(swd);
-	uint16_t __pollution(ftw);
-	uint16_t __pollution(fop);
-	uint64_t __pollution(rip);
-	uint64_t __pollution(rdp);
-	uint32_t __pollution(mxcsr);
-	uint32_t __pollution(mxcr_mask);
-	struct _fpxreg _st[8];
-	struct _xmmreg _xmm[16];
-	uint32_t __padding[24];
-};
-
-typedef struct {
-	unsigned long __pollution(gregs)[__NGREG];
-	struct _fpstate *__pollution(fpregs);
-	unsigned long __reserved1[8];
-} mcontext_t;
 
 #define REG_R8 0
 #define REG_R9 1
@@ -238,8 +206,85 @@ extern "C" void schedulingSchedule(int_frame_t* ctx);
 extern "C" void schedulingEnter();
 extern "C" void schedulingEnd(int_frame_t* ctx);
 
+typedef uint64_t u64;
+
+# define CSIGNAL       0x000000ff /* Signal mask to be sent at exit.  */
+# define CLONE_VM      0x00000100 /* Set if VM shared between processes.  */
+# define CLONE_FS      0x00000200 /* Set if fs info shared between processes.  */
+# define CLONE_FILES   0x00000400 /* Set if open files shared between processes.  */
+# define CLONE_SIGHAND 0x00000800 /* Set if signal handlers shared.  */
+# define CLONE_PIDFD   0x00001000 /* Set if a pidfd should be placed
+				     in parent.  */
+# define CLONE_PTRACE  0x00002000 /* Set if tracing continues on the child.  */
+# define CLONE_VFORK   0x00004000 /* Set if the parent wants the child to
+				     wake it up on mm_release.  */
+# define CLONE_PARENT  0x00008000 /* Set if we want to have the same
+				     parent as the cloner.  */
+# define CLONE_THREAD  0x00010000 /* Set to add to same thread group.  */
+# define CLONE_NEWNS   0x00020000 /* Set to create new namespace.  */
+# define CLONE_SYSVSEM 0x00040000 /* Set to shared SVID SEM_UNDO semantics.  */
+# define CLONE_SETTLS  0x00080000 /* Set TLS info.  */
+# define CLONE_PARENT_SETTID 0x00100000 /* Store TID in userlevel buffer
+					   before MM copy.  */
+# define CLONE_CHILD_CLEARTID 0x00200000 /* Register exit futex and memory
+					    location to clear.  */
+# define CLONE_DETACHED 0x00400000 /* Create clone detached.  */
+# define CLONE_UNTRACED 0x00800000 /* Set if the tracing process can't
+				      force CLONE_PTRACE on this clone.  */
+# define CLONE_CHILD_SETTID 0x01000000 /* Store TID in userlevel buffer in
+					  the child.  */
+# define CLONE_NEWCGROUP    0x02000000	/* New cgroup namespace.  */
+# define CLONE_NEWUTS	0x04000000	/* New utsname group.  */
+# define CLONE_NEWIPC	0x08000000	/* New ipcs.  */
+# define CLONE_NEWUSER	0x10000000	/* New user namespace.  */
+# define CLONE_NEWPID	0x20000000	/* New pid namespace.  */
+# define CLONE_NEWNET	0x40000000	/* New network namespace.  */
+# define CLONE_IO	0x80000000	/* Clone I/O context.  */
+
+struct clone_args {
+    u64 flags;        /* Flags bit mask */
+    u64 pidfd;        /* Where to store PID file descriptor
+                         (int *) */
+    u64 child_tid;    /* Where to store child TID,
+                         in child's memory (pid_t *) */
+    u64 parent_tid;   /* Where to store child TID,
+                         in parent's memory (pid_t *) */
+    u64 exit_signal;  /* Signal to deliver to parent on
+                         child termination */
+    u64 stack;        /* Pointer to lowest byte of stack */
+    u64 stack_size;   /* Size of stack */
+    u64 tls;          /* Location of new TLS */
+    u64 set_tid;      /* Pointer to a pid_t array
+                         (since Linux 5.5) */
+    u64 set_tid_size; /* Number of elements in set_tid
+                         (since Linux 5.5) */
+    u64 cgroup;       /* File descriptor for target cgroup
+                         of child (since Linux 5.7) */
+};
+
+struct stimeval {
+        long long    tv_sec;         /* seconds */
+        long long    tv_usec;        /* microseconds */
+};
+
+
+struct itimerval {
+    struct stimeval it_interval; /* следующее значение */
+    struct stimeval it_value;    /* текущее значение */
+};
+
+#define ITIMER_REAL             0
+#define ITIMER_VIRTUAL          1
+#define ITIMER_PROF             2
+
 namespace arch {
     namespace x86_64 {
+
+        struct sigset_list {
+            int sig;
+            sigset_t sigset;
+            sigset_list* next;
+        };
         
         typedef struct process {
             std::uint32_t id;
@@ -264,8 +309,25 @@ namespace arch {
 
             locks::spinlock fd_lock;
 
-            void* default_sig_handler;
-            void* sig_handlers[31];
+            itimerval itimer;
+            std::int64_t next_alarm;
+
+            itimerval vitimer;
+            std::int64_t virt_timer;
+
+            itimerval proftimer;
+            std::int64_t prof_timer;
+
+            sigset_t current_sigset;
+            sigset_t temp_sigset;
+            int is_restore_sigset;
+
+            void* sig_handlers[36];
+            void* ret_handlers[36];
+            int sig_flags[36];
+
+            sigset_list* sigset_list_obj;
+            stack_t altstack;
 
             std::uint8_t is_sig_real;
             std::uint32_t alloc_fd;
@@ -281,6 +343,8 @@ namespace arch {
             userspace_fd_t* fd_pool;
             vfs::passingfd_manager* pass_fd;
             signalmanager* sig;
+
+            sigtrace* sigtrace_obj;
 
             int is_cloexec;
 
@@ -303,6 +367,8 @@ namespace arch {
             int is_cloned;
             std::uint64_t* original_cr3_pointer;
 
+            std::uint64_t time_start;
+
             std::uint64_t futex;
             std::uint64_t syscall_stack;
             std::uint64_t user_stack;
@@ -310,8 +376,12 @@ namespace arch {
             std::uint64_t create_timestamp;
             std::uint64_t exit_timestamp;
 
-            std::uint32_t parent_id;
+            std::uint64_t thread_group; // just parent pid
 
+            std::uint32_t parent_id;
+            std::uint32_t exit_signal;
+
+            int* tidptr;
             int uid;
 
             int debug0;
@@ -322,6 +392,34 @@ namespace arch {
             struct process* next;
 
         } process_t;
+
+        inline void update_time(itimerval* itimer, std::int64_t* output, int is_tsc) {
+            if(itimer->it_value.tv_sec != 0 || itimer->it_value.tv_usec != 0) {
+                *output = (itimer->it_value.tv_usec) + (itimer->it_value.tv_sec * (1000*1000)) + (is_tsc ? drivers::tsc::currentus() : 0);
+            } else if(itimer->it_interval.tv_sec != 0 || itimer->it_interval.tv_usec != 0) {
+                *output = (itimer->it_interval.tv_usec) + (itimer->it_interval.tv_sec * (1000*1000)) + (is_tsc ? drivers::tsc::currentus() : 0);
+            }
+        }
+
+        inline sigset_t* get_sigset_from_list(process_t* proc, int sig) {
+            sigset_list* current = proc->sigset_list_obj;
+            while(current) {
+                if(current->sig == sig)
+                    return &current->sigset;
+                current = current->next;
+            }
+            return 0;
+        }
+
+        inline void free_sigset_from_list(process_t* proc) {
+            sigset_list* current = proc->sigset_list_obj;
+            while(current) {
+                sigset_list* next = current->next;
+                memory::pmm::_virtual::free((void*)current);
+                current = next;
+            }
+            proc->sigset_list_obj = 0;
+        } 
 
 static_assert(sizeof(process_t) < 4096,"process_t is bigger than page size");
 
@@ -337,13 +435,17 @@ static_assert(sizeof(process_t) < 4096,"process_t is bigger than page size");
             static process_t* create();
             static process_t* fork(process_t* proc,int_frame_t* ctx);
             static process_t* clone(process_t* proc,int_frame_t* ctx);
+            static process_t* clone3(process_t* proc, clone_args* clarg, int_frame_t* ctx);
             static process_t* by_pid(int pid);
+            static void create_kernel_thread(void (*func)(void*),void* arg);
             static void kill(process_t* proc);
             static void wakeup(process_t* proc);
-            static int futexwake(process_t* proc, int* lock);
+            static int futexwake(process_t* proc, int* lock, int num_to_wake);
             static void futexwait(process_t* proc, int* lock, int val, int* original_lock, std::uint64_t ts);
             static int loadelf(process_t* proc,char* path,char** argv,char** envp,int free_mem);
             static process_t* head_proc_();
+
+            static void sigreturn(process_t* proc);
 
         };
     }

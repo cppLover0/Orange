@@ -27,16 +27,26 @@ int __snprintf(char *buffer, size_t bufsz, char const *fmt, va_list vlist) {
 }
 
 Log LogObject;
-uint32_t default_fg = 0xEEEEEEEE;
+uint32_t default_fg = 0xFFFFFFFF;
 uint32_t default_fg_bright = 0xFFFFFFFF;
 
 locks::spinlock log_lock;
+#include <etc/font.hpp>
+
+extern "C" void* __flanterm_malloc(size_t size) {
+    return malloc(size);
+}
+
+extern "C" void __flanterm_free(void* ptr,size_t size) {
+    free(ptr);
+}
+
 
 void Log::Init() {
     struct limine_framebuffer* fb0 = BootloaderInfo::AccessFramebuffer();
     struct flanterm_context *ft_ctx = flanterm_fb_init(
-        NULL,
-        NULL,
+        __flanterm_malloc,
+        __flanterm_free,
         (uint32_t*)fb0->address, fb0->width, fb0->height, fb0->pitch,
         fb0->red_mask_size, fb0->red_mask_shift,
         fb0->green_mask_size, fb0->green_mask_shift,
@@ -45,9 +55,8 @@ void Log::Init() {
         NULL, NULL,
         NULL, &default_fg,
         NULL, &default_fg_bright,
-        NULL, 0, 0, 1,
-        1, 1,
-        0
+        (void*)unifont_arr, FONT_WIDTH, FONT_HEIGHT, 0,
+        1, 1, 0
     );
     LogObject.Setup(ft_ctx);
     
@@ -67,8 +76,12 @@ int __printfbuf(char* buffer, size_t bufsf, char const* fmt, ...) {
     va_end(val);
 }
 
+void Log::RawDisp(char* buffer, int len) {
+    LogObject.Write(buffer,len);
+}
+
 void Log::SerialDisplay(int level,char* msg,...) {
-    //log_lock.lock();
+    log_lock.lock();
     va_list val;
     va_start(val, msg);
     char buffer[512];
@@ -80,7 +93,7 @@ void Log::SerialDisplay(int level,char* msg,...) {
     int len = __snprintf(buffer,512,msg,val);
     serial.write((uint8_t*)buffer,len);
     va_end(val);
-    //log_lock.unlock();
+    log_lock.unlock();
 }
 
 void Log::Display(int level,char* msg,...) {
@@ -102,6 +115,17 @@ void Log::Display(int level,char* msg,...) {
     va_end(val);
 }
 
+winsizez Log::GetDimensions() {
+    struct winsizez buf;
+
+    size_t cols = 0;
+    size_t rows = 0;
+    flanterm_get_dimensions(LogObject.ft_ctx0,&cols,&rows);
+    buf.ws_col = cols;
+    buf.ws_row = rows;
+    return buf;
+}
+
 void Log::Raw(char* msg,...) {
     va_list val;
     va_start(val, msg);
@@ -109,7 +133,7 @@ void Log::Raw(char* msg,...) {
     memset(buffer,0,4096);
     log_lock.lock();
     int len = __snprintf(buffer,4096,msg,val);
-    //LogObject.Write(buffer,len);
+    LogObject.Write(buffer,len);
 
     drivers::serial serial(DEFAULT_SERIAL_PORT);
 

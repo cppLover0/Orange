@@ -101,7 +101,7 @@ diff -Naur doomgeneric/doomgeneric/doomgeneric_orange.c doomgeneric-patched/doom
 +
 +uint32_t DG_GetTicksMs() {
 +    struct timespec ts;
-+    clock_gettime(0,&ts);
++    clock_gettime(1,&ts);
 +    long ms = (ts.tv_nsec / 1000) / 1000;
 +    return ms + (ts.tv_sec * 1000);
 +    // hello
@@ -221,7 +221,7 @@ diff -Naur doomgeneric/doomgeneric/Makefile doomgeneric-patched/doomgeneric/Make
  
 -CC=clang  # gcc or g++
 -CFLAGS+=-ggdb3 -Os
-+CC=x86_64-orange-mlibc-gcc  # gcc or g++
++CC=x86_64-linux-gnu-gcc  # gcc or g++
 +CFLAGS+=-ggdb3 -Os -std=gnu17
  LDFLAGS+=-Wl,--gc-sections
  CFLAGS+=-ggdb3 -Wall -DNORMALUNIX -DLINUX -DSNDSERV -D_DEFAULT_SOURCE # -DUSEASM
