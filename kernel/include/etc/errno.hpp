@@ -150,6 +150,7 @@
 #define SIGCHLD   17
 #define SIGCONT   18
 #define SIGSTOP   19
+#define SIGABRT 6
 #define SIGTSTP   20
 #define SIGTTIN   21
 #define SIGTTOU   22

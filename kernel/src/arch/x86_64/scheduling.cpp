@@ -92,6 +92,10 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
     std::uint64_t elf_base = UINT64_MAX;
     std::uint64_t size = 0;
     std::uint64_t phdr = 0;
+
+    std::uint64_t highest_addr = 0;
+    char interp_path[2048];
+
     char ELF[4] = {0x7F,'E','L','F'};
     if(strncmp((const char*)head->e_ident,ELF,4)) {
         return {0,0,0,0,0,ENOENT};
@@ -108,6 +112,7 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
             current_head = (elfprogramheader_t*)((uint64_t)base + head->e_phoff + head->e_phentsize*i);
             if (current_head->p_type == PT_LOAD) {
                 elf_base = MIN2(elf_base, ALIGNDOWN(current_head->p_vaddr, PAGE_SIZE));
+                highest_addr = MAX2(highest_addr, ALIGNUP(current_head->p_vaddr + current_head->p_memsz, PAGE_SIZE));
             }
         }
     }
@@ -122,30 +127,32 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
         } 
 
         if (current_head->p_type == PT_LOAD) {
-            if(head->e_type != ET_DYN) {
-                start = ALIGNDOWN(current_head->p_vaddr, PAGE_SIZE);
-                end = ALIGNUP(current_head->p_vaddr + current_head->p_memsz, PAGE_SIZE);
-                size = MAX2(size, end - elf_base);
-            } else {
-                end = current_head->p_vaddr - elf_base + current_head->p_memsz;
-                size = MAX2(size, end);
-            }
+            end = current_head->p_vaddr - elf_base + current_head->p_memsz;
+            size = MAX2(size, end);
         }
     }
 
     void* elf_vmm;
 
+    DEBUG(1,"proc cr3 0x%p",proc->original_cr3);
+
+    size = ALIGNPAGEUP(size);
+
     if(head->e_type != ET_DYN) {
-        elf_vmm = memory::vmm::customalloc(proc, elf_base, size, PTE_PRESENT | PTE_RW | PTE_USER, 0, 0);
+        assert(!(memory::vmm::getlen(proc,elf_base)),"memory 0x%p is not avaiable !",elf_base);
+        elf_vmm = memory::vmm::customalloc(proc, elf_base , size, PTE_PRESENT | PTE_RW | PTE_USER, 0,1);
+        assert((std::uint64_t)elf_vmm == elf_base,"0x%p is not equal 0x%p",elf_vmm,elf_base);
+        elfload.base = (uint64_t)elf_base;
     } else {
         elf_vmm = memory::vmm::alloc(proc, size, PTE_PRESENT | PTE_RW | PTE_USER, 0);
+        elfload.base = (uint64_t)elf_vmm;
     }
 
-    elfload.base = (uint64_t)elf_vmm;
+    memory::vmm::invmapping(proc,(std::uint64_t)elf_vmm,size);
 
-    uint8_t* allocated_elf = (uint8_t*)memory::vmm::get(proc,(uint64_t)elf_vmm)->phys;
-    uint64_t phys_elf = (uint64_t)allocated_elf;
-    allocated_elf = (uint8_t*)Other::toVirt((uint64_t)allocated_elf);
+    uint8_t* allocated_elf = (uint8_t*)elf_vmm;
+
+    memory::paging::enablepaging(proc->original_cr3);
 
     for(int i = 0;i < head->e_phnum; i++) {
         uint64_t dest = 0;
@@ -153,7 +160,8 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
         
         if(current_head->p_type == PT_LOAD) {
             if(head->e_type != ET_DYN) {
-                dest = (uint64_t)allocated_elf + (current_head->p_vaddr - elf_base);
+                dest = ((current_head->p_vaddr) - elf_base) + (std::uint64_t)allocated_elf;
+                DEBUG(1,"load seg 0x%p to 0x%p (0x%p)",current_head->p_vaddr,current_head->p_vaddr + current_head->p_memsz,current_head->p_vaddr + current_head->p_filesz);
             } else {
                 dest = (uint64_t)allocated_elf + current_head->p_vaddr;
             }
@@ -168,13 +176,16 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
 
             memcpy(fd.path, (char*)((uint64_t)base + current_head->p_offset), strlen((char*)((uint64_t)base + current_head->p_offset)));
             int status = vfs::vfs::stat(&fd, &stat);
-            if(status) {
+            if(status) { memory::paging::enablekernel();
+                DEBUG(1,"unknown interp path %s (ENOENT)",(char*)((uint64_t)base + current_head->p_offset));
                 return {0,0,0,0,0,ENOENT};
             }
 
             char* inter = (char*)memory::pmm::_virtual::alloc(stat.st_size);
             vfs::vfs::read(&fd, inter, stat.st_size);
+            memory::paging::enablekernel();
             elfloadresult_t interpload = __scheduling_load_elf(proc, (std::uint8_t*)inter);
+            memory::paging::enablepaging(proc->original_cr3);
             memory::pmm::_virtual::free(inter);
 
             elfload.interp_base = interpload.base;
@@ -195,7 +206,106 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
         elfload.real_entry = (uint64_t)elf_vmm + head->e_entry;
     }
 
+    uint64_t strtab_offset = 0;
+    uint64_t strtab_addr = 0;
+    uint64_t strtab_size = 0;
+
+    elfprogramheader_t* phdrz =0;
+
+    if(head->e_type != ET_DYN) {
+        phdrz = (elfprogramheader_t*)(phdr); 
+    } else 
+        phdrz = (elfprogramheader_t*)((phdr));  
+    elfprogramheader_t* dynamic_phdr = NULL;
+
+    if(phdrz) {
+        for (int i = 0; i < head->e_phnum; i++) {
+            DEBUG(1,"phdr type %d",phdrz[i].p_type);
+            if (phdrz[i].p_type == PT_DYNAMIC) {
+                dynamic_phdr = &phdrz[i];
+                break;
+            }
+        }
+    }
+
+    if (dynamic_phdr == NULL) {
+        DEBUG(1, "DYNAMIC segment not found");
+        //goto end;
+    } else {
+        Elf64_Dyn* dyn;
+        if(head->e_type != ET_DYN) 
+            dyn = (Elf64_Dyn *)((char *)allocated_elf + (dynamic_phdr->p_vaddr - elf_base));
+        else
+            dyn = (Elf64_Dyn *)((char *)allocated_elf + (dynamic_phdr->p_vaddr));
+        uint64_t dyn_size = dynamic_phdr->p_filesz / sizeof(Elf64_Dyn);
+
+        for (uint64_t i = 0; i < dyn_size; i++) {
+            if (dyn[i].d_tag == DT_NULL) {
+                break;
+            }
+            
+            if (dyn[i].d_tag == DT_STRTAB) {
+                strtab_addr = dyn[i].d_un.d_ptr;
+            } else if (dyn[i].d_tag == DT_STRSZ) {
+                strtab_size = dyn[i].d_un.d_val;
+            }
+        }
+
+        if (strtab_addr == 0) {
+            DEBUG(1, ".dynstr string table not found");
+            //goto end;
+        }
+
+        for (int i = 0; i < head->e_phnum; i++) {
+            if (phdrz[i].p_type == PT_LOAD) {
+                uint64_t vaddr = phdrz[i].p_vaddr;
+                uint64_t memsz = phdrz[i].p_memsz;
+                uint64_t offset = phdrz[i].p_offset;
+                
+                if (strtab_addr >= vaddr && strtab_addr < vaddr + memsz) {
+                    strtab_offset = offset + (strtab_addr - vaddr);
+                    break;
+                }
+            }
+        }
+
+        if (strtab_offset == 0) {
+            DEBUG(1, "Could not find string table offset in file");
+            //goto end;
+        }
+
+        char *strtab = (char *)allocated_elf + strtab_offset;
+        int dep_count = 0;
+
+        DEBUG(1, "proc %d libraries", proc->id);
+
+        // Теперь ищем зависимости
+        for (uint64_t i = 0; i < dyn_size; i++) {
+            if (dyn[i].d_tag == DT_NULL) {
+                break;
+            }
+            
+            if (dyn[i].d_tag == DT_NEEDED) {
+                uint64_t str_offset = dyn[i].d_un.d_val;
+                
+                if (str_offset < strtab_size) {
+                    DEBUG(1, "  %s", strtab + str_offset);
+                    dep_count++;
+                } else {
+                    DEBUG(1, "  [Error: string offset out of bounds]");
+                }
+            }
+        }
+
+        if (dep_count == 0) {
+            DEBUG(1, "  (no dependencies found)");
+        }
+    }
+
+end:
+    elfload.base = (std::uint64_t)elf_vmm;
     elfload.status = 0;
+    memory::paging::enablekernel();
     return elfload;
 }
 
@@ -230,9 +340,12 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
         return elfload.status;
 
     proc->ctx.rsp = (std::uint64_t)memory::vmm::alloc(proc,USERSPACE_STACK_SIZE,PTE_PRESENT | PTE_USER | PTE_RW,0) + USERSPACE_STACK_SIZE - 4096;
+
+    memory::vmm::invmapping(proc,proc->ctx.rsp - (4096 * 10),4096 * 10);
     std::uint64_t* _stack = (std::uint64_t*)proc->ctx.rsp;
 
     std::uint64_t random_data_aux = (std::uint64_t)memory::vmm::alloc(proc,4096,PTE_PRESENT | PTE_USER | PTE_RW,0);
+    memory::vmm::invmapping(proc,random_data_aux,4096);
 
     std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ,0,AT_SECURE,random_data_aux,AT_RANDOM,4096,51,elfload.interp_base,AT_BASE};
     std::uint64_t argv_length = __elf_get_length(argv);
@@ -279,8 +392,6 @@ int arch::x86_64::scheduling::loadelf(process_t* proc,char* path,char** argv,cha
     memory::heap::free(stack_argv);
     memory::heap::free(stack_envp);
 
-    memory::vmm::reload(proc);
-
     return 0;
 }
 
@@ -317,6 +428,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone3(process_t* proc, clone
         start->pthread_count++;
         start->lock.unlock();
 
+
     } else {
         memory::vmm::clone(nproc,proc);
     }
@@ -348,17 +460,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone3(process_t* proc, clone
         nproc->ctx.rsp = clarg->stack;
     }
 
-    sigset_list* sigsetlist = proc->sigset_list_obj;
-    while(sigsetlist) {
-        sigset_list* newsigsetlist = (sigset_list*)memory::pmm::_virtual::alloc(sizeof(sigset_list));
-        memcpy(&newsigsetlist->sigset,&sigsetlist->sigset,sizeof(sigset_t));
-        newsigsetlist->sig = sigsetlist->sig;
-
-        newsigsetlist->next = nproc->sigset_list_obj;
-        nproc->sigset_list_obj = newsigsetlist;
-
-        sigsetlist = sigsetlist->next;
-    }
+    memcpy(nproc->sigsets,proc->sigsets,sizeof(proc->sigsets));
 
     memcpy(&nproc->current_sigset,&proc->current_sigset,sizeof(proc->current_sigset));
     memcpy(nproc->ret_handlers,proc->ret_handlers,sizeof(proc->ret_handlers));
@@ -409,18 +511,6 @@ arch::x86_64::process_t* arch::x86_64::scheduling::clone(process_t* proc,int_fra
     nproc->reversedforid = *proc->vmm_id;
     nproc->vmm_id = &nproc->reversedforid;
 
-    sigset_list* sigsetlist = proc->sigset_list_obj;
-    while(sigsetlist) {
-        sigset_list* newsigsetlist = (sigset_list*)memory::pmm::_virtual::alloc(sizeof(sigset_list));
-        memcpy(&newsigsetlist->sigset,&sigsetlist->sigset,sizeof(sigset_t));
-        newsigsetlist->sig = sigsetlist->sig;
-
-        newsigsetlist->next = nproc->sigset_list_obj;
-        nproc->sigset_list_obj = newsigsetlist;
-
-        sigsetlist = sigsetlist->next;
-    }
-
     memcpy(&nproc->current_sigset,&proc->current_sigset,sizeof(proc->current_sigset));
     memcpy(nproc->ret_handlers,proc->ret_handlers,sizeof(proc->ret_handlers));
     memcpy(nproc->sig_handlers,proc->sig_handlers,sizeof(proc->sig_handlers));
@@ -470,19 +560,7 @@ arch::x86_64::process_t* arch::x86_64::scheduling::fork(process_t* proc,int_fram
     nproc->fs_base = proc->fs_base;
     nproc->uid = proc->uid;
 
-    
-
-    sigset_list* sigsetlist = proc->sigset_list_obj;
-    while(sigsetlist) {
-        sigset_list* newsigsetlist = (sigset_list*)memory::pmm::_virtual::alloc(sizeof(sigset_list));
-        memcpy(&newsigsetlist->sigset,&sigsetlist->sigset,sizeof(sigset_t));
-        newsigsetlist->sig = sigsetlist->sig;
-
-        newsigsetlist->next = nproc->sigset_list_obj;
-        nproc->sigset_list_obj = newsigsetlist;
-
-        sigsetlist = sigsetlist->next;
-    }
+    memcpy(nproc->sigsets,proc->sigsets,sizeof(proc->sigsets));
 
     memcpy(&nproc->current_sigset,&proc->current_sigset,sizeof(proc->current_sigset));
     memcpy(nproc->ret_handlers,proc->ret_handlers,sizeof(proc->ret_handlers));
@@ -510,6 +588,7 @@ void arch::x86_64::scheduling::kill(process_t* proc) {
     proc->kill_lock.nowaitlock();
     proc->lock.nowaitlock();
     proc->status = PROCESS_STATE_ZOMBIE;
+    proc->is_execd = 1;
     proc->exit_timestamp = time::counter();
     free_sigset_from_list(proc);
     delete proc->pass_fd;
@@ -589,7 +668,7 @@ int arch::x86_64::scheduling::futexwake(process_t* proc, int* lock, int num_to_w
     process_t* proc0 = head_proc;
     futex_lock.lock();
     int nums = 0;
-    while(proc0 && num_to_wake != 0) {
+    while(proc0) {
         // if process vmm is same then they are connected
         if(((proc->vmm_start == proc0->vmm_start)) && proc0->futex == (std::uint64_t)lock) {
             proc0->futex = 0;
@@ -776,6 +855,7 @@ scheduleagain:
                                             char* vm_start = current->vmm_start;
                                             arch::x86_64::process_t* currentz = arch::x86_64::scheduling::head_proc_();
                                             memory::paging::enablekernel();
+                                            DEBUG(1,"sig kill %d",new_sig.sig);
                                             while(currentz) {
                                                 if(currentz->vmm_start == vm_start) {
                                                     currentz->exit_code = status;
@@ -811,21 +891,21 @@ scheduleagain:
                                     mcontext_t temp_mctx = {0};
                                     int_frame_to_mcontext(&current->ctx,&temp_mctx);
 
-                                    ucontext_t temp_uctx = {0};
-                                    memcpy(&temp_uctx.uc_mcontext,&temp_mctx,sizeof(mcontext_t));
-                                    temp_uctx.uc_sigmask = current->current_sigset;
-                                    temp_uctx.uc_stack.ss_size = USERSPACE_STACK_SIZE;
-                                    temp_uctx.uc_stack.ss_flags = 0;
-                                    temp_uctx.uc_stack.ss_sp = (void*)temp_mctx.gregs[REG_RSP];
-                                    temp_uctx.uc_link = 0;
-
                                     memory::paging::enablepaging(current->original_cr3);
 
-                                    std::uint64_t* new_stack = (std::uint64_t*)(current->altstack.ss_sp == 0 ? current->ctx.rsp - 8 : (std::uint64_t)current->altstack.ss_sp);
-                                    
-                                    new_stack = (std::uint64_t*)__stack_memcpy((std::uint64_t)new_stack,&temp_uctx,sizeof(ucontext_t));
+                                    std::uint64_t* new_stack = 0;
 
-                                    new_sigtrace.uctx = (ucontext_t*)new_stack;
+                                    if(!current->sigtrace_obj) {
+                                        new_stack = (std::uint64_t*)(current->altstack.ss_sp == 0 ? current->ctx.rsp - 8 : (std::uint64_t)current->altstack.ss_sp);
+                                    } else {
+                                        new_stack = (std::uint64_t*)(current->ctx.rsp - 8);
+                                    }
+
+                                    --new_stack;
+
+                                    new_stack = (std::uint64_t*)__stack_memcpy((std::uint64_t)new_stack,&temp_mctx,sizeof(mcontext_t));
+
+                                    new_sigtrace.mctx = (mcontext_t*)new_stack;
                                     --new_stack;
 
                                     siginfo_t siginfo;
@@ -837,6 +917,8 @@ scheduleagain:
                                     --new_stack;
 
                                     new_sigtrace.next = current->sigtrace_obj;
+
+                                    new_sigtrace.sigset = current->current_sigset;
 
                                     new_stack = (std::uint64_t*)__stack_memcpy((std::uint64_t)new_stack,&new_sigtrace,sizeof(sigtrace));
 
@@ -852,9 +934,9 @@ scheduleagain:
 
                                     // now setup new registers and stack
 
-                                    current->ctx.rdi = (std::uint64_t)current->sig_handlers[new_sig.sig];
-                                    current->ctx.rsi = (std::uint64_t)siginfoz;
-                                    current->ctx.rdx = (std::uint64_t)new_sigtrace.uctx;
+                                    current->ctx.rdi = new_sig.sig;
+                                    current->ctx.rsi = 0;
+                                    current->ctx.rdx = 0;
                                     current->ctx.rsp = (std::uint64_t)new_stack;
                                     current->ctx.rip = (std::uint64_t)current->sig_handlers[new_sig.sig];
                                     current->ctx.cs = 0x20 | 3;
@@ -999,8 +1081,8 @@ void arch::x86_64::scheduling::sigreturn(process_t* proc) { // pop values from s
     memory::paging::enablepaging(proc->original_cr3);
     if(!st)
         return;
-    mcontext_t* mctx = &st->uctx->uc_mcontext;
-    proc->current_sigset = st->uctx->uc_sigmask;
+    mcontext_t* mctx = st->mctx;
+    proc->current_sigset = st->sigset;
     mcontext_to_int_frame(mctx,&proc->ctx);
     proc->ctx.cr3 = proc->original_cr3;
     proc->ctx.cs = 0x20 | 3;
@@ -1008,6 +1090,7 @@ void arch::x86_64::scheduling::sigreturn(process_t* proc) { // pop values from s
     proc->ctx.rflags |= (1 << 9);
     memcpy(proc->sse_ctx,st->fpu_state,arch::x86_64::cpu::sse::size());
     proc->sigtrace_obj = st->next;
+    //DEBUG(1,"returning from sig to rip 0x%p, proc %d",proc->ctx.rip,proc->id);
     memory::paging::enablekernel();
 
     if(proc->ctx.cs != 0x08)

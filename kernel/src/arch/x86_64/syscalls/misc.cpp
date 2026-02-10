@@ -107,7 +107,7 @@ long long sys_uname(old_utsname* uname) {
 
     memset(uname,0,sizeof(old_utsname));
 
-    memcpy(uname->sysname,"Linux",sizeof("Linux"));
+    memcpy(uname->sysname,"Orange",sizeof("Orange"));
     memcpy(uname->nodename,"orange-pc",sizeof("orange-pc"));
     memcpy(uname->machine,"x86_64",sizeof("x86_64"));
 

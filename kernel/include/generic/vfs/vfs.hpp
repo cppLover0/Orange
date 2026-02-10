@@ -1083,6 +1083,8 @@ namespace vfs {
         std::int32_t (*readlink) (char* path, char* out, std::uint32_t out_len);
         std::int32_t (*rename) (char* path, char* new_path);
 
+        std::int32_t (*unlink) (userspace_fd_t* fd, char* path);
+
         void (*opt_create_and_write)(char* path, int type, char* content, std::uint64_t content_len, int chmod);
 
         void (*close)(userspace_fd_t* fd, char* path);
@@ -1127,6 +1129,8 @@ namespace vfs {
 
         static std::int32_t statx(userspace_fd_t* fd, int flags, int mask, statx_t* out);
         static std::int32_t extern_readlink(char* path, char* out, std::uint32_t out_len);
+
+        static std::int32_t unlink(userspace_fd_t* fd);
 
         static void opt_create_and_write(char* path, int type, char* content, std::uint64_t content_len, int chmod);
 

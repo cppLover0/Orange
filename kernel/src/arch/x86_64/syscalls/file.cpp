@@ -146,7 +146,7 @@ long long sys_openat(int dirfd, const char* path, int flags, int_frame_t* ctx) {
 
     if(status != 0) {
         new_fd_s->state = USERSPACE_FD_STATE_UNUSED;
-        DEBUG(1,"Failed to open %s (%d:%s + %s) from proc %d, is_creat %d, is_trunc %d, flags %d (%s)",result,dirfd,first_path,path,proc->id,flags & O_CREAT,flags & O_TRUNC,flags,proc->name);
+        DEBUG(proc->is_debug,"Failed to open %s (%d:%s + %s) from proc %d, is_creat %d, is_trunc %d, flags %d (%s)",result,dirfd,first_path,path,proc->id,flags & O_CREAT,flags & O_TRUNC,flags,proc->name);
         return -status;
     }
 
@@ -435,6 +435,8 @@ long long sys_lseek(int fd, long offset, int whence) {
     
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
+    DEBUG(proc->is_debug,"lseek fd %d offset %lli, whence %d",fd,offset,whence);
+
     if(!fd_s) 
         return -EBADF;
 
@@ -513,6 +515,9 @@ long long sys_fstat(int fd, void* out) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
     userspace_fd_t* fd_s = vfs::fdmanager::search(proc,fd);
 
+    assert(sizeof(vfs::stat_t) == 144,"omg");
+
+    SYSCALL_IS_SAFEZ(out,4096);
     memset(out,0,sizeof(vfs::stat_t));
 
     if(!fd_s)
@@ -1877,6 +1882,40 @@ long long sys_mkdirat(int dirfd, char* path, int mode) {
 
     vfs::vfs::var(&fd,mode,TMPFS_VAR_CHMOD | (1 << 7));
     return ret;
+}
+
+long long sys_unlink(char* path) {
+    return sys_unlinkat(AT_FDCWD,path,0);
+}
+
+long long sys_unlinkat(int dirfd, const char* path, int flags) {
+    SYSCALL_IS_SAFEZ((void*)path,4096);
+    if(!path)
+        return -EINVAL;
+
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+
+    char first_path[2048];
+    memset(first_path,0,2048);
+    if(dirfd >= 0)
+        memcpy(first_path,vfs::fdmanager::search(proc,dirfd)->path,strlen(vfs::fdmanager::search(proc,dirfd)->path));
+    else if(dirfd == AT_FDCWD && proc->cwd)
+        memcpy(first_path,proc->cwd,strlen(proc->cwd));
+
+    char kpath[2048];
+    memset(kpath,0,2048);
+    copy_in_userspace_string(proc,kpath,(void*)path,2048);
+
+    char result[2048];
+    memset(result,0,2048);
+    vfs::resolve_path(kpath,first_path,result,1,0);
+
+    userspace_fd_t fd;
+    fd.is_cached_path = 0;
+    memset(&fd,0,sizeof(fd));
+    memcpy(fd.path,result,2048);
+
+    return vfs::vfs::unlink(&fd);
 }
 
 long long sys_chmod(char* path, int mode) {

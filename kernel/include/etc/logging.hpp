@@ -55,6 +55,8 @@ void panic_wrap(const char* msg, ...);
 
 #define assert(cond, msg,...) if(!(cond)) panic_wrap("Failed assert at %s:%s:%d \"" msg "\"\n" , __FILE__ ,__FUNCTION__, __LINE__ , ##__VA_ARGS__)
 
+#define printf(fmt,...) if(1) Log::Raw(fmt, ##__VA_ARGS__)
+
 #define dmesg(fmt,...) if(1) dmesg0("[%llu] %s: " fmt "\n", drivers::tsc::currentus() ,__FUNCTION__, ##__VA_ARGS__)
 #define BREAKPOINT() Log::Display(LEVEL_MESSAGE_INFO,"breakpoint %s:%d\n ",__FILE__,__LINE__)
 

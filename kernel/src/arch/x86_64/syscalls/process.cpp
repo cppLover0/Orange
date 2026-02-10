@@ -58,6 +58,8 @@ long long sys_exit_group(int status) {
     while(current) {
         if(proc->id == current->id) {
             current->exit_code = 0;
+            current->is_execd = 1;
+
             DEBUG(proc->is_debug,"sh %d",current->id);
             arch::x86_64::scheduling::kill(current);
             
@@ -121,6 +123,8 @@ long long sys_exit(int status) {
 
     vfs::fdmanager* fd = (vfs::fdmanager*)proc->fd;
     fd->free();
+
+    proc->is_execd = 1;
 
     memory::pmm::_virtual::free(proc->cwd);
     memory::pmm::_virtual::free(proc->name);
@@ -202,9 +206,6 @@ long long sys_prlimit64(int pid, int res, rlimit64* new_rlimit, int_frame_t* ctx
 
 long long sys_mmap(std::uint64_t hint, std::uint64_t size, unsigned long prot, int_frame_t* ctx) {
 
-    SYSCALL_DISABLE_PREEMPT(); // ensure interrupts disabled
-    mmap_lock.lock();
-
     std::uint64_t flags = ctx->r10;
     int fd0 = ctx->r8;
     std::uint64_t off = ctx->r9;
@@ -213,7 +214,7 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t size, unsigned long prot, i
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
     
-    DEBUG(proc->is_debug,"trying to mmap 0x%p-0x%p sz %lli, prot %lli, flags %lli fd %d off %lli from proc %d",hint,hint + size,size,prot,flags,fd0,off,proc->id);
+    DEBUG(proc->is_debug,"trying to mmap 0x%p-0x%p sz %lli, prot %lli, flags %lli fd %d off %lli from proc %d, is fixed %d",hint,hint + size,size,prot,flags,fd0,off,proc->id,flags & MAP_FIXED);
     
     if(flags & MAP_ANONYMOUS) {
 
@@ -228,11 +229,10 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t size, unsigned long prot, i
         if(!new_hint) {
             new_hint = (std::uint64_t)memory::vmm::lazy_alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
         } else 
-            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,0,0);
+            memory::vmm::customalloc(proc,new_hint,size,PTE_PRESENT | PTE_RW | PTE_USER,0,flags & MAP_FIXED);
 
-        memory::paging::enablepaging(ctx->cr3); // try to reset tlb
+        memory::vmm::invtlb(proc,new_hint,size);
 
-        mmap_lock.unlock();
         DEBUG(proc->is_debug,"return 0x%p",new_hint);
         return (std::int64_t)new_hint;
     } else {
@@ -241,7 +241,7 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t size, unsigned long prot, i
         std::uint64_t mmap_size = 0;
         std::uint64_t mmap_flags = 0;
         userspace_fd_t* fd = vfs::fdmanager::search(proc,fd0);
-        if(!fd) { mmap_lock.unlock();
+        if(!fd) { 
             return -EBADF; }
 
         int status = vfs::vfs::mmap(fd,&mmap_base,&mmap_size,&mmap_flags);
@@ -254,41 +254,44 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t size, unsigned long prot, i
             vfs::stat_t stat;
             std::int32_t stat_status = vfs::vfs::stat(fd,&stat);
 
-            if(!(stat.st_mode & S_IFREG)) { mmap_lock.unlock();
+            if(!(stat.st_mode & S_IFREG)) { 
                 return -EFAULT; }
 
             std::uint64_t new_hint_hint;
 
             if(!hint) {
-                new_hint_hint = (std::uint64_t)memory::vmm::alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+                new_hint_hint = (std::uint64_t)memory::vmm::lazy_alloc(proc,size,PTE_PRESENT | PTE_USER | PTE_RW,0);
+                memory::vmm::invmapping(proc,new_hint_hint,size);
             } else {
-                new_hint_hint = (std::uint64_t)memory::vmm::customalloc(proc,hint,size,PTE_PRESENT | PTE_USER | PTE_RW,0,0);
+                new_hint_hint = (std::uint64_t)memory::vmm::customalloc(proc,hint,size,PTE_PRESENT | PTE_USER | PTE_RW,0,flags & MAP_FIXED);
+                memory::vmm::invmapping(proc,new_hint_hint,size);
             }
 
-            vfs::vfs::read(fd,Other::toVirt(memory::vmm::get(proc,new_hint_hint)->phys),size <= 0 ? stat.st_size : size);
+            memory::vmm::invtlb(proc,new_hint_hint,size);
+
+            vfs::vfs::read(fd,(void*)new_hint_hint,size <= 0 ? stat.st_size : size);
             fd->offset = old_offset;
 
-            mmap_lock.unlock();
             DEBUG(proc->is_debug,"returna 0x%p, is_fixed %d",new_hint_hint,flags & 0x100000);
+            
             return (std::int64_t)new_hint_hint;
 
         }
 
-        if(status != 0) { mmap_lock.unlock();
+        if(status != 0) { 
             return -status; }
 
         std::uint64_t new_hint_hint = (std::uint64_t)memory::vmm::map(proc,mmap_base,mmap_size,PTE_PRESENT | PTE_USER | PTE_RW | mmap_flags);
-        memory::paging::enablepaging(ctx->cr3); // try to reset tlb
-        
-        mmap_lock.unlock();
+        memory::vmm::invtlb(proc,new_hint_hint,mmap_size);
+
         return (std::int64_t)new_hint_hint;
     }
 }
 
 long long sys_free(void *pointer, size_t size) {
-
     arch::x86_64::process_t* proc = CURRENT_PROC;
-    memory::vmm::unmap(proc,(std::uint64_t)pointer);
+    memory::vmm::unmap(proc,(std::uint64_t)pointer,size);
+    memory::vmm::invtlb(proc,(std::uint64_t)pointer,size);
     
     return 0;
 }
@@ -476,6 +479,8 @@ long long sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
                 memory::heap::free(argv0);
                 memory::heap::free(envp0);
 
+                proc->is_execd = 1;
+
                 cpdata->temp.temp_ctx = 0;
                 schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
                 __builtin_unreachable();
@@ -539,6 +544,8 @@ long long sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
                     memory::heap::free(argv0);
                     memory::heap::free(envp0);
 
+                    proc->is_execd = 1;
+
                     cpdata->temp.temp_ctx = 0;
                     schedulingScheduleAndChangeStack(arch::x86_64::cpu::data()->timer_ist_stack,0);
                     __builtin_unreachable();
@@ -563,6 +570,7 @@ long long sys_exec(char* path, char** argv, char** envp, int_frame_t* ctx) {
     memory::heap::free(envp0);
 
     proc->exit_code = -1;
+    proc->is_execd = 1;
 
     cpdata->temp.temp_ctx = 0;
     arch::x86_64::scheduling::kill(proc);
@@ -779,8 +787,16 @@ long long sys_clone3(clone_args* clargs, size_t size, int c, int_frame_t* ctx) {
 
     arch::x86_64::scheduling::wakeup(new_proc);
 
-    DEBUG(proc->is_debug,"clone3 from proc %d, new proc %d (new syscall_stack: 0x%p)",proc->id,new_proc->id,new_proc->syscall_stack);
+    DEBUG(proc->is_debug,"clone3 from proc %d, new proc %d (new syscall_stack: 0x%p) %s, parent tid 0x%p , child tid 0x%p, pidfd 0x%p %s",proc->id,new_proc->id,new_proc->syscall_stack,clargs->flags & CLONE_VM ? "CLONEVM" : "NOCLONEVM",clargs->parent_tid,clargs->child_tid,clargs->pidfd,clargs->flags & CLONE_VFORK ? "VFORK" : "NOVFORK");
     new_proc->is_debug = proc->is_debug;
+
+    if(clargs->flags & CLONE_VFORK) {
+        while(1) {
+            if(new_proc->is_execd == 1)
+                break;
+            yield();
+        }
+    }
 
     return new_proc->id;
 }

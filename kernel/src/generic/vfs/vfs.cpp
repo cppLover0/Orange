@@ -338,7 +338,8 @@ std::int32_t vfs::vfs::create(char* path, std::uint8_t type) {
     if(!node->create) { vfs::vfs::unlock();
         return -ENOSYS; }
 
-    std::int32_t status = node->create(out,type);
+        
+    std::int32_t status = ((std::int32_t (*)(char*,int,long long))node->create)(out,type,0);
     vfs_lock->unlock();
     return status;
 }
@@ -649,6 +650,33 @@ std::int64_t vfs::vfs::ioctl(userspace_fd_t* fd, unsigned long req, void *arg, i
     vfs_lock->unlock();
     return status;
 }
+
+std::int32_t vfs::vfs::unlink(userspace_fd_t* fd) {
+    vfs_lock->lock();
+
+    char out0[2048];
+    memset(out0,0,2048);
+
+    if(!fd->is_cached_path) {
+        __vfs_symlink_resolve(fd->path,out0,0);
+        memcpy(fd->path,out0,strlen(out0));
+        fd->is_cached_path = 1;
+    } else
+        memcpy(out0,fd->path,strlen(fd->path));
+
+    vfs_node_t* node = find_node(out0);
+    if(!node) { vfs::vfs::unlock();
+        return -ENOENT; }
+
+    char* fs_love_name = out0 + strlen(node->path) - 1;
+    if(!node->unlink) { vfs::vfs::unlock();
+        return -ENOTSUP; }
+
+    std::int32_t ret = node->unlink(fd,fs_love_name);
+    vfs_lock->unlock();
+    return ret;
+}
+
 
 void vfs::vfs::close(userspace_fd_t* fd) {
     vfs_lock->lock();

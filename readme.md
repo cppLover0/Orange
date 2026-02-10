@@ -1,6 +1,6 @@
 # Orange
 
-Orange is my posix x86_64 os with microkernel features
+Orange is my x86_64 os with linux binary compat 
 
 [![GitHub top language](https://img.shields.io/github/languages/top/cpplover0/orange?logo=c&label=)](https://github.com/cpplover0/orange/blob/main/kernel/GNUmakefile)
 [![GitHub license](https://img.shields.io/github/license/cpplover0/orange)](https://github.com/cpplover0/orange/blob/master/LICENSE)

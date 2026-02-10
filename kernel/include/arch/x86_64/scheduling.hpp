@@ -206,6 +206,20 @@ extern "C" void schedulingSchedule(int_frame_t* ctx);
 extern "C" void schedulingEnter();
 extern "C" void schedulingEnd(int_frame_t* ctx);
 
+typedef struct {
+    int64_t d_tag;
+    union {
+        uint64_t d_val;
+        uint64_t d_ptr;
+    } d_un;
+} Elf64_Dyn;
+
+#define DT_NULL     0
+#define DT_NEEDED   1
+#define DT_STRTAB   5
+#define DT_SYMTAB   6
+#define DT_STRSZ    10
+
 typedef uint64_t u64;
 
 # define CSIGNAL       0x000000ff /* Signal mask to be sent at exit.  */
@@ -326,7 +340,9 @@ namespace arch {
             void* ret_handlers[36];
             int sig_flags[36];
 
-            sigset_list* sigset_list_obj;
+            std::atomic<int> is_execd;
+
+            sigset_t sigsets[36];
             stack_t altstack;
 
             std::uint8_t is_sig_real;
@@ -389,6 +405,8 @@ namespace arch {
 
             int is_debug;
 
+            int sex_abort;
+
             struct process* next;
 
         } process_t;
@@ -402,23 +420,12 @@ namespace arch {
         }
 
         inline sigset_t* get_sigset_from_list(process_t* proc, int sig) {
-            sigset_list* current = proc->sigset_list_obj;
-            while(current) {
-                if(current->sig == sig)
-                    return &current->sigset;
-                current = current->next;
-            }
+
             return 0;
         }
 
         inline void free_sigset_from_list(process_t* proc) {
-            sigset_list* current = proc->sigset_list_obj;
-            while(current) {
-                sigset_list* next = current->next;
-                memory::pmm::_virtual::free((void*)current);
-                current = next;
-            }
-            proc->sigset_list_obj = 0;
+            return;
         } 
 
 static_assert(sizeof(process_t) < 4096,"process_t is bigger than page size");

@@ -460,6 +460,10 @@ long long sys_setitimer(int which, itimerval* val, itimerval* old);
 long long sys_getitimer(int which, itimerval* val);
 
 long long sys_sigsuspend(sigset_t* sigset, size_t size);
+long long sys_sigaltstack(stack_t* new_stack, stack_t* old);
+
+long long sys_unlink(char* path);
+long long sys_unlinkat(int dirfd, const char* path, int flags);
 
 /* Misc */
 

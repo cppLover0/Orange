@@ -89,13 +89,25 @@ long long sys_kill(int pid, int sig) {
         case SIGTTIN:
         case SIGTTOU:
         case SIGSTOP:
+            if(target_proc->id == proc->id) // shit
+                yield();
             return 0;
         default:
             pending_signal_t pend_sig;
             pend_sig.sig = sig;
             target_proc->sig->push(&pend_sig);
+
+            DEBUG(1,"%d 0x%p",target_proc->id == proc->id,proc->sig_handlers[sig]);
+
+            if(target_proc->id == proc->id) // shit
+                signal_ret();
+
             return 0;
     }
+    
+    if(target_proc->id == proc->id) // shit
+                signal_ret();
+
     return 0;
 }
 
@@ -106,21 +118,22 @@ long long sys_sigaction(int signum, struct sigaction* hnd, struct sigaction* old
 
     DEBUG(proc->is_debug,"sigaction signum %d from proc %d with 0x%p",signum,proc->id,0);
 
+    if(ctx->r10 != sizeof(sigset_t)) {
+        DEBUG(proc->is_debug,"unsupported len %d for sigset sig %d from proc %d (linux dont support this)",ctx->r10,signum,proc->id);
+        return -EINVAL;
+    }
+
     if(signum >= 36)
         return -EINVAL;
 
     void* old_hnd = proc->sig_handlers[signum];
     void* old_rest = proc->ret_handlers[signum];
-    sigset_t* sigset = arch::x86_64::get_sigset_from_list(proc,signum);
-
     if(old) {
         memset(old,0,sizeof(struct sigaction));
         old->sa_handler = (void (*)(int))old_hnd;
         old->sa_restorer = (void (*)())old_rest;
         old->sa_flags = proc->sig_flags[signum];
-        if(sigset) {
-            memcpy(&old->sa_mask,sigset,sizeof(sigset_t));   
-        }
+        memcpy(&old->sa_mask,&proc->sigsets[signum],sizeof(sigset_t));   
     }
 
     if(hnd) {
@@ -128,14 +141,7 @@ long long sys_sigaction(int signum, struct sigaction* hnd, struct sigaction* old
         proc->ret_handlers[signum] = (void*)hnd->sa_restorer;
         proc->sig_handlers[signum] = (void*)hnd->sa_handler;
         proc->sig_flags[signum] = hnd->sa_flags;
-        if(!sigset) {
-            auto siglist = (arch::x86_64::sigset_list*)memory::pmm::_virtual::alloc(sizeof(sigset_t));
-            siglist->sig = signum;
-            siglist->next = proc->sigset_list_obj;
-            proc->sigset_list_obj = siglist;
-            sigset = &siglist->sigset;
-        }
-        memcpy(sigset,&hnd->sa_mask,sizeof(sigset_t));
+        memcpy(&proc->sigsets[signum],&hnd->sa_mask,sizeof(sigset_t));
     }
 
     return 0;
@@ -169,17 +175,16 @@ long long sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, int_fr
     SYSCALL_IS_SAFEZ((void*)set,4096);
     SYSCALL_IS_SAFEZ(oldset,4096);
 
-    if(how != SIG_SETMASK)
-        return 0; // unimplemented
-
     if(ctx->r10 != sizeof(sigset_t)) {
         DEBUG(proc->is_debug,"unsupported sigset len %d when normal is %d (even linux dont support this)",ctx->r10,sizeof(sigset_t));
         return 0;
     }
 
-    // if(oldset) {
-    //     memcpy(oldset,&proc->current_sigset,sizeof(sigset_t));
-    // }
+    DEBUG(proc->is_debug,"sigprocmask 0x%p old 0x%p, size %lli",set,oldset,ctx->r10);
+
+    if(oldset) {
+        memcpy(oldset,&proc->current_sigset,sizeof(sigset_t));
+    }
 
     if(set) {
         memcpy(&proc->current_sigset,set,sizeof(sigset_t));
@@ -187,6 +192,8 @@ long long sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, int_fr
 
     return 0;
 }
+
+
 
 long long sys_setitimer(int which, itimerval* val, itimerval* old) {
     arch::x86_64::process_t* proc = CURRENT_PROC;
@@ -275,6 +282,22 @@ long long sys_sigsuspend(sigset_t* sigset, size_t size) {
     while(1) {
         signal_ret_sigmask(sigset);
         yield();
+    }
+
+    return 0;
+}
+
+long long sys_sigaltstack(stack_t* new_stack, stack_t* old) {
+    arch::x86_64::process_t* proc = CURRENT_PROC;
+    SYSCALL_IS_SAFEZ(new_stack,4096);
+    SYSCALL_IS_SAFEZ(old,4096);
+
+    if(old) {
+        *old = proc->altstack;
+    }
+
+    if(new_stack) {
+        proc->altstack = *new_stack;
     }
 
     return 0;

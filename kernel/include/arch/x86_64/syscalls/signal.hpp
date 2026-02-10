@@ -27,7 +27,7 @@ typedef int uid_t;
 #define _SIGSET_NWORDS (1024 / (8 * sizeof (unsigned long int)))
 typedef struct
 {
-  unsigned long int __sig[_SIGSET_NWORDS];
+  unsigned long long __val;
 } __sigset_t;
 
 typedef __sigset_t sigset_t;
@@ -47,9 +47,7 @@ __sigword (int sig)
 static inline int
 __sigismember (sigset_t *set, int sig)
 {
-  unsigned long int mask = __sigmask (sig);
-  int word = __sigword (sig);
-  return set->__sig[word] & mask ? 1 : 0;
+  return (set->__val & (1 << (sig - 1))) ? 1 : 0;
 }
 
 
@@ -144,20 +142,9 @@ typedef struct {
 /* Structure to describe FPU registers.  */
 typedef struct _libc_fpstate *fpregset_t;
 
-/* Userlevel context.  */
-typedef struct ucontext_t
-  {
-    unsigned long int fld;
-    struct ucontext_t *uc_link;
-    stack_t uc_stack;
-    mcontext_t uc_mcontext;
-    sigset_t uc_sigmask;
-    struct _libc_fpstate __fpregs_mem;
-    unsigned long long int __ssp[4];
-  } ucontext_t;
-
 struct sigtrace {
-    ucontext_t* uctx;
+    mcontext_t* mctx;
+    sigset_t sigset;
     void* fpu_state;
     struct sigtrace* next;
 };

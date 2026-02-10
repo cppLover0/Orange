@@ -365,21 +365,21 @@ void uacpi_kernel_free(void *mem, uacpi_size size_hint);
  * strictly monotonic.
  */
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
-    return time::counter();
+    return drivers::tsc::currentnano();
 }
 
 /*
  * Spin for N microseconds.
  */
 void uacpi_kernel_stall(uacpi_u8 usec) {
-    time::sleep(usec);
+    drivers::tsc::sleep(usec);
 }
 
 /*
  * Sleep for N milliseconds.
  */
 void uacpi_kernel_sleep(uacpi_u64 msec) {
-    time::sleep(msec * 1000);
+    drivers::tsc::sleep(msec * 1000);
 }
 
 /*

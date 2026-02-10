@@ -332,6 +332,8 @@ std::int32_t __devfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
 
     out->st_size = 0;
     out->st_mode = S_IFCHR;
+    out->st_ino = 4;
+    out->st_mode |= 020666;
     return 0;
 }
 

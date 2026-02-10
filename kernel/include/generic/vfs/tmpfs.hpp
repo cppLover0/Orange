@@ -27,6 +27,8 @@ namespace vfs {
         std::uint64_t real_size; // real size in ram (optimization)
         struct tmpfs_node* next;
 
+        int is_request_unlink;
+
         std::uint64_t path_hash;
         char name[2048];
     } tmpfs_node_t;

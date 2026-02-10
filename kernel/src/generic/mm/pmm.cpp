@@ -331,13 +331,13 @@ int memory::freelist::free(std::uint64_t phys) {
 
 std::int64_t memory::freelist::alloc() {
     if(!freelist_page) { // request memory from buddy, 1 mb will be enough
-        std::uint64_t phys = memory::buddy::alloc(1024 * 1024);
+        std::uint64_t phys = memory::buddy::alloc(1024 * 1024 * 4);
 
         freelist_aloc_mem.arr[freelist_aloc_mem_ptr++] = phys;
 
         std::uint64_t ptr = phys;
         while(1) {
-            if(ptr >= phys + (1024 * 1024))
+            if(ptr >= phys + (1024 * 1024 * 4))
                 break;
             free(ptr);
             ptr += 4096;

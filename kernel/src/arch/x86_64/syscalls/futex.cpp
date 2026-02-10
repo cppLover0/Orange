@@ -19,6 +19,8 @@ long long sys_futex(int* uaddr, int op, uint32_t val, int_frame_t* ctx) {
 
     struct timespec* ts = (struct timespec*)ctx->r10;
 
+    DEBUG(proc->is_debug,"futex op %d, val %d, uaddr 0x%p, flags %d, raw_op %d",operation,val,uaddr,flags,op);
+
     switch(operation) {
     case FUTEX_WAIT: {
         
@@ -36,7 +38,7 @@ long long sys_futex(int* uaddr, int op, uint32_t val, int_frame_t* ctx) {
             t += drivers::tsc::currentus();
         }
 
-        DEBUG(0,"Waiting for futex, pointer: 0x%p excepted: %d, pointer_value %d in proc %d, ts->tv_nsec %lli ts->tv_sec %lli",uaddr,val,v,proc->id,ts != nullptr ? ts->tv_nsec : 0, ts != nullptr ? ts->tv_sec : 0);
+        DEBUG(proc->is_debug,"Waiting for futex, pointer: 0x%p excepted: %d, pointer_value %d in proc %d, ts->tv_nsec %lli ts->tv_sec %lli",uaddr,val,v,proc->id,ts != nullptr ? ts->tv_nsec : 0, ts != nullptr ? ts->tv_sec : 0);
             
         arch::x86_64::scheduling::futexwait(proc,&v,val,uaddr,t);
 

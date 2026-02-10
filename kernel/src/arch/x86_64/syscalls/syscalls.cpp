@@ -84,7 +84,7 @@ long long sys_zero_stub() {
 }
 
 arch::x86_64::syscall_item_t sys_table[] = {
-    {12,(void*)sys_stub}, // brk
+    {12,(void*)sys_zero_stub}, // brk
     {21,(void*)sys_access},
     {257,(void*)sys_openat},
     {5,(void*)sys_fstat},
@@ -169,7 +169,6 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {77,(void*)sys_zero_stub}, // todo implement ftrunc
     {95,(void*)sys_umask},
     {230,(void*)sys_nanosleep},
-    {87,(void*)sys_stub}, // priority todo implement unlink
     {55,(void*)sys_getsockopt},
     {49,(void*)sys_bind},
     {229,(void*)sys_stub}, //clock_getres
@@ -201,7 +200,11 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {137,(void*)sys_statfs},
     {138,(void*)sys_fstatfs},
     {74,(void*)sys_zero_stub}, // fsync
-    {144,(void*)sys_zero_stub} // setscheduler
+    {144,(void*)sys_zero_stub}, // setscheduler
+    {131,(void*)sys_sigaltstack},
+    {25,(void*)sys_stub}, // mremap
+    {87,(void*)sys_unlink},
+    {263,(void*)sys_unlinkat}
 };
 
 arch::x86_64::syscall_item_t* __syscall_find(int rax) {
@@ -235,7 +238,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     extern int last_sys;
     last_sys = ctx->rax;
 
-    DEBUG(0,"sys %d from %d",ctx->rax,proc->id);
+    DEBUG(0,"sys %d from %d rdi 0x%p, rsi %lli",ctx->rax,proc->id,ctx->rdi,ctx->rsi);
 
     //DEBUG(1,"sys %d from %d rip 0x%p, min_free_fd %d",ctx->rax,proc->id,ctx->rip,vfs::fdmanager::min_free(proc));
         
@@ -245,8 +248,8 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     long long ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
     ctx->rax = ret;
 
-    if(ret < 0)
-        DEBUG(proc->is_debug,"sys %d failed with code %lli",item->syscall_num,ctx->rax);
+    if(1)
+        DEBUG(ret < 0,"sys %d failed with code %lli",item->syscall_num,ctx->rax);
 
     //DEBUG(1,"sys %d ret %d",item->syscall_num,ctx->rax);
 

@@ -16,6 +16,8 @@
 
 #include <config.hpp>
 
+#include <etc/assembly.hpp>
+
 #include <etc/logging.hpp>
 
 void shm_rm(shm_seg_t* seg);
@@ -47,6 +49,8 @@ typedef struct vmm_obj {
     struct vmm_obj* next;
 } __attribute__((packed)) vmm_obj_t;
 
+extern std::int64_t __memory_paging_getphys(std::uint64_t cr3, std::uint64_t virt);
+
 namespace memory {
     class vmm {
     public:
@@ -77,6 +81,7 @@ namespace memory {
             uint64_t found = 0;
 
             uint64_t align_length = ALIGNUP(len,4096);
+            len = align_length;
 
             vmm_obj_t* top = find_free(start,len);
             if(top) {
@@ -118,77 +123,254 @@ namespace memory {
             return 0;
         }
 
-        inline static vmm_obj_t* v_find(arch::x86_64::process_t* proc,vmm_obj_t* start, std::uint64_t base, std::uint64_t len, int is_fixed) {
-        uint64_t align_length = ALIGNUP(len, 4096);
-        uint64_t end = base + align_length;
-
-        vmm_obj_t* current = start->next;
-        vmm_obj_t* prev = start;
-
-        is_fixed = 0;
-
-        if (is_fixed) {
+        inline static vmm_obj_t* nlgetlen(arch::x86_64::process_t* proc, std::uint64_t addr) {
+            asm volatile("cli"); // bug if they are enabled
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
 
             while (current) {
-                uint64_t curr_start = current->base;
-                uint64_t curr_end = current->base + current->len;
 
-                if (!(curr_end <= base || curr_start >= end)) {
-                    vmm_obj_t* to_delete = current;
-                    prev->next = current->next;
-                    current = current->next;
-                    
-                    //nolockunmap(proc,current->base);
-                    continue; 
+                if (addr >= current->base && addr < current->base + current->len) {
+                    return current;
                 }
 
-                if (curr_start >= end) {
+                if (current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     break;
+
+                current = current->next;
+            }
+            return 0;
+        }
+
+        inline static vmm_obj_t* old_v_find(vmm_obj_t* start, std::uint64_t base, std::uint64_t len) {
+            vmm_obj_t* current = start->next;
+            vmm_obj_t* prev = start;
+            uint64_t found = 0;
+
+            uint64_t align_length = ALIGNUP(len,4096);
+            
+            vmm_obj_t* vmm_new = new vmm_obj_t;
+
+            while(current) {
+
+                if(prev) {
+
+                    uint64_t prev_end = (prev->base + prev->len);
+                    uint64_t current_end = base + len;
+
+                    if(current->base == base) {
+                        delete (void*)vmm_new;
+                        vmm_new = current;
+                        break;
+                    }
+
+                    if(current->base >= current_end && prev_end <= base) {
+
+                        vmm_new->base = base;
+                        vmm_new->len = align_length;
+
+                        vmm_new->is_lazy_alloc = 0;
+                        vmm_new->is_lazy_allocated = 0;
+                        vmm_new->is_shared = 0;
+                        
+                        prev->next = vmm_new;
+                        vmm_new->next = current;
+
+                        break;
+
+                    } 
                 }
 
                 prev = current;
                 current = current->next;
             }
 
-            vmm_obj_t* vmm_new = new vmm_obj_t;
-            vmm_new->base = base;
-            vmm_new->len = align_length;
-            vmm_new->is_lazy_alloc = 0;
-            vmm_new->is_lazy_allocated = 0;
-            vmm_new->is_shared = 0;
-
-            vmm_new->next = current;
-            prev->next = vmm_new;
             return vmm_new;
+        }
 
-        } else {
+        inline static void invtlb(arch::x86_64::process_t* proc ,std::uint64_t base, std::uint64_t len) {
+            std::uint64_t sz_in_pages = len / 4096;
+            if(sz_in_pages == 0)
+                sz_in_pages = 1;
 
-            while (current) {
-                uint64_t gap_start = prev->base + prev->len;
-                uint64_t gap_end = current->base;
-
-                uint64_t actual_start = (gap_start < base) ? base : gap_start;
-
-                if (gap_end >= actual_start + align_length) {
-                    vmm_obj_t* vmm_new = new vmm_obj_t;
-                    vmm_new->base = actual_start;
-                    vmm_new->len = align_length;
-                    vmm_new->is_lazy_alloc = 0;
-                    vmm_new->is_lazy_allocated = 0;
-                    vmm_new->is_shared = 0;
-
-                    vmm_new->next = current;
-                    prev->next = vmm_new;
-                    return vmm_new;
+            if(sz_in_pages > 500) {
+                // at this point just reload cr3
+                memory::paging::enablepaging(proc->original_cr3);
+            } else {
+                for(std::uint64_t i = 0;i < len; i += PAGE_SIZE) {
+                    __invlpg(base + i);
                 }
-
-                prev = current;
-                current = current->next;
             }
         }
 
-        return nullptr;
-    }
+        inline static vmm_obj_t* v_find(arch::x86_64::process_t* proc, vmm_obj_t* start, std::uint64_t base, std::uint64_t len, int is_fixed) {
+            vmm_obj_t* current = start->next;
+            vmm_obj_t* prev = start;
+            uint64_t found = 0;
+
+            vmm_obj_t* before = nlgetlen(proc,base - 4096);
+            vmm_obj_t* after = nlgetlen(proc,base + len + 4096);
+            len = ALIGNUP(len, 4096);
+
+            if(before) {
+                if(before->base == 0)
+                    before = 0;
+            }
+
+            if(after) {
+                if(after->base == (std::uint64_t)Other::toVirt(0) - 4096) {
+                    after = 0;
+                }
+            }
+
+again:
+            current = start->next;
+            prev = start;
+
+            if(before == after && before != 0 && after != 0) {
+
+                if(before->is_mapped || before->shm) {
+                    memory::paging::zerorange(proc->original_cr3, before->base,before->len);
+                    if(before->shm) {
+                        before->shm->ctl.shm_dtime = getUnixTime();
+                        before->shm->ctl.shm_lpid = proc->id;
+                        before->shm->ctl.shm_nattch--;
+                        memory::paging::zerorange(proc->original_cr3,(std::uint64_t)before->base,before->len);
+
+                        if(before->shm->ctl.shm_nattch == 0 && before->shm->is_pending_rm) {
+                            shm_rm(before->shm);
+                        }
+
+                        before->shm = 0;
+                    }
+                }
+
+                vmm_obj_t* split = new vmm_obj_t;
+                memset(split,0,sizeof(vmm_obj_t));
+                memcpy(split,before,sizeof(vmm_obj_t));
+                split->len = (before->base + before->len) - (base + len);
+                split->base = base + len;
+                split->next = before->next;
+                before->next = split;
+                split->src_len = split->len;
+                before->len = before->len - (len + split->len);
+                before->src_len = before->len;
+                current = split->next;
+                if(before->how_much_connected) {
+                    split->how_much_connected = new int;
+                    *split->how_much_connected = *before->how_much_connected;
+                }
+                goto end;
+            } else {
+                while(current) {
+                    if(prev) {
+
+                        if(current == before && before != 0) {
+                            if(before->base + before->len > base) {
+                                if(before->is_mapped || before->shm) {
+                                    memory::paging::zerorange(proc->original_cr3, before->base,before->len);
+                                    if(before->shm) {
+                                        before->shm->ctl.shm_dtime = getUnixTime();
+                                        before->shm->ctl.shm_lpid = proc->id;
+                                        before->shm->ctl.shm_nattch--;
+                                        memory::paging::zerorange(proc->original_cr3,(std::uint64_t)before->base,before->len);
+
+                                        if(before->shm->ctl.shm_nattch == 0 && before->shm->is_pending_rm) {
+                                            shm_rm(before->shm);
+                                        }
+
+                                        before->shm = 0;
+                                    }
+                                }
+                                before->len -= ((before->base + before->len) - base);
+                                before->src_len = before->len;
+                            }
+                        } else {
+                            
+                            if(current->base >= base && current->base < (base + len)) {
+                                if(current->is_mapped || current->shm) {
+                                    memory::paging::zerorange(proc->original_cr3, current->base,current->len);
+                                    if(current->shm) {
+                                        current->shm->ctl.shm_dtime = getUnixTime();
+                                        current->shm->ctl.shm_lpid = proc->id;
+                                        current->shm->ctl.shm_nattch--;
+                                        memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+
+                                        if(current->shm->ctl.shm_nattch == 0 && current->shm->is_pending_rm) {
+                                            shm_rm(current->shm);
+                                        }
+
+                                        current->shm = 0;
+                                    }
+                                }
+                                std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
+                                current->len -= sz;
+                                current->base += sz;
+                                current->src_len = current->len;
+                                if(current->len == 0) {
+                                    prev->next = current->next;
+                                    if(current->how_much_connected)
+                                        delete (void*)current->how_much_connected;
+                                    delete (void*)current;
+                                    current = prev->next;
+                                }
+                            }
+                        }
+
+                        if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                            break;
+                    }
+
+                    prev = current;
+                    current = current->next;
+                }
+            }
+
+end:
+
+            memory::paging::destroyrange(proc->original_cr3, base, len);
+            memory::paging::zerorange(proc->original_cr3, base, len);
+
+            vmm_obj_t* vmm_new = new vmm_obj_t;
+
+            current = start->next;
+            prev = start;
+            
+            while(current) {
+                if(prev) {
+                    uint64_t prev_end = (prev->base + prev->len);
+                    uint64_t current_end = base + len;
+
+                    if(current->base == base) {
+                        asm volatile("ud2");
+                        delete vmm_new;
+                        vmm_new = current;
+                        break;
+                    }
+
+                    //DEBUG(1,"0x%p 0x%p 0x%p 0x%p",current->base,current_end,prev_end,base);
+
+                    if(current->base >= current_end && prev_end <= base) {
+                        vmm_new->base = base;
+                        vmm_new->len = len;
+                        vmm_new->is_lazy_alloc = 0;
+                        vmm_new->is_lazy_allocated = 0;
+                        vmm_new->is_shared = 0;
+                        
+                        prev->next = vmm_new;
+                        vmm_new->next = current;
+                        break;
+                    } 
+
+                    if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                        assert(0, "help !");
+                }
+
+                prev = current;
+                current = current->next;
+            }
+
+            return vmm_new;
+        }
 
         inline static void* map(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t length, std::uint64_t flags) {
             asm volatile("cli"); // bug if they are enabled
@@ -217,11 +399,11 @@ namespace memory {
             return (void*)new_vmm->base;
         }
 
-        inline static void* custom_map(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t phys, std::uint64_t length, std::uint64_t flags) {
+        inline static void* custom_map(arch::x86_64::process_t* proc, std::uint64_t virt, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_fixed) {
             asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
-            void* new_virt = mark(proc,virt,phys,length,flags,0,0);
+            void* new_virt = mark(proc,virt,phys,length,flags,0,is_fixed);
             paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)virt,length,flags,*proc->vmm_id);
             current->lock.unlock();
             vmm_obj_t* new_vmm = get(proc,virt);
@@ -270,6 +452,21 @@ namespace memory {
 
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return 0;
+        }
+
+        inline static void* oldmark(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_shared, int is_fixed) {
+            asm volatile("cli"); // bug if they are enabled
+            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
+            vmm_obj_t* new_vmm = old_v_find(current,base,length);
+            new_vmm->flags = flags;
+            new_vmm->phys = phys;
+            new_vmm->src_len = length;
+            new_vmm->base = base;
+            new_vmm->is_mapped = 0;
+            new_vmm->is_free = 0;
+            new_vmm->len = ALIGNUP(length,4096);
+            new_vmm->is_shared = is_shared;
+            return (void*)new_vmm->base;
         }
 
         inline static void* mark(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t phys, std::uint64_t length, std::uint64_t flags, int is_shared, int is_fixed) {
@@ -394,7 +591,7 @@ namespace memory {
                             memory::paging::duplicaterangeifexists(src_proc->original_cr3,dest_proc->original_cr3,src_current->base,src_current->len,src_current->flags);
                         }
 
-                        mark(dest_proc,src_current->base,phys,src_current->src_len,src_current->flags,src_current->is_shared,1);
+                        oldmark(dest_proc,src_current->base,phys,src_current->src_len,src_current->flags,src_current->is_shared,1);
                         get(dest_proc,src_current->base)->is_mapped = src_current->is_mapped;
 
                         get(dest_proc,src_current->base)->is_lazy_alloc = src_current->is_lazy_alloc;
@@ -463,49 +660,135 @@ namespace memory {
             }
         }
 
-        inline static void unmap(arch::x86_64::process_t* proc, std::uint64_t virt) {
-            vmm_obj_t* current = getlen(proc,virt);
-            if(!current)
-                return;
+        inline static void unmap(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t len) {
             vmm_obj_t* start = (vmm_obj_t*)proc->vmm_start;
-            start->lock.lock();
+            vmm_obj_t* current = start->next;
             vmm_obj_t* prev = start;
-            while(prev) {
-                if(prev->next == current)
-                    break;
-                prev = prev->next;
-            }
-            prev->next = current->next;
+            uint64_t found = 0;
 
-            if(!current->shm) {
-                if(current->is_lazy_alloc) {
-                    memory::paging::destroyrange(proc->original_cr3,current->base,current->len);
-                    memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
-                } else {
-                    memory::pmm::_physical::free(current->phys);
-                    memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+            vmm_obj_t* before = nlgetlen(proc,base - 4096);
+            vmm_obj_t* after = nlgetlen(proc,base + len + 4096);
+            len = ALIGNUP(len, 4096);
+
+            if(before) {
+                if(before->base == 0)
+                    before = 0;
+            }
+
+            if(after) {
+                if(after->base == (std::uint64_t)Other::toVirt(0) - 4096) {
+                    after = 0;
                 }
+            }
+
+again:
+            current = start->next;
+            prev = start;
+
+            if(before == after && before != 0 && after != 0) {
+
+                if(before->is_mapped || before->shm) {
+                    memory::paging::zerorange(proc->original_cr3, before->base,before->len);
+                    if(before->shm) {
+                        before->shm->ctl.shm_dtime = getUnixTime();
+                        before->shm->ctl.shm_lpid = proc->id;
+                        before->shm->ctl.shm_nattch--;
+                        memory::paging::zerorange(proc->original_cr3,(std::uint64_t)before->base,before->len);
+
+                        if(before->shm->ctl.shm_nattch == 0 && before->shm->is_pending_rm) {
+                            shm_rm(before->shm);
+                        }
+
+                        before->shm = 0;
+                    }
+                }
+
+                vmm_obj_t* split = new vmm_obj_t;
+                memset(split,0,sizeof(vmm_obj_t));
+                memcpy(split,before,sizeof(vmm_obj_t));
+                split->len = (before->base + before->len) - (base + len);
+                split->base = base + len;
+                split->next = before->next;
+                before->next = split;
+                split->src_len = split->len;
+                before->len = before->len - (len + split->len);
+                before->src_len = before->len;
+                current = split->next;
+                if(before->how_much_connected) {
+                    split->how_much_connected = new int;
+                    *split->how_much_connected = *before->how_much_connected;
+                }
+                goto end;
             } else {
-                current->shm->ctl.shm_dtime = getUnixTime();
-                current->shm->ctl.shm_lpid = proc->id;
-                current->shm->ctl.shm_nattch--;
-                memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+                while(current) {
+                    if(prev) {
 
-                if(current->shm->ctl.shm_nattch == 0 && current->shm->is_pending_rm) {
-                    shm_rm(current->shm);
+                        if(current == before && before != 0) {
+                            if(before->base + before->len > base) {
+                                if(before->is_mapped || before->shm) {
+                                    memory::paging::zerorange(proc->original_cr3, before->base,before->len);
+                                    if(before->shm) {
+                                        before->shm->ctl.shm_dtime = getUnixTime();
+                                        before->shm->ctl.shm_lpid = proc->id;
+                                        before->shm->ctl.shm_nattch--;
+                                        memory::paging::zerorange(proc->original_cr3,(std::uint64_t)before->base,before->len);
+
+                                        if(before->shm->ctl.shm_nattch == 0 && before->shm->is_pending_rm) {
+                                            shm_rm(before->shm);
+                                        }
+
+                                        before->shm = 0;
+                                    }
+                                }
+                                before->len -= ((before->base + before->len) - base);
+                                before->src_len = before->len;
+                            }
+                        } else {
+                            
+                            if(current->base >= base && current->base < (base + len)) {
+                                if(current->is_mapped || current->shm) {
+                                    memory::paging::zerorange(proc->original_cr3, current->base,current->len);
+                                    if(current->shm) {
+                                        current->shm->ctl.shm_dtime = getUnixTime();
+                                        current->shm->ctl.shm_lpid = proc->id;
+                                        current->shm->ctl.shm_nattch--;
+                                        memory::paging::zerorange(proc->original_cr3,(std::uint64_t)current->base,current->len);
+
+                                        if(current->shm->ctl.shm_nattch == 0 && current->shm->is_pending_rm) {
+                                            shm_rm(current->shm);
+                                        }
+
+                                        current->shm = 0;
+                                    }
+                                }
+                                std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
+                                current->len -= sz;
+                                current->base += sz;
+                                current->src_len = current->len;
+                                if(current->len == 0) {
+                                    prev->next = current->next;
+                                    if(current->how_much_connected)
+                                        delete (void*)current->how_much_connected;
+                                    delete (void*)current;
+                                    current = prev->next;
+                                }
+                            }
+                        }
+
+                        if(current->base == (std::uint64_t)Other::toVirt(0) - 4096)
+                            break;
+                    }
+
+                    prev = current;
+                    current = current->next;
                 }
-
-                current->shm = 0;
-
             }
 
-            current->is_free = 1;
+end:
 
-            if(current->how_much_connected)
-                delete current->how_much_connected;
-            delete current;
+            memory::paging::destroyrange(proc->original_cr3, base, len);
+            memory::paging::zerorange(proc->original_cr3, base, len);
             
-            start->lock.unlock();
         }
 
         inline static void free(arch::x86_64::process_t* proc) {
@@ -565,24 +848,7 @@ namespace memory {
         }
 
         inline static void* alloc(arch::x86_64::process_t* proc, std::uint64_t len, std::uint64_t flags, int is_shared) {
-            asm volatile("cli"); // bug if they are enabled
-            vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
-            current->lock.lock();
-            vmm_obj_t* new_vmm = v_alloc(current,len);
-            new_vmm->flags = flags;
-            new_vmm->src_len = len;
-            new_vmm->is_mapped = 0;
-            std::uint64_t phys = memory::pmm::_physical::alloc(len);
-            new_vmm->phys = phys;
-
-            if(is_shared) {
-                new_vmm->is_shared = 1;
-                new_vmm->how_much_connected = new int;
-            }
-
-            paging::maprangeid(proc->original_cr3,new_vmm->phys,new_vmm->base,new_vmm->len,flags,*proc->vmm_id);
-            ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
-            return (void*)new_vmm->base;
+            return lazy_alloc(proc,len,flags,0);
         }
 
         inline static void* lazy_alloc(arch::x86_64::process_t* proc, std::uint64_t len, std::uint64_t flags, int is_shared) {
@@ -598,6 +864,15 @@ namespace memory {
             memory::paging::zerorange(proc->original_cr3,(std::uint64_t)new_vmm->base,new_vmm->len);
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
             return (void*)new_vmm->base;
+        }
+
+        inline static void invmapping(arch::x86_64::process_t* proc, std::uint64_t base, std::uint64_t len) {
+            for(std::uint64_t i = 0; i < len; i += PAGE_SIZE) {
+                if(__memory_paging_getphys(proc->original_cr3,base + i) == -1) {
+                    std::uint64_t new_phys = memory::pmm::_physical::alloc(4096);
+                    memory::paging::map(proc->original_cr3,new_phys,base + i,PTE_PRESENT | PTE_RW | PTE_USER);
+                }
+            }
         }
 
         inline static vmm_obj_t* changemem(arch::x86_64::process_t* proc, std::uint64_t flags) {
@@ -624,15 +899,16 @@ namespace memory {
             asm volatile("cli"); // bug if they are enabled
             vmm_obj_t* current = (vmm_obj_t*)proc->vmm_start;
             current->lock.lock();
-            std::uint64_t phys = memory::pmm::_physical::alloc(len);
-            void* new_virt = mark(proc,virt,phys,len,flags,is_shared,is_fixed);
-            paging::maprangeid(proc->original_cr3,phys,(std::uint64_t)new_virt,len,flags,*proc->vmm_id);
+            void* new_virt = mark(proc,virt,0,len,flags,is_shared,is_fixed);
             current->lock.unlock();
             vmm_obj_t* new_vmm = get(proc,(std::uint64_t)new_virt);
             if(is_shared) {
                 new_vmm->is_shared = 1;
                 new_vmm->how_much_connected = new int;
             }
+            new_vmm->is_lazy_alloc = 1;
+            new_vmm->is_lazy_allocated = 1;
+            new_vmm->src_len = len;
 
             ((vmm_obj_t*)proc->vmm_start)->lock.unlock();
 

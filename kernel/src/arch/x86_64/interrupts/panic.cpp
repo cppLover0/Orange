@@ -120,7 +120,7 @@ void panic(int_frame_t* ctx, const char* msg) {
 
         while(1) {
 
-            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"Memory 0x%p-0x%p (with offset rip 0x%p)\n",current->base,current->base + current->src_len, ctx->rip - current->base);
+            Log::SerialDisplay(LEVEL_MESSAGE_INFO,"Memory 0x%p-0x%p (with offset rip 0x%p)\n",current->base,current->base + current->len, ctx->rip - current->base);
 
             if (current->base == (std::uint64_t)Other::toVirt(0) - 4096)
                     break;
@@ -128,6 +128,8 @@ void panic(int_frame_t* ctx, const char* msg) {
             current = current->next;
 
         }
+
+        asm volatile("hlt");
 
         stackframe_t* rbp = (stackframe_t*)ctx->rbp;
 

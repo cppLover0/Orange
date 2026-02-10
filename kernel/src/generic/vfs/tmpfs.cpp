@@ -154,8 +154,18 @@ static void allocate_node_pool_block() {
 }
 
 static vfs::tmpfs_node_t* allocate_node_from_pool() {
-    return (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
+    if (!node_pool_current || node_pool_offset >= node_pool_capacity) {
+        allocate_node_pool_block();
+        if (!node_pool_current) {
+            return 0; 
+        }
+    }
+    vfs::tmpfs_node_t* node = node_pool_current + node_pool_offset;
+    node_pool_offset++;
+    memset(node, 0, sizeof(vfs::tmpfs_node_t));
+    return node;
 }
+
 
 int __tmpfs__is_busy(vfs::tmpfs_node_t* node) {
 
@@ -163,7 +173,10 @@ int __tmpfs__is_busy(vfs::tmpfs_node_t* node) {
         return 0;
 
     if(node->busy != 0)
-        return 1;
+        return 1; 
+
+    if(node->type != TMPFS_TYPE_DIRECTORY)
+        return 0; // node->busy is ok so return 0
 
     for(std::uint64_t i = 0; i < (node->size / 8); i++) {
         if(node->content[i] != 0) {
@@ -183,10 +196,14 @@ int __tmpfs__is_busy(vfs::tmpfs_node_t* node) {
     return 0;
 }
 
-std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
+vfs::tmpfs_node_t* last = 0;
 
-    if(__tmpfs__exists(path))
-        return -EEXIST;
+std::int32_t __tmpfs__create(char* path,std::uint8_t type, vfs::tmpfs_node_t** out) {
+
+    if(out) {
+        if(__tmpfs__exists(path))
+            return -EEXIST;
+    }
     
     char copy[2048];
     memset(copy,0,2048);
@@ -202,16 +219,15 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
         copy[1] = '\0';
     }
 
-    if(!__tmpfs__exists(copy)) {
+    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
+
+    if(!parent) {
         if(!__tmpfs__create_parent_dirs_by_default)
             return -ENOENT;
         else {
-            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
+            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY,&parent);
         }
     }
-
-    if(__tmpfs__find(copy)->type != VFS_TYPE_DIRECTORY)
-        return -ENOTDIR;
 
     vfs::tmpfs_node_t* node = head_node;
 
@@ -238,6 +254,8 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
     node->busy = 0;
     node->id = ++__tmpfs_ptr_id;
 
+    
+
     node->create_time = getUnixTime();
     node->access_time = getUnixTime();
     
@@ -249,8 +267,6 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
         node->next = head_node;
         head_node = node;
     }
-
-    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
 
     if(!(parent->size <= parent->real_size)) {
         // overflow ! increase size
@@ -282,6 +298,12 @@ std::int32_t __tmpfs__create(char* path,std::uint8_t type) {
         node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
         node->real_size = DIRECTORY_LIST_SIZE;
         node->size = 0;
+    }
+
+    last = node;
+
+    if(out) {
+        *out = node;
     }
 
     return 0;
@@ -399,19 +421,20 @@ void __tmpfs__opt_create_and_write(char* path, int type, char* content, std::uin
         copy[1] = '\0';
     }
 
-    if(!__tmpfs__exists(copy)) {
+    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
+
+    if(!parent) {
         if(!__tmpfs__create_parent_dirs_by_default)
             return;
         else {
-            int status = __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
-            assert(__tmpfs__exists(copy),"error creating parent %s, status %d",copy,status);
+            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY,&parent);
         }
     }
 
     vfs::tmpfs_node_t* node = 0;
 
     if(!node)
-        node = (vfs::tmpfs_node_t*)memory::pmm::_virtual::alloc(4096);
+        node = (vfs::tmpfs_node_t*)allocate_node_from_pool();
 
     node->type = type;
     node->content = 0;
@@ -428,10 +451,6 @@ void __tmpfs__opt_create_and_write(char* path, int type, char* content, std::uin
 
     node->next = head_node;
     head_node = node;
-
-    vfs::tmpfs_node_t* parent = __tmpfs__find(copy);
-
-    parent = __tmpfs__find(copy);
 
     assert(parent,"parent is null %s (%d)",copy,__tmpfs__create_parent_dirs_by_default);
 
@@ -619,7 +638,7 @@ std::int32_t __tmpfs__touch(char* path, int mode) {
     vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
 
     if(!node) {
-        int status =  __tmpfs__create(path,VFS_TYPE_FILE);
+        int status =  __tmpfs__create(path,VFS_TYPE_FILE,0);
         node = __tmpfs__symfind(path);
         if(node)
             node->vars[TMPFS_VAR_CHMOD] |= (mode & ~(S_IFDIR | S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFDIR | S_IFIFO | S_IFMT | S_IFLNK));
@@ -862,7 +881,7 @@ std::int32_t __tmpfs__rename(char* path, char* new_path) {
         if(!__tmpfs__create_parent_dirs_by_default)
             return ENOENT;
         else {
-            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
+            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY,0);
         }
     }
 
@@ -926,7 +945,7 @@ std::int32_t __tmpfs__rename(char* path, char* new_path) {
         if(!__tmpfs__create_parent_dirs_by_default)
             return ENOENT;
         else {
-            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY);
+            __tmpfs__create(copy,TMPFS_TYPE_DIRECTORY,0);
         }
     }
 
@@ -971,7 +990,30 @@ void __tmpfs__close(userspace_fd_t* fd, char* path) {
     if(node->busy > 0)
         node->busy--;
 
+    if(node->is_request_unlink) {
+        if(node->busy == 0) {
+            __tmpfs__remove(fd,path);
+        }
+    }
+
     return;
+}
+
+std::int32_t __tmpfs__unlink(userspace_fd_t* fd, char* path) {
+
+    if(!path)
+        return -EINVAL;
+
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+    if(!node)
+        return -ENOENT;
+
+    node->is_request_unlink = 1;
+    if(node->busy == 0) {
+        __tmpfs__remove(fd,path);
+    }
+
+    return 0;
 }
 
 void vfs::tmpfs::mount(vfs_node_t* node) {
@@ -990,7 +1032,7 @@ void vfs::tmpfs::mount(vfs_node_t* node) {
     head_node->content = (std::uint8_t*)memory::pmm::_virtual::alloc(DIRECTORY_LIST_SIZE);
 
     node->readlink = __tmpfs__readlink;
-    node->create = __tmpfs__create;
+    node->create = (int (*)(char*,uint8_t))__tmpfs__create;
     node->remove = __tmpfs__remove;
     node->rename = __tmpfs__rename;
     node->write = __tmpfs__write;
@@ -1003,6 +1045,7 @@ void vfs::tmpfs::mount(vfs_node_t* node) {
     node->ls = __tmpfs__ls;
 
     node->statx = __tmpfs__statx;
+    node->unlink = __tmpfs__unlink;
 
     node->opt_create_and_write = __tmpfs__opt_create_and_write;
 

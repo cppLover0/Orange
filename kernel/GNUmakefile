@@ -19,7 +19,7 @@ CXX := c++
 LD := ld
 
 # User controllable C flags.
-CFLAGS := -g -pipe -Iinclude -Isrc/lib/Flanterm/src   -Isrc/lib/uACPI/include -O3
+CFLAGS := -g -pipe -Iinclude -Isrc/lib/Flanterm/src   -Isrc/lib/uACPI/include -O3 -w
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)
@@ -60,8 +60,6 @@ endif
 
 # Internal flags shared by both C and C++ compilers.
 override SHARED_FLAGS := \
-    -Wall \
-    -Wextra \
     -nostdinc \
     -ffreestanding \
     -fno-stack-protector \
