@@ -29,6 +29,8 @@
 #include <etc/etc.hpp>
 #include <limine.h>
 
+#include <drivers/ps2.hpp>
+
 #include <generic/vfs/fd.hpp>
 
 char is_shift_pressed = 0;
@@ -206,6 +208,8 @@ extern "C" void main() {
 
     drivers::pci::initworkspace();
     Log::Display(LEVEL_MESSAGE_OK,"PCI initializied\n");
+
+    drivers::ps2::init();
 
     vfs::ustar::copy();
     Log::Display(LEVEL_MESSAGE_OK,"USTAR parsed\n");
