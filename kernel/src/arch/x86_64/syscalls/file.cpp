@@ -385,8 +385,8 @@ long long sys_write(int fd, const void *buf, size_t count) {
     const char* _0 = "Content view is disabled in files";
     DEBUG(proc->is_debug,"Writing %s with content %s fd %d state %d from proc %d count %d writ sock 0x%p",fd_s->state == USERSPACE_FD_STATE_FILE ? fd_s->path : "Not file",buf,fd,fd_s->state,proc->id,count,fd_s->write_socket_pipe);
 
-    if(fd == 1) {
-        //Log::SerialDisplay(LEVEL_MESSAGE_INFO,"%s\n",buf);
+    if(0) {
+        Log::SerialDisplay(LEVEL_MESSAGE_INFO,"%s off %lli, new off %lli\n",buf,fd_s->offset,fd_s->offset + count);
     }
 
     std::int64_t bytes_written;
@@ -1923,20 +1923,28 @@ long long sys_chmod(char* path, int mode) {
 
     arch::x86_64::process_t* proc = CURRENT_PROC;
 
-    char result[2048];
-    memset(result,0,2048);
-
     if(!path)
         return -EINVAL;
 
-    copy_in_userspace_string(proc,result,path,2048);
+    char first_path[2048];
+    memset(first_path,0,2048);
+    if(0)
+        memcpy(first_path,vfs::fdmanager::search(proc,0)->path,strlen(vfs::fdmanager::search(proc,0)->path));
+    else if(1)
+        memcpy(first_path,proc->cwd,strlen(proc->cwd));
+
+    char kpath[2048];
+    memset(kpath,0,2048);
+    copy_in_userspace_string(proc,kpath,(void*)path,2048);
+
+    char result[2048];
+    memset(result,0,2048);
+    vfs::resolve_path(kpath,first_path,result,1,0);
 
     userspace_fd_t fd;
     fd.is_cached_path = 0;
     memset(&fd,0,sizeof(fd));
     memcpy(fd.path,result,2048);
-
-    DEBUG(proc->is_debug,"chmod %s %d\n",path,mode);
 
     uint64_t value;
     int ret = vfs::vfs::var(&fd,(uint64_t)&value,TMPFS_VAR_CHMOD);
@@ -1945,6 +1953,8 @@ long long sys_chmod(char* path, int mode) {
         return -ret;
 
     ret = vfs::vfs::var(&fd,value | mode, TMPFS_VAR_CHMOD | (1 << 7));
+
+    
 
     return -ret;
 }
@@ -2697,8 +2707,10 @@ long long sys_getdents64(int fd, char* buf, size_t count) {
     while(1) {
         vfs::dirent_t dirent = {0};
         int status = vfs::vfs::ls(fd_s,&dirent);
-        if(status < 0)
+        if(status < 0) {
+            DEBUG(proc->is_debug,"getdents64 fail status %d",status);
             return -status;
+        }
 
         if(dirent.d_reclen == 0) {
             break;

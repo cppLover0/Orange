@@ -663,6 +663,9 @@ typedef struct userspace_fd {
     std::uint8_t state;
     std::uint8_t pipe_side;
 
+    std::uint64_t rv0;
+    int rv1;
+
     int pid;
     int uid;
 

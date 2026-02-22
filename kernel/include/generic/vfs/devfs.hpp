@@ -231,6 +231,8 @@ namespace vfs {
         std::uint64_t mmap_size;
         std::uint64_t mmap_flags;
         std::int32_t dev_num;
+
+        int show_num;
         std::int8_t is_tty;
 
         std::int64_t (*read)(userspace_fd_t* fd, void* buffer, std::uint64_t count);
@@ -241,8 +243,10 @@ namespace vfs {
         std::int32_t (*ioctl)(userspace_fd_t* fd, unsigned long req, void *arg, int *res);
         std::int32_t (*open)(userspace_fd_t* fd, char* path);
         int mode;
+        int is_dir;
 
         int pgrp;
+        std::uint64_t ino;
 
         termios_t* term_flags;
 

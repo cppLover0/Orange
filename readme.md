@@ -30,14 +30,9 @@ Build kernel
 make all
 ```
 
-Build initrd (You should build it before running os)
+To build initrd create folder initrd, debootstrap to it, install packages which you want and do
 ```sh
-sh tar-initrd.sh
-```
-
-Build cross-compiler 
-```sh
-sh build-cross.sh
+sudo sh refresh-initrd.sh
 ```
 
 Build kernel and run iso 

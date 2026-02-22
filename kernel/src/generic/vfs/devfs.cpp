@@ -40,7 +40,8 @@ long reverse_number(long num) {
 }
 
 
-vfs::devfs_node_t* devfs_find_dev(const char* loc) {
+vfs::devfs_node_t* devfs_find_dev(char* loc) {
+
     vfs::devfs_node_t* dev = __devfs_head;
     char temp[256]; 
     int len = strlen((char*)loc);
@@ -80,6 +81,9 @@ std::int32_t __devfs__open(userspace_fd_t* fd, char* path) {
 
     if(node->open)
         return node->open(fd,path);
+
+    if(!node->open_flags.is_pipe && !node->readring)
+        return 0;
 
     if(node->open_flags.is_pipe) {
         fd->pipe = (vfs::pipe*)(node->pipe0 | (((uint64_t)node->pipe0 & (1 << 62)) << 63));
@@ -322,6 +326,17 @@ std::int32_t __devfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
     if(!path)
         return EFAULT;
 
+    DEBUG(1,"stat %s:%s",path,fd->path);
+
+    if(path[0] == '\0') {
+        path[0] = '/';
+        path[1] = '\0';
+        out->st_size = 0;
+        out->st_mode = S_IFDIR;
+        out->st_ino = 0;
+        return 0;
+    }
+
     vfs::devfs_node_t* node = devfs_find_dev(path);
     
     if(!node)
@@ -330,10 +345,57 @@ std::int32_t __devfs__stat(userspace_fd_t* fd, char* path, vfs::stat_t* out) {
     if(!out)
         return EINVAL;
 
-    out->st_size = 0;
-    out->st_mode = S_IFCHR;
-    out->st_ino = 4;
-    out->st_mode |= 020666;
+    if(node->slavepath[0] == '/' && node->slavepath[1] == '\0') {
+        out->st_size = 0;
+        out->st_mode = S_IFDIR;
+        out->st_ino = node->ino;
+        out->st_mode |= 020666;
+    } else {
+        out->st_size = 0;
+        out->st_mode = node->is_dir ? S_IFDIR : S_IFCHR;
+        out->st_ino = node->ino;
+        out->st_mode |= 0666;
+    }
+    return 0;
+}
+
+std::int32_t __devfs__ls(userspace_fd_t* fd, char* path, vfs::dirent_t* out) {
+
+    if(!path)
+        return EFAULT;
+
+againdev:
+
+    vfs::devfs_node_t* nod = 0;
+
+    if(fd->rv0 == 0 & fd->rv1 == 0) {
+        fd->rv0 = (std::uint64_t)__devfs_head->next;
+        nod = __devfs_head;
+    } else if(fd->rv0 != 0) {
+        nod = (vfs::devfs_node_t*)fd->rv0;
+        fd->rv0 = (std::uint64_t)nod->next;
+    }
+
+    if(!nod) { 
+        out->d_reclen = 0;
+        memset(out->d_name,0,sizeof(out->d_name));
+        return 0; 
+    }
+
+    if(nod->slavepath[0] == '/' && nod->slavepath[1] == '\0') {
+        if(nod->slavepath[0] == '/' && nod->slavepath[1] == '\0')
+            goto againdev;
+    }
+
+    memset(out->d_name,0,sizeof(out->d_name));
+    __printfbuf(out->d_name,1024,nod->show_num == 1 ? "%s" : "%s%d",nod->slavepath + 1,nod->dev_num);
+
+    out->d_reclen = sizeof(vfs::dirent_t);
+    out->d_ino = fd->rv1++;
+    out->d_off = 0;
+    out->d_type = nod->is_dir ? S_IFDIR : S_IFCHR;
+    fd->offset++;
+
     return 0;
 }
 
@@ -388,7 +450,7 @@ std::int64_t __devfs__poll(userspace_fd_t* fd, char* path, int operation_type) {
 
 extern locks::spinlock* vfs_lock;
 
-
+std::uint64_t devfs_ino_ptr = 1;
 
 std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
     devfs_node_t* node = devfs_find_dev(path);
@@ -402,6 +464,7 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
             new_node->writering = new Lists::Ring(128);
             new_node->dev_num = packet->size;
             new_node->next = __devfs_head;
+            new_node->ino = devfs_ino_ptr++;
             __devfs_head = new_node;
             return 0;
         }
@@ -420,6 +483,7 @@ std::int64_t vfs::devfs::send_packet(char* path,devfs_packet_t* packet) {
             new_node->dev_num = packet->size;
             new_node->open_flags.is_pipe_rw = 1;
             new_node->next = __devfs_head;
+            new_node->ino = devfs_ino_ptr++;
             __devfs_head = new_node;
             return 0;
         }
@@ -795,6 +859,9 @@ vfs::devfs_node_t* ktty_node = 0;
 
 void vfs::devfs::mount(vfs_node_t* node) {
     __devfs_head = (devfs_node_t*)memory::pmm::_virtual::alloc(4096);
+    memcpy(__devfs_head->slavepath,"/\0",2);
+
+    __devfs_head->show_num = 1;
     node->open = __devfs__open;
     node->read = __devfs__read;
     node->write = __devfs__write;
@@ -803,6 +870,7 @@ void vfs::devfs::mount(vfs_node_t* node) {
     node->var = __devfs__var;
     node->stat = __devfs__stat;
     node->poll = __devfs__poll;
+    node->ls = __devfs__ls;
 
     const char* name = "/ptmx";
 
@@ -813,7 +881,17 @@ void vfs::devfs::mount(vfs_node_t* node) {
 
     send_packet((char*)name,&packet);
 
+    __devfs_head->show_num = 1;
     __devfs_head->open = __ptmx_open;
+
+    packet.size = tty_ptr;
+    packet.request = DEVFS_PACKET_CREATE_PIPE_DEV;
+    packet.value = (std::uint64_t)"/input";
+
+    send_packet((char*)"/input",&packet);
+
+    __devfs_head->is_dir = 1;
+    __devfs_head->show_num = 1;
 
     const char* name0 = "/pic";
 
@@ -824,7 +902,8 @@ void vfs::devfs::mount(vfs_node_t* node) {
     send_packet((char*)name0,&packet);
 
     /* The head should be this dev so all ok */
-    
+
+    __devfs_head->show_num = 1;
     __devfs_head->write = __pic_write;
 
 
@@ -835,7 +914,8 @@ void vfs::devfs::mount(vfs_node_t* node) {
     packet.value = (std::uint64_t)name00;
 
     send_packet((char*)name00,&packet);
-    
+
+    __devfs_head->show_num = 1;
     __devfs_head->write = __zero_write;
     __devfs_head->read = __zero_read;
 
@@ -847,6 +927,7 @@ void vfs::devfs::mount(vfs_node_t* node) {
 
     send_packet((char*)name001,&packet);
     
+    __devfs_head->show_num = 1;
     __devfs_head->write = __random_write;
     __devfs_head->read = __random_read;
 
@@ -857,6 +938,7 @@ void vfs::devfs::mount(vfs_node_t* node) {
     // liborange_setup_ring_bytelen("/mouse0",4);
 
     packet.size = 0;
+    __devfs_head->show_num = 1;
     packet.request = DEVFS_PACKET_CREATE_DEV;
     packet.value = (std::uint64_t)"/masterps2keyboard";
 
@@ -866,6 +948,7 @@ void vfs::devfs::mount(vfs_node_t* node) {
     __devfs_head->writering->setup_bytelen(1);
 
     packet.size = 0;
+    __devfs_head->show_num = 1;
     packet.request = DEVFS_PACKET_CREATE_DEV;
     packet.value = (std::uint64_t)"/mastermouse";
 

@@ -7,8 +7,10 @@
 #include <generic/mm/heap.hpp>
 #include <generic/vfs/vfs.hpp>
 #include <etc/etc.hpp>
+#include <etc/logging.hpp>
 
 #include <drivers/pci.hpp>
+#include <generic/vfs/evdev.hpp>
 
 #include <arch/x86_64/scheduling.hpp>
 
@@ -1091,6 +1093,12 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     drivers::tsc::sleep(1000);
 
     Log::Display(LEVEL_MESSAGE_INFO,"Found USB%s Device %s (%d, %d, %d) %s %s on port %d and slot %d\n",dev->usb3ports[portnum] == 1 ? "3.0" : "2.0",((load_portsc & 0x3C00) >> 10) < 7 ? speed_to_str[(load_portsc & 0x3C00) >> 10] : "Broken (0 MB/S - USB ?)",(load_portsc & 0x3C00) >> 10,speed,descriptor->maxpacketsize,manufacter,product,portnum,usb_dev->slotid);
+    
+    char buffer[2048];
+    memset(buffer,0,2048);
+    __printfbuf(buffer,2048,"%s %s",manufacter, product);
+    
+    usb_dev->evdev_num = vfs::evdev::create(buffer,usb_dev->type == USB_TYPE_KEYBOARD ? EVDEV_TYPE_KEYBOARD : EVDEV_TYPE_MOUSE);
 
 }
 
@@ -1365,13 +1373,22 @@ void hid_layout_init() {
     hid_to_ps2_layout[0x47] = 0x46;
 }
 
-void input_send(uint8_t key) {
+void input_send(int num, uint8_t key) {
     userspace_fd_t fd;
     memset(&fd,0,sizeof(userspace_fd_t));
     memcpy(fd.path,"/dev/masterps2keyboard",strlen("/dev/masterps2keyboard"));
     fd.is_cached_path = 1;
 
+    std::uint64_t current_nano = drivers::tsc::currentnano();
+
     asm volatile("cli");
+    input_event ev;
+    ev.time.tv_sec = current_nano / 1000000000;
+    ev.time.tv_usec = (current_nano & 1000000000) / 1000;
+    ev.type = 1;
+    ev.code = key & ~(1 << 7);
+    ev.value = (key & (1 << 7)) ? 0 : 1;
+    vfs::evdev::submit(num,ev);
     vfs::vfs::write(&fd,&key,1);
     asm volatile("sti");
 }
@@ -1395,11 +1412,11 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     for (int i = 0; i < 8; i++) {
         uint8_t mask = 1 << i;
         if ((mods & mask) && !(prev_mods & mask)) {
-            if (i >= 4) input_send(0xE0);
-            input_send(hid_mods_to_ps2[i]);
+            if (i >= 4) input_send(usbdev->evdev_num, 0xE0);
+            input_send(usbdev->evdev_num, hid_mods_to_ps2[i]);
         } else if (!(mods & mask) && (prev_mods & mask)) {
-            if (i >= 4) input_send(0xE0); 
-            input_send(hid_mods_to_ps2[i] | 0x80);
+            if (i >= 4) input_send(usbdev->evdev_num, 0xE0); 
+            input_send(usbdev->evdev_num, hid_mods_to_ps2[i] | 0x80);
         }
     }
 
@@ -1413,19 +1430,19 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
         }
         if (!isPressed && data[i] != 0) {
             if (data[i] < 0x47) {
-                input_send(hid_to_ps2_layout[data[i]]);
+                input_send(usbdev->evdev_num, hid_to_ps2_layout[data[i]]);
             } else if(data[i] == 0x4F) {
-                input_send(0xE0);
-                input_send(0x4D); 
+                input_send(usbdev->evdev_num, 0xE0);
+                input_send(usbdev->evdev_num, 0x4D); 
             } else if(data[i] == 0x50) {
-                input_send(0xE0);
-                input_send(0x4B); 
+                input_send(usbdev->evdev_num, 0xE0);
+                input_send(usbdev->evdev_num, 0x4B); 
             } else if(data[i] == 0x51) {
-                input_send(0xE0);
-                input_send(0x50); 
+                input_send(usbdev->evdev_num, 0xE0);
+                input_send(usbdev->evdev_num, 0x50); 
             } else if(data[i] == 0x52) {
-                input_send(0xE0);
-                input_send(0x48); 
+                input_send(usbdev->evdev_num, 0xE0);
+                input_send(usbdev->evdev_num, 0x48); 
             }
         }
     }
@@ -1439,19 +1456,19 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
             }
         }
         if (!isStillPressed && usbdev->add_buffer[i] != 0) {
-            input_send(hid_to_ps2_layout[usbdev->add_buffer[i]] | 0x80);
+            input_send(usbdev->evdev_num, hid_to_ps2_layout[usbdev->add_buffer[i]] | 0x80);
         } else if(usbdev->add_buffer[i] == 0x4F) {
-                input_send(0xE0 | 0x80);
-                input_send(0x4D | 0x80); 
+                input_send(usbdev->evdev_num, 0xE0 | 0x80);
+                input_send(usbdev->evdev_num, 0x4D | 0x80); 
             } else if(usbdev->add_buffer[i] == 0x50) {
-                input_send(0xE0 | 0x80);
-                input_send(0x4B | 0x80); 
+                input_send(usbdev->evdev_num, 0xE0 | 0x80);
+                input_send(usbdev->evdev_num, 0x4B | 0x80); 
             } else if(usbdev->add_buffer[i] == 0x51) {
-                input_send(0xE0 | 0x80);
-                input_send(0x50 | 0x80); 
+                input_send(usbdev->evdev_num, 0xE0 | 0x80);
+                input_send(usbdev->evdev_num, 0x50 | 0x80); 
             } else if(usbdev->add_buffer[i] == 0x52) {
-                input_send(0xE0 | 0x80);
-                input_send(0x48 | 0x80); 
+                input_send(usbdev->evdev_num, 0xE0 | 0x80);
+                input_send(usbdev->evdev_num, 0x48 | 0x80); 
             }
     }
 
@@ -1465,17 +1482,21 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
 #define MOUSE_B4 (1 << 3)
 #define MOUSE_B5 (1 << 4)
 
-typedef struct {
-    unsigned char buttons;
-    unsigned char x;
-    unsigned char y;
-    unsigned char z;
-} __attribute__((packed)) mouse_packet_t;
-
 /*
 input0_fd = open("/dev/masterps2keyboard",O_RDWR);
     mouse_fd = open("/dev/mastermouse",O_RDWR);
 */
+
+#define REL_X			0x00
+#define REL_Y			0x01
+#define REL_Z			0x02
+#define REL_RX			0x03
+#define REL_RY			0x04
+#define REL_RZ			0x05
+#define REL_HWHEEL		0x06
+#define REL_DIAL		0x07
+#define REL_WHEEL		0x08
+#define REL_MISC		0x09
 
 void __usbmouse_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     uint8_t* data = usbdev->buffers[trb->info_s.ep_id - 2];
@@ -1498,8 +1519,70 @@ void __usbmouse_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     fd.is_cached_path = 1;
 
     asm volatile("cli");
-    vfs::vfs::write(&fd,&packet,4);
+    std::uint64_t current_nano = drivers::tsc::currentnano();
+    input_event ev;
+    ev.time.tv_sec = current_nano / 1000000000;
+    ev.time.tv_usec = (current_nano & 1000000000) / 1000;
+    if(packet.x) {
+        ev.code = REL_X;
+        ev.type = 2;
+        ev.value = (packet.x & 0x80) ? (packet.x | 0xFFFFFF00) : packet.x;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    }
+
+    if(packet.y) {
+        ev.code = REL_Y;
+        ev.type = 2;
+        ev.value = (packet.y & 0x80) ? (packet.y | 0xFFFFFF00) : packet.y;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    }
+
+    if(packet.z) {
+        ev.code = REL_Z;
+        ev.type = 2;
+        ev.value = (packet.z & 0x80) ? (packet.z | 0xFFFFFF00) : packet.z;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    }
+
+    if((packet.buttons & MOUSE_LB) && !(usbdev->last_pack.buttons & MOUSE_LB)) {
+        ev.code = 272;
+        ev.type = 1;
+        ev.value = 1;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    } else if(!(packet.buttons & MOUSE_LB) && (usbdev->last_pack.buttons & MOUSE_LB)) {
+        ev.code = 272;
+        ev.type = 1;
+        ev.value = 0;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    }
+
+    if((packet.buttons & MOUSE_RB) && !(usbdev->last_pack.buttons & MOUSE_RB)) {
+        ev.code = 273;
+        ev.type = 1;
+        ev.value = 1;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    } else if(!(packet.buttons & MOUSE_RB) && (usbdev->last_pack.buttons & MOUSE_RB)) {
+        ev.code = 273;
+        ev.type = 1;
+        ev.value = 0;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    }
+
+    if((packet.buttons & MOUSE_MB) && !(usbdev->last_pack.buttons & MOUSE_MB)) {
+        ev.code = 274;
+        ev.type = 1;
+        ev.value = 1;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    } else if(!(packet.buttons & MOUSE_MB) && (usbdev->last_pack.buttons & MOUSE_MB)) {
+        ev.code = 274;
+        ev.type = 1;
+        ev.value = 0;
+        vfs::evdev::submit(usbdev->evdev_num,ev);
+    }
+
     asm volatile("sti");
+
+    usbdev->last_pack = packet;
 
     drivers::tsc::sleep(1000); // actually hid wants this only after 1 ms
 

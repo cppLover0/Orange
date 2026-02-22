@@ -18,9 +18,10 @@ namespace Lists {
 
     class Bitmap {
     private:
+    public:
+
         std::uint8_t* pool;
         std::uint32_t pool_size;
-    public:
         
         Bitmap(std::uint32_t size) {
             pool_size = (ALIGNUP(size,8) / 8) + 1;

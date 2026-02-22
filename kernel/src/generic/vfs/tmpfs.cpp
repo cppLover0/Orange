@@ -178,16 +178,20 @@ int __tmpfs__is_busy(vfs::tmpfs_node_t* node) {
     if(node->type != TMPFS_TYPE_DIRECTORY)
         return 0; // node->busy is ok so return 0
 
-    for(std::uint64_t i = 0; i < (node->size / 8); i++) {
-        if(node->content[i] != 0) {
-            vfs::tmpfs_node_t* chld_node = (vfs::tmpfs_node_t*)(((std::uint64_t*)node->content)[i]);
-            if(chld_node->busy != 0)
-                return 1;
+    if(node->type == TMPFS_TYPE_DIRECTORY) {
 
-            if(chld_node->type == TMPFS_TYPE_DIRECTORY) {
-                int c = __tmpfs__is_busy(chld_node);
-                if(c == 1)
-                    return c;
+        std::uint64_t* cont = (std::uint64_t*)node->content;
+        for(std::uint64_t i = 0; i < (node->size / 8); i++) {
+            if(cont[i] != 0) {
+                vfs::tmpfs_node_t* chld_node = (vfs::tmpfs_node_t*)(((std::uint64_t*)node->content)[i]);
+                if(chld_node->busy != 0)
+                    return 1;
+
+                if(chld_node->type == TMPFS_TYPE_DIRECTORY) {
+                    int c = __tmpfs__is_busy(chld_node);
+                    if(c == 1)
+                        return c;
+                }
             }
  
         }
@@ -354,7 +358,8 @@ std::int64_t __tmpfs__write(userspace_fd_t* fd, char* path, void* buffer, std::u
             node->real_size = new_content0.real_size;
         }
 
-        node->size = new_size;
+        if(new_size > node->size)
+            node->size = new_size;
 
         node->access_time = getUnixTime();
         memcpy(node->content + offset, buffer, size);
@@ -537,15 +542,16 @@ std::int32_t __tmpfs__var(userspace_fd_t* fd, char* path, std::uint64_t value, s
 
 std::int32_t __tmpfs__ls(userspace_fd_t* fd, char* path, vfs::dirent_t* out) {
 
+again:
+
     if(!path)
         return EFAULT;
 
-vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
+    vfs::tmpfs_node_t* node = __tmpfs__symfind(path);
 
     if(!node)
         return ENOENT;
 
-again:
     if(node->type != VFS_TYPE_DIRECTORY)
         return ENOTDIR;
 
@@ -558,9 +564,8 @@ again:
     vfs::tmpfs_node_t* next = (vfs::tmpfs_node_t*)(((std::uint64_t*)node->content)[fd->offset]);
 
     if(next == 0) { // null pointer fix 
-        out->d_reclen = 0;
-        memset(out->d_name,0,sizeof(out->d_name));
-        return 0; 
+        fd->offset++;
+        goto again; 
     }
 
     memset(out->d_name,0,sizeof(out->d_name));
@@ -619,11 +624,19 @@ std::int32_t __tmpfs__remove(userspace_fd_t* fd, char* path) {
     }
 
     if(parent) {
-        for(std::uint64_t i = 0; i < (node->size / 8);i++) {
-            std::uint64_t* entry = &(((std::uint64_t*)node->content)[i]);
-            *entry = 0;
+        if(parent->type == TMPFS_TYPE_DIRECTORY) {
+            std::uint64_t* cont = (std::uint64_t*)parent->content;
+            
+            for(std::uint64_t i = 0; i < (parent->size / 8); i++) {
+                if(cont[i] != 0) {
+                    vfs::tmpfs_node_t* chld_node = (vfs::tmpfs_node_t*)cont[i];
+                    if((std::uint64_t)chld_node == (std::uint64_t)node) {
+                        cont[i] = 0;
+                    }
+                }
+            }
         }
-    }
+     }
 
     memset(node->name,0,2048);
     __tmpfs__dealloc(node);

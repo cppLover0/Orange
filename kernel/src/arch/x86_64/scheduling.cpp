@@ -206,101 +206,103 @@ elfloadresult_t __scheduling_load_elf(arch::x86_64::process_t* proc, std::uint8_
         elfload.real_entry = (uint64_t)elf_vmm + head->e_entry;
     }
 
-    uint64_t strtab_offset = 0;
-    uint64_t strtab_addr = 0;
-    uint64_t strtab_size = 0;
+   if(proc->is_debug) {
+        uint64_t strtab_offset = 0;
+        uint64_t strtab_addr = 0;
+        uint64_t strtab_size = 0;
 
-    elfprogramheader_t* phdrz =0;
+        elfprogramheader_t* phdrz =0;
 
-    if(head->e_type != ET_DYN) {
-        phdrz = (elfprogramheader_t*)(phdr); 
-    } else 
-        phdrz = (elfprogramheader_t*)((phdr));  
-    elfprogramheader_t* dynamic_phdr = NULL;
+        if(head->e_type != ET_DYN) {
+            phdrz = (elfprogramheader_t*)(phdr); 
+        } else 
+            phdrz = (elfprogramheader_t*)((phdr));  
+        elfprogramheader_t* dynamic_phdr = NULL;
 
-    if(phdrz) {
-        for (int i = 0; i < head->e_phnum; i++) {
-            DEBUG(1,"phdr type %d",phdrz[i].p_type);
-            if (phdrz[i].p_type == PT_DYNAMIC) {
-                dynamic_phdr = &phdrz[i];
-                break;
-            }
-        }
-    }
-
-    if (dynamic_phdr == NULL) {
-        DEBUG(1, "DYNAMIC segment not found");
-        //goto end;
-    } else {
-        Elf64_Dyn* dyn;
-        if(head->e_type != ET_DYN) 
-            dyn = (Elf64_Dyn *)((char *)allocated_elf + (dynamic_phdr->p_vaddr - elf_base));
-        else
-            dyn = (Elf64_Dyn *)((char *)allocated_elf + (dynamic_phdr->p_vaddr));
-        uint64_t dyn_size = dynamic_phdr->p_filesz / sizeof(Elf64_Dyn);
-
-        for (uint64_t i = 0; i < dyn_size; i++) {
-            if (dyn[i].d_tag == DT_NULL) {
-                break;
-            }
-            
-            if (dyn[i].d_tag == DT_STRTAB) {
-                strtab_addr = dyn[i].d_un.d_ptr;
-            } else if (dyn[i].d_tag == DT_STRSZ) {
-                strtab_size = dyn[i].d_un.d_val;
-            }
-        }
-
-        if (strtab_addr == 0) {
-            DEBUG(1, ".dynstr string table not found");
-            //goto end;
-        }
-
-        for (int i = 0; i < head->e_phnum; i++) {
-            if (phdrz[i].p_type == PT_LOAD) {
-                uint64_t vaddr = phdrz[i].p_vaddr;
-                uint64_t memsz = phdrz[i].p_memsz;
-                uint64_t offset = phdrz[i].p_offset;
-                
-                if (strtab_addr >= vaddr && strtab_addr < vaddr + memsz) {
-                    strtab_offset = offset + (strtab_addr - vaddr);
+        if(phdrz) {
+            for (int i = 0; i < head->e_phnum; i++) {
+                DEBUG(1,"phdr type %d",phdrz[i].p_type);
+                if (phdrz[i].p_type == PT_DYNAMIC) {
+                    dynamic_phdr = &phdrz[i];
                     break;
                 }
             }
         }
 
-        if (strtab_offset == 0) {
-            DEBUG(1, "Could not find string table offset in file");
+        if (dynamic_phdr == NULL) {
+            DEBUG(1, "DYNAMIC segment not found");
             //goto end;
-        }
+        } else {
+            Elf64_Dyn* dyn;
+            if(head->e_type != ET_DYN) 
+                dyn = (Elf64_Dyn *)((char *)allocated_elf + (dynamic_phdr->p_vaddr - elf_base));
+            else
+                dyn = (Elf64_Dyn *)((char *)allocated_elf + (dynamic_phdr->p_vaddr));
+            uint64_t dyn_size = dynamic_phdr->p_filesz / sizeof(Elf64_Dyn);
 
-        char *strtab = (char *)allocated_elf + strtab_offset;
-        int dep_count = 0;
-
-        DEBUG(1, "proc %d libraries", proc->id);
-
-        // Теперь ищем зависимости
-        for (uint64_t i = 0; i < dyn_size; i++) {
-            if (dyn[i].d_tag == DT_NULL) {
-                break;
-            }
-            
-            if (dyn[i].d_tag == DT_NEEDED) {
-                uint64_t str_offset = dyn[i].d_un.d_val;
+            for (uint64_t i = 0; i < dyn_size; i++) {
+                if (dyn[i].d_tag == DT_NULL) {
+                    break;
+                }
                 
-                if (str_offset < strtab_size) {
-                    DEBUG(1, "  %s", strtab + str_offset);
-                    dep_count++;
-                } else {
-                    DEBUG(1, "  [Error: string offset out of bounds]");
+                if (dyn[i].d_tag == DT_STRTAB) {
+                    strtab_addr = dyn[i].d_un.d_ptr;
+                } else if (dyn[i].d_tag == DT_STRSZ) {
+                    strtab_size = dyn[i].d_un.d_val;
                 }
             }
-        }
 
-        if (dep_count == 0) {
-            DEBUG(1, "  (no dependencies found)");
+            if (strtab_addr == 0) {
+                DEBUG(1, ".dynstr string table not found");
+                //goto end;
+            }
+
+            for (int i = 0; i < head->e_phnum; i++) {
+                if (phdrz[i].p_type == PT_LOAD) {
+                    uint64_t vaddr = phdrz[i].p_vaddr;
+                    uint64_t memsz = phdrz[i].p_memsz;
+                    uint64_t offset = phdrz[i].p_offset;
+                    
+                    if (strtab_addr >= vaddr && strtab_addr < vaddr + memsz) {
+                        strtab_offset = offset + (strtab_addr - vaddr);
+                        break;
+                    }
+                }
+            }
+
+            if (strtab_offset == 0) {
+                DEBUG(1, "Could not find string table offset in file");
+                //goto end;
+            }
+
+            char *strtab = (char *)allocated_elf + strtab_offset;
+            int dep_count = 0;
+
+            DEBUG(1, "proc %d libraries", proc->id);
+
+            // Теперь ищем зависимости
+            for (uint64_t i = 0; i < dyn_size; i++) {
+                if (dyn[i].d_tag == DT_NULL) {
+                    break;
+                }
+                
+                if (dyn[i].d_tag == DT_NEEDED) {
+                    uint64_t str_offset = dyn[i].d_un.d_val;
+                    
+                    if (str_offset < strtab_size) {
+                        DEBUG(1, "  %s", strtab + str_offset);
+                        dep_count++;
+                    } else {
+                        DEBUG(1, "  [Error: string offset out of bounds]");
+                    }
+                }
+            }
+
+            if (dep_count == 0) {
+                DEBUG(1, "  (no dependencies found)");
+            }
         }
-    }
+   }
 
 end:
     elfload.base = (std::uint64_t)elf_vmm;

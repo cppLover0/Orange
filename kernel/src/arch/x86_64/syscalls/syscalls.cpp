@@ -166,7 +166,7 @@ arch::x86_64::syscall_item_t sys_table[] = {
     {452,(void*)sys_fchmodat2},
     {326,(void*)sys_stub},
     {285,(void*)sys_stub},
-    {77,(void*)sys_zero_stub}, // todo implement ftrunc
+    {77,(void*)sys_stub}, // todo implement ftrunc
     {95,(void*)sys_umask},
     {230,(void*)sys_nanosleep},
     {55,(void*)sys_getsockopt},
@@ -248,7 +248,7 @@ extern "C" void syscall_handler_c(int_frame_t* ctx) {
     long long ret = sys(ctx->rdi,ctx->rsi,ctx->rdx,ctx);
     ctx->rax = ret;
 
-    if(1)
+    if(proc->is_debug)
         DEBUG(ret < 0,"sys %d failed with code %lli",item->syscall_num,ctx->rax);
 
     //DEBUG(1,"sys %d ret %d",item->syscall_num,ctx->rax);

@@ -26,6 +26,11 @@ vfs::vfs_node_t* find_node(char* path) {
                 match = &vfs_nodes[i];
             }
         }
+
+        if(!strncmp(path, vfs_nodes[i].path,strlen(vfs_nodes[i].path) - 1) && path[strlen(vfs_nodes[i].path) + 1] == '\0') {
+            return &vfs_nodes[i];
+        }
+
     }
     return match;
 }

@@ -5,6 +5,13 @@
 #define XHCI_RESET_TIMEOUT 1000
 
 typedef struct {
+    unsigned char buttons;
+    unsigned char x;
+    unsigned char y;
+    unsigned char z;
+} __attribute__((packed)) mouse_packet_t;
+
+typedef struct {
     uint32_t maxslots : 8;
     uint32_t maxintrs : 11;
     uint32_t reserved1 : 5;
@@ -461,6 +468,8 @@ typedef struct xhci_usb_device {
     uint32_t portnum;
     uint32_t type;
     uint8_t _is64byte;
+    mouse_packet_t last_pack;
+    int evdev_num;
     uint8_t add_buffer[8];
 } xhci_usb_device_t;
 
