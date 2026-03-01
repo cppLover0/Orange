@@ -1,14 +1,14 @@
-
 #include <cstdint>
-#include <generic/mm/pmm.hpp>
-#include <generic/mm/paging.hpp>
-#include <generic/mm/heap.hpp>
-#include <arch/x86_64/cpu/data.hpp>
+#include <generic/heap.hpp>
 #include <arch/x86_64/cpu/gdt.hpp>
-#include <etc/libc.hpp>
-#include <config.hpp>
+#include <generic/pmm.hpp>
+#include <generic/hhdm.hpp>
+#include <klibc/stdio.hpp>
+#include <arch/x86_64/cpu_local.hpp>
 
-gdt_t original_gdt = {
+#define KERNEL_STACK_SIZE 32 * 1024
+
+x86_64::gdt::gdt_t original_gdt = {
     {0,0,0,0,0,0}, /* 0x0 Null */
     {0,0,0,0x9a,0xa2,0}, /* 0x08 64 bit code */
     {0,0,0,0x92,0xa0,0}, /* just align user data and user code */
@@ -17,36 +17,35 @@ gdt_t original_gdt = {
     {0x68,0,0,0x89,0x20,0,0,0} /* 0x28 tss */
 };
 
-void arch::x86_64::cpu::gdt::init() {
-    arch::x86_64::cpu::gdt* new_gdt = (arch::x86_64::cpu::gdt*)memory::heap::malloc(sizeof(arch::x86_64::cpu::gdt));
+void x86_64::gdt::init() {
+    gdt_t* new_gdt = new gdt_t;
     tss_t* tss = new tss_t;
-    
-    /* For optimizations kheap doesn't zero memory */
-    memset(&new_gdt->gdt_obj,0,sizeof(gdt_t));
-    memset(tss,0,sizeof(tss_t));
 
-    memcpy(&new_gdt->gdt_obj,&original_gdt,sizeof(gdt_t));
+    gdt_pointer_t* gdtr = new gdt_pointer_t;
+    klibc::memcpy(new_gdt,&original_gdt,sizeof(gdt_t));
 
-    tss->rsp[0] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE);
-    tss->ist[0] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* Exceptions */
-    tss->ist[1] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* Timer */
-    tss->ist[2] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* IRQ Layout */
-    tss->ist[3] = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); /* For ignorestub */
+    tss->rsp[0] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm());
+    tss->ist[0] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* Exceptions */
+    tss->ist[1] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* Timer */
+    tss->ist[2] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* IRQ Layout */
+    tss->ist[3] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* For ignorestub */
 
     tss->iopb_offsset = sizeof(tss_t);
-    new_gdt->gdt_obj.tss.baselow16 = (std::uint64_t)tss & 0xFFFF;
-    new_gdt->gdt_obj.tss.basemid8 = ((std::uint64_t)tss >> 16) & 0xFF;
-    new_gdt->gdt_obj.tss.basehigh8 = ((std::uint64_t)tss >> 24) & 0xFF;
-    new_gdt->gdt_obj.tss.baseup32 = (std::uint64_t)tss >> 32;
+    new_gdt->tss.baselow16 = (std::uint64_t)tss & 0xFFFF;
+    new_gdt->tss.basemid8 = ((std::uint64_t)tss >> 16) & 0xFF;
+    new_gdt->tss.basehigh8 = ((std::uint64_t)tss >> 24) & 0xFF;
+    new_gdt->tss.baseup32 = (std::uint64_t)tss >> 32;
 
-    new_gdt->gdtr.size = sizeof(gdt_t) - 1;
-    new_gdt->gdtr.base = (std::uint64_t)&new_gdt->gdt_obj;
+    gdtr->size = sizeof(gdt_t) - 1;
+    gdtr->base = (std::uint64_t)new_gdt;
 
-    new_gdt->LoadGDT();
-    new_gdt->LoadTSS();
+    load_gdt(gdtr);
+    load_tss();
 
-    /* Also i want to init cpu data too */
-    auto cpudata = arch::x86_64::cpu::data();
-    cpudata->timer_ist_stack = memory::pmm::helper::alloc_kernel_stack(KERNEL_STACK_SIZE); 
+    x86_64::restore_cpu_data();
+    auto cpudata = x86_64::cpu_data();
+    cpudata->timer_ist_stack = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm());
+
+    klibc::printf("GDT: tss->rsp0 0x%p tss->ist0 0x%p\r\n",tss->rsp[0],tss->ist[0],tss->ist[1],tss->ist[2],tss->ist[3],cpudata->timer_ist_stack);
 
 }

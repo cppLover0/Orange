@@ -1,9 +1,13 @@
 /compile_commands.json
 /.cache
+/.deps-obtained
 /freestnd-c-hdrs
 /freestnd-cxx-hdrs
 /cc-runtime
-/src/limine.h
-/bin
-/obj
-
+/limine-protocol
+/bin-*
+/obj-*
+/nanoprintf
+/uacpi
+/flanterm
+/stb
