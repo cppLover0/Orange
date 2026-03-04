@@ -1,5 +1,7 @@
 
 #include <cstdint>
+#include <arch/aarch64/cpu/el.hpp>
+#include <arch/aarch64/cpu/timer.hpp>
 #include <generic/arch.hpp>
 
 namespace arch {
@@ -24,7 +26,10 @@ namespace arch {
 
     [[gnu::weak]] void tlb_flush(std::uintptr_t hint, std::uintptr_t len) {
         if (len / PAGE_SIZE > 256 || len == 0) {
-            asm volatile("tlbi alle1\n" "dsb ish\n" "isb\n" : : : "memory");
+            __asm__ volatile("dsb ishst" : : : "memory");
+            __asm__ volatile("tlbi vmalle1is" : : : "memory");
+            __asm__ volatile("dsb ish" : : : "memory");
+            __asm__ volatile("isb" : : : "memory");
         } else {
             for (std::uintptr_t i = 0; i < len; i += PAGE_SIZE) {
                 std::uintptr_t addr = hint + i;
@@ -48,7 +53,14 @@ namespace arch {
     }
 
     [[gnu::weak]] void init(int stage) {
-        (void)stage;
+        switch(stage) {
+        case ARCH_INIT_EARLY:
+            aarch64::el::init();
+            aarch64::timer::init();
+            return;
+        case ARCH_INIT_COMMON:
+            return;
+        } 
     }
 
 }

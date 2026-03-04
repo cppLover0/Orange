@@ -3,6 +3,7 @@
 #include <arch/x86_64/cpu/idt.hpp>
 #include <utils/bitmap.hpp>
 #include <klibc/stdio.hpp>
+#include <arch/x86_64/cpu/lapic.hpp>
 
 x86_64::idt::idt_entry_t idt_entries[255];
 utils::bitmap* idt_bitmap;
@@ -11,7 +12,7 @@ x86_64::idt::idtr_t idtr;
 extern "C" void* isrTable[];
 
 extern "C" void ignoreStubC() {
-    
+    x86_64::lapic::eoi();
 }
 
 void x86_64::idt::init() {
@@ -32,6 +33,8 @@ void x86_64::idt::init() {
 
     idt_bitmap->set(32);
     load();
+
+    klibc::printf("IDT: IDTR is 0x%p\r\n",&idtr);
 }
 
 void x86_64::idt::load() {

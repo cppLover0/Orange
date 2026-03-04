@@ -7,10 +7,11 @@
 #include <generic/paging.hpp>
 #include <generic/heap.hpp>
 #include <drivers/acpi.hpp>
+#include <generic/time.hpp>
 
 extern std::size_t memory_size;
 
-extern "C" void kmain() {
+extern "C" void main() {
     utils::cxx::init_constructors();
     bootloader::init();
     utils::flanterm::init();
@@ -28,6 +29,10 @@ extern "C" void kmain() {
     extern int is_early;
     is_early = 0;
     klibc::printf("Boot is done\r\n");
-    //*(int*)0x100 = 0;
+    klibc::printf("current sec %lli, waiting 2 sec and page faulting\r\n",time::timer->current_nano() / (1000 * 1000 * 1000));
+    klibc::printf("current sec %lli\r\n",time::timer->current_nano() / (1000 * 1000 * 1000));
+    arch::tlb_flush(0x47afe000,PAGE_SIZE);
+    *(int*)0x47afe710 = 0;
+    
     arch::hcf();
 }

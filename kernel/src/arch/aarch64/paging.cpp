@@ -4,6 +4,7 @@
 #include <generic/hhdm.hpp>
 #include <generic/pmm.hpp>
 #include <utils/gobject.hpp>
+#include <klibc/stdio.hpp>
 
 #define PTE_MASK_VALUE 0x0000fffffffff000
 #define PTE_PRESENT (1 << 0)
@@ -77,11 +78,11 @@ void aarch64_map_page(std::uintptr_t root, std::uintptr_t phys, std::uintptr_t v
 
 namespace arch {
     [[gnu::weak]] void enable_paging(std::uintptr_t root) {
-        asm volatile("msr ttbr0_el1, %0" : : "r"(root) : "memory");
         if (root == gobject::kernel_root) {
             asm volatile("msr ttbr1_el1, %0" : : "r"(root) : "memory");
             asm volatile("dsb ish; tlbi vmalle1; dsb ish; isb" : : : "memory");
         } else {
+            asm volatile("msr ttbr0_el1, %0" : : "r"(root) : "memory");
             asm volatile("dsb ish; tlbi vmalle1; dsb ish; isb" : : : "memory");
         }
     }
