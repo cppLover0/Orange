@@ -33,12 +33,12 @@ std::uint8_t gaster[] = {
 #embed "src/gaster.txt"
 };
 
-void print_ascii_art() {
+void x86_64::panic::print_ascii_art() {
     klibc::printf("%s\n",gaster);
 }
 
 extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
-    print_ascii_art();
+    x86_64::panic::print_ascii_art();
     print_regs(frame);
     arch::hcf();
 }

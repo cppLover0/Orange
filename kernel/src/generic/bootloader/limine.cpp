@@ -27,6 +27,7 @@ __attribute__((used, section(".limine_requests"))) volatile limine_hhdm_request 
 
 __attribute__((used, section(".limine_requests"))) volatile limine_executable_address_request kaddr_request = { .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST_ID, .revision = 0, .response = nullptr };
 
+__attribute__((used, section(".limine_requests"))) volatile limine_mp_request mp_request = { .id = LIMINE_MP_REQUEST_ID, .revision = 0, .response = nullptr, .flags = 0};
 
 __attribute__((used, section(".limine_requests"))) volatile limine_rsdp_request rsdp_request = { .id = LIMINE_RSDP_REQUEST_ID, .revision = 0, .response = nullptr };
 
@@ -72,6 +73,10 @@ namespace bootloader {
 
     limine_memmap_response* limine::get_memory_map() {
         return memmap_request.response;
+    }
+
+    limine_mp_response* limine::get_mp_info() {
+        return mp_request.response;
     }
 
 #if defined(__x86_64__)

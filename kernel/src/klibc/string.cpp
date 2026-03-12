@@ -3,26 +3,43 @@
 #include <klibc/string.hpp>
 
 void* klibc::memcpy(void *__restrict dest, const void *__restrict src, std::size_t n) {
+#if defined(__x86_64__)
+    asm volatile(
+        "rep movsb"
+        : "+D"(dest), "+S"(src), "+c"(n)
+        :
+        : "memory"
+    );
+    return dest; 
+#else
     std::uint8_t *__restrict pdest = static_cast<std::uint8_t *__restrict>(dest);
     const std::uint8_t *__restrict psrc = static_cast<const std::uint8_t *__restrict>(src);
 
     for (std::size_t i = 0; i < n; i++) {
         pdest[i] = psrc[i];
     }
-
     return dest;
+#endif
 }
 
 void* klibc::memset(void *s, int c, std::size_t n) {
+#if defined(__x86_64__)
+    void* original_s = s;
+    asm volatile(
+        "rep stosb"
+        : "+D"(s), "+c"(n)
+        : "a"((std::uint8_t)c)
+        : "memory"
+    );
+    return original_s;
+#else
     std::uint8_t *p = static_cast<std::uint8_t *>(s);
-
     for (std::size_t i = 0; i < n; i++) {
-        p[i] = static_cast<uint8_t>(c);
+        p[i] = static_cast<std::uint8_t>(c);
     }
-
     return s;
+#endif
 }
-
 void* klibc::memmove(void *dest, const void *src, std::size_t n) {
     std::uint8_t *pdest = static_cast<std::uint8_t *>(dest);
     const std::uint8_t *psrc = static_cast<const std::uint8_t *>(src);

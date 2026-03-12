@@ -23,7 +23,7 @@ void kheap::init() {
     
 }
 
-int is_early = 1;
+int is_early = 0;
 
 void kheap::opt_free(void* ptr) {
     if(!is_early) {

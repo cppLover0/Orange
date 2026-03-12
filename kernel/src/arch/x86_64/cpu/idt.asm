@@ -194,7 +194,7 @@ irqStub:
     push rax
     mov rdi,rsp
     xor rbp,rbp
-    nop
+    call irqHandler
     pop rax
     mov cr3,rax
     pop rax

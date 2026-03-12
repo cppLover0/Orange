@@ -46,6 +46,7 @@ void x86_64::gdt::init() {
     auto cpudata = x86_64::cpu_data();
     cpudata->timer_ist_stack = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm());
 
-    klibc::printf("GDT: tss->rsp0 0x%p tss->ist0 0x%p\r\n",tss->rsp[0],tss->ist[0],tss->ist[1],tss->ist[2],tss->ist[3],cpudata->timer_ist_stack);
+    static bool is_print = 0;
+    if(!is_print) { klibc::printf("GDT: tss->rsp0 0x%p tss->ist0 0x%p\r\n",tss->rsp[0],tss->ist[0],tss->ist[1],tss->ist[2],tss->ist[3],cpudata->timer_ist_stack); is_print = 1; }
 
 }

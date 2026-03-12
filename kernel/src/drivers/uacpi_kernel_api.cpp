@@ -5,6 +5,7 @@
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/io.hpp>
 #include <arch/x86_64/drivers/pci.hpp>
+#include <arch/x86_64/irq.hpp>
 #endif
 #include <generic/bootloader/bootloader.hpp>
 #include <generic/hhdm.hpp>
@@ -349,6 +350,21 @@ uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request*) {
     return UACPI_STATUS_OK;
 }
 
+#if defined(__x86_64__)
+
+uacpi_status uacpi_kernel_install_interrupt_handler(
+    uacpi_u32 irq, uacpi_interrupt_handler base, uacpi_handle ctx,
+    uacpi_handle *out_irq_handle
+) {
+    (void)ctx;
+    std::uint8_t vec = x86_64::irq::create(irq, IRQ_TYPE_LEGACY, (void (*)(void*))((void*)base), 0, 0);
+    *out_irq_handle = (uacpi_handle)((std::uint64_t)vec);
+
+    return UACPI_STATUS_OK;
+}
+
+#else
+
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler base, uacpi_handle ctx,
     uacpi_handle *out_irq_handle
@@ -358,6 +374,20 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     (void)ctx;
     (void)out_irq_handle;
     return UACPI_STATUS_OK;
+}
+
+#endif
+
+uacpi_interrupt_state uacpi_kernel_disable_interrupts(void) {
+    return 1;
+}
+
+/*
+ * Restore the state of the interrupt flags to the kernel-defined value provided
+ * in 'state'.
+ */
+void uacpi_kernel_restore_interrupts(uacpi_interrupt_state state) {
+    (void)state;
 }
 
 uacpi_status uacpi_kernel_uninstall_interrupt_handler(

@@ -2,3 +2,4 @@
 /edk2-ovmf
 *.iso
 *.hdd
+disk.img

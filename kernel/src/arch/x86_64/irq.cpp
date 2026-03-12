@@ -2,6 +2,7 @@
 #include <arch/x86_64/irq.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <arch/x86_64/drivers/ioapic.hpp>
+#include <arch/x86_64/cpu/xapic.hpp>
 #include <cstdint>
 
 irq_t irq_table[255];
@@ -16,7 +17,7 @@ extern "C" void irqHandler(x86_64::idt::int_frame_t* ctx) {
 
     irq_table[ctx->vec - 1].func(irq_table[ctx->vec - 1].arg);
 
-    x86_64::lapic::eoi();
+    x86_64::apic::eoi();
 
     if(ctx->cs & 3)
         ctx->ss |= 3;

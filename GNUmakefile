@@ -5,7 +5,7 @@
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 256M -d int -no-reboot 
+QEMUFLAGS := -m 256M -d int -no-reboot -serial stdio
 
 override IMAGE_NAME := orange-$(ARCH)
 
@@ -30,9 +30,9 @@ run-hdd: run-hdd-$(ARCH)
 
 .PHONY: run-x86_64
 run-x86_64: edk2-ovmf $(IMAGE_NAME).iso
-	qemu-system-$(ARCH) \
-		-enable-kvm \
+	qemu-system-$(ARCH)  \
 		-M q35 \
+		-enable-kvm -cpu host,+x2apic,+la57 \
 		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
 		-cdrom $(IMAGE_NAME).iso \
 		$(QEMUFLAGS)

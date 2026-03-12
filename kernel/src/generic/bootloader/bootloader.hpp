@@ -12,6 +12,7 @@ namespace bootloader {
         virtual std::uint64_t get_kernel_phys() = 0;
         virtual std::uintptr_t get_kernel_virt() = 0;
         virtual limine_memmap_response* get_memory_map() = 0;
+        virtual limine_mp_response* get_mp_info() = 0;
         virtual bool is_5_level_paging() = 0;
     };
 

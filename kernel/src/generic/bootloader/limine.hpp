@@ -10,6 +10,7 @@ public:
         std::uint64_t get_kernel_phys() override;
         std::uint64_t get_kernel_virt() override;
         limine_memmap_response* get_memory_map() override;
+        limine_mp_response* get_mp_info() override;
         bool is_5_level_paging() override;
     };
 };

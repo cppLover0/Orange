@@ -10,6 +10,7 @@
 
 #define ARCH_INIT_EARLY 0
 #define ARCH_INIT_COMMON 1
+#define ARCH_INIT_MP 2
 #define IRQ_TYPE_OTHER 0 
 #define IRQ_TYPE_LEGACY 1 
 #define IRQ_TYPE_MSI 2 
@@ -32,6 +33,10 @@ namespace arch {
     extern void destroy_root(std::uintptr_t root, int level);
     extern void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root);
     extern int level_paging();
+
+    extern std::uint64_t current_root();
+
+    extern void memory_barrier();
 
     extern int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg);
 

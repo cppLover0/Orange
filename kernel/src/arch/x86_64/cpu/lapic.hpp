@@ -9,10 +9,10 @@
 #include <utils/gobject.hpp>
 #include <arch/x86_64/assembly.hpp>
 #include <klibc/stdio.hpp>
-
 namespace x86_64 {
 
         inline int is_lapic_init = 0;
+        inline int is_x2apic = 0;
 
         class lapic {
 
@@ -21,46 +21,27 @@ namespace x86_64 {
                 }
 
                 static inline std::uint32_t read(std::uint32_t reg) {
-                    return *(volatile std::uint32_t*)(base() + reg); 
+                    if(is_x2apic) {
+                        return assembly::rdmsr(0x800 + (reg >> 4));
+                    } else {
+                        return *(volatile std::uint32_t*)(base() + reg); 
+                    }
                 }
 
                 static inline void write(std::uint32_t reg,std::uint32_t value) {
-                    *(volatile std::uint32_t*)(base() + reg) = value;
+                    if(is_x2apic) {
+                        assembly::wrmsr(0x800 + (reg >> 4), value);
+                    } else {
+                        *(volatile std::uint32_t*)(base() + reg) = value;
+                    }
                 }
 
             public:
 
-                static inline std::uint32_t id() {
-                    return read(0x20) >> 24;
-                }
-
-                static inline void eoi() {
-                    write(0xB0,0);
-                }
-
-                static inline void tick(std::uint64_t tick) {
-                    write(0x380,tick);
-                }
-
-                static inline std::uint64_t init(std::uint32_t us) {
-                    assembly::wrmsr(0x1B,assembly::rdmsr(0x1B));
-                    paging::map_range(gobject::kernel_root,assembly::rdmsr(0x1B) & 0xFFFFF000,(assembly::rdmsr(0x1B) & 0xFFFFF000) + etc::hhdm(),PAGE_SIZE, PAGING_PRESENT | PAGING_RW);
-                    write(0xf0,0xff | 0x100);
-                    write(0x3e0,1);
-                    write(0x320,32 | (1 << 16));
-                    write(0x380,0xFFFFFFFF);
-                    time::timer->sleep(us);
-                    std::uint64_t ticks = 0xFFFFFFFF - read(0x390);
-                    write(0x320, 32 | (1 << 17));
-                    write(0x3e0,1);
-                    write(0x380,0);
-
-                    if(!is_lapic_init) {
-                        klibc::printf("LAPIC: Calibration time is %lli, ticks %lli\r\n",us,ticks);
-                        is_lapic_init = 1;
-                    }
-
-                    return ticks;
-                }
+                static std::uint32_t id();
+                static void eoi();
+                static void off();
+                static void tick(std::uint64_t tick);
+                static std::uint64_t init(std::uint32_t us);
             };
 };

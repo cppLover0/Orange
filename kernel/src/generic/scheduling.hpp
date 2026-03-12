@@ -1,0 +1,64 @@
+#pragma once
+#include <cstdint>
+#if defined(__x86_64__)
+#include <arch/x86_64/cpu/idt.hpp>
+#elif defined(__aarch64__)
+#include <arch/aarch64/cpu/el.hpp>
+#endif
+#include <utils/signal.hpp>
+#include <generic/lock/spinlock.hpp>
+#include <atomic>
+
+#define PROCESS_NONE 1
+#define PROCESS_LIVE 2
+#define PROCESS_KILLED 3
+#define PROCESS_ZOMBIE 4
+#define PROCESS_SLEEP 5
+
+struct signal_member {
+    void* restorer;
+    void* handler;
+    std::uint32_t flags;
+};
+
+struct thread {
+    std::uint32_t id;
+    std::uint32_t pid;
+    std::uint32_t exit_code;
+#if defined(__x86_64__)
+    std::uint8_t* sse_ctx;
+    std::uint64_t fs_base;
+    x86_64::idt::int_frame_t ctx;
+#elif defined(__aarch64__)
+    aarch64::el::int_frame ctx;
+#endif
+    signal_manager* sig;
+    signal_member signals_handlers[32];
+    sig_stack signal_stack;
+    locks::spinlock lock;
+    std::atomic<std::uint32_t> futex;
+    std::atomic<std::uint32_t> status;
+    std::atomic<std::uint32_t> cpu;
+    std::uint64_t syscall_stack;
+    std::uint64_t original_root;
+
+    char* name;
+    char* cwd;
+    char* chroot;
+    thread* next;
+};
+
+static_assert(sizeof(thread) < 4096, "thread struct is bigger than page size (bug)");
+
+namespace process {
+    thread* create_process(bool is_user);
+    thread* by_id(std::uint32_t id);
+    thread* kthread(void (*func)(void*), void* arg);
+    void wakeup(thread* thread);
+    void kill(thread* thread);
+
+    extern "C" void schedule(void* frame);
+
+    extern "C" void switch_ctx(void* frame);
+    extern "C" void yield();
+};

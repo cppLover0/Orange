@@ -52,6 +52,10 @@ namespace arch {
         return 4;
     }
 
+    [[gnu::weak]] void memory_barrier() {
+        asm volatile("" ::: "memory"); 
+    }
+
     [[gnu::weak]] void init(int stage) {
         switch(stage) {
         case ARCH_INIT_EARLY:

@@ -16,6 +16,10 @@ namespace arch {
         asm volatile("wfi"); 
     }
     
+    [[gnu::weak]] void memory_barrier() {
+        asm volatile("" ::: "memory"); 
+    }
+
     [[gnu::weak]] void hcf() {
         disable_interrupts();
         while(true) {

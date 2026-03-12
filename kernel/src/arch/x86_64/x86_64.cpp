@@ -12,6 +12,9 @@
 #include <arch/x86_64/irq.hpp>
 #include <klibc/stdio.hpp>
 #include <arch/x86_64/drivers/ioapic.hpp>
+#include <arch/x86_64/schedule_timer.hpp>
+#include <utils/gobject.hpp>
+#include <arch/x86_64/cpu/sse.hpp>
 
 namespace arch {
     [[gnu::weak]] void disable_interrupts() {
@@ -35,6 +38,12 @@ namespace arch {
 
     [[gnu::weak]] void pause() {
         asm volatile("pause");
+    }
+
+    [[gnu::weak]] std::uint64_t current_root() {
+        std::uint64_t cr3;
+        asm volatile("mov %%cr3, %0" : "=r"(cr3) : : "memory");
+        return cr3;
     }
 
     [[gnu::weak]] void tlb_flush(std::uintptr_t hint, std::uintptr_t len) {
@@ -67,6 +76,19 @@ namespace arch {
             x86_64::idt::init();
             x86_64::lapic::init(1500);
             drivers::ioapic::init();
+            x86_64::schedule_timer::init();
+            x86_64::sse::init();
+            x86_64::sse::print_sse_features();
+            return;
+        case ARCH_INIT_MP:
+            enable_paging(gobject::kernel_root);
+            x86_64::init_cpu_data();
+            drivers::tsc::init();
+            x86_64::gdt::init();
+            x86_64::idt::init();
+            x86_64::lapic::init(1500);
+            x86_64::schedule_timer::init();
+            x86_64::sse::init();
             return;
         case ARCH_INIT_COMMON:
             return;
@@ -74,8 +96,12 @@ namespace arch {
     }
 
     [[gnu::weak]] void panic(char* msg) {
-        x86_64::panic::print_ascii_art();
         klibc::printf("Panic with message \"%s\"\r\n",msg);
+        arch::hcf();
+    }
+
+    [[gnu::weak]] void memory_barrier() {
+        asm volatile("lfence" ::: "memory");
     }
 
     [[gnu::weak]] int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg) {

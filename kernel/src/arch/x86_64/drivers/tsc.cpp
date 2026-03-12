@@ -54,7 +54,8 @@ void drivers::tsc::init() {
     
     x86_64::cpu_data()->tsc_freq = tsc_freq;
 
-    klibc::printf("TSC: TSC Frequency is %llu\r\n", tsc_freq);
+    static bool is_print = 0;
+    if(!is_print) {klibc::printf("TSC: TSC Frequency is %llu\r\n", tsc_freq); is_print = 1;}
     drivers::tsc_timer* tsc_timer = new drivers::tsc_timer;
     time::setup_timer(tsc_timer);
 }

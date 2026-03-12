@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include <arch/x86_64/cpu_local.hpp>
 #include <arch/x86_64/assembly.hpp>
+#include <generic/scheduling.hpp>
 #include <klibc/string.hpp>
 #include <klibc/stdio.hpp>
 #include <generic/arch.hpp>
@@ -13,7 +13,9 @@ typedef struct {
     std::uint64_t user_stack;
     std::uint64_t kernel_stack;
     std::uint64_t timer_ist_stack;
+    std::uint32_t cpu;
     std::uint64_t tsc_freq;
+    thread* current_thread;
 } cpudata_t;
 
 namespace x86_64 {
