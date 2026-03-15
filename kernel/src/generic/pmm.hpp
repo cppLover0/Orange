@@ -18,7 +18,6 @@ typedef struct buddy_info {
     };
     struct buddy_info* parent;
     struct buddy_info* twin;
-    std::uint32_t id;
     std::uint64_t phys;
 } __attribute__((packed)) buddy_info_t;
 

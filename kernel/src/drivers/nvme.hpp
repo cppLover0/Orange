@@ -3,9 +3,10 @@
 #include <drivers/disk.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/lock/spinlock.hpp>
+#include <generic/lock/mutex.hpp>
 #include <generic/arch.hpp>
 
-#define NVME_ORANGE_TRACE 
+//#define NVME_ORANGE_TRACE 
 
 #define NVME_REG_CAP 0x00 // Controller Capabilities
 #define NVME_REG_VS 0x08 // Version
@@ -124,7 +125,7 @@ struct nvme_pair_queue {
     std::uint8_t qid;
     volatile std::uint32_t* sq_doorbell;
     volatile std::uint32_t* cq_doorbell;
-    locks::spinlock lock;
+    locks::mutex lock;
 };
 
 struct nvme_controller {

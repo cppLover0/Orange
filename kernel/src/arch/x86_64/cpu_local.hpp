@@ -15,6 +15,7 @@ typedef struct {
     std::uint64_t timer_ist_stack;
     std::uint32_t cpu;
     std::uint64_t tsc_freq;
+    void* pvclock_buffer;
     thread* current_thread;
 } cpudata_t;
 

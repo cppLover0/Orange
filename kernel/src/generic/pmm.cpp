@@ -75,9 +75,6 @@ void pmm::buddy::merge(buddy_info_t* budy) {
     blud->is_splitted = 0;
     blud->is_was_splitted = 1;
     blud->is_free = 1;
-    blud->id = 0;
-    bl->id = 0;
-    ud->id = 0;
     if(blud->parent)
         merge(blud);
     return;
@@ -177,7 +174,6 @@ int pmm::buddy::nlfree(std::uint64_t phys) {
     if(!blud || blud->is_splitted)
         return -1;
     blud->is_free = 1;
-    blud->id = 0;
     if(blud->parent)
         merge(blud);
     return 0;

@@ -34,6 +34,8 @@ namespace arch {
     extern void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root);
     extern int level_paging();
 
+    extern bool test_interrupts();
+
     extern std::uint64_t current_root();
 
     extern void memory_barrier();

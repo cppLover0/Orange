@@ -15,6 +15,7 @@
 #include <arch/x86_64/schedule_timer.hpp>
 #include <utils/gobject.hpp>
 #include <arch/x86_64/cpu/sse.hpp>
+#include <arch/x86_64/drivers/pvclock.hpp>
 
 namespace arch {
     [[gnu::weak]] void disable_interrupts() {
@@ -72,6 +73,7 @@ namespace arch {
             x86_64::init_cpu_data();
             drivers::hpet::init();
             drivers::tsc::init();
+            drivers::pvclock::bsp_init();
             x86_64::gdt::init();
             x86_64::idt::init();
             x86_64::lapic::init(1500);
@@ -84,6 +86,7 @@ namespace arch {
             enable_paging(gobject::kernel_root);
             x86_64::init_cpu_data();
             drivers::tsc::init();
+            drivers::pvclock::init();
             x86_64::gdt::init();
             x86_64::idt::init();
             x86_64::lapic::init(1500);
@@ -107,5 +110,15 @@ namespace arch {
     [[gnu::weak]] int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg) {
         return x86_64::irq::create(irq,type,func,arg,flags);
     }
+
+    [[gnu::weak]] bool test_interrupts() {
+        uint64_t rflags;
+        __asm__ __volatile__ (
+            "pushfq\n\t"
+            "pop %0" : "=rm" (rflags): : "memory"
+        );
+        return (rflags & (1 << 9)) != 0;
+    }
+
 
 }

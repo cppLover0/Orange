@@ -109,6 +109,6 @@ namespace drivers {
     }
 
     int tsc_timer::get_priority() {
-        return 9999999; // undertale reference
+        return 9999; 
     }
 }

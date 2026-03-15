@@ -124,7 +124,7 @@ bool nvme_wait_io(nvme_pair_queue* queue, uint64_t timeout_ms) {
             uint16_t status_code = (cq[queue->cq_head].status >> 1) & 0xFF;
 
             queue->cq_head++;
-            if (queue->cq_head > 63) {
+            if (queue->cq_head > 1) {
                 queue->cq_head = 0;
                 queue->phase ^= 1;
             }
@@ -215,7 +215,7 @@ bool nvme_write(void* arg, char* buffer, std::uint64_t lba, std::size_t len_in_b
 
     std::size_t lba_size = disk->ctrl->namespaces[disk->nsid - 1].lba_size;
 
-    assert(((std::uint64_t)buffer & PAGE_SIZE) == 0, "Unaligned buffer\r\n");
+    assert(((std::uint64_t)buffer & (PAGE_SIZE - 1)) == 0, "Unaligned buffer\r\n");
 
     std::size_t blocks = len_in_blocks;
     std::size_t num_pages = ((blocks * lba_size) + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -265,7 +265,10 @@ bool nvme_read(void* arg, char* buffer, std::uint64_t lba, std::size_t len_in_bl
 
     std::size_t lba_size = disk->ctrl->namespaces[disk->nsid - 1].lba_size;
 
-    assert(((std::uint64_t)buffer & PAGE_SIZE) == 0, "Unaligned buffer\r\n");
+#ifdef NVME_ORANGE_TRACE
+    klibc::printf("NVME Trace: Reading with buffer 0x%p 0x%p %d\r\n",buffer, (std::uint64_t)buffer & PAGE_SIZE, ((std::uint64_t)buffer & PAGE_SIZE) == 0);
+#endif
+    assert(((std::uint64_t)buffer & (PAGE_SIZE - 1)) == 0, "Unaligned buffer\r\n");
 
     std::size_t blocks = len_in_blocks;
     std::size_t num_pages = ((blocks * lba_size) + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -302,36 +305,34 @@ bool nvme_read(void* arg, char* buffer, std::uint64_t lba, std::size_t len_in_bl
     return status;
 }
 
-static inline int isprint(int c) {
-    return (c >= 0x20 && c <= 0x7E);
-}
+// static inline int isprint(int c) {
+//     return (c >= 0x20 && c <= 0x7E);
+// }
 
 
-static inline void print_buffer(const unsigned char *buffer, std::size_t size) {
-    for (std::size_t i = 0; i < size; i++) {
-        if (isprint(buffer[i])) {
-            klibc::printf("%c ", buffer[i]);
-        } else {
-            klibc::printf("0x%02X ", buffer[i]);
-        }
-    }
-    klibc::printf("\r\n");
-}
+// static inline void print_buffer(const unsigned char *buffer, std::size_t size) {
+//     for (std::size_t i = 0; i < size; i++) {
+//         if (isprint(buffer[i])) {
+//             klibc::printf("%c ", buffer[i]);
+//         } else {
+//             klibc::printf("0x%02X ", buffer[i]);
+//         }
+//     }
+//     klibc::printf("\r\n");
+// }
 
 void nvme_init_namespace(nvme_controller* ctrl, std::uint32_t nsid) {
-    void* buffer_test = (void*)(pmm::freelist::alloc_4k() + etc::hhdm());
     nvme_arg_disk* new_disk = new nvme_arg_disk;
     new_disk->ctrl = ctrl;
     new_disk->nsid = nsid;
 
-    klibc::memset(buffer_test,'a',4096);
-    nvme_write(new_disk, (char*)buffer_test, 0, 2); 
-    nvme_read(new_disk, (char*)buffer_test, 0, 2);
+    disk* generic_disk = new disk;
+    generic_disk->arg = new_disk;
+    generic_disk->lba_size = ctrl->namespaces[new_disk->nsid - 1].lba_size;
+    generic_disk->read = nvme_read;
+    generic_disk->write = nvme_write;
 
-    ((char*)buffer_test)[4095] = '\0';
-    klibc::printf("test nvme dumping first 1024 byte \r\n", buffer_test, klibc::strlen((const char*)buffer_test));
-    print_buffer((const unsigned char*)buffer_test, 1024);
-
+    drivers::init_disk(generic_disk);
 }
 
 bool nvme_init_namespaces(nvme_controller* ctrl) {
@@ -453,8 +454,6 @@ void nvme_init(std::uint64_t base) {
 
     paging::map_range(gobject::kernel_root, base, base + etc::hhdm(), PAGE_SIZE * 4, PAGING_PRESENT | PAGING_RW | PAGING_NC);
 
-    std::uint64_t start = time::timer->current_nano();
-    
     nvme_controller* controller = new nvme_controller;
     controller->bar0 = (void*)(base + etc::hhdm());
     std::uint64_t cap = nvme::read64(controller, NVME_REG_CAP);
@@ -499,9 +498,6 @@ void nvme_init(std::uint64_t base) {
         klibc::printf("NVME: Failed to init namespaces\r\n");
     }
 
-    std::uint64_t end = time::timer->current_nano();
-
-    klibc::printf("NVME: Detected %d namespaces in %lli us\r\n", controller->num_namespaces, (end - start) / 1000);
     nvme_controllers[nvme_controller_ptr++] = controller;
 }
 

@@ -56,6 +56,15 @@ namespace arch {
         asm volatile("" ::: "memory"); 
     }
 
+    [[gnu::weak]] bool test_interrupts() {
+        uint64_t daif;
+        __asm__ __volatile__ (
+            "mrs %0, daif"
+            : "=r" (daif)
+        );
+        return (daif & (1 << 7)) == 0;
+    }
+
     [[gnu::weak]] void init(int stage) {
         switch(stage) {
         case ARCH_INIT_EARLY:

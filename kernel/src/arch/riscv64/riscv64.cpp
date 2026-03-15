@@ -20,6 +20,16 @@ namespace arch {
         asm volatile("" ::: "memory"); 
     }
 
+    [[gnu::weak]] bool test_interrupts() {
+        uint64_t status;
+        __asm__ __volatile__ (
+            "csrr %0, mstatus" 
+            : "=r" (status)
+        );
+
+        return (status & (1 << 3)) != 0;
+    }
+
     [[gnu::weak]] void hcf() {
         disable_interrupts();
         while(true) {

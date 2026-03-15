@@ -37,6 +37,7 @@ extern "C" void main() {
     acpi::init_tables();
     arch::init(ARCH_INIT_EARLY);
     acpi::full_init();
+    is_early = 0;
     arch::init(ARCH_INIT_COMMON);
     mp::init();
     mp::sync();
