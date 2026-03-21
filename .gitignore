@@ -4,3 +4,4 @@
 *.hdd
 disk.img
 disk_gpt.img
+*.img

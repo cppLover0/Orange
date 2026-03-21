@@ -5,7 +5,7 @@
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 256M -d int -no-reboot -serial stdio
+QEMUFLAGS := -m 256M -d int -serial stdio
 
 override IMAGE_NAME := orange-$(ARCH)
 

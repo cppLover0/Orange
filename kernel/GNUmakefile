@@ -46,7 +46,7 @@ ifeq ($(TOOLCHAIN),llvm)
 endif
 
 # User controllable C flags.
-CFLAGS := -g -O3 -pipe -Werror -Wall 
+CFLAGS := -g -O3 -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)
