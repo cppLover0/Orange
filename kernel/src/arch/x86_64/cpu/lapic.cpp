@@ -32,7 +32,7 @@ std::uint64_t x86_64::lapic::init(std::uint32_t us) {
 
     if(c & (1 << 21)) {
                             // x2apic present
-        if(!is_print) klibc::printf("X2APIC: Enabling x2apic (base is 0x%p)\r\n",0x800);
+        if(!is_print) log("x2apic", "enabling x2apic (base is 0x%p)",0x800);
         assembly::wrmsr(0x1B,assembly::rdmsr(0x1B) | (1 << 10) | (1 << 11));
         is_x2apic = 1;
     } else {
@@ -52,7 +52,7 @@ std::uint64_t x86_64::lapic::init(std::uint32_t us) {
     write(0x380,ticks);
 
     if(!is_lapic_init) {
-        if(!is_print) klibc::printf("LAPIC: Calibration time is %lli, ticks %lli\r\n",us,ticks);
+        if(!is_print) log("lapic", "calibration time is %lli, ticks %lli",us,ticks);
         is_print = 1;
         is_lapic_init = 1;
     }

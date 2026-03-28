@@ -13,19 +13,19 @@
 
 void poweroff::prepare_for_shutdown() {
     drivers::nvme::disable();
-    klibc::printf("Poweroff: NVME is disabled\r\n");
+    log("poweroff", "NVME is disabled");
 #if defined(__x86_64__)
     x86_64::schedule_timer::off();
 #endif
     locks::is_disabled = true;
-    klibc::printf("Poweroff: Preparing for shutdown is successful\r\n");
+    log("poweroff", "preparing for shutdown is successful");
 }
 
 void poweroff::off() {
     arch::disable_interrupts();
     prepare_for_shutdown();
     if(time::timer) {
-        klibc::printf("Poweroff: Shutdowning after 3 seconds\r\n");
+        log("poweroff", "shutdowning after 3 seconds");
         time::timer->sleep(3 * (1000 * 1000));
     }
 #if defined(__x86_64__) 
@@ -40,7 +40,7 @@ void poweroff::reboot() {
     arch::disable_interrupts();
     prepare_for_shutdown();
     if(time::timer) {
-        klibc::printf("Poweroff: Rebooting after 3 seconds\r\n");
+        log("poweroff","rebooting after 3 seconds");
         time::timer->sleep(3 * (1000 * 1000));
     }
 #if defined(__x86_64__) 

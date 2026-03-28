@@ -14,15 +14,11 @@
 
 locks::spinlock flanterm_lock;
 flanterm_context* ft_ctx0 = 0;
-int is_disabled_flanterm = 0;
+int is_disabled_flanterm = 1;
 
 std::uint32_t default_fg = 0xEEEEEEEE;
 std::uint32_t default_bright_fg = 0xFFFFFFFF;
 std::uint32_t default_bg = 0;
-
-static inline int abs(int x) {
-    return x < 0 ? -x : x;
-}
 
 extern "C" void* __flanterm_malloc(size_t size) {
     return klibc::malloc(size);
@@ -33,152 +29,6 @@ extern "C" void __flanterm_free(void* ptr,size_t size) {
     klibc::free(ptr);
 }
 
-void scale_image_nn(unsigned char* src, int src_w, int src_h,
-                    unsigned char* dst, int dst_w, int dst_h, int channels) {
-    for (int y = 0; y < dst_h; y++) {
-        int src_y = y * src_h / dst_h;
-        for (int x = 0; x < dst_w; x++) {
-            int src_x = x * src_w / dst_w;
-            for (int c = 0; c < channels; c++) {
-                dst[(y*dst_w + x)*channels + c] = src[(src_y*src_w + src_x)*channels + c];
-            }
-        }
-    }
-}
-
-uint32_t rgb_to_pixel(uint8_t r, uint8_t g, uint8_t b,
-                      int r_len, int r_off,
-                      int g_len, int g_off,
-                      int b_len, int b_off) {
-    uint32_t pixel = 0;
-    uint32_t R = (r >> (8 - r_len)) << r_off;
-    uint32_t G = (g >> (8 - g_len)) << g_off;
-    uint32_t B = (b >> (8 - b_len)) << b_off;
-    pixel = R | G | B;
-    return pixel;
-}
-
-static uint32_t blend_pixel(uint32_t dst, uint8_t r_src, uint8_t g_src, uint8_t b_src, int alpha_fixed,
-                            int r_len, int r_off, int g_len, int g_off, int b_len, int b_off) {
-    // alpha_fixed в диапазоне 0-256 (где 256 = 1.0)
-    
-    uint8_t r_dst = (dst >> r_off) & ((1 << r_len) - 1);
-    uint8_t g_dst = (dst >> g_off) & ((1 << g_len) - 1);
-    uint8_t b_dst = (dst >> b_off) & ((1 << b_len) - 1);
-
-    // Расширяем до 8 бит
-    r_dst = (r_dst << (8 - r_len)) | (r_dst >> (2 * r_len - 8));
-    g_dst = (g_dst << (8 - g_len)) | (g_dst >> (2 * g_len - 8));
-    b_dst = (b_dst << (8 - b_len)) | (b_dst >> (2 * b_len - 8));
-
-    // Блендинг с фиксированной точкой
-    uint8_t r = (uint8_t)((r_src * alpha_fixed + r_dst * (256 - alpha_fixed)) >> 8);
-    uint8_t g = (uint8_t)((g_src * alpha_fixed + g_dst * (256 - alpha_fixed)) >> 8);
-    uint8_t b = (uint8_t)((b_src * alpha_fixed + b_dst * (256 - alpha_fixed)) >> 8);
-
-    uint32_t pixel = 0;
-    pixel |= ((r >> (8 - r_len)) << r_off);
-    pixel |= ((g >> (8 - g_len)) << g_off);
-    pixel |= ((b >> (8 - b_len)) << b_off);
-
-    return pixel;
-}
-
-static void draw_transparent_black_square(uint32_t* canvas, int width, int height,
-                                          int r_len, int r_off,
-                                          int g_len, int g_off,
-                                          int b_len, int b_off,
-                                          int margin) {
-    int square_w = width - 2 * margin;
-    int square_h = height - 2 * margin;
-    int start_x = margin;
-    int start_y = margin;
-    
-    int alpha_fixed = 128; 
-
-    for (int y = start_y; y < start_y + square_h; y++) {
-        for (int x = start_x; x < start_x + square_w; x++) {
-            int idx = y * width + x;
-            canvas[idx] = blend_pixel(canvas[idx], 0, 0, 0, alpha_fixed,
-                                     r_len, r_off, g_len, g_off, b_len, b_off);
-        }
-    }
-}
-
-#pragma pack(push, 1)
-struct BMPHeader {
-    uint16_t signature;    
-    uint32_t file_size;
-    uint32_t reserved;
-    uint32_t data_offset;
-    uint32_t header_size;    
-    int32_t width;
-    int32_t height;
-    uint16_t planes;
-    uint16_t bpp;           
-    uint32_t compression;
-    uint32_t image_size;
-    int32_t x_pixels_per_meter;
-    int32_t y_pixels_per_meter;
-    uint32_t colors_used;
-    uint32_t important_colors;
-};
-#pragma pack(pop)
-
-static const unsigned char bg_bmp[] = {
-    #embed "src/bg.bmp"
-};
-
-static unsigned char* load_bmp_from_memory(const unsigned char* bmp_data, size_t bmp_size, 
-                                           int* width, int* height, int* channels) {
-    if (bmp_size < sizeof(BMPHeader)) {
-        return nullptr;
-    }
-    
-    BMPHeader* header = (BMPHeader*)bmp_data;
-    
-    if (header->signature != 0x4D42) { // 'BM'
-        return nullptr;
-    }
-    
-    if (header->bpp != 24 || header->compression != 0) {
-        return nullptr;
-    }
-    
-    *width = abs(header->width);
-    *height = abs(header->height);
-    *channels = 3;
-    
-    unsigned char* rgb_data = (unsigned char*)(pmm::buddy::alloc((*width) * (*height) * 3).phys  + etc::hhdm());
-    if (!rgb_data) {
-        return nullptr;
-    }
-    
-    int row_size = ((*width) * 3 + 3) & ~3; 
-    unsigned char* bmp_pixels = (unsigned char*)(bmp_data + header->data_offset);
-    
-    for (int y = 0; y < *height; y++) {
-        int src_y;
-        if (header->height > 0) {
-
-            src_y = (*height - 1 - y);
-        } else {
-           
-            src_y = y;
-        }
-        
-        unsigned char* src_row = bmp_pixels + src_y * row_size;
-        unsigned char* dst_row = rgb_data + y * (*width) * 3;
-        
-        for (int x = 0; x < *width; x++) {
-            dst_row[x*3 + 0] = src_row[x*3 + 2]; // R
-            dst_row[x*3 + 1] = src_row[x*3 + 1]; // G
-            dst_row[x*3 + 2] = src_row[x*3 + 0]; // B
-        }
-    }
-    
-    return rgb_data;
-}
 unsigned char unifont_arr[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x42, 0x81, 0xa5,
@@ -537,91 +387,49 @@ namespace utils {
             return;
         }
         
-        struct flanterm_context *ft_ctx = flanterm_fb_init(
-            NULL,
-            NULL,
-            (uint32_t*)fb0->address, fb0->width, fb0->height, fb0->pitch,
-            fb0->red_mask_size, fb0->red_mask_shift,
-            fb0->green_mask_size, fb0->green_mask_shift,
-            fb0->blue_mask_size, fb0->blue_mask_shift,
-            NULL,
-            NULL, NULL,
-            &default_bg, &default_fg,
-            NULL, &default_bright_fg,
-            (void*)NULL, 0, 0, 0,
-            1, 1, 0, 0
-        );
+        struct flanterm_context *ft_ctx;
+        if(bootloader::bootloader->get_flanterm() == nullptr) {
+            ft_ctx = flanterm_fb_init(
+                NULL,
+                NULL,
+                (uint32_t*)fb0->address, fb0->width, fb0->height, fb0->pitch,
+                fb0->red_mask_size, fb0->red_mask_shift,
+                fb0->green_mask_size, fb0->green_mask_shift,
+                fb0->blue_mask_size, fb0->blue_mask_shift,
+                NULL,
+                NULL, NULL,
+                &default_bg, &default_fg,
+                NULL, &default_bright_fg,
+                (void*)NULL, 0, 0, 0,
+                1, 1, 0, 0
+            );
+        } else {
+
+            limine_flanterm_fb_init_params_response* flan = bootloader::bootloader->get_flanterm();
+
+            ft_ctx = flanterm_fb_init(
+                __flanterm_malloc,
+                __flanterm_free,
+                (uint32_t*)fb0->address, fb0->width, fb0->height, fb0->pitch,
+                fb0->red_mask_size, fb0->red_mask_shift,
+                fb0->green_mask_size, fb0->green_mask_shift,
+                fb0->blue_mask_size, fb0->blue_mask_shift,
+                flan->entries[0]->canvas,
+                flan->entries[0]->ansi_colours, flan->entries[0]->ansi_bright_colours,
+                &flan->entries[0]->default_bg, &flan->entries[0]->default_fg,
+                &flan->entries[0]->default_bg_bright, &flan->entries[0]->default_fg_bright,
+                flan->entries[0]->font, flan->entries[0]->font_width, flan->entries[0]->font_height , flan->entries[0]->font_spacing,
+                flan->entries[0]->font_scale_x, flan->entries[0]->font_scale_y, flan->entries[0]->margin, flan->entries[0]->rotation
+            );
+        }
         ft_ctx0 = ft_ctx;
-        const char* msg = "flanterm: Found usable framebuffer\r\n";
+        const char* msg = "\033[1;31mflanterm\033[0m: Found usable framebuffer\r\n";
+        is_disabled_flanterm = 0;
         flanterm::write(msg,klibc::strlen(msg));
     }
 
     void flanterm::fullinit() {
-
-        limine_framebuffer* fb0 = bootloader::bootloader->get_framebuffer();
-        
-        if(fb0 == nullptr) {
-            is_disabled_flanterm = 1;
-            return;
-        }
-        
-
-        uint32_t* test_canvas = (uint32_t*)(pmm::buddy::alloc(fb0->pitch * fb0->height).phys + etc::hhdm());
-        if (!test_canvas) {
-            return;
-        }
-
-        int img_w, img_h, img_channels;
-        unsigned char* img_data = load_bmp_from_memory(bg_bmp, sizeof(bg_bmp), &img_w, &img_h, &img_channels);
-        if (!img_data) {
-            klibc::printf("error in stbi\n\r");
-            return;
-        }
-
-        unsigned char* scaled_rgb = (unsigned char*)(pmm::buddy::alloc(fb0->pitch * fb0->height * 3).phys + etc::hhdm());
-        if (!scaled_rgb) {
-            return;
-        }
-
-        scale_image_nn(img_data, img_w, img_h, scaled_rgb, fb0->width, fb0->height, 3);
-
-        for (std::size_t y = 0; y < fb0->height; y++) {
-            for (std::size_t x = 0; x < fb0->width; x++) {
-                int idx = (y * fb0->width + x) * 3;
-                uint8_t r = scaled_rgb[idx];
-                uint8_t g = scaled_rgb[idx + 1];
-                uint8_t b = scaled_rgb[idx + 2];
-                test_canvas[y * fb0->width + x] = rgb_to_pixel(r, g, b,
-                                                            fb0->red_mask_size, fb0->red_mask_shift,
-                                                            fb0->green_mask_size, fb0->green_mask_shift,
-                                                            fb0->blue_mask_size, fb0->blue_mask_shift);
-            }
-        }
-
-        int margin = 64; 
-
-        draw_transparent_black_square(test_canvas, fb0->width, fb0->height,
-                                    fb0->red_mask_size, fb0->red_mask_shift,
-                                    fb0->green_mask_size, fb0->green_mask_shift,
-                                    fb0->blue_mask_size, fb0->blue_mask_shift,
-                                    margin - 1);
-
-        flanterm_deinit(ft_ctx0, nullptr);
-
-        ft_ctx0 = flanterm_fb_init(
-            __flanterm_malloc, __flanterm_free,
-            (uint32_t*)fb0->address, fb0->width, fb0->height, fb0->pitch,
-            fb0->red_mask_size, fb0->red_mask_shift,
-            fb0->green_mask_size, fb0->green_mask_shift,
-            fb0->blue_mask_size, fb0->blue_mask_shift,
-            test_canvas,
-            NULL, NULL,
-            NULL, &default_fg,
-            NULL, &default_bright_fg,
-            (void*)unifont_arr, FONT_WIDTH, FONT_HEIGHT, 0,
-            1, 1, margin,0
-        );
-        
+        return;
     }
 
     void flanterm::write(const char* buffer, std::size_t size) {

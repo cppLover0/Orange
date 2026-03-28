@@ -12,5 +12,6 @@ public:
         limine_memmap_response* get_memory_map() override;
         limine_mp_response* get_mp_info() override;
         bool is_5_level_paging() override;
+        limine_flanterm_fb_init_params_response* get_flanterm() override;
     };
 };

@@ -144,7 +144,7 @@ edk2-ovmf:
 
 limine/limine:
 	rm -rf limine
-	git clone https://codeberg.org/Limine/Limine.git limine --branch=v10.x-binary --depth=1
+	git clone https://codeberg.org/Limine/Limine.git limine --branch=v11.x-binary --depth=1
 	$(MAKE) -C limine \
 		CC="$(HOST_CC)" \
 		CFLAGS="$(HOST_CFLAGS)" \
@@ -162,6 +162,7 @@ kernel: kernel/.deps-obtained
 $(IMAGE_NAME).iso: limine/limine kernel
 	rm -rf iso_root
 	mkdir -p iso_root/boot
+	cp -rf baseiso/* iso_root
 	cp -v kernel/bin-$(ARCH)/kernel iso_root/boot/
 	mkdir -p iso_root/boot/limine
 	cp -v limine.conf iso_root/boot/limine/

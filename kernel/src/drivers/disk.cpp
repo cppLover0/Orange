@@ -173,7 +173,7 @@ void drivers::init_disk(disk* new_disk) {
         return;
 
     partition_style style = determine_disk_type(new_disk);
-    klibc::printf("Disk: Detected %s partition style\r\n", disk_type_to_str(style));
+    log("disk", "detected %s partition style", disk_type_to_str(style));
 
     switch (style)
     {

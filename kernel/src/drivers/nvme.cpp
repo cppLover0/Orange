@@ -186,7 +186,7 @@ bool nvme_identify_namespace(struct nvme_controller* ctrl, uint32_t nsid) {
     }
     ns->valid = true;
 
-    klibc::printf("NVME: Detected namespace %d with lba_size %lli bytes and total size %lli bytes\r\n", nsid, ns->lba_size, ns->size * ns->lba_size);
+    log("nvme", "detected namespace %d with lba_size %lli bytes and total size %lli bytes", nsid, ns->lba_size, ns->size * ns->lba_size);
     return true;
 }
 
@@ -438,7 +438,7 @@ bool nvme_identify(nvme_controller* ctrl) {
     char model[41];
     klibc::memcpy(model, (void*)(phys_buffer + etc::hhdm() + 24), 40);
     model[40] = '\0';
-    klibc::printf("NVME: Controller Model: %s\r\n", model);
+    log("nvme", "controller Model: %s", model);
 
     ctrl->identify = (void*)(phys_buffer + etc::hhdm());
 
@@ -505,7 +505,7 @@ void nvme_init(std::uint64_t base) {
 void nvme_pci_init(pci_t pci, std::uint8_t a, std::uint8_t b, std::uint8_t c) {
     if(pci.progIF == 2) { // nvme 
         std::uint32_t cmd = x86_64::pci::pci_read_config32(a,b,c,0x4);
-        klibc::printf("NVME_PCI: Bus mastering %d, memory access %d\r\n",(cmd & (1 << 2)) ? 1 : 0, (cmd & (1 << 1)) ? 1 : 0);
+        log("nvme_pci", "bus mastering %d, memory access %d",(cmd & (1 << 2)) ? 1 : 0, (cmd & (1 << 1)) ? 1 : 0);
         cmd |= 1 << 2;
         cmd |= 1 << 1;
         x86_64::pci::pci_write_config32(a,b,c,0x4,cmd);

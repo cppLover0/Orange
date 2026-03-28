@@ -16,7 +16,7 @@ void drivers::powerbutton::init() {
         UACPI_FIXED_EVENT_POWER_BUTTON,
 	    handle_power_button, UACPI_NULL
     );
-    klibc::printf("PowerButton: Registered powerbutton at ip 0x%p\r\n",(std::uint64_t)handle_power_button);
+    log("powerbutton", "registered powerbutton at ip 0x%p",(std::uint64_t)handle_power_button);
 }
 
 #else

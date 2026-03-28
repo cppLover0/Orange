@@ -43,7 +43,7 @@ void x86_64::idt::init() {
 
     load();
 
-    if(!is_print) {klibc::printf("IDT: IDTR is 0x%p\r\n",&idtr); is_print = 1;}
+    if(!is_print) {log("idt", "idtr is 0x%p",&idtr); is_print = 1;}
 }
 
 void x86_64::idt::load() {

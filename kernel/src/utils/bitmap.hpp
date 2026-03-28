@@ -7,10 +7,10 @@
 namespace utils {
     class bitmap {
       private:
-        std::uint8_t* pool;
         std::uint32_t pool_size;
-
       public:
+        std::uint8_t* pool;
+
         bitmap(std::uint32_t size, std::uint8_t* custom_pool = 0) {
             if (custom_pool) {
                 this->pool = custom_pool;

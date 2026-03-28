@@ -35,12 +35,12 @@ void x86_64::schedule_timer::off() {
 
     std::uint32_t timeout = 10;
 
-    klibc::printf("Poweroff: Waiting for all cpus to done work\r\n"); // used from poweroff so
+    log("poweroff", "waiting for all cpus to done work"); // used from poweroff so
     while(stfu_cpus != (std::int32_t)(mp::cpu_count() - 1)) {
         arch::memory_barrier();
 
         if(--timeout == 0) {
-            klibc::printf("Poweroff: Can't wait longer, forching them to be disabled\r\n");
+            log("poweroff", "poweroff: Can't wait longer, forcing them to be disabled");
             x86_64::lapic::off();
             return;
         }

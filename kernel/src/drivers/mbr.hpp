@@ -3,7 +3,7 @@
 
 // mbr headers
 
-#define MBR_ORANGE_TRACE
+//#define MBR_ORANGE_TRACE
 
 struct __attribute__((packed)) mbr_partition {
     std::uint8_t  drive_status;     

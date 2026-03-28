@@ -17,7 +17,7 @@ static inline uint64_t rdtsc() {
 void drivers::tsc::init() {
 
     if(time::timer == nullptr) {
-        klibc::printf("TSC: Can't initialize without timer !\n");
+        log("tsc", "can't initialize without timer !");
     }
 
     uint64_t tsc_start, tsc_end;
@@ -55,7 +55,7 @@ void drivers::tsc::init() {
     x86_64::cpu_data()->tsc_freq = tsc_freq;
 
     static bool is_print = 0;
-    if(!is_print) {klibc::printf("TSC: TSC Frequency is %llu\r\n", tsc_freq); is_print = 1;}
+    if(!is_print) {log("tsc", "tsc frequency is %llu", tsc_freq); is_print = 1;}
     drivers::tsc_timer* tsc_timer = new drivers::tsc_timer;
     time::setup_timer(tsc_timer);
 }

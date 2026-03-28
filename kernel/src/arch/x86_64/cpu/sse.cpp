@@ -120,8 +120,8 @@ void x86_64::sse::print_sse_features() {
     std::uint32_t a,b,c,d;
     assembly::cpuid(1,0,&a,&b,&c,&d);
 
-    klibc::printf(
-        "SSE: Supported features:" "%s%s%s%s%s%s\n",
+    log( "sse",
+        "supported features:" "%s%s%s%s%s%s",
         (d & (1 << 25)) ? " SSE" : "\0",
         (d & (1 << 26)) ? " SSE2" : "\0",
         (c & (1 << 0)) ? " SSE3\0" : "\0",

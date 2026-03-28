@@ -6,7 +6,7 @@
 namespace {
 
 __attribute__((used, section(".limine_requests")))
-volatile std::uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(5);
+volatile std::uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
 
 }
 
@@ -30,6 +30,8 @@ __attribute__((used, section(".limine_requests"))) volatile limine_executable_ad
 __attribute__((used, section(".limine_requests"))) volatile limine_mp_request mp_request = { .id = LIMINE_MP_REQUEST_ID, .revision = 0, .response = nullptr, .flags = 0};
 
 __attribute__((used, section(".limine_requests"))) volatile limine_rsdp_request rsdp_request = { .id = LIMINE_RSDP_REQUEST_ID, .revision = 0, .response = nullptr };
+
+__attribute__((used, section(".limine_requests"))) volatile limine_flanterm_fb_init_params_request flanterm = { .id = LIMINE_FLANTERM_FB_INIT_PARAMS_REQUEST_ID, .revision = 0, .response = nullptr };
 
 #if defined(__x86_64__)
 #pragma GCC diagnostic push
@@ -77,6 +79,10 @@ namespace bootloader {
 
     limine_mp_response* limine::get_mp_info() {
         return mp_request.response;
+    }
+
+    limine_flanterm_fb_init_params_response* limine::get_flanterm() {
+        return flanterm.response;
     }
 
 #if defined(__x86_64__)

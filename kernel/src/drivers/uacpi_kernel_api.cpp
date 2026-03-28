@@ -36,7 +36,7 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len) {
 }
 
 void uacpi_kernel_log(uacpi_log_level, const uacpi_char* msg) {
-    klibc::printf("uACPI: %s\r", msg);
+    klibc::printf("\033[1;31muacpi\033[0m: %s\r", msg);
 }
 
 uacpi_status uacpi_kernel_pci_device_open(

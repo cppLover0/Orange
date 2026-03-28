@@ -5,6 +5,8 @@
 #include <utils/errno.hpp>
 #include <klibc/stdio.hpp>
 #include <generic/lock/mutex.hpp>
+#include <utils/assert.hpp>
+#include <generic/tmpfs.hpp>
 
 // /bin/path -> /usr/bin/path
 void __vfs_symlink_resolve_no_at_symlink_follow(char* path, char* out) {
@@ -13,15 +15,15 @@ void __vfs_symlink_resolve_no_at_symlink_follow(char* path, char* out) {
 
     int e = vfs::readlink(path,buffer,4096);
 
-    if(e == ENOSYS) 
+    if(e == -ENOSYS) 
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
 
-    if(e == EINVAL)
+    if(e == -EINVAL)
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
     else if(e == 0) {
         
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
-    } else if(e == ENOENT) {
+    } else if(e == -ENOENT) {
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
         // maybe it wants directory symlink ?
         char path0[4096];
@@ -54,7 +56,7 @@ void __vfs_symlink_resolve_no_at_symlink_follow(char* path, char* out) {
                 klibc::memcpy(buffer2 + c, path + klibc::strlen(result) + 1, klibc::strlen(path) - klibc::strlen(result));
                 __vfs_symlink_resolve_no_at_symlink_follow(buffer2,out);
                 return;
-            } else if(e == ENOENT) {
+            } else if(e == -ENOENT) {
                 klibc::memcpy(out,path,klibc::strlen(path) + 1);
             }
 
@@ -78,17 +80,17 @@ void __vfs_symlink_resolve(char* path, char* out, int level) {
 
     int e = vfs::readlink(path,buffer,4096);
 
-    if(e == ENOSYS) 
+    if(e == -ENOSYS) 
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
 
-    if(e == EINVAL)
+    if(e == -EINVAL)
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
     else if(e == 0) {
         
         char result[4096];
         vfs::resolve_path(buffer,path,result,0);
         __vfs_symlink_resolve(result,out, level + 1);
-    } else if(e == ENOENT) {
+    } else if(e == -ENOENT) {
         klibc::memcpy(out,path,klibc::strlen(path) + 1);
         // maybe it wants directory symlink ?
         char path0[4096];
@@ -121,7 +123,7 @@ void __vfs_symlink_resolve(char* path, char* out, int level) {
                 klibc::memcpy(buffer2 + c, path + klibc::strlen(result) + 1, klibc::strlen(path) - klibc::strlen(result));
                 __vfs_symlink_resolve(buffer2,out, level + 1);
                 return;
-            } else if(e == ENOENT) {
+            } else if(e == -ENOENT) {
                 klibc::memcpy(out,path,klibc::strlen(path) + 1);
                 return;
             } else {
@@ -135,7 +137,134 @@ void __vfs_symlink_resolve(char* path, char* out, int level) {
     }
 }
 
+vfs::node vfs_nodes[512];
+
+
+vfs::node* find_node(char* path) {
+    int r = 0;
+    vfs::node* match;
+    for(int i = 0;i < 512;i++) {
+        if(!klibc::strncmp(path,vfs_nodes[i].path,klibc::strlen(vfs_nodes[i].path))) {
+            if(klibc::strlen(vfs_nodes[i].path) > r) {
+                match = &vfs_nodes[i];
+            }
+        }
+
+        if(!klibc::strncmp(path, vfs_nodes[i].path,klibc::strlen(vfs_nodes[i].path) - 1) && path[klibc::strlen(vfs_nodes[i].path) + 1] == '\0') {
+            return &vfs_nodes[i];
+        }
+
+    }
+    return match;
+}
+
+std::int32_t vfs::open(file_descriptor* fd, char* path, bool follow_symlinks, bool is_directory) {
+    char out[4096];
+    klibc::memset(out,0,4096);
+
+    node* node = find_node(out);
+
+    if(follow_symlinks) {
+        __vfs_symlink_resolve(path, out, 0);
+    } else {
+        __vfs_symlink_resolve_no_at_symlink_follow(path, out);
+    }
+
+    if(!node) { 
+        return -ENOENT; }
+    
+    char* fs_love_name = out + klibc::strlen(node->path) - 1;
+    if(!node->fs->open) { assert(0, "meow :3");
+        return -ENOSYS; }
+
+    if(fs_love_name[0] == '\0') {
+        fs_love_name[0] = '/';
+        fs_love_name[1] = '\0';
+    }
+
+    std::int32_t status = node->fs->open(node->fs, (void*)fd, fs_love_name, is_directory);
+    return status;
+}
+
+std::int32_t vfs::create(char* path, vfs_file_type type, std::uint32_t mode) {
+    char out[4096];
+    klibc::memset(out,0,4096);
+
+    node* node = find_node(out);
+
+    __vfs_symlink_resolve_no_at_symlink_follow(path, out);
+
+    if(!node) { 
+        return -ENOENT; }
+    
+    char* fs_love_name = out + klibc::strlen(node->path) - 1;
+    if(!node->fs->create) { assert(0, "meow :3");
+        return -ENOSYS; }
+
+    if(fs_love_name[0] == '\0') {
+        fs_love_name[0] = '/';
+        fs_love_name[1] = '\0';
+    }
+
+    std::int32_t status = node->fs->create(node->fs, fs_love_name, type, mode);
+    return status;
+}
+
+std::int32_t vfs::readlink(char* path, char* out, std::uint32_t out_len) {
+
+    assert(out_len == 4096, "stfu");
+
+    char outp[4096];
+    klibc::memset(outp,0,4096);
+
+    node* node = find_node(outp);
+
+    klibc::memcpy(outp, path, klibc::strlen(path) + 1);
+
+    if(!node) { 
+        return -ENOENT; }
+    
+    char* fs_love_name = outp + klibc::strlen(node->path) - 1;
+    if(!node->fs->readlink) { assert(0, "meow :3");
+        return -ENOSYS; }
+
+    if(fs_love_name[0] == '\0') {
+        fs_love_name[0] = '/';
+        fs_love_name[1] = '\0';
+    }
+
+    std::int32_t status = node->fs->readlink(node->fs, fs_love_name, out);
+    return status;
+}
+
+std::int32_t vfs::remove(char* path) {
+    char out[4096];
+    klibc::memset(out,0,4096);
+
+    node* node = find_node(out);
+
+    __vfs_symlink_resolve_no_at_symlink_follow(path, out);
+
+    if(!node) { 
+        return -ENOENT; }
+    
+    char* fs_love_name = out + klibc::strlen(node->path) - 1;
+    if(!node->fs->remove) { assert(0, "meow remove :3");
+        return -ENOSYS; }
+
+    if(fs_love_name[0] == '\0') {
+        fs_love_name[0] = '/';
+        fs_love_name[1] = '\0';
+    }
+
+    std::int32_t status = node->fs->remove(node->fs, fs_love_name);
+    return status;
+}
+
+// will init default environment
 
 void vfs::init() {
-    
+    klibc::memset(vfs_nodes, 0, sizeof(vfs_nodes));
+    tmpfs::init_default(&vfs_nodes[0]);
+    log("vfs", "vfs_nodes 0x%p",vfs_nodes);
 }

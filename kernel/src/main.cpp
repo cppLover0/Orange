@@ -11,6 +11,7 @@
 #include <drivers/nvme.hpp>
 #include <drivers/powerbutton.hpp>
 #include <generic/mp.hpp>
+#include <generic/vfs.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
@@ -23,17 +24,17 @@ extern int is_early;
 extern "C" void main() {
     utils::cxx::init_constructors();
     bootloader::init();
-    utils::flanterm::init();
 #if defined(__x86_64__)
     x86_64::serial::init();
 #endif
     pmm::init();
     paging::init();
     kheap::init();
+    utils::flanterm::init();
     utils::flanterm::fullinit();
-    klibc::printf("PMM: Total usable memory: %lli bytes\r\n",memory_size); // i dont want to forgot these messages 
-    klibc::printf("Paging: Enabled kernel root with %d level paging\n\r", arch::level_paging());
-    klibc::printf("KHeap: Available memory %lli bytes\r\n",KHEAP_SIZE);
+    log("pmm", "total usable memory: %lli bytes", memory_size);
+    log("paging", "enabled kernel root with %d level paging", arch::level_paging());
+    log("kheap", "available memory %lli bytes", KHEAP_SIZE);
     acpi::init_tables();
     arch::init(ARCH_INIT_EARLY);
     acpi::full_init();
@@ -41,11 +42,12 @@ extern "C" void main() {
     arch::init(ARCH_INIT_COMMON);
     mp::init();
     mp::sync();
+    vfs::init();
     drivers::powerbutton::init();
     drivers::nvme::init();
 #if defined(__x86_64__)
     x86_64::pci::initworkspace();
-    klibc::printf("PCI: launched all drivers\r\n");
+    log("pci", "launched all drivers");
 #endif
     klibc::printf("Boot is done\r\n");
     mp::sync();

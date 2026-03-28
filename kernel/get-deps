@@ -49,7 +49,7 @@ clone_repo_commit \
 clone_repo_commit \
     https://codeberg.org/Limine/limine-protocol.git \
     limine-protocol \
-    068b6481557db836e41bf644382367f8dee76d21
+    26519f1b598564db409e50d1d84eb30642d58ba3
 
 clone_repo_commit \
     https://codeberg.org/Mintsuki/Flanterm.git \

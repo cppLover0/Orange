@@ -16,3 +16,5 @@ namespace klibc {
 
     void printf(const char* fmt, ...);
 };
+
+#define log(name, msg, ...) klibc::printf("\033[1;31m" name "\033[0m: " msg "\r\n" , ##__VA_ARGS__)

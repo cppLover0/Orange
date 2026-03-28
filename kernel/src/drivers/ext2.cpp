@@ -361,7 +361,7 @@ void ext2_free_blocks(ext2_partition* part, uint32_t count, uint64_t* blocks) {
     pmm::freelist::free((uint64_t)bitmap - etc::hhdm());
 }
 
-signed long ext2_read(file_descriptor* file, void* buffer, signed long count) {
+signed long ext2_read(file_descriptor* file, void* buffer, std::size_t count) {
     if (count <= 0) return 0;
 
     file->vnode.fs->lock.lock();
@@ -387,7 +387,7 @@ signed long ext2_read(file_descriptor* file, void* buffer, signed long count) {
     std::uint32_t block_size = 1024 << part->sb->s_log_block_size;
     char* temp_block = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
     
-    signed long total_read = 0;
+    std::size_t total_read = 0;
     char* out_ptr = (char*)buffer;
 
     while (total_read < count) {
@@ -506,7 +506,7 @@ void ext2_write_inode(ext2_partition* part, uint64_t ino, ext2_inode* inode) {
     pmm::freelist::free((uint64_t)buf - etc::hhdm());
 }
 
-signed long ext2_write(file_descriptor* file, void* buffer, signed long count) {
+signed long ext2_write(file_descriptor* file, void* buffer, std::size_t count) {
     if (count <= 0) return 0;
     file->vnode.fs->lock.lock();
 
@@ -515,7 +515,7 @@ signed long ext2_write(file_descriptor* file, void* buffer, signed long count) {
     uint32_t block_size = 1024 << part->sb->s_log_block_size;
     char* temp_block = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
 
-    signed long total_written = 0;
+    std::size_t total_written = 0;
     const char* in_ptr = (const char*)buffer;
     bool inode_dirty = false;
 
@@ -552,13 +552,17 @@ signed long ext2_write(file_descriptor* file, void* buffer, signed long count) {
     return total_written;
 }
 
-std::uint32_t ext2_open(filesystem* fs, void* file_desc, char* path) {
+std::uint32_t ext2_open(filesystem* fs, void* file_desc, char* path, bool is_directory) {
     fs->lock.lock();
     ext2_inode res;
     std::uint64_t inode_num = 0;
     std::uint32_t status = ext2_lookup((ext2_partition*)(fs->fs_specific.partition), path, &res, &inode_num);
     if(status != 0) { fs->lock.unlock();
         return status; }
+
+    if(is_directory && !(res.i_mode & EXT2_S_IFDIR))
+        return -ENOTDIR;
+
     file_descriptor* fd = (file_descriptor*)file_desc;
     fd->fs_specific.ino = inode_num;
     fd->vnode.fs = fs;
@@ -569,6 +573,7 @@ std::uint32_t ext2_open(filesystem* fs, void* file_desc, char* path) {
 }
 
 std::int32_t ext2_stat(file_descriptor* file, stat* out) {
+    file->vnode.fs->lock.lock();
     std::int32_t status = 0;
     ext2_partition* part = (ext2_partition*)(file->vnode.fs->fs_specific.partition);
     ext2_inode inode = ext2_get_inode(part, file->fs_specific.ino, &status);
@@ -593,7 +598,30 @@ std::int32_t ext2_stat(file_descriptor* file, stat* out) {
     out->st_rdev = 0; // should be filled by vfs 
     out->st_nlink = inode.i_links_count;
     out->st_mode = inode.i_mode;
+    out->st_ino = file->fs_specific.ino;
 
+    file->vnode.fs->lock.unlock();
+    return 0;
+}
+
+std::int32_t ext2_readlink(filesystem* fs, char* path, char* buffer) {
+    fs->lock.lock();
+    ext2_partition* part = (ext2_partition*)(fs->fs_specific.partition);
+    std::uint64_t inode = 0;
+    ext2_inode node = {};
+    std::int32_t status = ext2_lookup(part, path, &node, &inode);
+
+    if(status != 0) { fs->lock.unlock();
+        return status; }
+
+    if(!(node.i_mode & EXT2_S_IFLNK)) { fs->lock.unlock();
+        return -EINVAL; }
+
+    for(int i = 0;i < 4096 / (1024 << part->sb->s_log_block_size);i++) {
+        ext2_read_block(part, get_phys_block(part, &node, i), buffer);
+    }
+    
+    fs->lock.unlock();
     return 0;
 }
 
@@ -648,7 +676,7 @@ void drivers::ext2::init(disk* target_disk, std::uint64_t lba_start) {
     }
 
     if(sb->revision >= 1) {
-        klibc::printf("ext2: detected features %s %s %s\r\n",(sb->s_feature_ro_compat & EXT2_FEATURE_RO_COMPAT_LARGE_FILE) ? "EXT2_FEATURE_RO_COMPAT_LARGE_FILE" : "", (sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_64BIT) ? "EXT4_FEATURE_INCOMPAT_64BIT" : "", (sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_EXTENTS) ? "EXT4_FEATURE_INCOMPAT_EXTENTS" : "");
+        log("ext2", "detected features %s %s %s",(sb->s_feature_ro_compat & EXT2_FEATURE_RO_COMPAT_LARGE_FILE) ? "EXT2_FEATURE_RO_COMPAT_LARGE_FILE" : "", (sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_64BIT) ? "EXT4_FEATURE_INCOMPAT_64BIT" : "", (sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_EXTENTS) ? "EXT4_FEATURE_INCOMPAT_EXTENTS" : "");
     }
 
     uint32_t groups_count = (ext2_blocks_count(sb) + sb->s_blocks_per_group - 1);
@@ -663,26 +691,28 @@ void drivers::ext2::init(disk* target_disk, std::uint64_t lba_start) {
 
     ext2_load_group_descriptors(part);
 
-    ext2_inode root = ext2_get_inode(part, 2);
-    klibc::printf("inode 2 size %lli links count %lli mode 0x%p block_size %lli\r\n",root.i_size, root.i_links_count, root.i_mode, 1024 << part->sb->s_log_block_size);
-    klibc::printf("logic blocks for root first block = %lli, second block = %lli\r\n", get_phys_block(part, &root, 0),get_phys_block(part, &root, 1));
     (void)print_buffer;
 
-    char* buffer2 = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
-    ext2_read_block(part, get_phys_block(part, &root, 0), buffer2);
-    klibc::printf("dumping first root block\r\n");
-    print_buffer((const unsigned char*)buffer2, 1024 << part->sb->s_log_block_size);
+    // ext2_inode root = ext2_get_inode(part, 2);
+    // klibc::printf("inode 2 size %lli links count %lli mode 0x%p block_size %lli\r\n",root.i_size, root.i_links_count, root.i_mode, 1024 << part->sb->s_log_block_size);
+    // klibc::printf("logic blocks for root first block = %lli, second block = %lli\r\n", get_phys_block(part, &root, 0),get_phys_block(part, &root, 1));
+    // (void)print_buffer;
 
-    const char* file_test = "/test1/meow";
-    ext2_inode res = {};
-    std::uint64_t in = 0;
-    std::int32_t status = ext2_lookup(part, file_test, &res, &in);
+    // char* buffer2 = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
+    // ext2_read_block(part, get_phys_block(part, &root, 0), buffer2);
+    // klibc::printf("dumping first root block\r\n");
+    // print_buffer((const unsigned char*)buffer2, 1024 << part->sb->s_log_block_size);
 
-    klibc::memset(buffer2, 0, PAGE_SIZE);
-    klibc::printf("reading file %s, status %d, size %lli\r\n", file_test, status, res.i_size);
-    ext2_read_block(part, get_phys_block(part, &res, 0), buffer2);
-    klibc::printf("%s\r\n", buffer2);
+    // const char* file_test = "/test1/meow";
+    // ext2_inode res = {};
+    // std::uint64_t in = 0;
+    // std::int32_t status = ext2_lookup(part, file_test, &res, &in);
 
-    klibc::printf("group count %lli (size %lli)\r\n",groups_count,groups_count * sizeof(ext2_group_desc));
+    // klibc::memset(buffer2, 0, PAGE_SIZE);
+    // klibc::printf("reading file %s, status %d, size %lli\r\n", file_test, status, res.i_size);
+    // ext2_read_block(part, get_phys_block(part, &res, 0), buffer2);
+    // klibc::printf("%s\r\n", buffer2);
+
+    // klibc::printf("group count %lli (size %lli)\r\n",groups_count,groups_count * sizeof(ext2_group_desc));
     
 }

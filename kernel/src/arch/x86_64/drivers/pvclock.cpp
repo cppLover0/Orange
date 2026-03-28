@@ -43,25 +43,41 @@ void drivers::pvclock::bsp_init() {
     drivers::pvclock_timer* timer = new drivers::pvclock_timer;
     time::setup_timer(timer);
 
-    klibc::printf("pvclock: pointer to buffer 0x%p\r\n",x86_64::cpu_data()->pvclock_buffer);
+    log("pvclock", "pointer to buffer 0x%p",x86_64::cpu_data()->pvclock_buffer);
 }
 
 namespace drivers {
     
     std::uint64_t pvclock_timer::current_nano() {
-        uint32_t lo, hi;
-        asm volatile ("rdtsc" : "=a"(lo), "=d"(hi));
-        std::uint64_t tsc_v = ((uint64_t)hi << 32) | lo;
-        pvclock_vcpu_time_info* kvmclock_info = (pvclock_vcpu_time_info*)(x86_64::cpu_data()->pvclock_buffer);
-        std::uint64_t time0 = tsc_v - kvmclock_info->tsc_timestamp;
-        if(kvmclock_info->tsc_shift >= 0)
-            time0 <<= kvmclock_info->tsc_shift;
-        else
-            time0 >>= -kvmclock_info->tsc_shift;
-        time0 = (time0 * kvmclock_info->tsc_to_system_mul) >> 32;
-        time0 = time0 + kvmclock_info->system_time;
+        auto* info = (pvclock_vcpu_time_info*)CPU_LOCAL_READ(pvclock_buffer);
+        uint32_t version;
+        uint64_t time0;
+
+        do {
+            version = info->version;
+            std::atomic_thread_fence(std::memory_order_acquire);
+
+            uint32_t lo, hi;
+            asm volatile ("rdtsc" : "=a"(lo), "=d"(hi) : : "memory");
+            uint64_t tsc_v = (static_cast<uint64_t>(hi) << 32) | lo;
+
+            uint64_t delta = tsc_v - info->tsc_timestamp;
+            
+            if (info->tsc_shift >= 0)
+                delta <<= info->tsc_shift;
+            else
+                delta >>= -info->tsc_shift;
+
+            uint64_t scaled_delta = (static_cast<unsigned __int128>(delta) * info->tsc_to_system_mul) >> 32;
+            
+            time0 = info->system_time + scaled_delta;
+
+            std::atomic_thread_fence(std::memory_order_acquire);
+        } while ((info->version & 1) || (info->version != version));
+
         return time0;
     }
+
 
     void pvclock_timer::sleep(std::uint64_t us) {
         std::uint64_t current = this->current_nano();

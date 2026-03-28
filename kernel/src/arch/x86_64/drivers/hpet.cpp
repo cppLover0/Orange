@@ -23,7 +23,7 @@ void drivers::hpet::init() {
     uacpi_table hpet;
     uacpi_status ret = uacpi_table_find_by_signature("HPET",&hpet);
     if(ret != UACPI_STATUS_OK) {
-        klibc::printf("HPET: hpet is not detected with status %d\r\n",ret);
+        log("hpet", "hpet is not detected with status %d",ret);
         return; 
     }
 
@@ -36,7 +36,7 @@ void drivers::hpet::init() {
     hpet_clock_nano = (*(volatile uint32_t*)(hpet_base + 4)) / 1000000;
     hpet_timer* new_hpet_inst = new hpet_timer;
     time::setup_timer(new_hpet_inst);
-    klibc::printf("HPET: Detected %s hpet, current timestamp in nano %lli (hpet_base 0x%p)\r\n",hpet_is_32_bit ? "32 bit" : "64 bit", new_hpet_inst->current_nano(),hpet_base);
+    log("hpet", "Detected %s hpet, current timestamp in nano %lli (hpet_base 0x%p)",hpet_is_32_bit ? "32 bit" : "64 bit", new_hpet_inst->current_nano(),hpet_base);
 }
 
 namespace drivers {

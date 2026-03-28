@@ -105,6 +105,10 @@ struct ext2_inode {
     uint32_t i_osd2[3];
 };
 
+#define EXT2_S_IFMT   0xF000
+#define EXT2_S_IFLNK  0xA000
+#define EXT2_S_IFDIR 0040000
+
 struct ext2_dir_entry {
     uint32_t inode;       
     uint16_t rec_len;     

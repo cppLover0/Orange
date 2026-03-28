@@ -41,13 +41,13 @@ void drivers::ioapic::init() {
                 struct acpi_madt_ioapic* cur_ioapic = (acpi_madt_ioapic*)current;
                 paging::map_range(gobject::kernel_root,cur_ioapic->address,cur_ioapic->address + etc::hhdm(),PAGE_SIZE,PAGING_PRESENT | PAGING_RW);
                 apics[apic_ent++] = *cur_ioapic; 
-                klibc::printf("IOAPIC: Found ioapic with gsi base %d, address 0x%p, id %d\r\n",cur_ioapic->gsi_base,cur_ioapic->address,cur_ioapic->id);
+                log("ioapic", "Found ioapic with gsi base %d, address 0x%p, id %d",cur_ioapic->gsi_base,cur_ioapic->address,cur_ioapic->id);
                 break;
             }
             case ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE: {
                 struct acpi_madt_interrupt_source_override* cur_iso = (struct acpi_madt_interrupt_source_override*)current;
                 iso[iso_ent++] = *cur_iso;
-                klibc::printf("IOAPIC: Found ISO with bus %d, irq %d, gsi base %d, flags %d\r\n",cur_iso->bus,cur_iso->source,cur_iso->gsi,cur_iso->flags);
+                log("ioapic", "Found ISO with bus %d, irq %d, gsi base %d, flags %d",cur_iso->bus,cur_iso->source,cur_iso->gsi,cur_iso->flags);
                 break;
             }
         }
