@@ -153,6 +153,7 @@ std::int32_t evdev_stat(file_descriptor* file, stat* out) {
 std::int32_t evdev_open(filesystem* fs, void* file_desc, char* path, bool is_directory) {
 
     file_descriptor* fd = (file_descriptor*)file_desc;
+    (void)fs;
 
     if(klibc::strcmp(path, "/") == 0) {
         fd->fs_specific.tmpfs_pointer = (std::uint64_t)&evroot_node;

@@ -16,6 +16,7 @@
 #include <utils/gobject.hpp>
 #include <arch/x86_64/cpu/sse.hpp>
 #include <arch/x86_64/drivers/pvclock.hpp>
+#include <utils/assert.hpp>
 
 namespace arch {
     [[gnu::weak]] void disable_interrupts() {
@@ -74,6 +75,7 @@ namespace arch {
             drivers::hpet::init();
             drivers::tsc::init();
             drivers::pvclock::bsp_init();
+            assert(time::timer != nullptr, "can't init orange without timer !");
             x86_64::gdt::init();
             x86_64::idt::init();
             x86_64::lapic::init(1500);

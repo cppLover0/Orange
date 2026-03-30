@@ -12,6 +12,7 @@
 #include <drivers/powerbutton.hpp>
 #include <generic/mp.hpp>
 #include <generic/vfs.hpp>
+#include <drivers/xhci.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
@@ -45,6 +46,8 @@ extern "C" void main() {
     vfs::init();
     drivers::powerbutton::init();
     drivers::nvme::init();
+    xhci_init();
+
 #if defined(__x86_64__)
     x86_64::pci::initworkspace();
     log("pci", "launched all drivers");

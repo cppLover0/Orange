@@ -46,8 +46,6 @@ namespace utils {
             objs[tail].cycle = cycle;
             objs[tail].data = item;
 
-            write_counter++;
-
             if (++tail == size) {
                 tail = 0;
                 cycle = !cycle;
@@ -69,7 +67,6 @@ namespace utils {
 
             while (count < max && objs[q].cycle == (std::uint32_t)c) {
                 out[count] = objs[q].data;
-                read_counter++;
 
                 if (++q == size) {
                     q = 0;
@@ -85,7 +82,6 @@ namespace utils {
             return count;
         }
 
-        std::uint64_t get_write_count() const { return write_counter; }
     };
 
 }

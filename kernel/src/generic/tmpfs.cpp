@@ -117,7 +117,6 @@ signed long tmpfs_ls(file_descriptor* file, char* out, std::size_t count) {
     auto node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
 
     std::size_t current_offset = 0;
-    dirent file_ls = {};
 
     if(node->type != vfs_file_type::directory)
         return -ENOTDIR;
@@ -151,7 +150,7 @@ again:
     }
 
     file->vnode.fs->lock.unlock();
-    return 0;
+    return current_offset;
 }
 
 std::int32_t tmpfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode) {

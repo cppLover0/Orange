@@ -4,6 +4,8 @@
 #include <generic/lock/mutex.hpp>
 #include <utils/linux.hpp>
 #include <utils/assert.hpp>
+#include <generic/pmm.hpp>
+#include <generic/hhdm.hpp>
 #include <generic/scheduling.hpp>
 
 #define USERSPACE_PIPE_SIZE (64 * 1024)
@@ -237,6 +239,9 @@ struct file_descriptor {
     struct {
         int cycle;
         int queue;
+        int tty_num;
+        bool is_a_tty;
+        void* ls_pointer;
     } other;
 
     struct {
@@ -248,6 +253,8 @@ struct file_descriptor {
         signed long (*write)(file_descriptor* file, void* buffer, std::size_t count);
         std::int32_t (*stat)(file_descriptor* file, stat* out);
         void (*close)(file_descriptor* file);
+
+        std::int32_t (*mmap)(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size);
 
         signed long (*ls)(file_descriptor* file, char* out, std::size_t count);
         bool (*poll)(file_descriptor* file, vfs_poll_type type);
@@ -305,13 +312,9 @@ namespace vfs {
     class pipe {
     private:
         
-        std::uint64_t read_ptr = 0;
-        
         std::atomic_flag is_received = ATOMIC_FLAG_INIT;
         std::atomic_flag is_n_closed = ATOMIC_FLAG_INIT;
         
-
-        int is_was_writed_ever = 0;
 
     public:
 
@@ -383,7 +386,7 @@ namespace vfs {
             return count;
         }
 
-        std::uint64_t write(const char* src_buffer, std::uint64_t count,int id) {
+        std::uint64_t write(const char* src_buffer, std::uint64_t count) {
 
             std::uint64_t written = 0;
 
@@ -396,8 +399,6 @@ namespace vfs {
                     process::yield();
                     continue;
                 }
-
-                uint64_t old_size = this->size;
 
                 std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
                 if(to_write < 0)
@@ -413,7 +414,7 @@ namespace vfs {
             return written;
         }
 
-        std::uint64_t nolock_write(const char* src_buffer, std::uint64_t count,int id) {
+        std::uint64_t nolock_write(const char* src_buffer, std::uint64_t count) {
 
             std::uint64_t written = 0;
 
@@ -425,8 +426,6 @@ namespace vfs {
             while (written < count) {
 
                 std::uint64_t space_left = this->total_size - this->size;
-
-                uint64_t old_size = this->size;
 
                 std::uint64_t to_write = (count - written) < space_left ? (count - written) : space_left;
                 if(to_write < 0)
@@ -442,10 +441,9 @@ namespace vfs {
             return written;
         }
 
-        std::int64_t read(std::int64_t* read_count, char* dest_buffer, std::uint64_t count, int is_block) {
+        std::int64_t read(char* dest_buffer, std::uint64_t count, int is_block) {
 
             std::uint64_t read_bytes = 0;
-            int tries = 0;
 
             while (true) {
                 bool state = this->lock.lock();

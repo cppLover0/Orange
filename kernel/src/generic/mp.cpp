@@ -34,6 +34,7 @@ void mp::sync() {
 }
 
 void smptrampoline(limine_mp_info* smp_info) {
+    
     smp_lock.lock();
     std::uint32_t enum_cpu = smp_info->processor_id;
     arch::init(ARCH_INIT_MP);
@@ -41,7 +42,7 @@ void smptrampoline(limine_mp_info* smp_info) {
     x86_64::cpu_data()->cpu = balance_how_much_cpus++;
     enum_cpu = x86_64::cpu_data()->cpu;
 #endif
-    klibc::printf("SMP: Cpu %d is online (%d)\r\n",smp_info->lapic_id,enum_cpu);
+    log("smp", "cpu %d is online (%d)",smp_info->lapic_id,enum_cpu);
     smp_lock.unlock();
     mp::sync();
     if(time::timer) time::timer->sleep(10000);
@@ -63,4 +64,5 @@ void mp::init() {
             mp_info->cpus[i]->goto_address = smptrampoline;
         }
     }
+    log("mp", "detected %d cpus", mp_info->cpu_count);
 }

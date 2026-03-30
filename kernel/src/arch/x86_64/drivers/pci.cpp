@@ -2,6 +2,7 @@
 #include <cstdint>
 
 pci_driver_t pci_drivers[256];
+int last_pci_drv = 0;
 
 pci_t __pci_load(std::uint8_t bus, std::uint8_t num, std::uint8_t function) {
 	pci_t pciData;
@@ -19,6 +20,7 @@ void x86_64::pci::reg(void (*pcidrv)(pci_t, std::uint8_t, std::uint8_t, std::uin
 			pci_drivers[i]._class = _class;
 			pci_drivers[i].subclass = subclass;
 			pci_drivers[i].pcidrv = pcidrv;
+			return;
 		}
 	}
 }
@@ -27,7 +29,6 @@ void __pci_launch(pci_t pci, std::uint8_t bus, std::uint8_t device, std::uint8_t
 	for (std::uint16_t i = 0; i < 256; i++) {
 		if (pci_drivers[i].used && pci_drivers[i]._class == pci._class && pci_drivers[i].subclass == pci.subclass) {
 			pci_drivers[i].pcidrv(pci, bus, device, function);
-            return;
 		}
 	}
 }

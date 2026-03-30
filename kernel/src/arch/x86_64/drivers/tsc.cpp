@@ -14,10 +14,17 @@ static inline uint64_t rdtsc() {
     return ((uint64_t)hi << 32) | lo;
 }
 
+bool is_disabled_tsc = false;
+
 void drivers::tsc::init() {
+
+    if(is_disabled_tsc == true)
+        return;
 
     if(time::timer == nullptr) {
         log("tsc", "can't initialize without timer !");
+        is_disabled_tsc = true;
+        return;
     }
 
     uint64_t tsc_start, tsc_end;

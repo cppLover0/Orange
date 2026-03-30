@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <klibc/string.hpp>
 
 namespace assembly {
     inline static std::uint64_t rdmsr(std::uint32_t msr) {
@@ -28,4 +29,23 @@ namespace assembly {
         __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
         return ((uint64_t)hi << 32) | lo;
     }
+
+    inline static bool is_qemu() {
+        uint32_t a,b,c,d;
+
+        cpuid(0x40000000, 0, &a, &b, &c, &d);
+
+        char hypervisorSignature[13];
+        ((uint32_t *)hypervisorSignature)[0] = b;
+        ((uint32_t *)hypervisorSignature)[1] = c;
+        ((uint32_t *)hypervisorSignature)[2] = d;
+        hypervisorSignature[12] = '\0';  
+
+        if (klibc::memcmp(hypervisorSignature, (void*)"TCGTCGTCGTCG", 12) == 0 || klibc::memcmp(hypervisorSignature, (void*)"KVMKVMKVM\0\0\0", 12) == 0) {
+            return true;  
+        }
+
+        return false; 
+    }
+
 };
