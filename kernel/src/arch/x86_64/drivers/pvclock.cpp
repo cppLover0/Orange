@@ -46,9 +46,12 @@ void drivers::pvclock::bsp_init() {
     log("pvclock", "pointer to buffer 0x%p",x86_64::cpu_data()->pvclock_buffer);
 }
 
+locks::preempt_spinlock pvclock_lock;
+
 namespace drivers {
     
     std::uint64_t pvclock_timer::current_nano() {
+        bool state = pvclock_lock.lock();
         auto* info = (pvclock_vcpu_time_info*)CPU_LOCAL_READ(pvclock_buffer);
         uint32_t version;
         uint64_t time0;
@@ -75,6 +78,7 @@ namespace drivers {
             std::atomic_thread_fence(std::memory_order_acquire);
         } while ((info->version & 1) || (info->version != version));
 
+        pvclock_lock.unlock(state);
         return time0;
     }
 

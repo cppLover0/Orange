@@ -25,6 +25,7 @@ context_switch:
 extern scheduler_timer_asm
 global yield
 yield:
+    cli
     pop rax
     mov rdx, rsp
     mov rsp,[gs:16]

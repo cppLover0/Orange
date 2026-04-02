@@ -242,6 +242,7 @@ struct file_descriptor {
         int tty_num;
         bool is_a_tty;
         void* ls_pointer;
+        bool is_master;
     } other;
 
     struct {
@@ -267,7 +268,8 @@ namespace vfs {
 
     struct node {
         filesystem* fs;
-        char path[2048];
+        char internal_path[1024];
+        char path[1024];
     };
 
     void init();

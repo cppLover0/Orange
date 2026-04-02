@@ -85,6 +85,10 @@ namespace bootloader {
         return flanterm.response;
     }
 
+    limine_framebuffer_response* limine::get_framebuffers() {
+        return framebuffer_request.response;
+    }
+
 #if defined(__x86_64__)
     bool limine::is_5_level_paging() {
         return _5lvl_paging.response->mode == LIMINE_PAGING_MODE_X86_64_5LVL ? true : false;

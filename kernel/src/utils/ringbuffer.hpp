@@ -17,13 +17,13 @@ namespace utils {
     class ring_buffer {
     private:
         buffer_obj_t<T>* objs;
+        locks::preempt_spinlock lock;
+
+    public:
         int tail;
         int size;
         int cycle;
 
-        locks::preempt_spinlock lock;
-
-    public:
         explicit ring_buffer(std::size_t size_elements) {
             size = static_cast<int>(size_elements);
             objs = new buffer_obj_t<T>[size];

@@ -73,8 +73,8 @@ namespace arch {
         case ARCH_INIT_EARLY:
             x86_64::init_cpu_data();
             drivers::hpet::init();
-            drivers::tsc::init();
             drivers::pvclock::bsp_init();
+            drivers::tsc::init();
             assert(time::timer != nullptr, "can't init orange without timer !");
             x86_64::gdt::init();
             x86_64::idt::init();
@@ -87,13 +87,14 @@ namespace arch {
         case ARCH_INIT_MP:
             enable_paging(gobject::kernel_root);
             x86_64::init_cpu_data();
-            drivers::tsc::init();
             drivers::pvclock::init();
+            drivers::tsc::init();
             x86_64::gdt::init();
             x86_64::idt::init();
             x86_64::lapic::init(1500);
             x86_64::schedule_timer::init();
             x86_64::sse::init();
+            
             return;
         case ARCH_INIT_COMMON:
             return;

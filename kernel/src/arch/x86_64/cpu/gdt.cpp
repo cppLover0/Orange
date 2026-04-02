@@ -18,6 +18,7 @@ x86_64::gdt::gdt_t original_gdt = {
 };
 
 void x86_64::gdt::init() {
+    auto cpu_data_orig = x86_64::cpu_data();
     gdt_t* new_gdt = new gdt_t;
     tss_t* tss = new tss_t;
 
@@ -42,8 +43,10 @@ void x86_64::gdt::init() {
     load_gdt(gdtr);
     load_tss();
 
-    x86_64::restore_cpu_data();
+    x86_64::init_cpu_data();
     auto cpudata = x86_64::cpu_data();
+    klibc::memcpy(cpudata, cpu_data_orig, sizeof(cpudata_t));
+
     cpudata->timer_ist_stack = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm());
 
     static bool is_print = 0;

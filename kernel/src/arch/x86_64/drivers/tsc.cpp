@@ -5,6 +5,7 @@
 #include <arch/x86_64/cpu_local.hpp>
 #include <utils/gobject.hpp>
 #include <klibc/stdio.hpp>
+#include <utils/assert.hpp>
 
 #include <generic/arch.hpp>
 
@@ -26,6 +27,8 @@ void drivers::tsc::init() {
         is_disabled_tsc = true;
         return;
     }
+
+    assert(x86_64::cpu_data(), "cpu data is null wtf !!?!?!?!?");
 
     uint64_t tsc_start, tsc_end;
     std::uint64_t time_start,time_end;
@@ -62,10 +65,14 @@ void drivers::tsc::init() {
     x86_64::cpu_data()->tsc_freq = tsc_freq;
 
     static bool is_print = 0;
-    if(!is_print) {log("tsc", "tsc frequency is %llu", tsc_freq); is_print = 1;}
-    drivers::tsc_timer* tsc_timer = new drivers::tsc_timer;
-    time::setup_timer(tsc_timer);
+    if(!is_print) {log("tsc", "tsc frequency is %llu", tsc_freq); is_print = 1;
+        drivers::tsc_timer* tsc_timer = new drivers::tsc_timer;
+        time::setup_timer(tsc_timer);
+    }
+    
 }
+
+locks::preempt_spinlock tsc_lock;
 
 namespace drivers {
     void tsc_timer::sleep(std::uint64_t us) {
@@ -79,13 +86,16 @@ namespace drivers {
     }
 
     std::uint64_t tsc_timer::current_nano() {
+        bool state = tsc_lock.lock();
         std::uint64_t freq = x86_64::cpu_data()->tsc_freq;
 
         if(freq == 0) { // redirect to previous timer
             if(time::previous_timer) {
+                tsc_lock.unlock(state);
                 return time::previous_timer->current_nano();
             } else {
                 klibc::printf("TSC: Trying to get current nano timestamp without any timer from non calibrated tsc !\n");
+                tsc_lock.unlock(state);
                 return 0;
             }
         }
@@ -109,10 +119,14 @@ namespace drivers {
             uint64_t total_rem = (high_rem << 32) + low_rem;
             result += total_rem / freq;
             
+            tsc_lock.unlock(state);
             return result;
         } else {
+            tsc_lock.unlock(state);
             return (tsc_v * BILLION) / freq;
         }
+        tsc_lock.unlock(state);
+        return 0;
     }
 
     int tsc_timer::get_priority() {

@@ -55,8 +55,10 @@ void smptrampoline(limine_mp_info* smp_info) {
 
 void mp::init() {
     limine_mp_response* mp_info = bootloader::bootloader->get_mp_info();
-    if(!mp_info)
+    if(!mp_info) {
+        how_much_cpus = 1;
         return;
+    }
         
     how_much_cpus = mp_info->cpu_count;
     for(std::uint16_t i = 0;i < mp_info->cpu_count;i++) {

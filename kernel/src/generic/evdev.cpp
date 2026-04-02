@@ -9,7 +9,7 @@
 #include <utils/errno.hpp>
 #include <utils/assert.hpp>
 
-locks::mutex evdev_lock;
+locks::spinlock evdev_lock;
 evdev::evdev_node evroot_node = {};
 evdev::evdev_node* evhead_node = nullptr;
 std::uint32_t evdev_ptr = 0;
@@ -20,6 +20,7 @@ evdev::evdev_node* evdev_lookup(char* path) {
         if(klibc::strcmp(current->name, path) == 0) {
             return current;
         }
+        current = current->next;
     }
     return nullptr;
 }
@@ -77,11 +78,13 @@ void evdev::submit(int num, input_event event) {
     while(node) {
         if(node->num == num)
             break;
+        node = node->next;
     }
     assert(node, "hlehlpehspgfdkjfs");
     assert(node->main_ring,"ffff");
 
     node->main_ring->send(event);
+    evdev_lock.unlock();
 }
 
 int evdev::create(char* name, int type) {
@@ -107,6 +110,7 @@ int evdev::create(char* name, int type) {
     new_node->type = type;
     new_node->next = evhead_node;
     evhead_node = new_node;
+    evdev_lock.unlock();
     return new_node->num;
 }
 
@@ -162,8 +166,9 @@ std::int32_t evdev_open(filesystem* fs, void* file_desc, char* path, bool is_dir
 
     evdev_lock.lock();
 
-    if(is_directory)
-        return -EISDIR;
+    if(is_directory) { evdev_lock.unlock();
+        return -EISDIR; 
+    }
 
     evdev::evdev_node* node = evdev_lookup(path);
     fd->fs_specific.tmpfs_pointer = (std::uint64_t)node;
@@ -172,15 +177,25 @@ std::int32_t evdev_open(filesystem* fs, void* file_desc, char* path, bool is_dir
     fd->vnode.write = evdev_write;
     fd->vnode.stat = evdev_stat;
 
+    fd->other.cycle = node->main_ring->cycle;
+    fd->other.queue = node->main_ring->tail;
+
     evdev_lock.unlock();
     return 0;
 }
 
 void evdev::init_default(vfs::node* node) {
     evroot_node.is_root = true;
+
+    filesystem* new_fs = new filesystem;
+    node->fs = new_fs;
+
     klibc::memcpy(node->path, "/dev/input/\0\0", sizeof("/dev/input/\0\0") + 1);
+    klibc::memcpy(node->internal_path, "/dev/input", sizeof("/dev/input\0") + 1);
     node->fs->readlink = evdev_readlink;
     node->fs->open = evdev_open;
     node->fs->create = evdev_create;
+
+    log("evdev", "evdev filesystem is 0x%p",new_fs);
     
 }

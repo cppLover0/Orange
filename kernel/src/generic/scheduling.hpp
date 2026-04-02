@@ -40,6 +40,7 @@ struct thread {
     std::atomic<std::uint32_t> status;
     std::atomic<std::uint32_t> cpu;
     std::uint64_t syscall_stack;
+    std::uint64_t user_stack;
     std::uint64_t original_root;
 
     char* name;

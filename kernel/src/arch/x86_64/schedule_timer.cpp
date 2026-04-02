@@ -21,9 +21,25 @@ extern "C" void timer_tick(x86_64::idt::int_frame_t* ctx) {
         arch::hcf();
     }
 
+    if(ctx->cs != 0x08)
+        asm volatile("swapgs");
+
     process::schedule((void*)ctx);
-    static std::atomic<int> i = 0;
-    klibc::printf("timer tick %lli %d\r", i++,x86_64::cpu_data()->cpu);
+    if(ctx->cs & 3)
+        ctx->ss |= 3;
+                            
+    if(ctx->ss & 3)
+        ctx->cs |= 3;
+
+    if(ctx->cs == 0x20)
+        ctx->cs |= 3;
+                            
+    if(ctx->ss == 0x18)
+        ctx->ss |= 3;
+
+    if(ctx->cs != 0x08)
+        asm volatile("swapgs");
+
     x86_64::apic::eoi();
 }
 

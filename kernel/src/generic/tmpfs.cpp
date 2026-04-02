@@ -299,6 +299,8 @@ void tmpfs::init_default(vfs::node* node) {
     root_node.size = 0;
     root_node.physical_size = root_alloc.real_size;
     klibc::memcpy(root_node.name, "/\0", sizeof("/\0") + 1);
+    klibc::memcpy(node->internal_path, "/tmp", sizeof("/tmp\0") + 1);
+
     root_node.directory_content = (tmpfs::tmpfs_node**)(root_alloc.phys + etc::hhdm());
     log("tmpfs", "root_node is 0x%p",&root_node);
 

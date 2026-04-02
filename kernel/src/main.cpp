@@ -13,14 +13,30 @@
 #include <generic/mp.hpp>
 #include <generic/vfs.hpp>
 #include <drivers/xhci.hpp>
+#include <generic/lock/spinlock.hpp>
+#include <generic/tty.hpp>
+#include <generic/fbdev.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
+#include <arch/x86_64/cpu_local.hpp>
 #include <arch/x86_64/drivers/serial.hpp>
 #endif
 
 extern std::size_t memory_size;
 extern int is_early;
+
+void scheduling_test(void* arg) {
+    static locks::mutex lock;
+    arch::disable_interrupts();
+    while(true) {
+        lock.lock();
+        klibc::printf("%lli",arg);
+        lock.unlock();
+        time::timer->sleep(5000);
+        process::yield();
+    }
+}
 
 extern "C" void main() {
     utils::cxx::init_constructors();
@@ -52,6 +68,15 @@ extern "C" void main() {
     x86_64::pci::initworkspace();
     log("pci", "launched all drivers");
 #endif
+    tty::init();
+    fbdev::init();
+
+    // thread* thread = process::kthread(scheduling_test, (void*)1);
+    // process::wakeup(thread);
+    // thread = process::kthread(scheduling_test, (void*)2);
+    // process::wakeup(thread);
+    // thread = process::kthread(scheduling_test, (void*)3);
+    // process::wakeup(thread);
     klibc::printf("Boot is done\r\n");
     mp::sync();
     arch::enable_interrupts();

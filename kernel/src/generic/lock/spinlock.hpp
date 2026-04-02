@@ -15,14 +15,14 @@ namespace locks {
                 if(is_disabled)
                     return 0;
 
-                bool state = arch::test_interrupts();
+                //bool state = arch::test_interrupts();
                 
-                arch::disable_interrupts();
+                //arch::disable_interrupts();
                 while (flag.test_and_set(std::memory_order_acquire)) {
                     arch::pause();
                 }
 
-                return state;
+                return false;
             }
 
             void unlock(bool state) {
@@ -63,7 +63,7 @@ namespace locks {
             }
 
             bool try_lock() {
-                return !flag.test_and_set(std::memory_order_acquire);
+                return flag.test_and_set(std::memory_order_acquire);
             }
     };
 };

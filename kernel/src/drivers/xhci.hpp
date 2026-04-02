@@ -311,17 +311,25 @@ typedef struct {
 } __attribute__((packed)) xhci_endpoint_ctx64_t;
 
 typedef struct {
-    xhci_input_control_ctx_t input_ctx;
+    xhci_slot_ctx64_t slot;
+    xhci_endpoint_ctx64_t ep0;
+    xhci_endpoint_ctx64_t ep[30];
+} __attribute__((packed)) xhci_device_ctx64_t;
+
+typedef struct {
     xhci_slot_ctx_t slot;
     xhci_endpoint_ctx_t ep0;
     xhci_endpoint_ctx_t ep[30];
+} __attribute__((packed)) xhci_device_ctx_t;
+
+typedef struct {
+    xhci_input_control_ctx_t input_ctx;
+    xhci_device_ctx_t device_ctx;
 } __attribute__((packed)) xhci_input_ctx_t;
 
 typedef struct {
     xhci_input_control_ctx64_t input_ctx;
-    xhci_slot_ctx64_t slot;
-    xhci_endpoint_ctx64_t ep0;
-    xhci_endpoint_ctx64_t ep[30];
+    xhci_device_ctx64_t device_ctx;
 } __attribute__((packed)) xhci_input_ctx64_t;
 
 typedef struct {
@@ -462,6 +470,7 @@ typedef struct xhci_usb_device {
     xhci_device_t* dev;
     xhci_input_ctx_t* input_ctx;
     xhci_port_ring_ctx_t* ep_ctx[30];
+    xhci_endpoint_ctx_t* epp[30];
     uint64_t phys_buffers[30];
     uint8_t* buffers[30];
     uint8_t main_ep;
@@ -618,29 +627,22 @@ typedef struct {
 } xhci_statusstage_trb_t;
 
 typedef struct {
-    uint32_t cycle : 1;
-    uint32_t ent : 1;
-    uint32_t isp : 1;
-    uint32_t nosnoop : 1;
-    uint32_t chain : 1;
-    uint32_t ioc : 1;
-    uint32_t imdata : 1;
-    uint32_t reserved0 : 2;
-    uint32_t bei : 1;
-    uint32_t type : 6;
-    uint32_t dir : 1;
-    uint32_t reserved1 : 15;
-} xhci_normal_info_trb_t;
-
-typedef struct {
     uint64_t base;
     uint32_t trbtransferlen : 17;
-    uint32_t tdsize : 5;
-    uint32_t target : 10;
-    union {
-        xhci_normal_info_trb_t info_s;
-        uint32_t info;
-    };
+    uint16_t tdsize : 5;
+    uint16_t target : 10;
+    uint16_t cycle : 1;
+    uint16_t ent : 1;
+    uint16_t isp : 1;
+    uint16_t nosnoop : 1;
+    uint16_t chain : 1;
+    uint16_t ioc : 1;
+    uint16_t imdata : 1;
+    uint16_t reserved0 : 2;
+    uint16_t bei : 1;
+    uint16_t type : 6;
+    uint16_t dir : 1;
+    uint16_t reserved1 : 15;
 } xhci_normal_trb_t;
 
 typedef struct {

@@ -240,7 +240,7 @@ const char* trb_type_to_str(int type) {
 xhci_trb_t __xhci_event_wait(xhci_device_t* dev,int type) {
     xhci_event_ring_ctx_t* father = dev->event_ring;
     xhci_trb_t* buffer[1024];
-    int timeout = 100;
+    int timeout = 1000;
     while(1) {
         arch::memory_barrier();
         int count = 0;
@@ -364,7 +364,7 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
     xhci_set_addr_trb_t trb;
     klibc::memset(&trb,0,sizeof(trb));
     trb.base = addr;
-    trb.info_s.bsr = 0;
+    trb.info_s.bsr = bsr;
     trb.info_s.type = TRB_ADDRESSDEVICECOMMAND_TYPE;
     trb.info_s.slotid = id;
     __xhci_clear_event(dev);
@@ -386,9 +386,19 @@ int __xhci_set_addr(xhci_device_t* dev,uint64_t addr,uint32_t id,char bsr) {
 
 }
 
+void __xhci_reset_iman(xhci_device_t* dev) {
+    volatile uint32_t* iman_reg = (volatile uint32_t*)((uint8_t*)dev->runtime + 0x20);
+
+    uint32_t val = *iman_reg;
+
+    val |= (1 << 0);
+    val |= (1 << 1);
+
+    *iman_reg = val;
+}
+
 xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_usb_command_t usbcommand,void* out,uint64_t len) {
 
-    uint64_t phys_status_buf = pmm::freelist::alloc_4k();
     uint64_t phys_desc_buf = pmm::freelist::alloc_4k();
 
     void* desc_buf = (void*)(phys_desc_buf + etc::hhdm());
@@ -397,51 +407,43 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
 
     xhci_setupstage_trb_t setup;
     xhci_datastage_trb_t data;
-    xhci_eventdata_trb_t event0;
     xhci_statusstage_trb_t status;
-    xhci_eventdata_trb_t event1;
 
     klibc::memset(&setup,0,sizeof(xhci_trb_t));
     klibc::memset(&data,0, sizeof(xhci_trb_t));
-    klibc::memset(&event0,0,sizeof(xhci_trb_t));
     klibc::memset(&status,0,sizeof(xhci_trb_t));
-    klibc::memset(&event1,0,sizeof(xhci_trb_t));
 
     klibc::memcpy(&setup.command,&usbcommand,sizeof(xhci_usb_command_t));
 
     setup.type = TRB_SETUPSTAGE_TYPE;
     setup.trt = 3;
-    setup.imdata = 1;
     setup.len = 8;
+    setup.intoncomp = 0;
+    setup.imdata = 1;
 
+    __xhci_port_ring_queue(usbdev->transfer_ring, (xhci_trb_t*)&setup);
+    
     data.type = TRB_DATASTAGE_TYPE;
-    data.data = phys_desc_buf;
-    data.len = len;
-    data.chain = 1;
     data.direction = 1;
+    data.len = len;
+    data.chain = 0;
+    data.introncomp = 0;
+    data.data = phys_desc_buf;
 
-    event0.type = TRB_EVENTDATA_TYPE;
-    event0.base = phys_status_buf;
-    event0.chain = 0;
-    event0.intoncomp = 1;
+    __xhci_port_ring_queue(usbdev->transfer_ring, (xhci_trb_t*)&data);
 
     status.type = TRB_STATUSSTAGE_TYPE;
-    status.chain = 1;
+    status.direction = 0;
+    status.intoncomp = 1;
+    status.chain = 0;
 
-    event1.type = TRB_EVENTDATA_TYPE;
-    event1.intoncomp = 1;
-
-    __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&setup);
-    __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&data);
-    __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&event0);
-    __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&status);
-    __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&event1);
-
+    __xhci_port_ring_queue(usbdev->transfer_ring, (xhci_trb_t*)&status);
 
     arch::memory_barrier();
 
     __xhci_clear_event(dev);
 
+    __xhci_reset_iman(dev);
     __xhci_doorbell_id(dev,usbdev->slotid,1);
     time::timer->sleep(5000);
 
@@ -454,8 +456,7 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
     }
 
     if(ret.ret_code != 1) {
-        log("xhci","Failed to request xhci device, idx: %p, val: %p, type: %p, len: %p, request: %d ret_code %d",usbcommand.index,usbcommand.value,usbcommand.type,usbcommand.len,usbcommand.request,ret.ret_code);
-        ret.ret_code = 0;
+        log("xhci","send_usb Failed to request xhci device, idx: %p, val: %p, type: %p, len: %p, request: %d ret_code %d",usbcommand.index,usbcommand.value,usbcommand.type,usbcommand.len,usbcommand.request,ret.ret_code);
         return ret;
     }
 
@@ -464,7 +465,6 @@ xhci_trb_t __xhci_send_usb_request_packet(xhci_device_t* dev,xhci_usb_device_t* 
     klibc::memcpy(out,desc_buf,len);
 
     pmm::freelist::free(phys_desc_buf);
-    pmm::freelist::free(phys_status_buf);
 
     return ret;
 
@@ -506,7 +506,7 @@ int __xhci_get_usb_descriptor(xhci_device_t* dev,xhci_usb_device_t* usbdev,void*
     xhci_usb_command_t usbcommand;
     usbcommand.type = 0x80;
     usbcommand.request = 6;
-    usbcommand.value = 1 << 8;
+    usbcommand.value = 0x100;
     usbcommand.index = 0;
     usbcommand.len = len;
 
@@ -606,7 +606,7 @@ void __xhci_unicode_to_ascii(uint16_t* src,char* dest) {
     dest[dest_ptr] = '\0';
 }
 
-int __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_string_descriptor_t* out,uint8_t index,uint8_t lang) {
+int __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_string_descriptor_t* out,uint8_t index,uint16_t lang) {
     xhci_usb_command_t usbcommand;
     usbcommand.type = 0x80;
     usbcommand.request = 6;
@@ -614,7 +614,7 @@ int __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_str
     usbcommand.index = lang;
     usbcommand.len = sizeof(xhci_usb_descriptor_header);
 
-    xhci_trb_t ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,usbcommand.len);
+    xhci_trb_t ret = __xhci_send_usb_request_packet(dev,usbdev,usbcommand,out,sizeof(xhci_usb_descriptor_header));
     if(ret.ret_code != 1)
         return 0;
 
@@ -635,6 +635,7 @@ int __xhci_read_usb_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_str
 
 
 int __xhci_read_usb_lang_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhci_lang_descriptor_t* out) {
+    
     xhci_usb_command_t usbcommand;
     usbcommand.type = 0x80;
     usbcommand.request = 6;
@@ -658,11 +659,12 @@ int __xhci_read_usb_lang_string(xhci_device_t* dev,xhci_usb_device_t* usbdev,xhc
 
 int __xhci_print_device_info(xhci_device_t* dev,xhci_usb_device_t* usb_dev,char* product0,char* manufacter0) {
     xhci_lang_descriptor_t lang;
-
     int status = __xhci_read_usb_lang_string(dev,usb_dev,&lang);
 
     if(!status)
         return 0;
+
+
 
     uint16_t lang0 = lang.lang[0];
 
@@ -770,10 +772,11 @@ void __xhci_ask_for_help_hid(xhci_device_t* dev,xhci_usb_device_t* usbdev) {
             continue;
 
         xhci_port_ring_ctx_t* transfer_ring = usbdev->ep_ctx[i];
-        xhci_normal_trb_t trb;
-        klibc::memset(&trb,0,sizeof(xhci_normal_trb_t));
-        trb.info_s.type = 1;
-        trb.info_s.ioc = 1;
+        xhci_normal_trb_t trb = {};
+        trb.type = 1;
+        trb.isp = 1;
+        trb.ioc = 1;
+        trb.dir = 1;
         trb.base = (uint64_t)usbdev->phys_buffers[i];
         trb.trbtransferlen = usbdev->buffers_need_size[i];
 
@@ -804,13 +807,19 @@ int log2(unsigned int x) {
 }
 
 bool usb_device_self_test(xhci_device_t* dev, xhci_usb_device_t* usbdev) {
+    return true;
     xhci_normal_trb_t trb = {};
-    trb.info_s.type = 8;
-    trb.info_s.ioc = 1;
+    trb.type = 8;
+    trb.ioc = 1;
+
+    xhci_statusstage_trb_t status = {};
+    status.type = TRB_STATUSSTAGE_TYPE;
+    status.intoncomp = 1;
 
     __xhci_clear_event(dev);
 
     __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&trb);
+    __xhci_port_ring_queue(usbdev->transfer_ring,(xhci_trb_t*)&status);
 
     arch::memory_barrier();
 
@@ -853,17 +862,13 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     
     usb_dev->interface = 0;
 
-    uint64_t addr = pmm::freelist::alloc_4k();
-    __xhci_create_dcbaa(dev,usb_dev->slotid,addr);
+    uint64_t dcbaa_addr = pmm::freelist::alloc_4k();
+    __xhci_create_dcbaa(dev,usb_dev->slotid,dcbaa_addr);
+
+    std::uint64_t input_ctxa = pmm::freelist::alloc_4k();
 
     uint32_t* hccparams = (uint32_t*)(&dev->cap->hccparams1);
     char context_size = ((hccparams1_t*)hccparams)->contextsize;
-
-
-    if(!context_size)
-        dev->dcbaa[id] += 64;
-    else
-        dev->dcbaa[id] += 128; 
 
     if(!context_size)
         usb_dev->_is64byte = 0;
@@ -885,52 +890,61 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         "(10 Gb/s - USB 3.1)"
     };
 
-    assert((addr % 64) == 0, "addr is not aligned (kernel bug)");
+    assert((dcbaa_addr % 64) == 0, "addr is not aligned (kernel bug)");
     assert((usb_dev->transfer_ring->phys % 16) == 0, "sfaf");
+    assert(usb_dev->transfer_ring->cycle == 1, "shit fuck");
+
+    //log("xhci", "speed %d, calculated %d, ring 0x%p, cycle %d",(load_portsc & 0x3C00) >> 10, speed,usb_dev->transfer_ring->phys,usb_dev->transfer_ring->cycle);
 
     if(!context_size) {
-        xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(addr + etc::hhdm());
+        xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(input_ctxa + etc::hhdm());
 
         klibc::memset(input_ctx,0,4096);
         input_ctx->input_ctx.A = (1 << 0) | (1 << 1);
-        input_ctx->slot.contextentries = 1;
-        input_ctx->slot.speed = (load_portsc & 0x3C00) >> 10;
-        input_ctx->slot.porthubnum = portnum + 1;
-        input_ctx->ep0.endpointtype = 4;
-        input_ctx->ep0.cerr = 3;
-        input_ctx->ep0.maxpacketsize = speed;
-        input_ctx->ep0.base = usb_dev->transfer_ring->phys | usb_dev->transfer_ring->cycle;
-        input_ctx->ep0.averagetrblen = 0x8;
+        input_ctx->device_ctx.slot.contextentries = 1;
+        input_ctx->device_ctx.slot.speed = (load_portsc & 0x3C00) >> 10;
+        input_ctx->device_ctx.slot.porthubnum = portnum + 1;
+        input_ctx->device_ctx.ep0.endpointtype = 4;
+        input_ctx->device_ctx.ep0.cerr = 3;
+        input_ctx->device_ctx.ep0.maxpacketsize = speed;
+        input_ctx->device_ctx.ep0.base = usb_dev->transfer_ring->phys | usb_dev->transfer_ring->cycle;
+        input_ctx->device_ctx.ep0.averagetrblen = 0x8;
         usb_dev->input_ctx = (xhci_input_ctx_t*)input_ctx;
-
     } else {
-        xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(addr  + etc::hhdm());
+        xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(input_ctxa  + etc::hhdm());
 
         klibc::memset(input_ctx,0,4096);
         input_ctx->input_ctx.A = (1 << 0) | (1 << 1);
-        input_ctx->slot.contextentries = 1;
-        input_ctx->slot.speed = (load_portsc & 0x3C00) >> 10;
-        input_ctx->slot.porthubnum = portnum + 1;
-        input_ctx->ep0.endpointtype = 4;
-        input_ctx->ep0.cerr = 3;
-        input_ctx->ep0.maxpacketsize = speed;
-        input_ctx->ep0.base = usb_dev->transfer_ring->phys | usb_dev->transfer_ring->cycle;
-        input_ctx->ep0.averagetrblen = 8;
+        input_ctx->device_ctx.slot.contextentries = 1;
+        input_ctx->device_ctx.slot.speed = (load_portsc & 0x3C00) >> 10;
+        input_ctx->device_ctx.slot.porthubnum = portnum + 1;
+        input_ctx->device_ctx.ep0.endpointtype = 4;
+        input_ctx->device_ctx.ep0.cerr = 3;
+        input_ctx->device_ctx.ep0.maxpacketsize = speed;
+        input_ctx->device_ctx.ep0.base = usb_dev->transfer_ring->phys | usb_dev->transfer_ring->cycle;
+        input_ctx->device_ctx.ep0.averagetrblen = 8;
 
         usb_dev->input_ctx = (xhci_input_ctx_t*)input_ctx;
-
     }
 
-    int status_addr = __xhci_set_addr(dev,addr,id,0);
+    int status_addr = __xhci_set_addr(dev,input_ctxa,id,0);
 
     if(status_addr == 0) {
         log("xhci","zero ret from xhci_set_addr (broken xhci ?)");
     } else if(status_addr != 1) 
         return;
 
-    // bool self_test = usb_device_self_test(dev, usb_dev);
-    // if(self_test == false)
-    //     return;
+    if(!context_size) {
+        xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx_t));
+    } else {
+        xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx64_t));
+    }
+
+    bool self_test = usb_device_self_test(dev, usb_dev);
+    if(self_test == false)
+        return;
 
     xhci_usb_descriptor_t* descriptor = (xhci_usb_descriptor_t*)klibc::malloc(4096);
     int status2 = __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,8);
@@ -938,7 +952,10 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     if(!status2)
         return;
 
-    ((xhci_input_ctx_t*)(dev->dcbaa[id]  + etc::hhdm()))->ep0.maxpacketsize = descriptor->maxpacketsize;
+    if(!context_size) 
+        ((xhci_device_ctx_t*)(dev->dcbaa[id]  + etc::hhdm()))->ep0.maxpacketsize = descriptor->maxpacketsize;
+    else
+        ((xhci_device_ctx64_t*)(dev->dcbaa[id]  + etc::hhdm()))->ep0.maxpacketsize = descriptor->maxpacketsize;
 
     status2 = __xhci_get_usb_descriptor(dev,usb_dev,(void*)descriptor,descriptor->head.len);
     if(!status2)
@@ -959,20 +976,38 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     klibc::memset(manufacter,0,1024);
 
     int status4 = __xhci_print_device_info(dev,usb_dev,product,manufacter);
-    if(!status4)
-        return;
+    if(!status4) {
+        log("xhci", "failed to get device info");
+        klibc::memset(product,0,1024);
+        klibc::memset(manufacter,0,1024);
+    }
+
+    if(!context_size) {
+        xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx_t));
+    } else {
+        xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx64_t));
+    }
 
     xhci_config_descriptor_t* cfg = (xhci_config_descriptor_t*)klibc::malloc(4096);
     usb_dev->config = cfg;
 
     __xhci_get_config_descriptor(dev,usb_dev,cfg);
-
     __xhci_setup_config(dev,usb_dev,cfg->configval);
+
+    if(!context_size) {
+        xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx_t));
+    } else {
+        xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx64_t));
+    }
 
     if(!context_size) {
         usb_dev->input_ctx->input_ctx.A = (1 << 0);
     } else {
-        xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)(addr + etc::hhdm());
+        xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)(input_ctxa + etc::hhdm());
         input->input_ctx.A = (1 << 0);
     }
 
@@ -1052,18 +1087,20 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                 usb_dev->ep_ctx[idx] = __xhci_setup_port_ring(256,usb_dev->slotid);
                 
                 usb_dev->buffers_need_size[idx] = ep->maxpacketsize;
+                //log("ep","size %lli",ep->maxpacketsize);
 
                 usb_dev->phys_buffers[idx] = pmm::freelist::alloc_4k();
                 usb_dev->buffers[idx] = (uint8_t*)(usb_dev->phys_buffers[idx]  + etc::hhdm());
                 usb_dev->doorbell_values[idx] = idx + 2;
 
                 if(!context_size) { 
-                    xhci_input_ctx_t* input = (xhci_input_ctx_t*)(addr  + etc::hhdm());
-                    xhci_endpoint_ctx_t* ep1 = &input->ep[idx];
+                    xhci_input_ctx_t* input = (xhci_input_ctx_t*)(input_ctxa  + etc::hhdm());
+                    xhci_endpoint_ctx_t* ep1 = &input->device_ctx.ep[idx];
                     klibc::memset(ep1,0,sizeof(xhci_endpoint_ctx_t));
                     usb_dev->input_ctx->input_ctx.A |= (1 << (idx + 2));
                     
-                    input->slot.contextentries += 2;
+                    usb_dev->epp[idx] = ep1;
+                    if(input->device_ctx.slot.contextentries < idx + 2) input->device_ctx.slot.contextentries = idx + 2;
                     ep1->state = 0;
                     ep1->endpointtype = __xhci_ep_to_type(ep);
                     ep1->maxpacketsize = ep->maxpacketsize;
@@ -1076,6 +1113,8 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     uint8_t interval = ep->interval;
                     uint8_t epty = ep1->endpointtype;
 
+                    //log("xhci","new ep %d", idx + 2);
+
                     /* thanks n00byedge for tips */
 
                     if(port_speed == XHCI_USB_SPEED_HIGH_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED_PLUS)
@@ -1083,16 +1122,19 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     else if(port_speed == XHCI_USB_SPEED_FULL_SPEED && (epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_IN || epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_OUT))
                         ep1->interval = interval + 2;
                     else if((port_speed == XHCI_USB_SPEED_FULL_SPEED || port_speed == XHCI_USB_SPEED_LOW_SPEED) && (epty == XHCI_ENDPOINTTYPE_INTERRUPT_IN || epty == XHCI_ENDPOINTTYPE_INTERRUPT_OUT)) {
-                        ep1->interval = log2(interval) + 4;
+                        ep1->interval = log2(interval) + 3;
+                    } else {
+                        ep1->interval = interval;
                     }
 
                     
                 } else {
-                    xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)(addr  + etc::hhdm());
-                    xhci_endpoint_ctx_t* ep1 = (xhci_endpoint_ctx_t*)(&input->ep[idx]);
-                    klibc::memset(ep1,0,sizeof(xhci_endpoint_ctx_t));
+                    xhci_input_ctx64_t* input = (xhci_input_ctx64_t*)(input_ctxa  + etc::hhdm());
+                    xhci_endpoint_ctx64_t* ep1 = (xhci_endpoint_ctx64_t*)(&input->device_ctx.ep[idx]);
+                    klibc::memset(ep1,0,sizeof(xhci_endpoint_ctx64_t));
                     
-                    input->slot.contextentries += 2;
+                    usb_dev->epp[idx] = (xhci_endpoint_ctx_t*)ep1;
+                    if(input->device_ctx.slot.contextentries < idx + 2) input->device_ctx.slot.contextentries = idx + 2;
                     input->input_ctx.A |= (1 << (idx + 2));
                     ep1->state = 0;
                     ep1->endpointtype = __xhci_ep_to_type(ep);
@@ -1101,7 +1143,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     ep1->cerr = 3;
                     ep1->maxburstsize = 0;
                     ep1->averagetrblen = ep->maxpacketsize;
-                    ep1->base = (uint64_t)usb_dev->ep_ctx[idx]->phys | usb_dev->ep_ctx[idx]->cycle;
+                    ep1->base = usb_dev->ep_ctx[idx]->phys | usb_dev->ep_ctx[idx]->cycle;
                     uint8_t port_speed = (load_portsc & 0x3C00) >> 10;
                     uint8_t interval = ep->interval;
                     uint8_t epty = ep1->endpointtype;
@@ -1111,7 +1153,9 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     else if(port_speed == XHCI_USB_SPEED_FULL_SPEED && (epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_IN || epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_OUT))
                         ep1->interval = interval + 2;
                     else if((port_speed == XHCI_USB_SPEED_FULL_SPEED || port_speed == XHCI_USB_SPEED_LOW_SPEED) && (epty == XHCI_ENDPOINTTYPE_INTERRUPT_IN || epty == XHCI_ENDPOINTTYPE_INTERRUPT_OUT)) {
-                        ep1->interval = log2(interval) + 4;
+                        ep1->interval = log2(interval) + 3;
+                    } else {
+                        ep1->interval = interval;
                     }
                 }
 
@@ -1126,7 +1170,7 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     klibc::memset(&ep_trb,0,sizeof(xhci_trb_t));
     
     ep_trb.info_s.type = 12;
-    ep_trb.base = addr;
+    ep_trb.base = input_ctxa;
     ep_trb.info_s.slot = usb_dev->slotid;
 
     __xhci_clear_event(dev);
@@ -1135,15 +1179,42 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
     __xhci_doorbell(dev,0);
     time::timer->sleep(5000);
 
-    xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE);
+    xhci_trb_t ret = __xhci_event_wait(dev,TRB_COMMANDCOMPLETIONEVENT_TYPE); 
 
-    if(ret.ret_code > 1) {
+    if(ret.ret_code != 1) {
         log("xhci","Can't configure endpoints for port %d (ret %d base %p), context_size: %d, given addr %p",portnum,ret.ret_code,ret.base,usb_dev->_is64byte,ep_trb.base);
         return;
-    } else if(ret.ret_code == 0) {
-        log("xhci","Endpoint configure TRB ret_code is 0 (it shouldn't)");
     }
     
+    if(!context_size) {
+        xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx_t));
+    } else {
+        xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(input_ctxa + etc::hhdm());
+        klibc::memcpy((void*)&(input_ctx->device_ctx), (void*)(dcbaa_addr + etc::hhdm()), sizeof(xhci_device_ctx64_t));
+    }
+
+    __xhci_clear_event(dev);
+
+    time::timer->sleep(150000);
+
+
+    // if(!context_size) {
+    //     for(int i = 0;i < 30;i++) {
+    //         xhci_input_ctx_t* input_ctx = (xhci_input_ctx_t*)(addr + etc::hhdm());
+    //         if(input_ctx->ep[i].baselow != 0) {
+    //             log("xhci", "state ep%d is %d",i + 2, input_ctx->ep[i].state);
+    //         }
+    //     }
+    // } else {
+    //     for(int i = 0;i < 30;i++) {
+    //         xhci_input_ctx64_t* input_ctx = (xhci_input_ctx64_t*)(addr + etc::hhdm());
+    //         if(input_ctx->ep[i].baselow != 0 || input_ctx->ep[i].base_high != 0) {
+    //             log("xhci", "state ep%d is %d",i + 2, input_ctx->ep[i].state);
+    //         }
+    //     }
+    // }
+
     __xhci_ask_for_help_hid(dev,usb_dev);
 
     time::timer->sleep(1000);
@@ -1236,9 +1307,12 @@ void __xhci_process_fetch(xhci_device_t* dev) {
     xhci_event_ring_ctx_t* father = dev->event_ring;
     xhci_trb_t* buffer[1024];
 
+    arch::disable_interrupts();
+
     while(1) {
         //Paging::EnableKernel();  
         int count = 0;
+
         klibc::memset(buffer,0,sizeof(xhci_trb_t*) * 1024);
         if(get_trb(father,father->queue).info_s.cycle == father->cycle)
             count = __xhci_event_receive(dev,father,buffer);
@@ -1257,14 +1331,19 @@ void __xhci_process_fetch(xhci_device_t* dev) {
                         xhci_done_trb_t* trb = (xhci_done_trb_t*)current;
                         while(usbdev) {
                             if(usbdev->dev == dev) {
+                                if(trb->ret_code != 1) {
+                                    //log("xhci", "got ret_code %d in process_fetch for slot %d",trb->ret_code, usbdev->slotid);
+                                }
                                 if(usbdev->slotid == trb->info_s.slot) {
                                     xhci_hid_driver_t* drv = hid_drv;
                                     while(drv) {
-                                        if((std::uint32_t)drv->type == usbdev->type)
+                                        if((std::uint32_t)drv->type == usbdev->type) {
                                             drv->func(usbdev,trb);
+                                        }
                                         drv = drv->next;
                                     }
                                     __xhci_ask_for_help_hid(dev,usbdev);
+                                    
                                 }
                             }
                             usbdev = usbdev->next;
@@ -1323,7 +1402,7 @@ void xhci_device(std::uint64_t addr) {
     uint8_t major = (hci_version >> 8) & 0xFF;
     uint8_t minor = hci_version & 0xFF;
 
-    log("xhci", "hciversion: %d.%d (0x%04x)", major, minor, hci_version);
+    log("xhci", "xhci version is %d.%d (0x%04x)", major, minor, hci_version);
 
     //DEBUG("Resetting XHCI device");
     __xhci_reset(dev);
@@ -1340,15 +1419,16 @@ void xhci_device(std::uint64_t addr) {
     __xhci_iterate_usb_ports(dev);
     //INFO("Configuring XHCI Ports");
 
-    log("xhci", "iterating ports");
+    //log("xhci", "iterating ports");
     __xhci_init_ports(dev);
 
     // int pid = fork();
     // if(pid == 0)
     //     __xhci_process_fetch(dev);
 
-    process::kthread((void (*)(void*))__xhci_process_fetch,(void*)dev); 
-    log("xhci", "xhci initializied");
+    thread* thr = process::kthread((void (*)(void*))__xhci_process_fetch,(void*)dev); 
+    process::wakeup(thr);
+    //log("xhci", "xhci initializied");
 }
 
 #if defined(__x86_64__)
@@ -1453,6 +1533,8 @@ void hid_layout_init() {
 }
 
 void input_send(int num, uint8_t key) {
+
+    log("usb keyboard", "got key %d",key);
 
     std::uint64_t current_nano = time::timer->current_nano();
 
