@@ -38,6 +38,8 @@ CXX := $(TOOLCHAIN_PREFIX)c++
 # User controllable linker command.
 LD := $(TOOLCHAIN_PREFIX)ld
 
+MODE := DEBUG
+
 # Defaults overrides for variables if using "llvm" as toolchain.
 ifeq ($(TOOLCHAIN),llvm)
     CC := clang
@@ -46,7 +48,14 @@ ifeq ($(TOOLCHAIN),llvm)
 endif
 
 # User controllable C flags.
-CFLAGS := -g -O3 -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
+
+ifeq ($(MODE),DEBUG)
+    CFLAGS := -g -pipe -Werror -Wall
+else ifeq ($(MODE), RELEASE)
+    CFLAGS := -g -O3 -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
+else
+    $(error unknown mode release/debug)
+endif
 
 # User controllable C++ flags. We default to same as C flags.
 CXXFLAGS := $(CFLAGS)

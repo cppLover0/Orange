@@ -33,6 +33,7 @@ void kheap::opt_free(void* ptr) {
 
     if(!ptr) return;
     heap_block* block = (heap_block*)((std::uint64_t)ptr - sizeof(heap_block)); 
+    klibc::memset(ptr, 0, block->size);
     block->is_free = 1;
     if (block->next && block->next->is_free) {
         block->size += block->next->size;
@@ -69,6 +70,7 @@ void kheap::free(void* ptr) {
 
     heap_block* block = (heap_block*)((std::uint64_t)ptr - sizeof(heap_block)); 
     block->is_free = 1;
+    klibc::memset(ptr, 0, block->size);
     if (block->next && block->next->is_free) {
         block->size += block->next->size;
         block->next = block->next->next;

@@ -34,8 +34,36 @@ void scheduling_balance_cpus() {
 
 
 thread* process::create_process(bool is_user) {
-    (void)is_user;
-    return nullptr;
+    thread* new_thread = (thread*)(pmm::freelist::alloc_4k() + etc::hhdm());
+    new_thread->id = ++last_id;
+    new_thread->status = PROCESS_SLEEP;
+    new_thread->lock.lock();
+    new_thread->pid = new_thread->id;
+    new_thread->original_root = pmm::freelist::alloc_4k();
+
+#if defined(__x86_64__)
+    new_thread->sse_ctx = (std::uint8_t*)(pmm::buddy::alloc(x86_64::sse::size()).phys + etc::hhdm());
+    x86_64::sse::setup_headers((x86_64::sse::fpu_head_t*)new_thread->sse_ctx); // yes ik but why not 
+    new_thread->ctx.ss = is_user ? (0x18 | 3) : 0;
+    new_thread->ctx.cs = is_user ? (0x20 | 3) : 0x08;
+    new_thread->ctx.rflags = (1 << 9);
+    new_thread->ctx.cr3 = new_thread->original_root;
+#endif
+
+    new_thread->is_debug = true;
+    new_thread->sig = new signal_manager;
+    new_thread->original_syscall_stack = pmm::buddy::alloc(KERNEL_STACK_SIZE).phys;
+    new_thread->syscall_stack = (std::uint64_t)(new_thread->original_syscall_stack + etc::hhdm() + (KERNEL_STACK_SIZE - PAGE_SIZE));
+    new_thread->cwd = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
+    new_thread->cwd[0] = '/';
+    new_thread->cwd[1] = '\0';
+
+    bool state = scheduling_lock.lock();
+    new_thread->next = (thread*)head_proc.load();
+    head_proc = (void*)new_thread;
+    scheduling_lock.unlock(state);
+
+    return new_thread;
 }
 
 thread* process::by_id(std::uint32_t id) {
@@ -129,9 +157,10 @@ void process::schedule(void* ctx) {
                     assembly::wrmsr(0xC0000100, current_thread->fs_base);
                     if(current_thread->sse_ctx)
                         x86_64::sse::load(current_thread->sse_ctx);
+                    CPU_LOCAL_WRITE(kernel_stack, current_thread->syscall_stack);
+                    CPU_LOCAL_WRITE(user_stack, current_thread->user_stack);
                     CPU_LOCAL_WRITE(current_thread, current_thread);
 
-                    //klibc::printf("jmp to %d\r\n",current_thread->id);
 #endif
                     return;
                 }

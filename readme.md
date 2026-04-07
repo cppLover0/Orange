@@ -12,3 +12,11 @@ for build do
 ```sh
 make run -j$(nproc) ARCH=$ARCH TOOLCHAIN=llvm
 ```
+
+for building distro you can use supermin (febootstrap) and install with supermin.d 
+```sh
+supermin --build --format chroot supermin.d -o ./orange_sysroot
+```
+
+there's also cmdline for some stuff: init=path, notsc, noacpi
+noacpi means only table init

@@ -5,7 +5,7 @@
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 256M -d int -serial stdio -device qemu-xhci -device usb-kbd -s
+QEMUFLAGS := -m 256M -d int -serial stdio -device qemu-xhci -device usb-kbd -s -smp 4
 
 override IMAGE_NAME := orange-$(ARCH)
 
@@ -27,6 +27,14 @@ run: run-$(ARCH)
 
 .PHONY: run-hdd
 run-hdd: run-hdd-$(ARCH)
+
+.PHONY: run-bios
+run-bios: $(IMAGE_NAME).iso
+	qemu-system-$(ARCH)  \
+		-M q35 \
+		-enable-kvm -cpu host,+x2apic,+la57 \
+		-cdrom $(IMAGE_NAME).iso \
+		$(QEMUFLAGS)
 
 .PHONY: run-x86_64
 run-x86_64: edk2-ovmf $(IMAGE_NAME).iso
@@ -121,15 +129,6 @@ run-hdd-loongarch64: edk2-ovmf $(IMAGE_NAME).hdd
 		-device usb-mouse \
 		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
 		-hda $(IMAGE_NAME).hdd \
-		$(QEMUFLAGS)
-
-
-.PHONY: run-bios
-run-bios: $(IMAGE_NAME).iso
-	qemu-system-$(ARCH) \
-		-M q35 \
-		-cdrom $(IMAGE_NAME).iso \
-		-boot d \
 		$(QEMUFLAGS)
 
 .PHONY: run-hdd-bios

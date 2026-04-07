@@ -1,0 +1,4 @@
+
+namespace modules {
+    void init();
+}

@@ -161,3 +161,20 @@ struct	winsize {
 #define FBIOGET_FSCREENINFO 0x4602
 #define FB_VISUAL_TRUECOLOR		2	/* True color	*/
 #define FB_TYPE_PACKED_PIXELS		0	/* Packed Pixels	*/
+
+#define O_DIRECTORY     00200000   
+
+#define __O_SYNC        04000000
+#define O_SYNC          (__O_SYNC | O_DSYNC)
+
+#define O_PATH          010000000   
+#define __O_TMPFILE     020000000
+#define O_TMPFILE       (__O_O_TMPFILE | O_DIRECTORY)
+
+#define AT_FDCWD        -100     
+
+#define AT_SYMLINK_NOFOLLOW 0x100   
+#define AT_REMOVEDIR        0x200  
+#define AT_SYMLINK_FOLLOW   0x400  
+#define AT_EACCESS          0x200 
+#define AT_EMPTY_PATH 0x1000

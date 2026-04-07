@@ -13,4 +13,8 @@ namespace klibc {
     char* strcat(char* dest, const char* src);
     int strncmp(const char *s1, const char *s2, std::size_t n);
     int strcmp(const char *s1, const char *s2);
+    char* itoa(int value, char* buffer, int base);
+    char* utoa(unsigned int value, char* buffer, int base);
+    char* itoa64(int64_t value, char* buffer, int base);
+    char* utoa64(uint64_t value, char* buffer, int base);
 };

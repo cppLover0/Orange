@@ -29,7 +29,7 @@ namespace arch {
 
     extern void enable_paging(std::uintptr_t root);
     extern void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags);
-    extern std::uint64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt);
+    extern std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt);
     extern void destroy_root(std::uintptr_t root, int level);
     extern void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root);
     extern int level_paging();

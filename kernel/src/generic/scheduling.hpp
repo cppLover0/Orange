@@ -7,6 +7,7 @@
 #endif
 #include <utils/signal.hpp>
 #include <generic/lock/spinlock.hpp>
+#include <generic/vmm.hpp>
 #include <atomic>
 
 #define PROCESS_NONE 1
@@ -39,9 +40,17 @@ struct thread {
     std::atomic<std::uint32_t> futex;
     std::atomic<std::uint32_t> status;
     std::atomic<std::uint32_t> cpu;
+    std::uint64_t original_syscall_stack;
     std::uint64_t syscall_stack;
     std::uint64_t user_stack;
     std::uint64_t original_root;
+    bool is_debug;
+
+    int* tidptr;
+    std::atomic<int> fd_ptr;
+
+    void* fd;
+    vmm* vmem;
 
     char* name;
     char* cwd;

@@ -183,3 +183,159 @@ int klibc::strcmp(const char *s1, const char *s2) {
         }
     }
 }
+static char to_char(int digit) {
+    if (digit < 10) return '0' + digit;
+    return 'a' + (digit - 10);
+}
+
+char* klibc::itoa(int value, char* buffer, int base) {
+    if (base < 2 || base > 36) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+    
+    char* ptr = buffer;
+    bool negative = false;
+    
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return buffer;
+    }
+    
+    if (value < 0 && base == 10) {
+        negative = true;
+        value = -value;
+    }
+    
+    while (value != 0) {
+        int digit = value % base;
+        *ptr++ = to_char(digit);
+        value /= base;
+    }
+    
+    if (negative) {
+        *ptr++ = '-';
+    }
+    
+    *ptr = '\0';
+    
+    char* start = buffer;
+    char* end = ptr - 1;
+    while (start < end) {
+        char temp = *start;
+        *start++ = *end;
+        *end-- = temp;
+    }
+    
+    return buffer;
+}
+
+char* klibc::utoa(unsigned int value, char* buffer, int base) {
+    if (base < 2 || base > 36) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+    
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return buffer;
+    }
+    
+    char* ptr = buffer;
+    
+    while (value != 0) {
+        int digit = value % base;
+        *ptr++ = to_char(digit);
+        value /= base;
+    }
+    
+    *ptr = '\0';
+    
+    char* start = buffer;
+    char* end = ptr - 1;
+    while (start < end) {
+        char temp = *start;
+        *start++ = *end;
+        *end-- = temp;
+    }
+    
+    return buffer;
+}
+
+char* klibc::itoa64(int64_t value, char* buffer, int base) {
+    if (base < 2 || base > 36) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+    
+    char* ptr = buffer;
+    bool negative = false;
+    
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return buffer;
+    }
+    
+    if (value < 0 && base == 10) {
+        negative = true;
+        value = -value;
+    }
+    
+    while (value != 0) {
+        int digit = value % base;
+        *ptr++ = to_char(digit);
+        value /= base;
+    }
+    
+    if (negative) {
+        *ptr++ = '-';
+    }
+    
+    *ptr = '\0';
+    
+    char* start = buffer;
+    char* end = ptr - 1;
+    while (start < end) {
+        char temp = *start;
+        *start++ = *end;
+        *end-- = temp;
+    }
+    
+    return buffer;
+}
+
+char* klibc::utoa64(uint64_t value, char* buffer, int base) {
+    if (base < 2 || base > 36) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+    
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return buffer;
+    }
+    
+    char* ptr = buffer;
+    
+    while (value != 0) {
+        int digit = value % base;
+        *ptr++ = to_char(digit);
+        value /= base;
+    }
+    
+    *ptr = '\0';
+    
+    char* start = buffer;
+    char* end = ptr - 1;
+    while (start < end) {
+        char temp = *start;
+        *start++ = *end;
+        *end-- = temp;
+    }
+    
+    return buffer;
+}

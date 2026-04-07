@@ -6,6 +6,8 @@
 #include <generic/hhdm.hpp>
 #include <generic/paging.hpp>
 #include <utils/linux.hpp>
+#include <klibc/string.hpp>
+#include <generic/sysfs.hpp>
 #include <atomic>
 
 std::int32_t fbdev_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
@@ -23,12 +25,17 @@ std::int32_t fbdev_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
 }
 
 void fbdev::init() {
+
+    sysfs::create_dir("/class/graphics/fbcon");
+    sysfs::create_symlink("/class/graphics/fbcon/subsystem", (char*)"../..");
+    sysfs::create("/class/graphics/fbcon/rotate", (void*)"0\0", 2);
+    sysfs::create("/class/graphics/fbcon/cursor_blink", (void*)"-1\0", 3);
+
     limine_framebuffer_response* fbdevs = bootloader::bootloader->get_framebuffers();
     for(std::uint64_t i = 0;i < fbdevs->framebuffer_count; i++) {
         log("fbdev", "found framebuffer %d %llix%llix%lli with base 0x%p",i, fbdevs->framebuffers[i]->width, fbdevs->framebuffers[i]->height, fbdevs->framebuffers[i]->bpp, fbdevs->framebuffers[i]->address);
         
         char buffer[256];
-        klibc::memset(buffer,0,256);
         klibc::__printfbuf(buffer, 256, "/fb%d", i);
 
         fbdev::fbdev_arg* new_arg = new fbdev::fbdev_arg;
@@ -60,6 +67,32 @@ void fbdev::init() {
         finfo->visual = FB_VISUAL_TRUECOLOR;
         finfo->type = FB_TYPE_PACKED_PIXELS;
         finfo->mmio_len = fb.pitch * fb.height;
+
+        sysfs::create_dir("/class/graphics/fb%d", i);
+        sysfs::create_symlink("/class/graphics/fb%d/subsystem", (char*)"../..", i);
+        sysfs::create("/class/graphics/fb%d/rotate", (void*)"0\0", 2, i);
+        sysfs::create("/class/graphics/fb%d/name", (void*)"vesafb\0", sizeof("vesafb"), i);
+
+        char buffer2[256];
+        int len2 = klibc::__printfbuf(buffer2, 256, "U:%llix%llip-0", fb.width, fb.height);
+        sysfs::create("/class/graphics/fb%d/modes", (void*)buffer2, len2 + 1, i);
+        sysfs::create("/class/graphics/fb%d/mode", (void*)buffer2, len2 + 1, i);
+
+        sysfs::create("/class/graphics/fb%d/pan", (void*)("0,0\0"), sizeof("0,0"), i);
+
+        len2 = klibc::__printfbuf(buffer2, 256, "%lli,%lli", fb.width, fb.height);
+        sysfs::create("/class/graphics/fb%d/virtual_size", buffer2, len2, i);
+
+        len2 = klibc::__printfbuf(buffer2, 256, "%d", vinfo->bits_per_pixel);
+        sysfs::create("/class/graphics/fb%d/bits_per_pixel", (void*)buffer2, len2 + 1, i);
+        sysfs::create("/class/graphics/fb%d/blank", (void*)"0\0", sizeof("0"), i);
+        sysfs::create("/class/graphics/fb%d/state", (void*)"0\0", sizeof("0"), i);
+
+        len2 = klibc::__printfbuf(buffer2, 256, "29:%d", i);
+        sysfs::create("/class/graphics/fb%d/dev", buffer2, len2, i);
+
+        sysfs::create("/class/graphics/fb%d/console", (void*)"\0", 1, i);
+        sysfs::create("/class/graphics/fb%d/cursor", (void*)"\0", 1, i);
 
         devfs::create(false, buffer, new_arg, (std::uint64_t)fb.address - etc::hhdm(), fb.pitch * fb.height, nullptr, fbdev_ioctl, nullptr, nullptr, nullptr, nullptr, false, PAGING_WC);
     }

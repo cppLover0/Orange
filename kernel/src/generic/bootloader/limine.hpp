@@ -14,5 +14,7 @@ public:
         bool is_5_level_paging() override;
         limine_flanterm_fb_init_params_response* get_flanterm() override;
         limine_framebuffer_response* get_framebuffers() override;
+        limine_module_response* get_modules() override;
+        char* get_cmdline() override;
     };
 };

@@ -266,6 +266,14 @@ void *uacpi_kernel_alloc(uacpi_size size) {
     return kheap::opt_malloc(size);
 }
 
+#ifdef UACPI_NATIVE_ALLOC_ZEROED
+
+void *uacpi_kernel_alloc_zeroed(uacpi_size size) {
+    return kheap::opt_malloc(size);
+}
+#endif
+
+
 void uacpi_kernel_free(void *mem) {
     kheap::opt_free(mem);
 }

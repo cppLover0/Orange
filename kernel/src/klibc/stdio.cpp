@@ -43,3 +43,17 @@ void klibc::printf(const char* fmt, ...) {
     va_end(val);
     print_lock.unlock();
 }
+
+void klibc::debug_printf(const char* fmt, ...) {
+    print_lock.lock();
+    va_list val;
+    va_start(val, fmt);
+    char buffer[4096];
+    memset(buffer,0,4096);
+    int len = _snprintf(buffer,4096,fmt,val);
+#if defined(__x86_64__)
+    x86_64::serial::write_data(buffer,len);
+#endif
+    va_end(val);
+    print_lock.unlock();
+}

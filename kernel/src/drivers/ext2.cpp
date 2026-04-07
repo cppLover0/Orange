@@ -27,27 +27,6 @@ inline static std::uint64_t inode_to_block(ext2_superblock* sb, std::uint64_t in
     return (index * inode_size(sb)) / (1024 << sb->s_log_block_size);
 }
 
-inline static std::uint64_t ext2_blocks_count(ext2_superblock* sb) {
-    if(sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_64BIT) {
-        return sb->s_blocks_count | ((std::uint64_t)sb->s_blocks_count_hi << 32);
-    } else 
-        return sb->s_blocks_count;
-    return 0;
-}
-
-
-inline static bool ext2_test_bit(std::uint8_t* bitmap, std::uint32_t bit) {
-    return bitmap[bit / 8] & (1 << (bit % 8));
-}
-
-inline static void ext2_set_bit(std::uint8_t* bitmap, std::uint32_t bit) {
-    bitmap[bit / 8] |= (1 << (bit % 8));
-}
-
-inline static void ext2_clear_bit(std::uint8_t* bitmap, std::uint32_t bit) {
-    bitmap[bit / 8] &= ~(1 << (bit % 8));
-}
-
 ext2_inode ext2_get_inode(ext2_partition* partition, std::uint64_t inode_num, std::int32_t* status = nullptr) {
     ext2_superblock* sb = partition->sb;
     std::uint32_t block_size = 1024 << sb->s_log_block_size;
@@ -57,8 +36,13 @@ ext2_inode ext2_get_inode(ext2_partition* partition, std::uint64_t inode_num, st
     char* bgdt = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
 
     bytes_to_block_res res;
+    
+    uint32_t bgdt_block = (block_size == 1024) ? 2 : 1;
 
-    ext2_group_desc* gd = (ext2_group_desc*)((std::uint64_t)partition->cached_group + group * sizeof(ext2_group_desc));
+    res = bytes_to_blocks((bgdt_block * block_size) + ((group * sizeof(ext2_group_desc))), sizeof(ext2_group_desc), partition->target_disk->lba_size);
+
+    partition->target_disk->read(partition->target_disk->arg, bgdt, res.lba + partition->lba_start, res.size_in_blocks);
+    ext2_group_desc* gd = (ext2_group_desc*)((std::uint64_t)bgdt + res.offset);
     uint32_t inode_table_block = gd->bg_inode_table;
 
     uint32_t inode_byte_offset = inode_to_index(sb, inode_num) * inode_size(sb);
@@ -283,84 +267,6 @@ std::int32_t ext2_lookup(ext2_partition* part, const char* path, ext2_inode* out
     return 0;
 }
 
-std::int64_t ext2_alloc_blocks(ext2_partition* part, uint32_t count, uint64_t* out) {
-    uint64_t blocks_per_group = part->sb->s_blocks_per_group;
-    uint64_t total_groups = (ext2_blocks_count(part->sb) + blocks_per_group - 1) / blocks_per_group;
-    
-    uint8_t* bitmap = (uint8_t*)(pmm::freelist::alloc_4k() + etc::hhdm());
-    uint64_t allocated_so_far = 0;
-
-    for (uint32_t g = 0; g < total_groups; g++) {
-        ext2_group_desc* gd = &((ext2_group_desc*)part->cached_group)[g];
-        if (gd->bg_free_blocks_count < count) continue;
-
-        ext2_read_block(part, gd->bg_block_bitmap, (char*)bitmap);
-
-        for (uint32_t i = 0; i <= blocks_per_group - count; i++) {
-            bool found = true;
-            for (uint32_t j = 0; j < count; j++) {
-                if (ext2_test_bit(bitmap, i + j)) {
-                    found = false;
-                    break;
-                }
-            }
-
-            if (found) {
-                for (uint32_t j = 0; j < count; j++) {
-                    ext2_set_bit(bitmap, i + j);
-                    out[j] = (uint64_t)g * blocks_per_group + i + j + part->sb->s_first_data_block;
-                }
-                ext2_write_block(part, gd->bg_block_bitmap, (char*)bitmap);
-                gd->bg_free_blocks_count -= count;
-                pmm::freelist::free((uint64_t)bitmap - etc::hhdm());
-                return 0;
-            }
-        }
-    }
-
-    for (uint32_t g = 0; g < total_groups && allocated_so_far < count; g++) {
-        ext2_group_desc* gd = &((ext2_group_desc*)part->cached_group)[g];
-        if (gd->bg_free_blocks_count == 0) continue;
-
-        ext2_read_block(part, gd->bg_block_bitmap, (char*)bitmap);
-        bool changed = false;
-
-        for (uint32_t i = 0; i < blocks_per_group && allocated_so_far < count; i++) {
-            if (!ext2_test_bit(bitmap, i)) {
-                ext2_set_bit(bitmap, i);
-                out[allocated_so_far++] = (uint64_t)g * blocks_per_group + i + part->sb->s_first_data_block;
-                gd->bg_free_blocks_count--;
-                changed = true;
-            }
-        }
-        if (changed) ext2_write_block(part, gd->bg_block_bitmap, (char*)bitmap);
-    }
-
-    pmm::freelist::free((uint64_t)bitmap - etc::hhdm());
-    return (allocated_so_far == count) ? 0 : -ENOSPC;
-}
-
-void ext2_free_blocks(ext2_partition* part, uint32_t count, uint64_t* blocks) {
-    uint32_t blocks_per_group = part->sb->s_blocks_per_group;
-    uint8_t* bitmap = (uint8_t*)(pmm::freelist::alloc_4k() + etc::hhdm());
-
-    for (uint32_t i = 0; i < count; i++) {
-        uint64_t abs_block = blocks[i] - part->sb->s_first_data_block;
-        uint32_t group = abs_block / blocks_per_group;
-        uint32_t index = abs_block % blocks_per_group;
-
-        ext2_group_desc* gd = &((ext2_group_desc*)part->cached_group)[group];
-        
-        ext2_read_block(part, gd->bg_block_bitmap, (char*)bitmap);
-        if (ext2_test_bit(bitmap, index)) {
-            ext2_clear_bit(bitmap, index);
-            gd->bg_free_blocks_count++;
-            ext2_write_block(part, gd->bg_block_bitmap, (char*)bitmap);
-        }
-    }
-    pmm::freelist::free((uint64_t)bitmap - etc::hhdm());
-}
-
 signed long ext2_read(file_descriptor* file, void* buffer, std::size_t count) {
     if (count <= 0) return 0;
 
@@ -429,149 +335,6 @@ uint32_t set_indirect_ptr(ext2_partition* part, uint32_t table_block, uint32_t i
     return new_val;
 }
 
-uint64_t get_or_alloc_phys_block(ext2_partition* part, ext2_inode* node, uint32_t logical_block, bool* dirty) {
-    uint32_t block_size = 1024 << part->sb->s_log_block_size;
-    uint32_t ptrs_per_block = block_size / 4;
-
-    auto alloc_one = [&]() {
-        uint64_t b = 0;
-        ext2_alloc_blocks(part, 1, &b);
-        char* zero = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
-        klibc::memset(zero, 0, block_size);
-        ext2_write_block(part, b, zero);
-        pmm::freelist::free((uint64_t)zero - etc::hhdm());
-        *dirty = true;
-        return (uint32_t)b;
-    };
-
-    if (logical_block < 12) {
-        if (!node->i_block[logical_block]) node->i_block[logical_block] = alloc_one();
-        return node->i_block[logical_block];
-    }
-    logical_block -= 12;
-
-    if (logical_block < ptrs_per_block) {
-        if (!node->i_block[12]) node->i_block[12] = alloc_one();
-        uint32_t phys = read_indirect_ptr(part, node->i_block[12], logical_block);
-        if (!phys) phys = set_indirect_ptr(part, node->i_block[12], logical_block, alloc_one());
-        return phys;
-    }
-    logical_block -= ptrs_per_block;
-
-    uint64_t doubly_limit = ptrs_per_block * ptrs_per_block;
-    if (logical_block < doubly_limit) {
-        if (!node->i_block[13]) node->i_block[13] = alloc_one();
-        uint32_t a = logical_block / ptrs_per_block;
-        uint32_t b = logical_block % ptrs_per_block;
-
-        uint32_t L1 = read_indirect_ptr(part, node->i_block[13], a);
-        if (!L1) L1 = set_indirect_ptr(part, node->i_block[13], a, alloc_one());
-        
-        uint32_t phys = read_indirect_ptr(part, L1, b);
-        if (!phys) phys = set_indirect_ptr(part, L1, b, alloc_one());
-        return phys;
-    }
-    logical_block -= doubly_limit;
-
-    if (!node->i_block[14]) node->i_block[14] = alloc_one();
-    uint32_t a = logical_block / (ptrs_per_block * ptrs_per_block);
-    uint32_t rem = logical_block % (ptrs_per_block * ptrs_per_block);
-    uint32_t b = rem / ptrs_per_block;
-    uint32_t c = rem % ptrs_per_block;
-
-    uint32_t L1 = read_indirect_ptr(part, node->i_block[14], a);
-    if (!L1) L1 = set_indirect_ptr(part, node->i_block[14], a, alloc_one());
-    uint32_t L2 = read_indirect_ptr(part, L1, b);
-    if (!L2) L2 = set_indirect_ptr(part, L1, b, alloc_one());
-    uint32_t phys = read_indirect_ptr(part, L2, c);
-    if (!phys) phys = set_indirect_ptr(part, L2, c, alloc_one());
-
-    return phys;
-}
-
-void ext2_write_inode(ext2_partition* part, uint64_t ino, ext2_inode* inode) {
-    ext2_superblock* sb = part->sb;
-    uint32_t block_size = 1024 << sb->s_log_block_size;
-    uint32_t group = inode_to_block_group(sb, ino);
-    ext2_group_desc* gd = (ext2_group_desc*)((uint64_t)part->cached_group + group * sizeof(ext2_group_desc));
-    
-    uint32_t inode_off = inode_to_index(sb, ino) * inode_size(sb);
-    uint32_t block = gd->bg_inode_table + (inode_off / block_size);
-    uint32_t off_in_block = inode_off % block_size;
-
-    char* buf = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
-    ext2_read_block(part, block, buf);
-    klibc::memcpy(buf + off_in_block, inode, sizeof(ext2_inode));
-    ext2_write_block(part, block, buf);
-    pmm::freelist::free((uint64_t)buf - etc::hhdm());
-}
-
-signed long ext2_write(file_descriptor* file, void* buffer, std::size_t count) {
-    if (count <= 0) return 0;
-    file->vnode.fs->lock.lock();
-
-    ext2_partition* part = (ext2_partition*)(file->vnode.fs->fs_specific.partition);
-    ext2_inode inode = ext2_get_inode(part, file->fs_specific.ino, nullptr);
-    uint32_t block_size = 1024 << part->sb->s_log_block_size;
-    char* temp_block = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
-
-    std::size_t total_written = 0;
-    const char* in_ptr = (const char*)buffer;
-    bool inode_dirty = false;
-
-    while (total_written < count) {
-        uint64_t logical_block = (file->offset) / block_size;
-        uint64_t block_offset = (file->offset) % block_size;
-        uint32_t to_write = block_size - block_offset;
-        if (to_write > (uint32_t)(count - total_written)) to_write = count - total_written;
-
-        uint64_t phys_block = get_or_alloc_phys_block(part, &inode, logical_block, &inode_dirty);
-        
-        if (to_write < block_size) {
-            ext2_read_block(part, phys_block, temp_block);
-        }
-        
-        klibc::memcpy(temp_block + block_offset, in_ptr + total_written, to_write);
-        ext2_write_block(part, phys_block, temp_block);
-
-        file->offset += to_write;
-        total_written += to_write;
-        
-        if (file->offset > inode.i_size) {
-            inode.i_size = file->offset;
-            inode_dirty = true;
-        }
-    }
-
-    if (inode_dirty) {
-        ext2_write_inode(part, file->fs_specific.ino, &inode);
-    }
-
-    pmm::freelist::free((uint64_t)temp_block - etc::hhdm());
-    file->vnode.fs->lock.unlock();
-    return total_written;
-}
-
-std::uint32_t ext2_open(filesystem* fs, void* file_desc, char* path, bool is_directory) {
-    fs->lock.lock();
-    ext2_inode res;
-    std::uint64_t inode_num = 0;
-    std::uint32_t status = ext2_lookup((ext2_partition*)(fs->fs_specific.partition), path, &res, &inode_num);
-    if(status != 0) { fs->lock.unlock();
-        return status; }
-
-    if(is_directory && !(res.i_mode & EXT2_S_IFDIR))
-        return -ENOTDIR;
-
-    file_descriptor* fd = (file_descriptor*)file_desc;
-    fd->fs_specific.ino = inode_num;
-    fd->vnode.fs = fs;
-    fd->vnode.read = ext2_read;
-    fd->vnode.write = ext2_write;
-    fs->lock.unlock();
-    return 0;
-}
-
 std::int32_t ext2_stat(file_descriptor* file, stat* out) {
     file->vnode.fs->lock.lock();
     std::int32_t status = 0;
@@ -604,6 +367,27 @@ std::int32_t ext2_stat(file_descriptor* file, stat* out) {
     return 0;
 }
 
+std::uint32_t ext2_open(filesystem* fs, void* file_desc, char* path, bool is_directory) {
+    fs->lock.lock();
+    ext2_inode res;
+    std::uint64_t inode_num = 0;
+    std::uint32_t status = ext2_lookup((ext2_partition*)(fs->fs_specific.partition), path, &res, &inode_num);
+    if(status != 0) { fs->lock.unlock();
+        return status; }
+
+    if(is_directory && !(res.i_mode & EXT2_S_IFDIR))
+        return -ENOTDIR;
+
+    file_descriptor* fd = (file_descriptor*)file_desc;
+    fd->fs_specific.ino = inode_num;
+    fd->vnode.fs = fs;
+    fd->vnode.read = ext2_read;
+    fd->vnode.write = nullptr;
+    fd->vnode.stat = ext2_stat;
+    fs->lock.unlock();
+    return 0;
+}
+
 std::int32_t ext2_readlink(filesystem* fs, char* path, char* buffer) {
     fs->lock.lock();
     ext2_partition* part = (ext2_partition*)(fs->fs_specific.partition);
@@ -623,22 +407,6 @@ std::int32_t ext2_readlink(filesystem* fs, char* path, char* buffer) {
     
     fs->lock.unlock();
     return 0;
-}
-
-void ext2_load_group_descriptors(ext2_partition* part) {
-    uint32_t block_size = 1024 << part->sb->s_log_block_size;
-    
-    uint32_t bgdt_block = (block_size == 1024) ? 2 : 1;
-
-    uint32_t blocks_per_group = part->sb->s_blocks_per_group;
-    uint32_t groups_count = (ext2_blocks_count(part->sb) + blocks_per_group - 1) / blocks_per_group;
-    
-    uint32_t table_size_bytes = groups_count * sizeof(ext2_group_desc);
-    uint32_t table_size_blocks = (table_size_bytes + block_size - 1) / block_size;
-
-    for (uint32_t i = 0; i < table_size_blocks; i++) {
-        ext2_read_block(part, bgdt_block + i, (char*)((uint64_t)part->cached_group + (i * block_size)));
-    }
 }
 
 static inline int isprint(int c) {
@@ -679,17 +447,12 @@ void drivers::ext2::init(disk* target_disk, std::uint64_t lba_start) {
         log("ext2", "detected features %s %s %s",(sb->s_feature_ro_compat & EXT2_FEATURE_RO_COMPAT_LARGE_FILE) ? "EXT2_FEATURE_RO_COMPAT_LARGE_FILE" : "", (sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_64BIT) ? "EXT4_FEATURE_INCOMPAT_64BIT" : "", (sb->s_feature_incompat & EXT4_FEATURE_INCOMPAT_EXTENTS) ? "EXT4_FEATURE_INCOMPAT_EXTENTS" : "");
     }
 
-    uint32_t groups_count = (ext2_blocks_count(sb) + sb->s_blocks_per_group - 1);
-
     ext2_partition* part = new ext2_partition;
     part->buffer = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
     part->lba_start = lba_start;
     part->lock.unlock();
     part->sb = sb;
     part->target_disk = target_disk;
-    part->cached_group = (void*)(pmm::buddy::alloc(groups_count * sizeof(ext2_group_desc)).phys + etc::hhdm());
-
-    ext2_load_group_descriptors(part);
 
     (void)print_buffer;
 

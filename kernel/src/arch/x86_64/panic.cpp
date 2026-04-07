@@ -2,8 +2,13 @@
 #include <arch/x86_64/panic.hpp>
 #include <arch/x86_64/cpu/idt.hpp>
 #include <generic/arch.hpp>
+#include <generic/vmm.hpp>
+#include <arch/x86_64/cpu_local.hpp>
+#include <generic/scheduling.hpp>
+#include <generic/arch.hpp>
 
 void print_regs(x86_64::idt::int_frame_t* ctx) {
+
     uint64_t cr2;
     asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
     klibc::printf("Kernel panic\n\nReason: %s\n\r","cpu exception");
@@ -38,6 +43,47 @@ void x86_64::panic::print_ascii_art() {
 }
 
 extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
+
+    if(frame->cs != 0x08)
+        asm volatile("swapgs");
+
+    uint64_t cr2;
+    asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
+
+    x86_64::cpu_data();
+
+    thread* current_thread = CPU_LOCAL_READ(current_thread);
+
+    if(frame->vec == 14 && cr2 > PAGE_SIZE && current_thread != nullptr) {
+        bool state = current_thread->vmem->lock.lock();
+        vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
+        if(obj != nullptr) {
+            bool status = current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
+            assert(status == true, "SSDFJSDFHJSDKJVBSKDBVKSDBFKD 0x%p 0x%p %lli", cr2, ALIGNPAGEDOWN(cr2), PAGE_SIZE);
+            arch::tlb_flush(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
+            current_thread->vmem->lock.unlock(state);
+
+            if(frame->cs & 3)
+                frame->ss |= 3;
+                                    
+            if(frame->ss & 3)
+                frame->cs |= 3;
+
+            if(frame->cs == 0x20)
+                frame->cs |= 3;
+                                    
+            if(frame->ss == 0x18)
+                frame->ss |= 3;
+
+            if(frame->cs != 0x08)
+                asm volatile("swapgs");
+
+            process::switch_ctx(frame);
+            __builtin_unreachable();
+        }
+        current_thread->vmem->lock.unlock(state);
+    }
+
     x86_64::panic::print_ascii_art();
     print_regs(frame);
     arch::hcf();

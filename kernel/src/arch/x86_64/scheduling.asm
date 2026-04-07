@@ -1,6 +1,6 @@
 
-global context_switch
-context_switch:
+global switch_ctx
+switch_ctx:
     mov rsp, rdi 
     pop rax
     mov cr3,rax

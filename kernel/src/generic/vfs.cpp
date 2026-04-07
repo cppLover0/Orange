@@ -9,6 +9,7 @@
 #include <generic/tmpfs.hpp>
 #include <generic/devfs.hpp>
 #include <generic/evdev.hpp>
+#include <generic/sysfs.hpp>
 
 // /bin/path -> /usr/bin/path
 void __vfs_symlink_resolve_no_at_symlink_follow(char* path, char* out) {
@@ -139,8 +140,8 @@ void __vfs_symlink_resolve(char* path, char* out, int level) {
     }
 }
 
+// vfs_nodes[0] is always root
 vfs::node vfs_nodes[512];
-
 
 vfs::node* find_node(char* path) {
     int r = 0;
@@ -272,9 +273,10 @@ std::int32_t vfs::remove(char* path) {
 
 void vfs::init() {
     klibc::memset(vfs_nodes, 0, sizeof(vfs_nodes));
-    tmpfs::init_default(&vfs_nodes[0]);
+    tmpfs::init_default(&vfs_nodes[1]);
     evdev::init_default(&vfs_nodes[2]);
-    devfs::init(&vfs_nodes[1]);
+    devfs::init(&vfs_nodes[3]);
+    sysfs::init(&vfs_nodes[4]);
 
     log("vfs", "test /dev/ptmx node is %s", find_node((char*)"/dev/ptmx")->path);
     log("vfs", "vfs_nodes 0x%p",vfs_nodes);

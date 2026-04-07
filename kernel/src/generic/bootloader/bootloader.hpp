@@ -16,6 +16,8 @@ namespace bootloader {
         virtual bool is_5_level_paging() = 0;
         virtual limine_framebuffer_response* get_framebuffers() = 0;
         virtual limine_flanterm_fb_init_params_response* get_flanterm() = 0;
+        virtual limine_module_response* get_modules() = 0;
+        virtual char* get_cmdline() = 0;
     };
 
     void init();

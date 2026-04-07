@@ -7,6 +7,7 @@
 #include <generic/pmm.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/scheduling.hpp>
+#include <generic/lock/spinlock.hpp>
 
 #define USERSPACE_PIPE_SIZE (64 * 1024)
 #define S_IFSOCK 0140000 
@@ -161,6 +162,8 @@ struct dirent {
     char d_name[];
 };
 
+#define PIPE_SIDE_WRITE 1
+#define PIPE_SIDE_READ 2
 
 struct stat {
     dev_t     st_dev;       
@@ -224,93 +227,7 @@ struct filesystem {
     char path[2048];
 };
 
-struct file_descriptor {
-    
-    file_descriptor_type type;
-
-    std::size_t offset;
-    std::uint32_t flags;
-
-    union {
-        std::uint64_t ino;
-        std::uint64_t tmpfs_pointer;
-    } fs_specific;
-
-    struct {
-        int cycle;
-        int queue;
-        int tty_num;
-        bool is_a_tty;
-        void* ls_pointer;
-        bool is_master;
-    } other;
-
-    struct {
-        disk* target_disk;
-        filesystem* fs;
-
-        std::int32_t (*ioctl)(file_descriptor* file, std::uint64_t req, void* arg);
-        signed long (*read)(file_descriptor* file, void* buffer, std::size_t count);
-        signed long (*write)(file_descriptor* file, void* buffer, std::size_t count);
-        std::int32_t (*stat)(file_descriptor* file, stat* out);
-        void (*close)(file_descriptor* file);
-
-        std::int32_t (*mmap)(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size);
-
-        signed long (*ls)(file_descriptor* file, char* out, std::size_t count);
-        bool (*poll)(file_descriptor* file, vfs_poll_type type);
-
-    } vnode;
-
-};
-
 namespace vfs {
-
-    struct node {
-        filesystem* fs;
-        char internal_path[1024];
-        char path[1024];
-    };
-
-    void init();
-    std::int32_t open(file_descriptor* fd, char* path, bool follow_symlinks, bool is_directory);
-    std::int32_t create(char* path, vfs_file_type type, std::uint32_t mode); 
-    std::int32_t readlink(char* path, char* out, std::uint32_t out_len);
-    std::int32_t remove(char* path);
-}
-
-typedef unsigned char cc_t;
-typedef unsigned int speed_t;
-typedef unsigned int tcflag_t;
-
-#define NCCS     19
-
-typedef struct {
-	tcflag_t c_iflag;
-	tcflag_t c_oflag;
-	tcflag_t c_cflag;
-	tcflag_t c_lflag;
-	cc_t c_line;
-	cc_t c_cc[NCCS];
-	speed_t ibaud;
-	speed_t obaud;
-} __attribute__((packed)) termios_t;
-
-typedef struct {
-	tcflag_t c_iflag;
-	tcflag_t c_oflag;
-	tcflag_t c_cflag;
-	tcflag_t c_lflag;
-	cc_t c_line;
-	cc_t c_cc[NCCS];
-} __attribute__((packed)) termiosold_t;
-
-#define PIPE_SIDE_WRITE 1
-#define PIPE_SIDE_READ 2
-
-// took from old kernel 
-namespace vfs {
-
     class pipe {
     private:
         
@@ -489,7 +406,215 @@ namespace vfs {
         }
 
     };
+}
 
+struct file_descriptor {
+    
+    file_descriptor_type type;
+
+    std::size_t offset;
+    std::uint32_t flags;
+    std::int32_t index;
+
+    bool is_cloexec;
+
+    union {
+        std::uint64_t ino;
+        std::uint64_t tmpfs_pointer;
+        vfs::pipe* pipe;
+    } fs_specific;
+
+    struct {
+        int cycle;
+        int queue;
+        int tty_num;
+        bool is_a_tty;
+        void* ls_pointer;
+        bool is_master;
+        int pipe_side;
+        bool is_non_block; 
+    } other;
+
+    struct {
+        disk* target_disk;
+        filesystem* fs;
+
+        std::int32_t (*ioctl)(file_descriptor* file, std::uint64_t req, void* arg);
+        signed long (*read)(file_descriptor* file, void* buffer, std::size_t count);
+        signed long (*write)(file_descriptor* file, void* buffer, std::size_t count);
+        std::int32_t (*stat)(file_descriptor* file, stat* out);
+        void (*close)(file_descriptor* file);
+
+        void (*ondup)();
+
+        std::int32_t (*mmap)(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size);
+
+        signed long (*ls)(file_descriptor* file, char* out, std::size_t count);
+        bool (*poll)(file_descriptor* file, vfs_poll_type type);
+
+        std::int32_t (*chmod)(file_descriptor* file, int new_mode);
+        std::int32_t (*zero)(file_descriptor* file);
+
+    } vnode;
+
+    file_descriptor* next;
+    char path[3500];
+};
+
+static_assert(sizeof(file_descriptor) < 4096, "no pls");
+
+namespace vfs {
+
+    class fdmanager {
+    public:
+        file_descriptor* head_fd = nullptr;
+        std::atomic<std::int32_t>* fd_ptr = nullptr;
+        locks::preempt_spinlock fd_lock;
+        std::atomic<int> fd_usage_pointer = 0;
+
+        file_descriptor* search(int idx) {
+            bool state = this->fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            while(current) {
+                if(current->index == idx) {
+                    this->fd_lock.unlock(state);
+                    return current;
+                }
+                current = current->next;
+            }
+
+            this->fd_lock.unlock(state);
+            return nullptr;
+        }
+
+        file_descriptor* createlowest(int idx) {
+            bool state = this->fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            file_descriptor* lowest = nullptr;
+            while(current) {
+                if(current->type == file_descriptor_type::unallocated && current->index > idx) {
+                    if(!lowest)
+                        lowest = current;
+                    if(current->index < lowest->index) 
+                        lowest = current;
+                }
+                current = current->next;
+            }
+
+            if(lowest == nullptr) {
+                lowest = (file_descriptor*)(pmm::freelist::alloc_4k() + etc::hhdm());
+                lowest->index = this->fd_ptr->fetch_add(1);
+                lowest->next = head_fd;
+                head_fd = lowest;
+            }
+
+            file_descriptor* next = lowest->next;
+            int index = lowest->index;
+
+            klibc::memset(lowest, 0, sizeof(file_descriptor));
+            lowest->next = next;
+            lowest->index = index;
+            lowest->type = file_descriptor_type::file;
+
+            this->fd_lock.unlock(state);
+            return lowest;
+
+        }
+
+        void kill() {
+            bool state = fd_lock.lock();
+            fd_usage_pointer--;
+            if(fd_usage_pointer > 0) {fd_lock.unlock(state); return; }
+            file_descriptor* current = this->head_fd;
+            while(current) {
+                if(current->type != file_descriptor_type::unallocated) {
+                    this->close(current); 
+                }
+                file_descriptor* next = current->next;
+                pmm::freelist::free((std::uint64_t)current - etc::hhdm());
+                current = next;
+            } 
+        }
+
+        void new_usage() {
+            fd_usage_pointer++;
+        }
+
+        void duplicate(fdmanager* dest) {
+            bool state = fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            while(current) {
+                file_descriptor* new_fd = (file_descriptor*)(pmm::freelist::alloc_4k() + etc::hhdm());
+                klibc::memcpy(new_fd, current, sizeof(file_descriptor));
+                new_fd->next = dest->head_fd;
+                dest->head_fd = new_fd;
+            
+                if(new_fd->type == file_descriptor_type::pipe) {
+                    new_fd->fs_specific.pipe->create(new_fd->other.pipe_side);
+                } else if(new_fd->type == file_descriptor_type::file) {
+                    if(new_fd->vnode.ondup)
+                        new_fd->vnode.ondup();
+                }
+
+                current = current->next;
+            }
+            fd_lock.unlock(state);
+        }
+
+        void close(file_descriptor* file) {
+            if(file->type == file_descriptor_type::file) {
+                if(file->vnode.close)
+                    file->vnode.close(file);
+            } else if(file->type == file_descriptor_type::pipe) {
+                file->fs_specific.pipe->close(file->other.pipe_side);
+            } else {
+                assert(0, "unimplemented close type %d", file->type);
+            }
+        }
+
+    };
+
+    struct node {
+        filesystem* fs;
+        char internal_path[1024];
+        char path[1024];
+    };
+
+    void init();
+    std::int32_t open(file_descriptor* fd, char* path, bool follow_symlinks, bool is_directory);
+    std::int32_t create(char* path, vfs_file_type type, std::uint32_t mode); 
+    std::int32_t readlink(char* path, char* out, std::uint32_t out_len);
+    std::int32_t remove(char* path);
+}
+
+typedef unsigned char cc_t;
+typedef unsigned int speed_t;
+typedef unsigned int tcflag_t;
+
+#define NCCS     19
+
+typedef struct {
+	tcflag_t c_iflag;
+	tcflag_t c_oflag;
+	tcflag_t c_cflag;
+	tcflag_t c_lflag;
+	cc_t c_line;
+	cc_t c_cc[NCCS];
+	speed_t ibaud;
+	speed_t obaud;
+} __attribute__((packed)) termios_t;
+
+typedef struct {
+	tcflag_t c_iflag;
+	tcflag_t c_oflag;
+	tcflag_t c_cflag;
+	tcflag_t c_lflag;
+	cc_t c_line;
+	cc_t c_cc[NCCS];
+} __attribute__((packed)) termiosold_t;
+
+// took from old kernel 
+namespace vfs {
 
     static inline std::uint64_t resolve_count(char* str,std::uint64_t sptr,char delim) {
         char* current = str;

@@ -207,7 +207,7 @@ alloc_t pmm::buddy::nlalloc_ext(std::size_t size) {
         return result;
     }
 
-    klibc::printf("There's no memory !\n\r");
+    klibc::printf("There's no memory ! (tried to allocate %lli bytes) \n\r", size);
     return {0,0};
 }
 

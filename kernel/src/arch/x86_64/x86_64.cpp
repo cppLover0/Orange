@@ -17,6 +17,8 @@
 #include <arch/x86_64/cpu/sse.hpp>
 #include <arch/x86_64/drivers/pvclock.hpp>
 #include <utils/assert.hpp>
+#include <arch/x86_64/syscall.hpp>
+#include <utils/cmdline.hpp>
 
 namespace arch {
     [[gnu::weak]] void disable_interrupts() {
@@ -74,7 +76,11 @@ namespace arch {
             x86_64::init_cpu_data();
             drivers::hpet::init();
             drivers::pvclock::bsp_init();
-            drivers::tsc::init();
+            if(!cmdline::parser->contains("notsc")) {
+                drivers::tsc::init();
+            } else {
+                log("tsc", "tsc is disabled with cmdline");
+            }
             assert(time::timer != nullptr, "can't init orange without timer !");
             x86_64::gdt::init();
             x86_64::idt::init();
@@ -88,15 +94,19 @@ namespace arch {
             enable_paging(gobject::kernel_root);
             x86_64::init_cpu_data();
             drivers::pvclock::init();
-            drivers::tsc::init();
+            if(!cmdline::parser->contains("notsc")) {
+                drivers::tsc::init();
+            }
             x86_64::gdt::init();
             x86_64::idt::init();
             x86_64::lapic::init(1500);
             x86_64::schedule_timer::init();
             x86_64::sse::init();
+            syscall::init();
             
             return;
         case ARCH_INIT_COMMON:
+            syscall::init();
             return;
         }
     }

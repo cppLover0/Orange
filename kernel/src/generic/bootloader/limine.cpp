@@ -3,6 +3,8 @@
 #include <generic/bootloader/limine.hpp>
 #include <limine.h>
 
+#include <utils/assert.hpp>
+
 namespace {
 
 __attribute__((used, section(".limine_requests")))
@@ -32,6 +34,13 @@ __attribute__((used, section(".limine_requests"))) volatile limine_mp_request mp
 __attribute__((used, section(".limine_requests"))) volatile limine_rsdp_request rsdp_request = { .id = LIMINE_RSDP_REQUEST_ID, .revision = 0, .response = nullptr };
 
 __attribute__((used, section(".limine_requests"))) volatile limine_flanterm_fb_init_params_request flanterm = { .id = LIMINE_FLANTERM_FB_INIT_PARAMS_REQUEST_ID, .revision = 0, .response = nullptr };
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
+__attribute__((used, section(".limine_requests"))) volatile limine_executable_cmdline_request cmdline_request = { .id = LIMINE_EXECUTABLE_CMDLINE_REQUEST_ID, .revision = 0, .response = nullptr };
+__attribute__((used, section(".limine_requests"))) volatile limine_module_request modules_request = { .id = LIMINE_MODULE_REQUEST_ID, .revision = 0, .response = nullptr };
+#pragma GCC diagnostic pop
 
 #if defined(__x86_64__)
 #pragma GCC diagnostic push
@@ -88,6 +97,16 @@ namespace bootloader {
     limine_framebuffer_response* limine::get_framebuffers() {
         return framebuffer_request.response;
     }
+
+    limine_module_response* limine::get_modules() {
+        return modules_request.response;
+    }
+
+    char* limine::get_cmdline() {
+        assert(cmdline_request.response, "wtffff ");
+        return cmdline_request.response->cmdline;
+    }
+
 
 #if defined(__x86_64__)
     bool limine::is_5_level_paging() {

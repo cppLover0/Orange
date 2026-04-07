@@ -127,7 +127,7 @@ namespace arch {
         riscv64_map_page(root,phys,virt,convert_flags(flags));
     }
 
-    [[gnu::weak]] std::uint64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
+    [[gnu::weak]] std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
         return __memory_paging_getphys((std::uint64_t*)(root + etc::hhdm()),virt,0);
     }
 
