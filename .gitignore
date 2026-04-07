@@ -6,3 +6,4 @@ disk.img
 disk_gpt.img
 *.img
 orange_sysroot
+initrd.ustar
