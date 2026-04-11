@@ -418,8 +418,8 @@ namespace utils {
                 flan->entries[0]->ansi_colours, flan->entries[0]->ansi_bright_colours,
                 &flan->entries[0]->default_bg, &flan->entries[0]->default_fg,
                 &flan->entries[0]->default_bg_bright, &flan->entries[0]->default_fg_bright,
-                flan->entries[0]->font, flan->entries[0]->font_width, flan->entries[0]->font_height , flan->entries[0]->font_spacing,
-                flan->entries[0]->font_scale_x, flan->entries[0]->font_scale_y, flan->entries[0]->margin, flan->entries[0]->rotation
+                (void*)unifont_arr, FONT_WIDTH, FONT_HEIGHT, 0,
+                1, 1, flan->entries[0]->margin, 0
             );
         }
         ft_ctx0 = ft_ctx;

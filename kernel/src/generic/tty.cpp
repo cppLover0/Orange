@@ -106,6 +106,7 @@ std::int32_t tty_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
     tty_lock.lock();
     tty::tty_arg* arg2 = (tty::tty_arg*)node->arg;
     switch(req) {
+        case TCSETSW:
         case TCSETS: 
             klibc::memcpy(&arg2->termios, arg, sizeof(termiosold_t));
             tty_lock.unlock();
@@ -132,6 +133,15 @@ std::int32_t tty_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
             klibc::memcpy(&arg2->winsz, arg, sizeof(winsize));
             tty_lock.unlock();
             return 0;
+        case set_pgrp:
+            arg2->pgrp = *(int*)arg;
+            tty_lock.unlock();
+            return 0;
+        case get_pgrp:
+            *(int*)arg = arg2->pgrp;
+            tty_lock.unlock();
+            return 0;
+
     }
     assert(0,"tty shitfuck req %lli, arg 0x%p", req, arg);
     tty_lock.unlock();
@@ -201,8 +211,68 @@ std::int32_t ptmx_open(file_descriptor* fd, devfs_node* node) {
 file_descriptor ktty_fd = {};
 file_descriptor slave_ktty_fd = {};
 
+vfs::pipe* ktty_pipe = nullptr;
+
+char is_shift_pressed = 0;
+char is_ctrl_pressed = 0;
+
+const char en_layout_translation[] = {
+    '\0', '\e', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', '\t',
+    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', '\0', 'a', 's',
+    'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', '\0', '\\', 'z', 'x', 'c', 'v',
+    'b', 'n', 'm', ',', '.', '/', '\0', '\0', '\0', ' '
+};
+
+const char en_layout_translation_shift[] = {
+    '\0', '\e', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', '\t',
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', '\0', 'A', 'S',
+    'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '\"', '~', '\0', '|', 'Z', 'X', 'C', 'V',
+    'B', 'N', 'M', '<', '>', '?', '\0', '\0', '\0', ' '
+};
+
+#define ASCII_CTRL_OFFSET 96
+
+#define SHIFT_PRESSED 0x2A
+#define SHIFT_RELEASED 0xAA
+#define CTRL_PRESSED 29
+#define CTRL_RELEASED 157
+
+static void doKeyWork(uint8_t key) {
+
+    if(key == SHIFT_PRESSED) {
+        is_shift_pressed = 1;
+        return;
+    } else if(key == SHIFT_RELEASED) {
+        is_shift_pressed = 0;
+        return;
+    }
+
+    if(key == CTRL_PRESSED) {
+        is_ctrl_pressed = 1;
+        return;
+    } else if(key == CTRL_RELEASED) {
+        is_ctrl_pressed = 0;
+        return;
+    }
+
+    if(!(key & (1 << 7))) {
+        char layout_key;
+
+        if(!is_shift_pressed)
+            layout_key = en_layout_translation[key];
+        else
+            layout_key = en_layout_translation_shift[key];
+        if(is_ctrl_pressed)
+            layout_key = en_layout_translation[key] - ASCII_CTRL_OFFSET;
+
+        
+        ktty_fd.vnode.write(&ktty_fd, (char*)&layout_key, 1);
+    }
+}
+
 void tty_work(void* arg) {
     (void)arg;
+    arch::disable_interrupts();
     assert(ktty_fd.vnode.read, "DSFBmvfdnHJA124MFk!");
     while(true) {
         char buffer[512];
@@ -211,6 +281,15 @@ void tty_work(void* arg) {
         if(c > 0) {
             utils::flanterm::write(buffer, c);
         }
+
+        klibc::memset(buffer,0,512);
+        signed long iz = ktty_pipe->read(buffer, 512, true);
+        if(iz > 0) {
+            for(int i = 0;i < iz;i++) {
+                doKeyWork(buffer[i]);
+            }
+        }
+        process::yield();
     }
 }
 
@@ -222,6 +301,8 @@ void tty::init() {
     log("tty", "kernel tty node is %s (0x%p)", nod->path, nod);
     status = vfs::open(&slave_ktty_fd, (char*)"/dev/pts/0", false, false);
     assert(status == 0, "failed to open slave tty device (status is %d)",status);
+    ktty_pipe = new vfs::pipe(O_NONBLOCK);
+    ktty_fd.flags |= O_NONBLOCK;
     thread* thr = process::kthread(tty_work, nullptr);
     process::wakeup(thr);
 }

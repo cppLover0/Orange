@@ -23,14 +23,14 @@ void print_regs(x86_64::idt::int_frame_t* ctx) {
          ctx->rsp, cr2, ctx->cr3, ctx->vec, ctx->err_code, ctx->cs,ctx->ss);
     klibc::printf("\n\r    Stacktrace\n\r\n\r");
 
-    //stackframe_t* rbp = (stackframe_t*)ctx->rbp;
+    stackframe_t* rbp = (stackframe_t*)ctx->rbp;
 
     klibc::printf("[0] - 0x%016llX (current rip)\n\r",ctx->rip);
-    // for (int i = 1; i < 5 && rbp; ++i) {
-    //     std::uint64_t ret_addr = rbp->rip;
-    //     klibc::printf("[%d] - 0x%016llX\n\r", i, ret_addr);
-    //     rbp = (stackframe_t*)rbp->rbp;
-    // }
+     for (int i = 1; i < 5 && rbp; ++i) {
+         std::uint64_t ret_addr = rbp->rip;
+         klibc::printf("[%d] - 0x%016llX\n\r", i, ret_addr);
+         rbp = (stackframe_t*)rbp->rbp;
+     }
 
 }
 
@@ -40,7 +40,10 @@ std::uint8_t gaster[] = {
 
 void x86_64::panic::print_ascii_art() {
     klibc::printf("%s\n",gaster);
-}
+} 
+
+#include <generic/lock/spinlock.hpp>
+#include <arch/x86_64/cpu/lapic.hpp>
 
 extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
 
@@ -84,6 +87,8 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         current_thread->vmem->lock.unlock(state);
     }
 
+    x86_64::lapic::off();
+    locks::is_disabled = true;
     x86_64::panic::print_ascii_art();
     print_regs(frame);
     arch::hcf();

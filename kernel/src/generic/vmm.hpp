@@ -137,7 +137,54 @@ public:
         bool state = lock.lock();
         usage_counter--;
         if(usage_counter > 0) {lock.unlock(state); return;}
+        vmm_obj* current = (vmm_obj*)this->start;
+        while(current) {
 
+            if(current == end)
+                break;
+
+            if(!current->is_mapped && current->base != 0) {
+                paging::free_range(*this->root, current->base, current->len);
+            } 
+
+            if(current->base != 0) {
+                paging::zero_range(*this->root, current->base, current->len);
+            }
+
+            vmm_obj* next = current->next;
+            delete current;
+            current = next;
+        }
+
+        arch::destroy_root(*this->root, 0);
+        pmm::freelist::free(*this->root);
+
+        delete this;
+        return;
+    }
+
+    void duplicate(vmm* dest) {
+        bool state = this->lock.lock();
+        vmm_obj* current = (vmm_obj*)this->start;
+        while(current) {
+
+            if(current == end)
+                break;
+
+            if(current->base != 0) {
+                if(current->is_mapped) {
+                    dest->map_memory(current->base, current->phys, current->flags, current->len, true);
+                } else {
+                    vmm_obj* obj = dest->v_find(current->base, current->len);
+                    (void)obj;
+                    paging::duplicate_range(*dest->root, *this->root, current->base, current->len, PAGING_PRESENT | PAGING_RW | PAGING_USER);
+                }
+            }
+
+            current = current->next;
+        }
+        this->lock.unlock(state);
+        return;
     }
 
     vmm_obj* nlgetlen(std::uint64_t addr) {
@@ -256,6 +303,8 @@ public:
 end:
         paging::free_range(*this->root, base, len);
         paging::zero_range(*this->root, base, len);
+
+        arch::tlb_flush(base, len);
 
         if(should_lock)
             this->lock.unlock(state);

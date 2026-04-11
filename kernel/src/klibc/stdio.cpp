@@ -21,6 +21,7 @@
 #include <arch/x86_64/drivers/serial.hpp>
 #endif
 #include <generic/lock/spinlock.hpp>
+#include <generic/userspace/syscall_list.hpp>
 
 locks::spinlock print_lock;
 
@@ -52,7 +53,11 @@ void klibc::debug_printf(const char* fmt, ...) {
     memset(buffer,0,4096);
     int len = _snprintf(buffer,4096,fmt,val);
 #if defined(__x86_64__)
-    x86_64::serial::write_data(buffer,len);
+    (void)len;
+    char buffer2[4096] = {};
+    int len2 = klibc::__printfbuf(buffer2, 4096, "[pid %05d] %s", current_proc ? current_proc->id : -1, buffer);
+
+    x86_64::serial::write_data(buffer2,len2);
 #endif
     va_end(val);
     print_lock.unlock();

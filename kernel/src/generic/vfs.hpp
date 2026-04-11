@@ -433,6 +433,7 @@ struct file_descriptor {
         bool is_master;
         int pipe_side;
         bool is_non_block; 
+        bool is_cloexec;
     } other;
 
     struct {
@@ -468,7 +469,6 @@ namespace vfs {
     class fdmanager {
     public:
         file_descriptor* head_fd = nullptr;
-        std::atomic<std::int32_t>* fd_ptr = nullptr;
         locks::preempt_spinlock fd_lock;
         std::atomic<int> fd_usage_pointer = 0;
 
@@ -476,7 +476,7 @@ namespace vfs {
             bool state = this->fd_lock.lock();
             file_descriptor* current = this->head_fd;
             while(current) {
-                if(current->index == idx) {
+                if(current->index == idx && current->type != file_descriptor_type::unallocated) {
                     this->fd_lock.unlock(state);
                     return current;
                 }
@@ -487,39 +487,68 @@ namespace vfs {
             return nullptr;
         }
 
-        file_descriptor* createlowest(int idx) {
-            bool state = this->fd_lock.lock();
+        file_descriptor* nl_search(int idx) {
             file_descriptor* current = this->head_fd;
-            file_descriptor* lowest = nullptr;
             while(current) {
-                if(current->type == file_descriptor_type::unallocated && current->index > idx) {
-                    if(!lowest)
-                        lowest = current;
-                    if(current->index < lowest->index) 
-                        lowest = current;
+                if(current->index == idx) {
+                    return current;
                 }
                 current = current->next;
             }
 
-            if(lowest == nullptr) {
+            return nullptr;
+        }
+
+        file_descriptor* createlowest(int idx) {
+            bool state = this->fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            file_descriptor* lowest = nullptr;
+
+            current = this->head_fd;
+            while (current) {
+                if (current->type == file_descriptor_type::unallocated && current->index > idx) {
+                    if (!lowest || current->index < lowest->index) {
+                        lowest = current;
+                    }
+                }
+                current = current->next;
+            }
+
+            if (lowest == nullptr) {
+                int candidate = idx + 1;
+                bool found_collision;
+
+                do {
+                    found_collision = false;
+                    current = this->head_fd;
+                    while (current) {
+                        if (current->index == candidate) {
+                            candidate++; 
+                            found_collision = true;
+                            break;
+                        }
+                        current = current->next;
+                    }
+                } while (found_collision);
+
                 lowest = (file_descriptor*)(pmm::freelist::alloc_4k() + etc::hhdm());
-                lowest->index = this->fd_ptr->fetch_add(1);
+                lowest->index = candidate;
                 lowest->next = head_fd;
                 head_fd = lowest;
             }
 
-            file_descriptor* next = lowest->next;
-            int index = lowest->index;
+            file_descriptor* next_ptr = lowest->next;
+            int final_idx = lowest->index;
 
             klibc::memset(lowest, 0, sizeof(file_descriptor));
-            lowest->next = next;
-            lowest->index = index;
+            lowest->next = next_ptr;
+            lowest->index = final_idx;
             lowest->type = file_descriptor_type::file;
 
             this->fd_lock.unlock(state);
             return lowest;
-
         }
+
 
         void kill() {
             bool state = fd_lock.lock();
@@ -561,6 +590,63 @@ namespace vfs {
             fd_lock.unlock(state);
         }
 
+        void do_dup(file_descriptor* src, file_descriptor* new_fd) {
+            bool state = fd_lock.lock();
+            file_descriptor* next = new_fd->next;
+            klibc::memcpy(new_fd, src, sizeof(file_descriptor));
+            if(new_fd->type == file_descriptor_type::pipe) {
+                new_fd->fs_specific.pipe->create(new_fd->other.pipe_side);
+            } else if(new_fd->type == file_descriptor_type::file) {
+                if(new_fd->vnode.ondup)
+                    new_fd->vnode.ondup();
+            }
+            new_fd->next = next;
+            fd_lock.unlock(state);
+        } 
+
+        file_descriptor* try_dup2(file_descriptor* src, int idx) {
+            bool state = this->fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            file_descriptor* lowest = nullptr;
+
+            current = this->head_fd;
+            while (current) {
+                if (current->index == idx) {
+                    lowest = current;
+                    break;
+                }
+                current = current->next;
+            }
+
+            if(lowest) {
+                this->close(lowest);
+            }
+
+            if (lowest == nullptr) {
+                lowest = (file_descriptor*)(pmm::freelist::alloc_4k() + etc::hhdm());
+                lowest->index = idx;
+                lowest->next = head_fd;
+                head_fd = lowest;
+            }
+
+            file_descriptor* next_ptr = lowest->next;
+            int final_idx = lowest->index;
+
+            klibc::memcpy(lowest, src, sizeof(file_descriptor));
+            lowest->next = next_ptr;
+            lowest->index = final_idx;
+            
+            if(lowest->type == file_descriptor_type::pipe) {
+                lowest->fs_specific.pipe->create(lowest->other.pipe_side);
+            } else if(lowest->type == file_descriptor_type::file) {
+                if(lowest->vnode.ondup)
+                    lowest->vnode.ondup();
+            }
+
+            this->fd_lock.unlock(state);
+            return lowest;
+        }
+
         void close(file_descriptor* file) {
             if(file->type == file_descriptor_type::file) {
                 if(file->vnode.close)
@@ -570,6 +656,19 @@ namespace vfs {
             } else {
                 assert(0, "unimplemented close type %d", file->type);
             }
+            file->type = file_descriptor_type::unallocated;
+        }
+
+        void cloexec() {
+            bool state = fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            while(current) {
+                file_descriptor* next = current->next;
+                if(current->other.is_cloexec)
+                    this->close(current); 
+                current = next;
+            } 
+            fd_lock.unlock(state);
         }
 
     };

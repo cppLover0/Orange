@@ -13,9 +13,9 @@ for build do
 make run -j$(nproc) ARCH=$ARCH TOOLCHAIN=llvm
 ```
 
-for building distro you can use supermin (febootstrap) and install with supermin.d 
+for building distro you can use dnf 
 ```sh
-supermin --build --format chroot supermin.d -o ./orange_sysroot
+sudo debootstrap sid orange_sysroot http://deb.debian.org/debian/
 ```
 
 there's also cmdline for some stuff: init=path, notsc, noacpi

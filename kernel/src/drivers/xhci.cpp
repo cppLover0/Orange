@@ -1532,9 +1532,9 @@ void hid_layout_init() {
     hid_to_ps2_layout[0x47] = 0x46;
 }
 
-void input_send(int num, uint8_t key) {
+extern vfs::pipe* ktty_pipe;
 
-    log("usb keyboard", "got key %d",key);
+void input_send(int num, uint8_t key) {
 
     std::uint64_t current_nano = time::timer->current_nano();
 
@@ -1545,6 +1545,8 @@ void input_send(int num, uint8_t key) {
     ev.code = key & ~(1 << 7);
     ev.value = (key & (1 << 7)) ? 0 : 1;
     evdev::submit(num,ev);
+
+    ktty_pipe->write((const char*)&key, 1);
 }
 
 uint8_t hid_mods_to_ps2[8] = {

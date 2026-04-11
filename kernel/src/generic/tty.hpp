@@ -7,6 +7,9 @@
 #include <atomic>
 #include <generic/vfs.hpp>
 
+#define set_pgrp 0x5410
+#define get_pgrp 21519
+
 namespace tty {
 
     class pipe {
@@ -195,6 +198,7 @@ namespace tty {
         winsize winsz;
         vfs::pipe* writepipe;
         tty::pipe* readpipe;
+        int pgrp;
     };
 
     void init();

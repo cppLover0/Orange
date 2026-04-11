@@ -57,6 +57,18 @@ __sigismember (sigset_t *set, int sig)
   return (set->__val & (1 << (sig - 1))) ? 1 : 0;
 }
 
+struct sigaction {
+    union {
+      void     (*sa_handler)(int);                
+      void     (*sa_sigaction)(int, void*, void *); 
+    } __sigaction_handler;                        
+
+    sigset_t   sa_mask;                           
+    int        sa_flags;                           
+    void     (*sa_restorer)(void);                  
+};
+
+
 struct sig_stack {
     void  *ss_sp;     /* Base address of stack */
     int    ss_flags;  /* Flags */
@@ -104,7 +116,7 @@ public:
     bool is_not_empty_sigset(sigset_t* sigsetz) {
         this->lock.lock();
 
-        // ban sigset signals :p
+        // ban sigset signals
         for(int i = 0; i < 128; i++) {
             if(this->bitmap->test(i) && !__sigismember(sigsetz,this->sigs[i])) {
                 this->lock.unlock(); // great there's unbanned pending signal
@@ -117,3 +129,6 @@ public:
     }
 
 };
+
+#define SIG_DFL 0
+#define SIG_IGN 1

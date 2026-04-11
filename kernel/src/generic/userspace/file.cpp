@@ -7,6 +7,7 @@
 #include <utils/errno.hpp>
 #include <generic/userspace/syscall_list.hpp>
 #include <generic/userspace/safety.hpp>
+#include <generic/time.hpp>
 
 long long sys_access(const char* path, int mode) {
     (void)mode;
@@ -141,6 +142,7 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
 
         process_path(current->chroot, at, buffer1, buffer);
 
+        target_fd.type = file_descriptor_type::file;
         int status = vfs::open(&target_fd, buffer, flags & AT_SYMLINK_NOFOLLOW ? false : true, false);
         if(status != 0)
             return status;
@@ -154,6 +156,21 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
 
     target_fd.vnode.stat(&target_fd, out);
 
+    if(!is_empty) {
+        if(target_fd.vnode.close)
+            target_fd.vnode.close(&target_fd);
+    }
+
+    return 0;
+}
+
+// just stat and return if ok
+long long sys_faccessat2(int dfd, const char* path, int mode, int flags) {
+    (void)mode;
+    stat out = {};
+    long long ret = sys_newfstatat(dfd, path, &out, flags);
+    if(ret != 0)
+        return ret;
     return 0;
 }
 
@@ -186,10 +203,43 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
     if(file->type == file_descriptor_type::file) {
         return file->vnode.read(file, buffer, count);
     } else if(file->type == file_descriptor_type::pipe) {
-        return file->fs_specific.pipe->read(buffer, count, file->other.is_non_block);
+        return file->fs_specific.pipe->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
     }
 
     assert(0, "unimplemented read fd %d, type %d", fd, file->type);
+
+    return -EFAULT;
+}
+
+long long sys_write(int fd, char* buffer, std::uint64_t count) {
+    if(count == 0)
+        return 0;
+
+    thread* current = current_proc;
+
+    if(buffer == nullptr)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)buffer, count)) {
+        return -EFAULT;
+    }
+
+    if(current->is_debug) {
+        klibc::debug_printf("trying to write fd %d buffer 0x%p count %lli\n", fd, buffer, count);
+    }
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* file = manager->search(fd);
+    if(file == nullptr)
+        return -EBADF;
+
+    if(file->type == file_descriptor_type::file) {
+        return file->vnode.write(file, buffer, count);
+    } else if(file->type == file_descriptor_type::pipe) {
+        return file->fs_specific.pipe->write(buffer, count);
+    }
+
+    assert(0, "unimplemented write fd %d, type %d", fd, file->type);
 
     return -EFAULT;
 }
@@ -243,4 +293,457 @@ long long sys_close(int fd) {
 
     manager->close(file);
     return 0;
+}
+
+long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
+    thread* current = current_proc;
+
+    if(current->is_debug) {
+        klibc::debug_printf("trying to ioctl fd %d cmd %d arg 0x%p\n", fd, req, arg);
+    }
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* file = manager->search(fd);
+
+    if(!file)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -EINVAL;
+
+    if(!file->vnode.ioctl)
+        return -ENOTTY;
+
+    if(!is_safe_to_rw(current, arg, PAGE_SIZE))
+        return -EFAULT;
+
+    return file->vnode.ioctl(file, req, (void*)arg);
+}
+
+long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096) && path) {
+        return -EFAULT;
+    }
+
+    if(!is_safe_to_rw(current, (std::uint64_t)buf, 4096)) {
+        return -EFAULT;
+    }
+
+    if(path == nullptr || buf == nullptr)
+        return -EINVAL;
+
+    if(bufsize <= 0)
+        return 0;
+
+    if(current->is_debug) {
+        klibc::debug_printf("trying to readlinkat %d %s 0x%p\n", dfd, path ? path : "empty path", 0);
+    }
+
+    file_descriptor target_fd = {};
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current, dfd);
+    if(at == nullptr)
+            return -EBADF;
+
+    process_path(current->chroot, at, buffer1, buffer);
+
+    int status = vfs::open(&target_fd, buffer, false, false);
+    if(status != 0)
+        return status;
+
+    if(target_fd.type != file_descriptor_type::file)
+        return -EINVAL;
+
+    std::int64_t ret = target_fd.vnode.read(&target_fd, buf, bufsize);
+
+    if(target_fd.vnode.close)
+        target_fd.vnode.close(&target_fd);
+
+    return ret;
+}
+
+long long sys_readlink(const char* path, char* buf, int size) {
+    return sys_readlinkat(AT_FDCWD, path, buf, size);
+}
+
+long long sys_dup(int fd) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* src = manager->search(fd);
+    if(src == nullptr)
+        return -EBADF;
+
+    file_descriptor* new_fd = manager->createlowest(-1);
+    manager->do_dup(src, new_fd);
+    return new_fd->index;
+}
+
+long long sys_dup2(int old, int new_fd) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* src = manager->search(old);
+    if(src == nullptr)
+        return -EBADF;
+
+    file_descriptor* new_fd_s = manager->try_dup2(src, new_fd);
+    return new_fd_s->index;
+}
+
+long long sys_fcntl(int fd, int request, std::uint64_t arg) {
+
+    thread* proc = current_proc;
+    auto manager = (vfs::fdmanager*)proc->fd;
+
+    if(!is_safe_to_rw(proc, arg, PAGE_SIZE))
+        return -EFAULT;
+
+    if(proc->is_debug)
+        klibc::debug_printf("fcntl fd %d req %d arg 0x%p from proc %d",fd,request,arg);
+    int is_cloexec = 0;
+    switch(request) {
+        case F_DUPFD_CLOEXEC:
+            is_cloexec = 1;
+        case F_DUPFD: {
+            file_descriptor* fd_s = manager->search(fd);
+            if(fd_s == nullptr)
+                return -EBADF;
+            file_descriptor* new_fd = manager->createlowest(arg);
+            manager->do_dup(fd_s, new_fd);
+            if(proc->is_debug)
+                klibc::debug_printf("return fd %d",new_fd->index);
+            new_fd->is_cloexec = is_cloexec;
+            return new_fd->index; 
+        }
+
+        case F_GETFD: {
+            file_descriptor* fd_s = manager->search(fd);
+            if(!fd_s)
+                return -EBADF;
+            return fd_s->other.is_cloexec;
+        }
+
+        case F_SETFD: {
+            file_descriptor* fd_s = manager->search(fd);
+            if(!fd_s)
+                return -EBADF;
+
+            fd_s->other.is_cloexec = arg & 1;
+            return 0;
+        }
+
+        case F_GETFL: {
+            file_descriptor* fd_s = manager->search(fd);
+            if(!fd_s)
+                return -EBADF;
+
+            return (fd_s->flags & ~(O_RDONLY | O_WRONLY)) | O_RDWR;
+        }
+
+        case F_SETFL: {
+            file_descriptor* fd_s = manager->search(fd);
+
+            if(!fd_s)
+                return -EBADF;
+
+            fd_s->flags &= ~(O_APPEND | O_ASYNC | O_NONBLOCK | O_RDONLY | O_RDWR | O_WRONLY);
+            fd_s->flags |= (arg & (O_APPEND | O_ASYNC | O_NONBLOCK | O_RDONLY | O_RDWR | O_WRONLY));
+
+            return 0;
+        }
+
+        default: {
+            assert(0,"unsupported fcntl");
+        }
+    }
+    return -EINVAL;
+}
+
+long long sys_pipe2(int* fds, int flags) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+    if(!is_safe_to_rw(current, (std::uint64_t)fds, PAGE_SIZE))
+        return -EFAULT;
+
+    if(fds == nullptr)
+        return -EINVAL;
+
+    file_descriptor* fd0 = manager->createlowest(2);
+    file_descriptor* fd1 = manager->createlowest(2);
+    fd0->type = file_descriptor_type::pipe;
+    fd1->type = file_descriptor_type::pipe;
+    fd0->fs_specific.pipe = new vfs::pipe(flags);
+    fd1->fs_specific.pipe = fd0->fs_specific.pipe;
+    fd0->other.pipe_side = PIPE_SIDE_READ;
+    fd1->other.pipe_side = PIPE_SIDE_WRITE;
+    fds[0] = fd0->index;
+    fds[1] = fd1->index;
+    fd0->other.is_cloexec = (flags & __O_CLOEXEC) ? true : false; 
+    fd1->other.is_cloexec = (flags & __O_CLOEXEC) ? true : false; 
+
+    return 0;
+}
+
+void poll_to_str(int event, char* out) {
+    const char* result = "Undefined";
+    if(event & POLLIN && event & POLLOUT) {
+        result = "POLLIN and POLLOUT";
+    } else if(event & POLLIN) {
+        result = "POLLIN";
+    } else if(event & POLLOUT) {
+        result = "POLLOUT";
+    }
+    klibc::memcpy(out,result,klibc::strlen(result) + 1);
+}
+
+long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+    
+    if(fds == nullptr)
+        return -EINVAL;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla-cxx-extension"
+    file_descriptor* cached[nfds];
+    klibc::memset(cached, 0, nfds * sizeof(file_descriptor*));
+#pragma clang diagnostic pop
+
+    for(std::uint32_t i = 0; i < nfds; i++) {
+        fds[i].revents = 0;
+        file_descriptor* fd = manager->search(fds[i].fd);
+        if(fd == nullptr)
+            return -EBADF;
+
+        cached[i] = fd;
+
+        if(current->is_debug) {
+            char type[64] = {};
+            poll_to_str(fds[i].events, type);
+            klibc::debug_printf("trying to poll fd %d, type %s (%d)\n", fds[i].fd, type ,fds[i].events);
+        }
+    }
+
+    auto poll_body = [fds, nfds](file_descriptor** cached) -> int {
+        int count = 0;
+        for(std::uint32_t i = 0;i < nfds;i++) {
+            file_descriptor* fd = cached[i];
+            bool is_event = false;
+            if(fds[i].events & POLLIN) {
+                bool ret = false;
+                if(fd->type == file_descriptor_type::file) {
+                    if(fd->vnode.poll) {
+                        ret = fd->vnode.poll(fd, vfs_poll_type::pollin);
+                    } 
+                } else if(fd->type == file_descriptor_type::pipe) {
+                    if(fd->fs_specific.pipe->size.load() != 0) 
+                        ret = true;
+                }
+
+                if(ret == true) {
+                    fds[i].revents |= POLLIN;
+                    is_event = true;
+                }
+            }
+            
+            if(fds[i].events & POLLOUT) {
+                bool ret = false;
+                if(fd->type == file_descriptor_type::file) {
+                    if(fd->vnode.poll) {
+                        ret = fd->vnode.poll(fd, vfs_poll_type::pollout);
+                    } 
+                } else if(fd->type == file_descriptor_type::pipe) {
+                    if((std::uint64_t)fd->fs_specific.pipe->size.load() != fd->fs_specific.pipe->total_size) 
+                        ret = true;
+                }
+
+                if(ret == true) {
+                    fds[i].revents |= POLLOUT;
+                    is_event = true;
+                }
+            }
+
+            if(is_event)
+                count++;
+        }
+        return count;
+    };
+
+    if(timeout == -1) {
+        while(true) {
+            int ret = poll_body(cached);
+            if(ret != 0)
+                return ret;
+            process::yield();
+        }
+    } else {
+        std::uint64_t current_timestamp = time::timer->current_nano() / 1000;
+        std::uint64_t end_timestamp = (current_timestamp + (timeout * 1000));
+        while(time::timer->current_nano() / 1000 < end_timestamp) {
+            int ret = poll_body(cached);
+            if(ret != 0)
+                return ret;
+            
+            if(time::timer->current_nano() / 1000 < end_timestamp) {
+                process::yield();
+            }
+        }
+        return 0;
+    }
+
+    assert(0,"n");
+    return -EFAULT;
+}
+
+long long sys_poll(pollfd* fds, std::uint32_t nfds, int timeout) {
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)fds, (nfds * sizeof(pollfd)) + PAGE_SIZE))
+        return -EFAULT;
+
+    return poll_impl(fds, nfds, timeout);
+}
+
+long long sys_pselect6(int num_fds, fd_set* read_set, fd_set* write_set, fd_set* except_set, timespec* timeout, sigset_t* sigmask) {
+    (void)sigmask;
+    thread* proc = current_proc;
+
+    if(proc->is_debug)
+        klibc::debug_printf("Trying to pselect num_fds %d, read_set 0x%p, write_set 0x%p, except_set 0x%p, timeout 0x%p from proc %d\n",num_fds,read_set,write_set,except_set,timeout,proc->id);
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)read_set, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)write_set, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)except_set, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)timeout, PAGE_SIZE))
+        return -EFAULT;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla-cxx-extension"
+    pollfd fds[num_fds];
+    klibc::memset(fds, 0, num_fds * sizeof(pollfd));
+#pragma clang diagnostic pop
+    
+	int actual_count = 0;
+
+	for(int fd = 0; fd < num_fds; ++fd) {
+		short events = 0;
+		if(read_set && FD_ISSET(fd, read_set)) {
+			events |= POLLIN;
+		}
+
+		if(write_set && FD_ISSET(fd, write_set)) {
+			events |= POLLOUT;
+		}
+
+		if(except_set && FD_ISSET(fd, except_set)) {
+			events |= POLLIN;
+		}
+
+		if(events) {
+			fds[actual_count].fd = fd;
+			fds[actual_count].events = events;
+			fds[actual_count].revents = 0;
+			actual_count++;
+		}
+	}
+
+	long long num;
+
+    if(timeout) {
+        num = poll_impl(fds, actual_count, (timeout->tv_sec * 1000) + (timeout->tv_nsec / (1000 * 1000)));
+    } else {
+        num = poll_impl(fds, actual_count, -1);
+    }
+
+    if(proc->is_debug)
+        klibc::debug_printf("pselect6 to poll status %lli\n",num);
+
+    if(num < 0)
+        return num;
+
+	#define READ_SET_POLLSTUFF (POLLIN | POLLHUP | POLLERR)
+	#define WRITE_SET_POLLSTUFF (POLLOUT | POLLERR)
+	#define EXCEPT_SET_POLLSTUFF (POLLPRI)
+
+	int return_count = 0;
+	for(int fd = 0; fd < actual_count; ++fd) {
+		int events = fds[fd].events;
+		if((events & POLLIN) && (fds[fd].revents & READ_SET_POLLSTUFF) == 0) {
+			FD_CLR(fds[fd].fd, read_set);
+			events &= ~POLLIN;
+		}
+
+		if((events & POLLOUT) && (fds[fd].revents & WRITE_SET_POLLSTUFF) == 0) {
+			FD_CLR(fds[fd].fd, write_set);
+			events &= ~POLLOUT;
+		}
+
+		if(events)
+			return_count++;
+	}
+	return return_count;
+}
+
+long long sys_seek(int fd, long offset, int whence) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+
+    file_descriptor* file = manager->search(fd);
+    if(file == nullptr)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -ESPIPE;
+
+    switch (whence)
+    {
+        case SEEK_SET:
+            file->offset = offset;
+            break;
+
+        case SEEK_CUR:
+            file->offset += offset;
+            break;
+
+        case SEEK_END: {
+            stat statz = {};
+            int res = file->vnode.stat(file, &statz);
+            if(res != 0)
+                return res;
+
+            file->offset = statz.st_size + offset;
+            break;
+        }
+
+        default:
+            return -EINVAL;
+    }
+
+    return file->offset;
+}
+
+long long sys_writev(int fd, iovec* vecs, std::uint64_t vlen) {
+    thread* current = current_proc;
+    std::uint64_t total = 0;
+    if(!is_safe_to_rw(current, (std::uint64_t)vecs, (sizeof(iovec) * vlen) + PAGE_SIZE))
+            return -EFAULT;
+    for(std::uint64_t i = 0; i < vlen; i++) {
+        if(!is_safe_to_rw(current, (std::uint64_t)vecs[i].iov_base, vecs[i].iov_len + PAGE_SIZE))
+            return -EFAULT;
+        long long ret = sys_write(fd, (char*)vecs[i].iov_base, vecs[i].iov_len);
+        if(ret < 0)
+            return ret;
+        total += ret;
+    }
+    return total;
 }

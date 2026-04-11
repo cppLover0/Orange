@@ -99,6 +99,12 @@ void ustar::load(char* archive, std::uint64_t len) {
                 char* file = (char*)((uint64_t)current->file_name);
                 if(file[0] == '.')
                     file++;
+
+                if(file[0] != '/') {
+                    log("ustar", "bad file %s", file);
+                    goto skip;
+                }
+
                 int size = oct2bin((uint8_t*)current->file_size,klibc::strlen(current->file_size));
                 std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
                 file_descriptor fd = {};
@@ -126,6 +132,11 @@ void ustar::load(char* archive, std::uint64_t len) {
                 char* file = (char*)((uint64_t)current->file_name);
                 if(file[0] == '.')
                     file++;
+
+                if(file[0] != '/') {
+                    log("ustar", "bad file %s", file);
+                    goto skip;
+                }
                     
                 if(file[0] != '/' && file[1] != '0') {
                     std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
@@ -138,11 +149,17 @@ void ustar::load(char* archive, std::uint64_t len) {
                 char* file = (char*)((uint64_t)current->file_name);
                 if(file[0] == '.')
                     file++;
+
+                if(file[0] != '/') {
+                    log("ustar", "bad file %s", file);
+                    goto skip;
+                }
+
                 std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
                 file_descriptor fd = {};
                 vfs::create(file, vfs_file_type::symlink, actual_mode);
                 int status = vfs::open(&fd, file, false, false);
-                assert(status == 0, "svfddfm %d", status);
+                assert(status == 0, "svfddfm %d %s", status, file);
                 if(fd.vnode.write) {
                     fd.vnode.write(&fd, current->name_linked,klibc::strlen(current->name_linked));
                 } else {
@@ -155,6 +172,7 @@ void ustar::load(char* archive, std::uint64_t len) {
             }
         }
         
+skip:
         current = (ustar_header_t*)((uint64_t)current + ALIGNUP(oct2bin((uint8_t*)&current->file_size,klibc::strlen(current->file_size)),512) + 512);
     }
     

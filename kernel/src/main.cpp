@@ -20,6 +20,7 @@
 #include <generic/modules.hpp>
 #include <utils/cmdline.hpp>
 #include <generic/elf.hpp>
+#include <utils/random.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
@@ -75,6 +76,9 @@ extern "C" void main() {
     mp::init();
     mp::sync();
     vfs::init();
+
+    random::reseed();
+
     if(!cmdline::parser->contains("noacpi")) {
         drivers::powerbutton::init();
     } else {
@@ -128,7 +132,6 @@ extern "C" void main() {
     elf::exec(init_thread, init, argv, envp);
 
     vfs::fdmanager* manager = (vfs::fdmanager*)init_thread->fd;
-    manager->fd_ptr = &init_thread->fd_ptr;
     file_descriptor* stdio = manager->createlowest(-1);
     file_descriptor* stdout = manager->createlowest(-1);
     file_descriptor* stderr = manager->createlowest(-1);
@@ -144,8 +147,11 @@ extern "C" void main() {
     assert(status == 0, "no tty :( %d",status);
 
     process::wakeup(init_thread);
+    mp::sync();
 
     log("main", "Boot is done");
+
+    klibc::printf("\033[H\033[2J");
 
     arch::enable_interrupts();
     while(1) {

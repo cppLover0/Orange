@@ -219,6 +219,11 @@ std::int32_t vfs::create(char* path, vfs_file_type type, std::uint32_t mode) {
 
 std::int32_t vfs::readlink(char* path, char* out, std::uint32_t out_len) {
 
+    if(path[0] != '/') {
+        log("vfs", "unhealth shit %s", path);
+        asm volatile("ud2");
+    }
+
     assert(out_len == 4096, "stfu");
 
     char outp[4096];
@@ -240,7 +245,6 @@ std::int32_t vfs::readlink(char* path, char* out, std::uint32_t out_len) {
         fs_love_name[1] = '\0';
     }
 
-    
     std::int32_t status = node->fs->readlink(node->fs, fs_love_name, out);
     return status;
 }

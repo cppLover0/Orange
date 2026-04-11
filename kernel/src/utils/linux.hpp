@@ -20,6 +20,30 @@ struct timespec {
     long    tv_nsec; 
 };
 
+# define CLOCK_REALTIME			0
+/* Monotonic system-wide clock.  */
+# define CLOCK_MONOTONIC		1
+/* High-resolution timer from the CPU.  */
+# define CLOCK_PROCESS_CPUTIME_ID	2
+/* Thread-specific CPU-time clock.  */
+# define CLOCK_THREAD_CPUTIME_ID	3
+/* Monotonic system-wide clock, not adjusted for frequency scaling.  */
+# define CLOCK_MONOTONIC_RAW		4
+/* Identifier for system-wide realtime clock, updated only on ticks.  */
+# define CLOCK_REALTIME_COARSE		5
+/* Monotonic system-wide clock, updated only on ticks.  */
+# define CLOCK_MONOTONIC_COARSE		6
+/* Monotonic system-wide clock that includes time spent in suspension.  */
+# define CLOCK_BOOTTIME			7
+/* Like CLOCK_REALTIME but also wakes suspended system.  */
+# define CLOCK_REALTIME_ALARM		8
+/* Like CLOCK_BOOTTIME but also wakes suspended system.  */
+# define CLOCK_BOOTTIME_ALARM		9
+/* Like CLOCK_REALTIME but in International Atomic Time.  */
+# define CLOCK_TAI			11
+
+typedef int clockid_t;
+
 typedef unsigned int __u32;
 typedef unsigned short __u16;
 
@@ -173,8 +197,202 @@ struct	winsize {
 
 #define AT_FDCWD        -100     
 
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
+struct iovec {
+    void  *iov_base;    /* Starting address of the buffer */
+    std::size_t iov_len;     /* Number of bytes to transfer */
+};
+
+#define TCSETSW            0x5403
 #define AT_SYMLINK_NOFOLLOW 0x100   
 #define AT_REMOVEDIR        0x200  
 #define AT_SYMLINK_FOLLOW   0x400  
 #define AT_EACCESS          0x200 
 #define AT_EMPTY_PATH 0x1000
+
+#define RLIMIT_CPU		0	/* CPU time in sec */
+#define RLIMIT_FSIZE		1	/* Maximum filesize */
+#define RLIMIT_DATA		2	/* max data size */
+#define RLIMIT_STACK		3	/* max stack size */
+#define RLIMIT_CORE		4	/* max core file size */
+
+#ifndef RLIMIT_RSS
+# define RLIMIT_RSS		5	/* max resident set size */
+#endif
+
+#ifndef RLIMIT_NPROC
+# define RLIMIT_NPROC		6	/* max number of processes */
+#endif
+
+#ifndef RLIMIT_NOFILE
+# define RLIMIT_NOFILE		7	/* max number of open files */
+#endif
+
+#ifndef RLIMIT_MEMLOCK
+# define RLIMIT_MEMLOCK		8	/* max locked-in-memory address space */
+#endif
+
+#ifndef RLIMIT_AS
+# define RLIMIT_AS		9	/* address space limit */
+#endif
+
+#define RLIMIT_LOCKS		10	/* maximum file locks held */
+#define RLIMIT_SIGPENDING	11	/* max number of pending signals */
+#define RLIMIT_MSGQUEUE		12	/* maximum bytes in POSIX mqueues */
+#define RLIMIT_NICE		13	
+#define RLIMIT_RTPRIO		14	/* maximum realtime priority */
+#define RLIMIT_RTTIME		15	/* timeout for RT tasks in us */
+#define RLIM_NLIMITS		16
+
+#ifndef RLIM_INFINITY
+# define RLIM_INFINITY		(~0UL)
+#endif
+
+struct rlimit64 {
+	std::uint64_t rlim_cur;
+	std::uint64_t rlim_max;
+};
+
+struct timeval {
+    long long    tv_sec;         
+    long long    tv_usec;       
+};
+
+#define SIG_BLOCK          0	
+#define SIG_UNBLOCK        1	
+#define SIG_SETMASK        2	
+
+struct old_utsname {
+        char sysname[65];
+        char nodename[65];
+        char release[65];
+        char version[65];
+        char machine[65];
+};
+
+#define F_DUPFD_CLOEXEC 1030
+#define F_GETFD  1
+#define F_SETFD  2
+#define F_DUPFD         0     
+#define F_GETFL         3       
+#define F_SETFL         4      
+
+#define POLLIN     0x0001 
+#define POLLPRI    0x0002  
+#define POLLOUT    0x0004  
+
+#define POLLERR    0x0008  
+#define POLLHUP    0x0010 
+#define POLLNVAL   0x0020 
+
+struct pollfd {
+    int   fd;      
+    short events;   
+    short revents;  
+};
+
+#define __FD_SETSIZE		1024
+
+typedef long int __fd_mask;
+
+/* Some versions of <linux/posix_types.h> define this macros.  */
+#undef	__NFDBITS
+/* It's easier to assume 8-bit bytes than to get CHAR_BIT.  */
+#define __NFDBITS	(8 * (int) sizeof (__fd_mask))
+#define	__FD_ELT(d)	((d) / __NFDBITS)
+#define	__FD_MASK(d)	((__fd_mask) (1UL << ((d) % __NFDBITS)))
+
+/* fd_set for select and pselect.  */
+typedef struct
+  {
+    /* XPG4.2 requires this member name.  Otherwise avoid the name
+       from the global namespace.  */
+#ifdef __USE_XOPEN
+    __fd_mask fds_bits[__FD_SETSIZE / __NFDBITS];
+# define __FDS_BITS(set) ((set)->fds_bits)
+#else
+    __fd_mask __fds_bits[__FD_SETSIZE / __NFDBITS];
+# define __FDS_BITS(set) ((set)->__fds_bits)
+#endif
+  } fd_set;
+
+/* We don't use `memset' because this would require a prototype and
+   the array isn't too big.  */
+#define __FD_ZERO(s) \
+  do {									      \
+    unsigned int __i;							      \
+    fd_set *__arr = (s);						      \
+    for (__i = 0; __i < sizeof (fd_set) / sizeof (__fd_mask); ++__i)	      \
+      __FDS_BITS (__arr)[__i] = 0;					      \
+  } while (0)
+#define __FD_SET(d, s) \
+  ((void) (__FDS_BITS (s)[__FD_ELT(d)] |= __FD_MASK(d)))
+#define __FD_CLR(d, s) \
+  ((void) (__FDS_BITS (s)[__FD_ELT(d)] &= ~__FD_MASK(d)))
+#define __FD_ISSET(d, s) \
+  ((__FDS_BITS (s)[__FD_ELT (d)] & __FD_MASK (d)) != 0)
+
+
+#define	FD_SET(fd, fdsetp)	__FD_SET (fd, fdsetp)
+#define	FD_CLR(fd, fdsetp)	__FD_CLR (fd, fdsetp)
+#define	FD_ISSET(fd, fdsetp)	__FD_ISSET (fd, fdsetp)
+#define	FD_ZERO(fdsetp)		__FD_ZERO (fdsetp)
+
+# define CSIGNAL       0x000000ff /* Signal mask to be sent at exit.  */
+# define CLONE_VM      0x00000100 /* Set if VM shared between processes.  */
+# define CLONE_FS      0x00000200 /* Set if fs info shared between processes.  */
+# define CLONE_FILES   0x00000400 /* Set if open files shared between processes.  */
+# define CLONE_SIGHAND 0x00000800 /* Set if signal handlers shared.  */
+# define CLONE_PIDFD   0x00001000 /* Set if a pidfd should be placed
+				     in parent.  */
+# define CLONE_PTRACE  0x00002000 /* Set if tracing continues on the child.  */
+# define CLONE_VFORK   0x00004000 /* Set if the parent wants the child to
+				     wake it up on mm_release.  */
+# define CLONE_PARENT  0x00008000 /* Set if we want to have the same
+				     parent as the cloner.  */
+# define CLONE_THREAD  0x00010000 /* Set to add to same thread group.  */
+# define CLONE_NEWNS   0x00020000 /* Set to create new namespace.  */
+# define CLONE_SYSVSEM 0x00040000 /* Set to shared SVID SEM_UNDO semantics.  */
+# define CLONE_SETTLS  0x00080000 /* Set TLS info.  */
+# define CLONE_PARENT_SETTID 0x00100000 /* Store TID in userlevel buffer
+					   before MM copy.  */
+# define CLONE_CHILD_CLEARTID 0x00200000 /* Register exit futex and memory
+					    location to clear.  */
+# define CLONE_DETACHED 0x00400000 /* Create clone detached.  */
+# define CLONE_UNTRACED 0x00800000 /* Set if the tracing process can't
+				      force CLONE_PTRACE on this clone.  */
+# define CLONE_CHILD_SETTID 0x01000000 /* Store TID in userlevel buffer in
+					  the child.  */
+# define CLONE_NEWCGROUP    0x02000000	/* New cgroup namespace.  */
+# define CLONE_NEWUTS	0x04000000	/* New utsname group.  */
+# define CLONE_NEWIPC	0x08000000	/* New ipcs.  */
+# define CLONE_NEWUSER	0x10000000	/* New user namespace.  */
+# define CLONE_NEWPID	0x20000000	/* New pid namespace.  */
+# define CLONE_NEWNET	0x40000000	/* New network namespace.  */
+# define CLONE_IO	0x80000000	/* Clone I/O context.  */
+
+typedef unsigned long long u64;
+
+struct clone_args {
+    u64 flags;        /* Flags bit mask */
+    u64 pidfd;        /* Where to store PID file descriptor
+                         (int *) */
+    u64 child_tid;    /* Where to store child TID,
+                         in child's memory (pid_t *) */
+    u64 parent_tid;   /* Where to store child TID,
+                         in parent's memory (pid_t *) */
+    u64 exit_signal;  /* Signal to deliver to parent on
+                         child termination */
+    u64 stack;        /* Pointer to lowest byte of stack */
+    u64 stack_size;   /* Size of stack */
+    u64 tls;          /* Location of new TLS */
+    u64 set_tid;      /* Pointer to a pid_t array
+                         (since Linux 5.5) */
+    u64 set_tid_size; /* Number of elements in set_tid
+                         (since Linux 5.5) */
+    u64 cgroup;       /* File descriptor for target cgroup
+                         of child (since Linux 5.7) */
+};

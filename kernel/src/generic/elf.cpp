@@ -354,7 +354,7 @@ void elf::exec(thread* proc, const char* path, char** argv, char** envp) {
     std::uint64_t random_data_aux = (std::uint64_t)proc->vmem->alloc_memory(0, 4096, false);
     proc->vmem->inv_lazy_alloc(random_data_aux, 4096);
 
-    std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ,0,AT_SECURE,random_data_aux,AT_RANDOM,4096,51,elfload.interp_base,AT_BASE};
+    std::uint64_t auxv_stack[] = {(std::uint64_t)elfload.real_entry,AT_ENTRY,elfload.phdr,AT_PHDR,elfload.phentsize,AT_PHENT,elfload.phnum,AT_PHNUM,4096,AT_PAGESZ,0,AT_SECURE,random_data_aux,AT_RANDOM,4096,51,elfload.interp_base,AT_BASE, (std::uint64_t)proc->uid, AT_UID, (std::uint64_t)proc->uid, AT_EUID, (std::uint64_t)proc->gid, AT_GID};
     std::uint64_t argv_length = __elf_get_length(argv);
     std::uint64_t envp_length = __elf_get_length(envp);
 

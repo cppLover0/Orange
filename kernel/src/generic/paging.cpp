@@ -63,7 +63,7 @@ namespace paging {
         zero_range(root, virt, len);
         for (std::uint64_t i = 0; i < len; i += 4096) {
             std::int64_t phys = arch::get_phys_from_page(src_root, virt + i);
-            if (phys != -1) {
+            if (phys != -1 && phys != 0) {
                 std::uint64_t new_phys = pmm::freelist::alloc_4k();
                 klibc::memcpy((void*)(new_phys + etc::hhdm()), (void*) (phys + etc::hhdm()), 4096);
                 arch::map_page(root, new_phys, virt + i, flags);

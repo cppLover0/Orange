@@ -62,3 +62,13 @@ long long sys_set_tid_address(int* tidptr) {
     current->tidptr = tidptr;
     return 0;
 }
+
+long long sys_munmap(std::uint64_t addr, std::uint64_t len) {
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)addr, len + PAGE_SIZE)) {
+        return -EFAULT;
+    }
+
+    current->vmem->unmap(ALIGNPAGEDOWN(addr), ALIGNPAGEUP(len));
+    return 0;
+}

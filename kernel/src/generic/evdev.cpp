@@ -84,6 +84,7 @@ void evdev::submit(int num, input_event event) {
     assert(node->main_ring,"ffff");
 
     node->main_ring->send(event);
+
     evdev_lock.unlock();
 }
 
