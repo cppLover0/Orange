@@ -70,8 +70,37 @@ syscall_item syscall_table[] = {
     {false, 20, (void*)sys_writev},
     {false, 61, (void*)sys_wait4},
     {false, 228, (void*)sys_clock_gettime},
-    {false, 202, (void*)sys_stub},
-    {false, 231, (void*)sys_exit_group}
+    {false, 202, (void*)sys_futex},
+    {false, 231, (void*)sys_exit_group},
+    {false, 28, (void*)sys_enosys_stub},
+    {false, 230, (void*)sys_nanosleep},
+    {false, 60, (void*)sys_exit},
+    {false, 59, (void*)sys_execve},
+    {false, 217, (void*)sys_getdents64},
+    {false, 122, (void*)sys_stub}, // setfsuid im not implementing this because uhhhhh
+    {false, 123, (void*)sys_stub}, // setfsgid 
+    {false, 137, (void*)sys_statfs},
+    {false, 332, (void*)sys_statx},
+    {false, 80, (void*)sys_chdir},
+    {false, 83, (void*)sys_mkdir},
+    {false, 95, (void*)sys_umask},
+    {false, 81, (void*)sys_fchdir},
+    {false, 74, (void*)sys_stub},
+    {false, 87, (void*)sys_unlink_path}, // unlink todo
+    {false, 157, (void*)sys_enosys_stub}, //todo prctl
+    {false, 258, (void*)sys_mkdirat},
+    {false, 165, (void*)sys_mount}, // todo mount
+    {false, 162, (void*)sys_stub},
+    {false, 436, (void*)sys_close_range},
+    {false, 131, (void*)sys_sigaltstack},
+    {false, 99, (void*)sys_sysinfo},
+    {false, 221, (void*)sys_stub}, // no fadvise
+    {false, 2, (void*)sys_open},
+    {false, 186, (void*)sys_gettid},
+    {false, 263, (void*)sys_unlink},
+    {false, 247, (void*)sys_waitid}, // todo waitid
+    {false, 98, (void*)sys_enosys_stub},
+    {false, 90, (void*)sys_stub}
 };
 
 syscall_item* find_syscall(long long num) {
@@ -93,7 +122,7 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
     long long ret = 0;
 
     if(current->is_debug)
-        klibc::debug_printf("sys %d rdi 0x%p rsi 0x%p rdx 0x%p\n", current_sys->num, ctx->rdi, ctx->rsi, ctx->rdx);
+        klibc::debug_printf("sys %d rdi 0x%p rsi 0x%p rdx 0x%p cwd %s\n", current_sys->num, ctx->rdi, ctx->rsi, ctx->rdx, current->cwd);
 
     if(current_sys->is_ctx_passed) {
         auto func = (long long (*)(x86_64::idt::int_frame_t*, long long, long long, long long, long long, long long, long long))(current_sys->sys);

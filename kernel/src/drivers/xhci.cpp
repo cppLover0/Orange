@@ -1577,55 +1577,43 @@ void __usbkeyboard_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     }
 
     for (int i = 2; i < 8; i++) {
-        int isPressed = 0;
+        uint8_t key = data[i];
+        if (key == 0) continue;
+
+        bool was_pressed = false;
         for (int j = 2; j < 8; j++) {
-            if (usbdev->add_buffer[j] == data[i]) {
-                isPressed = 1;
-                break;
-            }
+            if (usbdev->add_buffer[j] == key) { was_pressed = true; break; }
         }
-        if (!isPressed && data[i] != 0) {
-            if (data[i] < 0x47) {
-                input_send(usbdev->evdev_num, hid_to_ps2_layout[data[i]]);
-            } else if(data[i] == 0x4F) {
+
+        if (!was_pressed) {
+            if (key >= 0x4F && key <= 0x52) {
+                static const uint8_t arrow_codes[] = { 0x4D, 0x4B, 0x50, 0x48 };
                 input_send(usbdev->evdev_num, 0xE0);
-                input_send(usbdev->evdev_num, 0x4D); 
-            } else if(data[i] == 0x50) {
-                input_send(usbdev->evdev_num, 0xE0);
-                input_send(usbdev->evdev_num, 0x4B); 
-            } else if(data[i] == 0x51) {
-                input_send(usbdev->evdev_num, 0xE0);
-                input_send(usbdev->evdev_num, 0x50); 
-            } else if(data[i] == 0x52) {
-                input_send(usbdev->evdev_num, 0xE0);
-                input_send(usbdev->evdev_num, 0x48); 
+                input_send(usbdev->evdev_num, arrow_codes[key - 0x4F]);
+            } else if (key < 0x48) {
+                input_send(usbdev->evdev_num, hid_to_ps2_layout[key]);
             }
         }
     }
 
     for (int i = 2; i < 8; i++) {
-        int isStillPressed = 0;
+        uint8_t old_key = usbdev->add_buffer[i];
+        if (old_key == 0) continue;
+
+        bool still_pressed = false;
         for (int j = 2; j < 8; j++) {
-            if (usbdev->add_buffer[i] == data[j]) {
-                isStillPressed = 1;
-                break;
+            if (data[j] == old_key) { still_pressed = true; break; }
+        }
+
+        if (!still_pressed) {
+            if (old_key >= 0x4F && old_key <= 0x52) {
+                static const uint8_t arrow_codes[] = { 0x4D, 0x4B, 0x50, 0x48 };
+                input_send(usbdev->evdev_num, 0xE0);
+                input_send(usbdev->evdev_num, arrow_codes[old_key - 0x4F] | 0x80);
+            } else if (old_key < 0x48) {
+                input_send(usbdev->evdev_num, hid_to_ps2_layout[old_key] | 0x80);
             }
         }
-        if (!isStillPressed && usbdev->add_buffer[i] != 0) {
-            input_send(usbdev->evdev_num, hid_to_ps2_layout[usbdev->add_buffer[i]] | 0x80);
-        } else if(usbdev->add_buffer[i] == 0x4F) {
-                input_send(usbdev->evdev_num, 0xE0 | 0x80);
-                input_send(usbdev->evdev_num, 0x4D | 0x80); 
-            } else if(usbdev->add_buffer[i] == 0x50) {
-                input_send(usbdev->evdev_num, 0xE0 | 0x80);
-                input_send(usbdev->evdev_num, 0x4B | 0x80); 
-            } else if(usbdev->add_buffer[i] == 0x51) {
-                input_send(usbdev->evdev_num, 0xE0 | 0x80);
-                input_send(usbdev->evdev_num, 0x50 | 0x80); 
-            } else if(usbdev->add_buffer[i] == 0x52) {
-                input_send(usbdev->evdev_num, 0xE0 | 0x80);
-                input_send(usbdev->evdev_num, 0x48 | 0x80); 
-            }
     }
 
     klibc::memcpy(usbdev->add_buffer, data, 8);

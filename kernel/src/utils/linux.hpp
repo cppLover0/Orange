@@ -20,6 +20,88 @@ struct timespec {
     long    tv_nsec; 
 };
 
+#define TIOCL_SETSEL             2  
+#define TIOCL_PASTESEL           3 
+#define TIOCL_UNBLANKSCREEN      4  
+#define TIOCL_SELLOADLUT         5 
+#define TIOCL_GETSHIFTSTATE      6  
+#define TIOCL_GETMOUSEREPORTING  7  
+#define TIOCL_SETVESABLANK       10 
+#define TIOCL_SETKMSGREDIRECT    11 
+#define TIOCL_GETFGCONSOLE       12 
+#define TIOCL_SCROLLCONSOLE      13 
+#define TIOCL_BLANKSCREEN        14 
+#define TIOCL_BLANKEDSCREEN      15 
+#define TIOCL_GETKMSGREDIRECT    17
+
+#define _IOC_NONE       0U
+#define _IOC_WRITE      1U
+#define _IOC_READ       2U
+
+#define _IOC_NRBITS     8
+#define _IOC_TYPEBITS   8
+#define _IOC_SIZEBITS   14
+#define _IOC_DIRBITS    2
+#define _IOC_NRMASK     ((1 << _IOC_NRBITS) - 1)
+#define _IOC_TYPEMASK   ((1 << _IOC_TYPEBITS) - 1)
+#define _IOC_SIZEMASK   ((1 << _IOC_SIZEBITS) - 1)
+#define _IOC_DIRMASK    ((1 << _IOC_DIRBITS) - 1)
+#define _IOC_NRSHIFT    0
+#define _IOC_TYPESHIFT  (_IOC_NRSHIFT + _IOC_NRBITS)
+#define _IOC_SIZESHIFT  (_IOC_TYPESHIFT + _IOC_TYPEBITS)
+#define _IOC_DIRSHIFT   (_IOC_SIZESHIFT + _IOC_SIZEBITS)
+
+#define _IOC(dir, type, nr, size) \
+    (((dir)  << _IOC_DIRSHIFT) | \
+     ((type) << _IOC_TYPESHIFT) | \
+     ((nr)   << _IOC_NRSHIFT) | \
+     ((size) << _IOC_SIZESHIFT))
+
+#define _IO(type, nr)           _IOC(_IOC_NONE, (type), (nr), 0)
+#define _IOR(type, nr, size)    _IOC(_IOC_READ, (type), (nr), sizeof(size))
+#define _IOW(type, nr, size)    _IOC(_IOC_WRITE, (type), (nr), sizeof(size))
+#define _IOWR(type, nr, size)   _IOC(_IOC_READ | _IOC_WRITE, (type), (nr), sizeof(size))
+
+#define _IOC_DIR(nr)            (((nr) >> _IOC_DIRSHIFT) & _IOC_DIRMASK)
+#define _IOC_TYPE(nr)           (((nr) >> _IOC_TYPESHIFT) & _IOC_TYPEMASK)
+#define _IOC_NR(nr)             (((nr) >> _IOC_NRSHIFT) & _IOC_NRMASK)
+#define _IOC_SIZE(nr)           (((nr) >> _IOC_SIZESHIFT) & _IOC_SIZEMASK)
+
+struct siginfo {
+    int si_signo;          
+    int si_errno;          
+    int si_code;         
+
+    union {
+        int _pad[28];     
+
+        struct {
+            int _pid;  
+            unsigned int _uid; 
+            int _status;  
+            long _utime;   
+            long _stime;   
+        } _sigchld;
+    } _sifields;
+};
+
+
+struct sysinfo {
+    long uptime;       
+    unsigned long loads[3];
+    unsigned long totalram;
+    unsigned long freeram; 
+    unsigned long sharedram; 
+    unsigned long bufferram; 
+    unsigned long totalswap; 
+    unsigned long freeswap; 
+    unsigned short procs;    
+    unsigned long totalhigh;
+    unsigned long freehigh; 
+    unsigned int mem_unit;  
+    char _f[20-2*sizeof(long)-sizeof(int)]; 
+};
+
 # define CLOCK_REALTIME			0
 /* Monotonic system-wide clock.  */
 # define CLOCK_MONOTONIC		1

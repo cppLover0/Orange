@@ -3,6 +3,7 @@
 #include <generic/vfs.hpp>
 #include <klibc/string.hpp>
 #include <utils/assert.hpp>
+#include <utils/linux.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/cpu_local.hpp>
@@ -52,6 +53,14 @@ inline static char* at_to_char(thread* thread, int atdir) {
     return nullptr;
 }
 
+long long sys_waitid(int which, int pid, siginfo* siginfo, int options, void* ru);
+long long sys_unlink(int dfd, const char* path, int flags);
+long long sys_close_range(int first, int last, int flags);
+long long sys_mkdirat(int dfd, const char* path, int mode);
+long long sys_fchdir(int fd);
+long long sys_umask(int mask);
+long long sys_mkdir(const char* path, int mode);
+long long sys_chdir(const char* path);
 long long sys_setpgid(int pid, int pgid);
 long long sys_dup2(int old, int new_fd);
 long long sys_dup(int fd);
@@ -61,6 +70,14 @@ long long sys_getpid();
 long long sys_getppid();
 long long sys_getpgrp();
 
+long long sys_unlink_path(const char* path);
+long long sys_gettid();
+long long sys_open(const char* path, int flags, int mode);
+long long sys_sysinfo(sysinfo* out);
+long long sys_sigaltstack(const sig_stack* stack, sig_stack* old);
+long long sys_mount(const char* source, const char* target, const char* type, std::uint64_t mountflags, const void* data);
+long long sys_getdents64(int fd, char* buf, std::uint64_t count);
+long long sys_statfs(const char* path, statfs* out);
 long long sys_seek(int fd, long offset, int whence);
 long long sys_getresgid(int* uid, int* euid, int* suid);
 long long sys_getresuid(int* uid, int* euid, int* suid);
@@ -83,9 +100,14 @@ long long sys_gettimeofday(timeval* tv, void* tz);
 long long sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, std::uint64_t len);
 long long sys_sigprocaction(int sig, const sigaction* src, sigaction* old, std::uint64_t len);
 
+long long sys_statx(int dfd, const char* path, int flags, std::uint32_t mask, statx* out);
+long long sys_execve(const char* path, char** argv, char** envp);
+long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts);
+long long sys_exit(int status);
+long long sys_nanosleep(int clock, int flags, timespec* rqtp, timespec* rmtp);
 long long sys_exit_group(int status);
 long long sys_clock_gettime(clockid_t which_clock, struct timespec *tp);
-long long sys_wait4();
+long long sys_wait4(int pid, int *wstatus, int options);
 long long sys_writev(int fd, iovec* vecs, std::uint64_t vlen);
 long long sys_fcntl(int fd, int request, std::uint64_t arg);
 long long sys_close(int fd);

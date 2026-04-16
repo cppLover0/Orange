@@ -87,7 +87,7 @@ long long sys_time(std::uint64_t* time) {
     }
 
     if(time == nullptr)
-        return -EINVAL;
+        return time::current_unix_time;
 
     *time = time::current_unix_time;
 
@@ -111,9 +111,55 @@ long long sys_clock_gettime(clockid_t which_clock, struct timespec *tp) {
     case CLOCK_MONOTONIC_RAW:
     case CLOCK_MONOTONIC:
         std::uint64_t ts = time::timer->current_nano();
+        if(ts < clk_mnt_sync) ts = clk_mnt_sync.load();
+        else clk_mnt_sync.store(ts);
         tp->tv_sec = ts / 1000000000;
         tp->tv_nsec = ts % 1000000000;
         return 0;
     };
     return -EINVAL;
+}
+
+long long sys_nanosleep(int clock, int flags, timespec* rqtp, timespec* rmtp) {
+    (void)clock;
+    (void)flags;
+    (void)rmtp;
+    std::uint64_t us = (rqtp->tv_nsec / 1000) + (rqtp->tv_sec * 1000000);
+    thread* proc = current_proc;
+    (void)proc;
+    if(1) { // tsc sleep
+        std::uint64_t current = time::timer->current_nano();
+        std::uint64_t end = us * 1000;
+        while((time::timer->current_nano() - current) < end) {
+            if((time::timer->current_nano() - current) < 1500) {
+                asm volatile("pause");
+            } else
+                process::yield();
+        }
+    } 
+    return 0;
+} 
+
+extern std::uint32_t proc_count;
+extern std::size_t free_mem;
+extern std::size_t memory_size;
+
+long long sys_sysinfo(sysinfo* out) {
+
+    thread* current_thread = current_proc;
+
+    if(!is_safe_to_rw(current_thread, (std::uint64_t)out, PAGE_SIZE))
+        return -EFAULT;
+
+    if(out == nullptr)
+        return -EINVAL;
+
+    sysinfo info = {};
+    info.totalram = memory_size;
+    info.freeram = free_mem;
+    info.procs = proc_count & 0xFFFF;
+    info.mem_unit = 1; // for 64 bit there's no bad things for it
+    info.uptime = time::timer->current_nano() / (1000 * 1000 * 1000);
+    *out = info;
+    return 0;
 }

@@ -92,12 +92,16 @@ fail:
             new_fd->offset = file_stat.st_size;
     }
 
-    assert((std::uint64_t)(klibc::strlen(buffer1) + 1) < sizeof(new_fd->path), "bruh.");
-    klibc::memcpy(new_fd->path, buffer1, klibc::strlen(buffer1) + 1);
+    assert((std::uint64_t)(klibc::strlen(buffer) + 1) < sizeof(new_fd->path), "bruh.");
+    klibc::memcpy(new_fd->path, buffer, klibc::strlen(buffer) + 1);
 
     new_fd->flags = flags;
 
     return new_fd->index;
+}
+
+long long sys_open(const char* path, int flags, int mode) {
+    return sys_openat(AT_FDCWD, path, flags, mode);
 }
 
 long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
@@ -110,6 +114,8 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
     if(!is_safe_to_rw(current, (std::uint64_t)out, 4096)) {
         return -EFAULT;
     }
+
+    klibc::memset(out, 0, sizeof(stat));
 
     if(current->is_debug) {
         klibc::debug_printf("trying to stat %d %s 0x%p\n", dfd, path ? path : "empty path", flags);
@@ -155,6 +161,7 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
     assert(target_fd.vnode.stat, "no lol");
 
     target_fd.vnode.stat(&target_fd, out);
+    if(current->is_debug) klibc::debug_printf("mode %o %s", out->st_mode, path == nullptr ? "" : path);
 
     if(!is_empty) {
         if(target_fd.vnode.close)
@@ -176,6 +183,47 @@ long long sys_faccessat2(int dfd, const char* path, int mode, int flags) {
 
 long long sys_fstat(int fd, stat* out) {
     return sys_newfstatat(fd, nullptr, out, 0);
+}
+
+long long sys_statfs(const char* path, statfs* out) {
+    thread* current_thread = current_proc;
+    if(!is_safe_to_rw(current_thread, (std::uint64_t)out, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(current_thread, (std::uint64_t)path, PAGE_SIZE))
+        return -EFAULT;
+
+    stat tmp_stat = {};
+    file_descriptor target_fd = {};
+    char buffer[4096] = {};
+    char buffer1[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current_thread, AT_FDCWD);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current_thread->chroot, at, buffer1, buffer);
+
+    target_fd.type = file_descriptor_type::file;
+    int status = vfs::open(&target_fd, buffer, true, false);
+    if(status != 0)
+        return status;
+
+    target_fd.vnode.stat(&target_fd, &tmp_stat);
+
+    if(target_fd.vnode.close) target_fd.vnode.close(&target_fd);
+
+    out->f_type = 0xEF53;
+    out->f_bsize = tmp_stat.st_blksize;
+    out->f_blocks = 0;
+    out->f_bfree = 0;
+    out->f_bavail = 0;
+    out->f_files = 0;
+    out->f_ffree = 0;
+    out->f_namelen = 4096;
+
+    return 0;
 }
 
 long long sys_read(int fd, char* buffer, std::uint64_t count) {
@@ -416,7 +464,7 @@ long long sys_fcntl(int fd, int request, std::uint64_t arg) {
             manager->do_dup(fd_s, new_fd);
             if(proc->is_debug)
                 klibc::debug_printf("return fd %d",new_fd->index);
-            new_fd->is_cloexec = is_cloexec;
+            new_fd->other.is_cloexec = is_cloexec;
             return new_fd->index; 
         }
 
@@ -746,4 +794,307 @@ long long sys_writev(int fd, iovec* vecs, std::uint64_t vlen) {
         total += ret;
     }
     return total;
+}
+
+long long sys_getdents64(int fd, char* buf, std::uint64_t count) {
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)buf, count + PAGE_SIZE)) 
+        return -EFAULT;
+
+    auto manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* file = nullptr;
+
+    file = manager->search(fd);
+    if(file == nullptr)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -EINVAL;
+
+    if(buf == nullptr)
+        return -EINVAL;
+
+    if(file->vnode.ls == nullptr)
+        return -ENOTSUP;
+
+    return file->vnode.ls(file, buf, count);
+}
+
+#define STATX_BASIC_STATS 0x7ff
+#define STATX_BTIME 0x800
+
+long long sys_statx(int dfd, const char* path, int flags, std::uint32_t mask, statx* out) {
+    (void)mask;
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096) && path) {
+        return -EFAULT;
+    }
+
+    if(!is_safe_to_rw(current, (std::uint64_t)out, 4096)) {
+        return -EFAULT;
+    }
+
+    klibc::memset(out, 0, sizeof(stat));
+
+    if(current->is_debug) {
+        klibc::debug_printf("trying to statx %d %s 0x%p\n", dfd, path ? path : "empty path", flags);
+    }
+
+    bool is_empty = false;
+    if(!path)
+        is_empty = true;
+
+    if(path) {
+        if(path[0] == '\0')
+            is_empty = true;
+    }
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+    file_descriptor target_fd = {};
+    if(is_empty) {
+        file_descriptor* fd = manager->search(dfd);
+        if(!fd)
+            return -EBADF;
+        target_fd = *fd;
+    } else {
+        char buffer1[4096] = {};
+        char buffer[4096] = {};
+        klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+        char* at = at_to_char(current, dfd);
+        if(at == nullptr)
+            return -EBADF;
+
+        process_path(current->chroot, at, buffer1, buffer);
+
+        target_fd.type = file_descriptor_type::file;
+        int status = vfs::open(&target_fd, buffer, flags & AT_SYMLINK_NOFOLLOW ? false : true, false);
+        if(status != 0)
+            return status;
+
+    }
+
+    stat tmp_stat = {};
+
+    if(target_fd.type != file_descriptor_type::file)
+        return -EINVAL;
+
+    assert(target_fd.vnode.stat, "no lol");
+
+    target_fd.vnode.stat(&target_fd, &tmp_stat);
+
+    if(!is_empty) {
+        if(target_fd.vnode.close)
+            target_fd.vnode.close(&target_fd);
+    }
+
+    // convert stat to statx
+
+    klibc::memset(out, 0, sizeof(statx));
+
+    out->stx_ino = tmp_stat.st_ino;
+    out->stx_blksize = tmp_stat.st_blksize;
+    out->stx_nlink = tmp_stat.st_nlink;
+    out->stx_mode = tmp_stat.st_mode;
+    out->stx_size = tmp_stat.st_size;
+    out->stx_atime.tv_sec = tmp_stat.st_atim.tv_sec;
+    out->stx_mtime.tv_sec = tmp_stat.st_mtim.tv_sec;
+    out->stx_btime.tv_sec = tmp_stat.st_ctim.tv_sec;
+    out->stx_blocks = tmp_stat.st_blocks;
+    out->stx_uid = tmp_stat.st_uid;
+    out->stx_gid = tmp_stat.st_gid;
+    out->stx_mask = STATX_BASIC_STATS | STATX_BTIME;
+
+    return 0;
+}
+
+long long sys_chdir(const char* path) {
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096)) {
+        return -EFAULT;
+    }
+
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current, AT_FDCWD);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer1, buffer);
+
+    file_descriptor file = {};
+
+    int status = vfs::open(&file, buffer, true, true);
+    if(status != 0)
+        return status;
+
+    if(file.vnode.close) file.vnode.close(&file);
+
+    klibc::debug_printf("chdir %s\n", buffer);
+
+    klibc::memcpy(current->cwd, buffer, klibc::strlen(buffer) + 1);
+
+    return 0;
+}
+
+long long sys_fchdir(int fd) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+
+    file_descriptor* file = manager->search(fd);
+    if(file == nullptr)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -EINVAL;
+
+    stat tmp_stat = {};
+    file->vnode.stat(file, &tmp_stat);
+
+    if(!(tmp_stat.st_mode & S_IFDIR))
+        return -ENOTDIR;
+
+    klibc::debug_printf("fchdir %s (fd %d)\n", file->path, fd);
+    klibc::memcpy(current->cwd, file->path, klibc::strlen(file->path) + 1);
+    return 0;
+}
+
+long long sys_mkdir(const char* path, int mode) {
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(path == nullptr)
+        return -EINVAL;
+
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current, AT_FDCWD);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer1, buffer);
+
+    int status = vfs::create(buffer, vfs_file_type::directory, mode);
+    if(status != 0)
+        return status;
+
+    return 0;
+}
+
+long long sys_mkdirat(int dfd, const char* path, int mode) {
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(path == nullptr)
+        return -EINVAL;
+
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current, dfd);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer1, buffer);
+
+    int status = vfs::create(buffer, vfs_file_type::directory, mode);
+    if(status != 0)
+        return status;
+
+    return 0;
+}
+
+long long sys_umask(int mask) {
+    (void)mask;
+    return 0;
+}
+
+long long sys_close_range(int first, int last, int flags) {
+    thread* current = current_proc;
+    if(first > last)
+        return -EINVAL;
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+
+    if(flags & CLOSE_RANGE_UNSHARE) {
+        if(manager->fd_usage_pointer > 1) {
+            current->fd = new vfs::fdmanager;
+            vfs::fdmanager* new_m = (vfs::fdmanager*)current->fd;
+            manager->duplicate(new_m);
+            manager->fd_usage_pointer--;
+            manager = new_m;
+        }
+    }
+
+    manager->close_range(first, last, (flags & CLOSE_RANGE_CLOEXEC) ? true : false);
+    return 0;
+}
+
+long long sys_mount(const char* source, const char* target, const char* type, std::uint64_t mountflags, const void* data) {
+    klibc::debug_printf("mount src %s target %s fstype %s flags 0x%p data 0x%p\n", source ? source : "no src", target ? target : "no target", type ? type : "no type", mountflags, data);
+    return -ENOSYS;
+}
+
+long long sys_unlink(int dfd, const char* path, int flags) {
+    (void)flags;
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(path == nullptr)
+        return -EINVAL;
+
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current, dfd);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer1, buffer);
+
+    int res = vfs::unlink(buffer);
+    return res;
+}
+
+long long sys_unlink_path(const char* path) {
+    return sys_unlink(AT_FDCWD, path, 0);
+}
+
+long long sys_chmod(const char* path, int mode) {
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(path == nullptr)
+        return -EINVAL;
+
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current, AT_FDCWD);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer1, buffer);
+
+    file_descriptor file = {};
+    
+
+    return 0;
 }

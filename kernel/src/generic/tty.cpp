@@ -10,6 +10,7 @@
 #include <utils/errno.hpp>
 #include <generic/scheduling.hpp>
 #include <atomic>
+#include <utils/flanterm.hpp>
 
 #define PTMX "/ptmx"
 #define TCGETS                   0x5401
@@ -141,9 +142,19 @@ std::int32_t tty_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
             *(int*)arg = arg2->pgrp;
             tty_lock.unlock();
             return 0;
+        case 0x5603: {
+            vt_stat* out = (vt_stat*)arg;
+            out->v_active = 0;
+            out->v_state = (1 << 0);
+            tty_lock.unlock();
+            return 0;
+        }
+        case 0x541c:
+            tty_lock.unlock();
+            return -ENOTTY;
 
     }
-    assert(0,"tty shitfuck req %lli, arg 0x%p", req, arg);
+    assert(0,"tty shitfuck req %lli (0x%p), arg 0x%p", req, req, arg);
     tty_lock.unlock();
     return -EINVAL;
 }
@@ -174,6 +185,11 @@ std::int32_t tty_open(file_descriptor* fd, devfs_node* node) {
     return 0;
 }
 
+#include <flanterm_backends/fb.h>
+#include <flanterm.h>
+
+extern flanterm_context* ft_ctx0;
+
 void ptmx_open(file_descriptor* fd) {
     fd->other.is_master = true;
     tty::tty_arg* new_tty = new tty::tty_arg;
@@ -191,6 +207,15 @@ void ptmx_open(file_descriptor* fd) {
     std::uint32_t num = tty_ptr++;
     fd->other.is_a_tty = true;
     fd->other.tty_num = num;
+
+    // ktty
+    if(num == 0) {
+        std::size_t cols = 0;
+        std::size_t rows = 0;
+        flanterm_get_dimensions(ft_ctx0,&cols,&rows);
+        new_tty->winsz.ws_col = cols;
+        new_tty->winsz.ws_row = rows;
+    }
 
     char buffer[256];
     klibc::memset(buffer,0,256);
@@ -237,38 +262,57 @@ const char en_layout_translation_shift[] = {
 #define CTRL_PRESSED 29
 #define CTRL_RELEASED 157
 
+static bool is_e0_prefix = false; 
+
 static void doKeyWork(uint8_t key) {
 
-    if(key == SHIFT_PRESSED) {
-        is_shift_pressed = 1;
-        return;
-    } else if(key == SHIFT_RELEASED) {
-        is_shift_pressed = 0;
+    if (key == 0xE0) {
+        is_e0_prefix = true;
         return;
     }
 
-    if(key == CTRL_PRESSED) {
-        is_ctrl_pressed = 1;
-        return;
-    } else if(key == CTRL_RELEASED) {
-        is_ctrl_pressed = 0;
-        return;
-    }
+    if(key == SHIFT_PRESSED) { is_shift_pressed = 1; return; }
+    if(key == SHIFT_RELEASED) { is_shift_pressed = 0; return; }
+    if(key == CTRL_PRESSED) { is_ctrl_pressed = 1; return; }
+    if(key == CTRL_RELEASED) { is_ctrl_pressed = 0; return; }
 
-    if(!(key & (1 << 7))) {
-        char layout_key;
+    if(!(key & 0x80)) {
+        if (is_e0_prefix) {
+            is_e0_prefix = false; 
+            
+            const char* sequence = nullptr;
+            switch (key) {
+                case 0x48: sequence = "\e[A"; break; 
+                case 0x50: sequence = "\e[B"; break; 
+                case 0x4D: sequence = "\e[C"; break; 
+                case 0x4B: sequence = "\e[D"; break;
+            }
 
-        if(!is_shift_pressed)
-            layout_key = en_layout_translation[key];
-        else
-            layout_key = en_layout_translation_shift[key];
-        if(is_ctrl_pressed)
-            layout_key = en_layout_translation[key] - ASCII_CTRL_OFFSET;
+            if (sequence) {
+                ktty_fd.vnode.write(&ktty_fd, (char*)sequence, 3);
+                return;
+            }
+        }
 
-        
-        ktty_fd.vnode.write(&ktty_fd, (char*)&layout_key, 1);
+        if (key < sizeof(en_layout_translation)) {
+            char layout_key;
+            if(!is_shift_pressed)
+                layout_key = en_layout_translation[key];
+            else
+                layout_key = en_layout_translation_shift[key];
+            
+            if(is_ctrl_pressed && layout_key >= 64)
+                layout_key -= ASCII_CTRL_OFFSET;
+
+            if (layout_key != '\0') {
+                ktty_fd.vnode.write(&ktty_fd, (char*)&layout_key, 1);
+            }
+        }
+    } else {
+        is_e0_prefix = false;
     }
 }
+
 
 void tty_work(void* arg) {
     (void)arg;

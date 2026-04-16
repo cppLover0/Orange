@@ -43,6 +43,8 @@ struct thread {
     std::uint32_t pgrp;
     std::uint32_t exit_code;
     std::uint32_t exit_signal;
+    std::uint32_t waitpid_state;
+    bool should_not_save_ctx;
 #if defined(__x86_64__)
     std::uint8_t* sse_ctx;
     std::uint64_t fs_base;
@@ -55,7 +57,7 @@ struct thread {
     sig_stack alt_stack;
     signal_trace* sigtrace_obj;
     signal_manager* sig;
-    signal_member signals_handlers[32];
+    signal_member signals_handlers[34];
     sig_stack signal_stack;
     locks::spinlock lock;
     std::atomic<std::uint32_t> futex;
@@ -70,6 +72,7 @@ struct thread {
     int exit_request; // 1 signle exit, 2 group exit
     std::atomic<bool> did_exec;
 
+    std::uint64_t ts;
     int* pending_child_settid;
     sigset_t temp_sigset;
 
@@ -79,7 +82,7 @@ struct thread {
  
     int uid;
     int gid;
-
+    
     void* fd;
     vmm* vmem;
 
@@ -102,8 +105,13 @@ namespace process {
     void wakeup(thread* thread);
     void kill(thread* thread, int status, bool exit_group);
 
+    int futex_wake(thread* proc, int* lock, int count);
+    void futex_wait(thread* proc, int* lock);
+
     extern "C" void schedule(void* frame);
 
     extern "C" void switch_ctx(void* frame);
     extern "C" void yield();
+
+    thread* _head_proc();
 };

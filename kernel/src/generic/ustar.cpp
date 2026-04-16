@@ -177,4 +177,12 @@ skip:
     }
     
     __tmpfs__create_parent_dirs_by_default = 0;
+    log("ustar", "doing initrd free rn");
+    std::uint64_t align_start = (std::uint64_t)ALIGNPAGEUP((std::uint64_t)archive);
+    std::uint64_t proc_len = len - (align_start - (std::uint64_t)archive);
+    std::uint64_t align_len = ALIGNPAGEDOWN(proc_len);
+    for(std::uint64_t i = 0; i < align_len; i += PAGE_SIZE) {
+        pmm::freelist::free((align_start - etc::hhdm()) + i);
+    }
+
 }

@@ -9,14 +9,31 @@
 #include <generic/scheduling.hpp>
 #include <generic/lock/spinlock.hpp>
 
+struct statfs {
+   long    f_type;  
+   long    f_bsize;
+   long    f_blocks;  
+   long    f_bfree;   
+   long    f_bavail;
+   long    f_files; 
+   long    f_ffree;    
+   long    f_fsid;  
+   long    f_namelen;  
+   long    f_spare[6];
+};
+
 #define USERSPACE_PIPE_SIZE (64 * 1024)
-#define S_IFSOCK 0140000 
-#define S_IFLNK  0120000 
-#define S_IFREG  0100000  
-#define S_IFBLK  0060000  
-#define S_IFDIR  0040000  
-#define S_IFCHR  0020000 
-#define S_IFIFO  0010000  
+#define S_IFMT  00170000
+#define S_IFSOCK 0140000
+#define S_IFLNK	 0120000
+#define S_IFREG  0100000
+#define S_IFBLK  0060000
+#define S_IFDIR  0040000
+#define S_IFCHR  0020000
+#define S_IFIFO  0010000
+#define S_ISUID  0004000
+#define S_ISGID  0002000
+#define S_ISVTX  0001000
 #define DT_UNKNOWN 0
 #define DT_FIFO    1
 #define DT_CHR     2
@@ -55,9 +72,6 @@
 #define S_IROTH 04
 #define S_IWOTH 02
 #define S_IXOTH 01
-#define S_ISUID 04000
-#define S_ISGID 02000
-#define S_ISVTX 01000
 
 /* open/fcntl.  */
 #define O_ACCMODE	   0003
@@ -162,20 +176,52 @@ struct dirent {
     char d_name[];
 };
 
+// i asked clanker for writing some structs at least cuz im scared to have broken structs
+struct statx {
+    uint32_t stx_mask;         
+    uint32_t stx_blksize;     
+    uint64_t stx_attributes;  
+    uint32_t stx_nlink;     
+    uint32_t stx_uid;            
+    uint32_t stx_gid;          
+    uint16_t stx_mode;       
+    uint16_t __spare0[1]; 
+    uint64_t stx_ino;       
+    uint64_t stx_size;   
+    uint64_t stx_blocks;       
+    uint64_t stx_attributes_mask; 
+
+    struct { int64_t tv_sec; uint32_t tv_nsec; int32_t __reserved; } stx_atime;
+    struct { int64_t tv_sec; uint32_t tv_nsec; int32_t __reserved; } stx_btime; 
+    struct { int64_t tv_sec; uint32_t tv_nsec; int32_t __reserved; } stx_ctime;
+    struct { int64_t tv_sec; uint32_t tv_nsec; int32_t __reserved; } stx_mtime;
+
+    uint32_t stx_rdev_major;    
+    uint32_t stx_rdev_minor;    
+    uint32_t stx_dev_major;      
+    uint32_t stx_dev_minor;    
+
+    uint64_t stx_mnt_id;     
+    uint64_t __spare2;        
+    uint64_t __spare3[12];   
+};
+
+
 #define PIPE_SIDE_WRITE 1
 #define PIPE_SIDE_READ 2
 
 struct stat {
-    dev_t     st_dev;       
-    ino_t     st_ino;         
-    mode_t    st_mode;   
-    nlink_t   st_nlink;       
-    uid_t     st_uid;      
-    gid_t     st_gid;        
-    dev_t     st_rdev;      
-    off_t     st_size;       
-    blksize_t st_blksize;    
-    blkcnt_t  st_blocks;     
+    unsigned long  st_dev;      /* ID устройства (8 байт) */
+    unsigned long  st_ino;      /* Номер инoда (8 байт) */
+    unsigned long  st_nlink;    /* Кол-во жестких ссылок (8 байт) */
+    unsigned int   st_mode;     /* Тип файла и права (4 байта) */
+    unsigned int   st_uid;      /* ID пользователя (4 байта) */
+    unsigned int   st_gid;      /* ID группы (4 байта) */
+    int            __pad0;      /* Выравнивание (4 байта) */
+    unsigned long  st_rdev;     /* ID устройства спец. файла (8 байт) */
+    long           st_size;     /* Размер в байтах (8 байт) */
+    long           st_blksize;  /* Размер блока В/В (8 байт) */
+    long           st_blocks;   /* Кол-во 512Б блоков (8 байт) */
 
     struct timespec st_atim;
     struct timespec st_mtim; 
@@ -223,6 +269,7 @@ struct filesystem {
     std::int32_t (*open)(filesystem* fs, void* file_desc, char* path, bool is_directory);
     std::int32_t (*readlink)(filesystem* fs, char* path, char* buffer);
     std::int32_t (*create)(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode);
+    std::int32_t (*unlink)(filesystem* fs, char* path);
 
     char path[2048];
 };
@@ -416,8 +463,6 @@ struct file_descriptor {
     std::uint32_t flags;
     std::int32_t index;
 
-    bool is_cloexec;
-
     union {
         std::uint64_t ino;
         std::uint64_t tmpfs_pointer;
@@ -455,12 +500,14 @@ struct file_descriptor {
 
         std::int32_t (*chmod)(file_descriptor* file, int new_mode);
         std::int32_t (*zero)(file_descriptor* file);
-
     } vnode;
 
     file_descriptor* next;
     char path[3500];
 };
+
+#define CLOSE_RANGE_UNSHARE     (1U << 1)
+#define CLOSE_RANGE_CLOEXEC     (1U << 2)
 
 static_assert(sizeof(file_descriptor) < 4096, "no pls");
 
@@ -604,6 +651,23 @@ namespace vfs {
             fd_lock.unlock(state);
         } 
 
+        void close_range(int first, int last, bool should_cloexec) {
+            bool state = fd_lock.lock();
+            file_descriptor* current = this->head_fd;
+            while(current) {
+                file_descriptor* next = current->next;
+                if(current->index >= first && current->index <= last && current->type != file_descriptor_type::unallocated) {
+                    if(should_cloexec) {
+                        current->other.is_cloexec = true;
+                    } else {
+                        this->close(current);
+                    }
+                }
+                current = next;
+            }
+            fd_lock.unlock(state);
+        }
+
         file_descriptor* try_dup2(file_descriptor* src, int idx) {
             bool state = this->fd_lock.lock();
             file_descriptor* current = this->head_fd;
@@ -653,7 +717,7 @@ namespace vfs {
                     file->vnode.close(file);
             } else if(file->type == file_descriptor_type::pipe) {
                 file->fs_specific.pipe->close(file->other.pipe_side);
-            } else {
+            } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);
             }
             file->type = file_descriptor_type::unallocated;
@@ -683,6 +747,8 @@ namespace vfs {
     std::int32_t open(file_descriptor* fd, char* path, bool follow_symlinks, bool is_directory);
     std::int32_t create(char* path, vfs_file_type type, std::uint32_t mode); 
     std::int32_t readlink(char* path, char* out, std::uint32_t out_len);
+    std::int32_t rename(char* path, char* newpath);
+    std::int32_t unlink(char* path);
     std::int32_t remove(char* path);
 }
 
@@ -760,8 +826,8 @@ namespace vfs {
     /* I'll use path resolver from my old kernel */
     static inline void resolve_path(const char* inter0,const char* base, char *result, char spec) {
         char* next = 0;
-        char buffer2_in_stack[2048];
-        char inter[2048];
+        char buffer2_in_stack[4096];
+        char inter[4096];
         char* buffer = 0;
         char* final_buffer = (char*)buffer2_in_stack;
         std::uint64_t ptr = klibc::strlen((char*)base);
@@ -854,7 +920,7 @@ namespace vfs {
             
             buffer = klibc::strtok(&next,0,"/");
         }
-        normalize_path(final_buffer,result,2048);
+        normalize_path(final_buffer,result,4096);
 
         if(result[0] == '\0') {
             result[0] = '/';

@@ -51,7 +51,7 @@ long long sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, std::u
 
 long long sys_sigprocaction(int sig, const sigaction* src, sigaction* old, std::uint64_t len) {
     (void)len;
-    assert(sig < 32, "m");
+    assert(sig < 34, "m %d", sig);
 
     thread* proc = current_proc;
     if(!is_safe_to_rw(proc, (std::uint64_t)src, PAGE_SIZE))
@@ -73,6 +73,25 @@ long long sys_sigprocaction(int sig, const sigaction* src, sigaction* old, std::
         proc->signals_handlers[sig].restorer = (void*)src->sa_restorer;
         proc->signals_handlers[sig].flags = src->sa_flags;
         proc->signals_handlers[sig].sigset = src->sa_mask;
+    }
+
+    return 0;
+}
+
+long long sys_sigaltstack(const sig_stack* stack, sig_stack* old) {
+    thread* current_thread = current_proc;
+    if(!is_safe_to_rw(current_thread, (std::uint64_t)stack, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(current_thread, (std::uint64_t)old, PAGE_SIZE))
+        return -EFAULT;
+
+    if(old) {
+        *old = current_thread->signal_stack;
+    }
+
+    if(stack) {
+        current_thread->signal_stack = *stack;
     }
 
     return 0;

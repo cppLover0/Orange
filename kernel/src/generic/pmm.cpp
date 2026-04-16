@@ -12,6 +12,8 @@ locks::spinlock pmm_lock;
 std::uint64_t* freelist_hhdm = 0;
 std::size_t memory_size = 0;
 
+std::size_t free_mem = 0;
+
 buddy_t mem;
 
 buddy_info_t* buddy_find_by_parent(buddy_info_t* blud,char split_x) {
@@ -167,12 +169,15 @@ void pmm::buddy::init() {
         }
     }
 
+    free_mem = memory_size;
+
 }
 
 int pmm::buddy::nlfree(std::uint64_t phys) {
     auto blud = buddy_find_by_phys_without_split(phys);
     if(!blud || blud->is_splitted)
         return -1;
+    free_mem += LEVEL_TO_SIZE(blud->level);
     blud->is_free = 1;
     if(blud->parent)
         merge(blud);
@@ -202,6 +207,8 @@ alloc_t pmm::buddy::nlalloc_ext(std::size_t size) {
 
         alloc_t result;
         result.real_size = LEVEL_TO_SIZE(blud->level);
+
+        free_mem -= LEVEL_TO_SIZE(blud->level);
         result.phys = blud->phys;
 
         return result;
@@ -260,6 +267,7 @@ void pmm::freelist::nlfree(std::uint64_t phys) {
 }
 
 void pmm::freelist::free(std::uint64_t phys) {
+    return;
     pmm_lock.lock();
     freelist::nlfree(phys);
     pmm_lock.unlock();

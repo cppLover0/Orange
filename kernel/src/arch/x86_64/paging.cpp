@@ -3,6 +3,7 @@
 #include <generic/bootloader/bootloader.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/pmm.hpp>
+#include <klibc/stdio.hpp>
 
 #define PTE_MASK_VALUE_5 0x000ffffffffffff000
 #define PTE_MASK_VALUE 0x000ffffffffff000
@@ -42,7 +43,7 @@ int64_t* __paging_next_level_noalloc(std::uint64_t* table, std::uint16_t idx) {
 }
 
 std::int64_t __memory_paging_getphys(std::uint64_t* table, std::uint64_t virt, int level) {
-    if (!table && (std::int64_t) table == -1)
+    if (!table || (std::int64_t) table == (std::int64_t)-1)
         return -1;
     int max_level = bootloader::bootloader->is_5_level_paging() ? 4 : 3;
     if (max_level == level) {
@@ -151,6 +152,15 @@ namespace arch {
         }
     }
 
+    [[gnu::weak]] void fill_root(std::uintptr_t root) {
+        std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
+        for (int i = 255; i < 512; i++) {
+            if(virt_rootcr3[i] == 0) {
+                virt_rootcr3[i] = pmm::freelist::alloc_4k() | PTE_PRESENT | PTE_RW;
+            } 
+        }
+    }
+    
     [[gnu::weak]] void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         std::uint64_t* virt_srccr3 = (std::uint64_t*) (src_root + etc::hhdm());

@@ -31,6 +31,8 @@
 extern std::size_t memory_size;
 extern int is_early;
 
+int k_breakpoint = 0;
+
 void scheduling_test(void* arg) {
     static locks::mutex lock;
     arch::disable_interrupts();
@@ -62,7 +64,7 @@ extern "C" void main() {
     thread* init_thread = process::create_process(true);
     init_thread->fd = (void*)(new vfs::fdmanager);
     init_thread->vmem = new vmm;
-    init_thread->vmem->root = &init_thread->original_root;
+    init_thread->vmem->root = init_thread->original_root;
 
     acpi::init_tables();
     arch::init(ARCH_INIT_EARLY);
@@ -95,6 +97,8 @@ extern "C" void main() {
     fbdev::init();
     //sysfs::dump();
 
+    time::update_unix_time();
+
     modules::init();
 
     // thread* thread = process::kthread(scheduling_test, (void*)1);
@@ -119,17 +123,17 @@ extern "C" void main() {
     assert(initfd.vnode.stat(&initfd, &initstat) == 0, "helo");
 
     char* init_buffer = (char*)(pmm::buddy::alloc(initstat.st_size).phys + etc::hhdm());
-    initfd.vnode.read(&initfd, init_buffer, initstat.st_size);
 
+    initfd.vnode.read(&initfd, init_buffer, initstat.st_size);
     assert(elf::is_valid_elf(init_thread ,init_buffer), "init is not valid elf ! (%s)", init);
 
     pmm::buddy::free((std::uint64_t)init_buffer - etc::hhdm());
 
-    char* argv[] = {0};
-    char* envp[] = {0};
+    char* argv[] = {(char*)init, 0};
+    char* envp[] = {(char*)"TERM=linux", 0};
 
     init_thread->vmem->init_root();
-    elf::exec(init_thread, init, argv, envp);
+    elf::exec(init_thread, init, argv, envp);    
 
     vfs::fdmanager* manager = (vfs::fdmanager*)init_thread->fd;
     file_descriptor* stdio = manager->createlowest(-1);
@@ -139,19 +143,16 @@ extern "C" void main() {
 
     status = vfs::open(stdio, (char*)"/dev/pts/0", false, false);
     assert(status == 0, "no tty :( %d",status);
-
     status = vfs::open(stdout, (char*)"/dev/pts/0", false, false);
     assert(status == 0, "no tty :( %d",status);
-
     status = vfs::open(stderr, (char*)"/dev/pts/0", false, false);
     assert(status == 0, "no tty :( %d",status);
-
+    
     process::wakeup(init_thread);
     mp::sync();
-
     log("main", "Boot is done");
 
-    klibc::printf("\033[H\033[2J");
+    klibc::printf("\n");
 
     arch::enable_interrupts();
     while(1) {

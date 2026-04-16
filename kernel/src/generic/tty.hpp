@@ -10,6 +10,12 @@
 #define set_pgrp 0x5410
 #define get_pgrp 21519
 
+struct vt_stat {
+    unsigned short v_active;
+    unsigned short v_signal; 
+    unsigned short v_state;  
+};
+
 namespace tty {
 
     class pipe {

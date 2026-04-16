@@ -30,6 +30,7 @@ uint64_t __elf_get_length(char** arr) {
 }
 
 bool elf::is_valid_elf(thread* proc, char* data) {
+
     if (data[0] == '#' && data[1] == '!') {
         log("a","a");
         char* path = &data[2];
@@ -69,7 +70,6 @@ bool elf::is_valid_elf(thread* proc, char* data) {
             char path[4096] = {};
             process_path(proc->chroot, proc->cwd, (char*)((uint64_t)data + current_head->p_offset), path);
             int status = vfs::open(&fd, path, true, false);
-            log("elf", "lookup interp %s %s status %d", data + current_head->p_offset, path, status);
             if (status) return false;
             if (fd.vnode.close) fd.vnode.close(&fd);
         }
@@ -128,7 +128,7 @@ elfloadresult_t elf::load_elf(thread* proc, char* data) {
     if(head->e_type != ET_DYN) {
         assert(!(proc->vmem->getlen(elf_base)),"memory 0x%p is not avaiable !",elf_base);
         elf_vmm = (void*)proc->vmem->alloc_memory(elf_base, size, true);
-        assert((std::uint64_t)elf_vmm == elf_base,"0x%p is not equal 0x%p",elf_vmm,elf_base);
+        assert((std::uint64_t)elf_vmm == elf_base,"0x%p is not equal 0x%p, elf size %lli",elf_vmm,elf_base, size);
         res.base = (uint64_t)elf_base;
     } else {
         elf_vmm = (void*)proc->vmem->alloc_memory(0, size, false);

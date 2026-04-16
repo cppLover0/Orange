@@ -34,7 +34,7 @@ public:
     vmm_obj* end = nullptr;
     std::atomic<std::uint32_t> usage_counter = 0;
 
-    std::uint64_t* root;
+    std::uint64_t root;
 
     vmm() {
         start = new vmm_obj;
@@ -48,7 +48,7 @@ public:
     }
 
     void init_root() {
-        arch::copy_higher_half(*root, gobject::kernel_root);
+        arch::copy_higher_half(root, gobject::kernel_root);
     }
 
     vmm_obj* v_alloc(std::uint64_t len) {
@@ -144,11 +144,11 @@ public:
                 break;
 
             if(!current->is_mapped && current->base != 0) {
-                paging::free_range(*this->root, current->base, current->len);
+                paging::free_range(this->root, current->base, current->len);
             } 
 
             if(current->base != 0) {
-                paging::zero_range(*this->root, current->base, current->len);
+                paging::zero_range(this->root, current->base, current->len);
             }
 
             vmm_obj* next = current->next;
@@ -156,8 +156,8 @@ public:
             current = next;
         }
 
-        arch::destroy_root(*this->root, 0);
-        pmm::freelist::free(*this->root);
+        arch::destroy_root(this->root, 0);
+        pmm::freelist::free(this->root);
 
         delete this;
         return;
@@ -177,7 +177,7 @@ public:
                 } else {
                     vmm_obj* obj = dest->v_find(current->base, current->len);
                     (void)obj;
-                    paging::duplicate_range(*dest->root, *this->root, current->base, current->len, PAGING_PRESENT | PAGING_RW | PAGING_USER);
+                    paging::duplicate_range(dest->root, this->root, current->base, current->len, PAGING_PRESENT | PAGING_RW | PAGING_USER);
                 }
             }
 
@@ -253,7 +253,7 @@ public:
         if(before == after && before != 0 && after != 0) {
 
             if(before->is_mapped) {
-                paging::zero_range(*this->root, before->base,before->len);
+                paging::zero_range(this->root, before->base,before->len);
             }
 
             vmm_obj* split = new vmm_obj;
@@ -272,7 +272,7 @@ public:
                     if(current == before && before != 0) {
                         if(before->base + before->len > base) {
                             if(before->is_mapped) {
-                                paging::zero_range(*this->root, before->base,before->len);
+                                paging::zero_range(this->root, before->base,before->len);
                                 
                             }
                             before->len -= ((before->base + before->len) - base);
@@ -281,7 +281,7 @@ public:
                         
                         if(current->base >= base && current->base < (base + len)) {
                             if(current->is_mapped) {
-                                paging::zero_range(*this->root, current->base,current->len);
+                                paging::zero_range(this->root, current->base,current->len);
                             }
                             std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
                             current->len -= sz;
@@ -301,8 +301,8 @@ public:
             }
         }
 end:
-        paging::free_range(*this->root, base, len);
-        paging::zero_range(*this->root, base, len);
+        paging::free_range(this->root, base, len);
+        paging::zero_range(this->root, base, len);
 
         arch::tlb_flush(base, len);
 
@@ -321,7 +321,7 @@ end:
             current = this->v_alloc(ALIGNUP(len, PAGE_SIZE));
         }
 
-        paging::zero_range(*this->root, current->base, current->len); // remove trash from page tables
+        paging::zero_range(this->root, current->base, current->len); // remove trash from page tables
 
         this->lock.unlock(state);
         return current->base;
@@ -341,8 +341,8 @@ end:
         current->phys = phys;
         current->flags = paging_flags;
 
-        paging::zero_range(*this->root, current->base, current->len);
-        paging::map_range(*this->root, current->phys, current->base, current->len, current->flags);
+        paging::zero_range(this->root, current->base, current->len);
+        paging::map_range(this->root, current->phys, current->base, current->len, current->flags);
 
         this->lock.unlock(state);
         return current->base;
@@ -352,10 +352,10 @@ end:
         bool is_allocated = false;
         // map_memory stuff should be already mapped so i can dont care about it 
         for(std::uint64_t i = 0;i < len; i += PAGE_SIZE) {
-            std::int64_t current_phys = arch::get_phys_from_page(*this->root, virt + i);
+            std::int64_t current_phys = arch::get_phys_from_page(this->root, virt + i);
             if(current_phys == 0 || current_phys == -1) {
                 is_allocated = true;
-                paging::map_range(*this->root, pmm::freelist::alloc_4k(), virt + i, PAGE_SIZE, PAGING_PRESENT | PAGING_RW | PAGING_USER);
+                paging::map_range(this->root, pmm::freelist::alloc_4k(), virt + i, PAGE_SIZE, PAGING_PRESENT | PAGING_RW | PAGING_USER);
             }
         }
         return is_allocated;

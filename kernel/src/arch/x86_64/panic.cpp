@@ -22,15 +22,17 @@ void print_regs(x86_64::idt::int_frame_t* ctx) {
          ctx->r12, ctx->r13, ctx->r14, ctx->r15, ctx->rbp,
          ctx->rsp, cr2, ctx->cr3, ctx->vec, ctx->err_code, ctx->cs,ctx->ss);
     klibc::printf("\n\r    Stacktrace\n\r\n\r");
-
+  
     stackframe_t* rbp = (stackframe_t*)ctx->rbp;
 
     klibc::printf("[0] - 0x%016llX (current rip)\n\r",ctx->rip);
-     for (int i = 1; i < 5 && rbp; ++i) {
-         std::uint64_t ret_addr = rbp->rip;
-         klibc::printf("[%d] - 0x%016llX\n\r", i, ret_addr);
-         rbp = (stackframe_t*)rbp->rbp;
-     }
+    for (int i = 1; i < 30 && rbp; ++i) {
+        if((std::uint64_t)rbp < etc::hhdm())
+            break;
+        std::uint64_t ret_addr = rbp->rip;
+        klibc::printf("[%d] - 0x%016llX\n\r", i, ret_addr);
+        rbp = (stackframe_t*)rbp->rbp;
+    }
 
 }
 
@@ -47,6 +49,8 @@ void x86_64::panic::print_ascii_art() {
 
 extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
 
+    arch::enable_paging(gobject::kernel_root);
+
     if(frame->cs != 0x08)
         asm volatile("swapgs");
 
@@ -62,27 +66,28 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
         if(obj != nullptr) {
             bool status = current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
-            assert(status == true, "SSDFJSDFHJSDKJVBSKDBVKSDBFKD 0x%p 0x%p %lli", cr2, ALIGNPAGEDOWN(cr2), PAGE_SIZE);
-            arch::tlb_flush(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
-            current_thread->vmem->lock.unlock(state);
+            if(status == true) {
+                arch::tlb_flush(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
+                current_thread->vmem->lock.unlock(state);
 
-            if(frame->cs & 3)
-                frame->ss |= 3;
-                                    
-            if(frame->ss & 3)
-                frame->cs |= 3;
+                if(frame->cs & 3)
+                    frame->ss |= 3;
+                                        
+                if(frame->ss & 3)
+                    frame->cs |= 3;
 
-            if(frame->cs == 0x20)
-                frame->cs |= 3;
-                                    
-            if(frame->ss == 0x18)
-                frame->ss |= 3;
+                if(frame->cs == 0x20)
+                    frame->cs |= 3;
+                                        
+                if(frame->ss == 0x18)
+                    frame->ss |= 3;
 
-            if(frame->cs != 0x08)
-                asm volatile("swapgs");
+                if(frame->cs != 0x08)
+                    asm volatile("swapgs");
 
-            process::switch_ctx(frame);
-            __builtin_unreachable();
+                process::switch_ctx(frame);
+                __builtin_unreachable();
+            }
         }
         current_thread->vmem->lock.unlock(state);
     }
@@ -91,5 +96,24 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
     locks::is_disabled = true;
     x86_64::panic::print_ascii_art();
     print_regs(frame);
+    extern int k_breakpoint;
+    klibc::printf("k_breakpoint is %d, proc is %d, cpu is %d, target_cpu %d\r\n",k_breakpoint, current_thread == nullptr ? 0 : current_thread->id, CPU_LOCAL_READ(cpu),current_thread == nullptr ? 0 : current_thread->cpu.load());
+    
+    if(current_thread) {
+        if(current_thread->vmem) {
+            klibc::printf("memory map\n");
+            vmm_obj* current = current_thread->vmem->start;
+            while(current) {
+
+                if(current == current_thread->vmem->end)
+                    break;
+
+                klibc::printf("memory 0x%p-0x%p len %lli, rip - base is 0x%p\n",current->base, current->base + current->len, current->len, frame->rip - current->base);
+
+                current = current->next;
+            }
+        }
+    }
+    
     arch::hcf();
 }

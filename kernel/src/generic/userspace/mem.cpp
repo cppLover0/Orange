@@ -10,11 +10,12 @@
 
 long long sys_brk(std::uint64_t brk) {
     (void)brk;
-    return -ENOSYS;
+    return 0;
 }
 
 long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, std::uint64_t flags, int fd, std::uint64_t off) {
     (void)prot;
+
     thread* current = current_proc;
     if(!is_safe_to_rw(current, (std::uint64_t)hint, len)) {
         return -EFAULT;
@@ -33,8 +34,6 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
     }
 
     std::uint64_t allocated = 0;
-
-    assert(!(flags & MAP_SHARED), "lmao");
 
     if(flags & MAP_FIXED) {
         allocated = current->vmem->alloc_memory(hint, len, true);
@@ -60,10 +59,11 @@ long long sys_set_tid_address(int* tidptr) {
         return -EFAULT;
     }
     current->tidptr = tidptr;
-    return 0;
+    return current->id;
 }
 
 long long sys_munmap(std::uint64_t addr, std::uint64_t len) {
+    return 0;
     thread* current = current_proc;
     if(!is_safe_to_rw(current, (std::uint64_t)addr, len + PAGE_SIZE)) {
         return -EFAULT;

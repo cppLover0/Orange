@@ -129,21 +129,24 @@ signed long sysfs_ls(file_descriptor* file, char* out, std::size_t count) {
 again:
 
     if(file->offset >= node->size) {
+        //klibc::debug_printf("%lli %lli\n", file->offset, node->size);
         file->vnode.fs->lock.unlock();
-        return 0; 
+        return current_offset; 
     }
 
     while(true) {
-        auto current_node = node->directory_content[file->offset];
-        if(sizeof(dirent) + klibc::strlen(current_node->name) + 1 > count - current_offset) {
-            file->vnode.fs->lock.unlock();
-            return current_offset; 
-        }
+        auto current_node = node->directory_content[file->offset / sizeof(tmpfs::tmpfs_node**)];
 
         file->offset += sizeof(tmpfs::tmpfs_node**);
 
         if(current_node == nullptr)
             goto again;
+
+        if(sizeof(dirent) + klibc::strlen(current_node->name) + 1 > count - current_offset) {
+            file->vnode.fs->lock.unlock();
+            klibc::debug_printf("%lli %lli\n", sizeof(dirent) + klibc::strlen(current_node->name) + 1, count - current_offset);
+            return current_offset; 
+        }
 
         dirent* current_dir = (dirent*)(out + current_offset);
         current_dir->d_ino = current_node->ino;
@@ -151,6 +154,8 @@ again:
         current_dir->d_reclen = sizeof(dirent) + klibc::strlen(current_node->name) + 1;
         current_dir->d_off = 0;
         current_offset += current_dir->d_reclen;
+
+        klibc::memcpy(current_dir->d_name, current_node->name, klibc::strlen(current_node->name) + 1);
 
     }
 

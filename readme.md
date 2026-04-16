@@ -13,7 +13,7 @@ for build do
 make run -j$(nproc) ARCH=$ARCH TOOLCHAIN=llvm
 ```
 
-for building distro you can use dnf 
+for building distro you can use debootstrap
 ```sh
 sudo debootstrap sid orange_sysroot http://deb.debian.org/debian/
 ```

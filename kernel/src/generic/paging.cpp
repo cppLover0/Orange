@@ -79,6 +79,10 @@ namespace paging {
         mapentry(kernel_root, LIMINE_MEMMAP_FRAMEBUFFER, PAGING_WC);
         mapentry(kernel_root, LIMINE_MEMMAP_EXECUTABLE_AND_MODULES, 0);
         map_kernel(kernel_root);
+
+        if(arch::fill_root) 
+            arch::fill_root(kernel_root);
+
         arch::enable_paging(kernel_root);
         arch::tlb_flush(0,0);
         klibc::printf("Paging: Enabled kernel root with %d level paging\n\r", arch::level_paging());

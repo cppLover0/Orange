@@ -44,4 +44,5 @@ namespace arch {
 
     extern void panic(char* msg);
 
+    [[gnu::weak]] void fill_root(std::uintptr_t root);
 };

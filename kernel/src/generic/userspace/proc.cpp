@@ -8,6 +8,10 @@
 #include <utils/linux.hpp>
 #include <generic/userspace/robust.hpp>
 #include <generic/userspace/safety.hpp>
+#include <generic/heap.hpp>
+#include <generic/elf.hpp>
+#include <klibc/string.hpp>
+#include <generic/time.hpp>
 
 #if defined(__x86_64__)
 #define ARCH_SET_GS                     0x1001
@@ -229,9 +233,85 @@ long long sys_getresgid(int* uid, int* euid, int* suid) {
     return 0;
 }
 
-long long sys_wait4() {
+#define WNOHANG 1
+
+long long sys_wait4(int pid, int *wstatus, int options) {
+    thread* proc = current_proc;
+
+    thread* current = process::_head_proc();
+
+    if(proc->is_debug) klibc::debug_printf("Trying to waitpid with pid %d from proc %d",pid,proc->id);
+    
+    if(pid < -1 || pid == 0)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)wstatus, 4096))
+        return -EFAULT;
+
+    int success = 0;
+
+    if(pid == -1) {
+        while (current)
+        {
+            if(current->parent_pid == proc->id && (current->status == PROCESS_ZOMBIE || current->status == PROCESS_LIVE) && current->waitpid_state != 2) {
+                current->waitpid_state = 1;
+                success = 1;
+            }
+            current = current->next;
+        }
+    } else if(pid > 0) {
+        while (current)
+        {
+            if(current->parent_pid == proc->id && (current->status == PROCESS_ZOMBIE || current->status == PROCESS_LIVE) && current->id == (std::uint32_t)pid && current->waitpid_state != 2) {
+                current->waitpid_state = 1;
+                success = 1;
+                break;
+            }
+            current = current->next;
+        }
+    }
+
+    if(!success) 
+        return -ECHILD;
+
+    proc = current_proc;
+
+    std::uint64_t stack_protect = 0xFFAACCBB11009922;
+    std::uint32_t parent_id = proc->id;
+
+    current = process::_head_proc();
     while(1) {
+        while (current)
+        {
+            if(current) {
+                if(current->parent_pid == parent_id && current->status == PROCESS_ZOMBIE && current->waitpid_state == 1 && current->id != 0) {
+                    klibc::debug_printf("%d %d x%d x \n", current_proc->id, proc->id, current->parent_pid);
+                    current->waitpid_state = 2;
+                    std::int64_t bro = (std::int64_t)(((std::uint64_t)current->exit_code) << 32) | current->id;
+                    current->status = PROCESS_KILLED;
+                    if(proc->is_debug) klibc::debug_printf("Waitpid done pid %d from proc %d",pid,proc->id);
+                    if(wstatus)  
+                        *wstatus = current->exit_code;
+                    return bro;
+                } 
+            }
+            assert(stack_protect == 0xFFAACCBB11009922, "stack fucked :(");
+            current = current->next;
+        }
+
+        if(options & WNOHANG) {
+            thread* pro = process::_head_proc();
+            while(pro) {
+                if(pro->parent_pid == parent_id && proc->waitpid_state == 1)
+                    proc->waitpid_state = 0;
+                pro = pro->next;
+            }
+            if(proc->is_debug) klibc::debug_printf("Waitpid return WNOHAND from proc %d",proc->id);
+            return 0;
+        }
+        
         process::yield();
+        current = process::_head_proc();
     }
 }
 
@@ -286,7 +366,7 @@ long long clone3_impl(void* ctx, clone_args* clarg, std::uint64_t size) {
 
     if(clarg->flags & CLONE_VFORK) {
         while(1) {
-            if(new_proc->did_exec == false)
+            if(new_proc->did_exec == true)
                 break;
             process::yield();    
         }
@@ -297,8 +377,6 @@ long long clone3_impl(void* ctx, clone_args* clarg, std::uint64_t size) {
 
 long long sys_clone3(void* ctx, clone_args* clarg, std::uint64_t size) {
     (void)size;
-
-    log("t", "type shit 0x%p 0x%p %lli", ctx, clarg, size);
 
     thread* proc = current_proc;
     if(!is_safe_to_rw(proc, (std::uint64_t)clarg, PAGE_SIZE))
@@ -328,8 +406,193 @@ long long sys_clone(void* frame, unsigned long flags, unsigned long newsp, int* 
 long long sys_exit_group(int status) {
     thread* proc = current_proc;
     proc->exit_request = 2;
-    proc->exit_code = status;
+    proc->exit_code = (status & 0xFF) << 8;
     arch::enable_paging(gobject::kernel_root);
     process::yield();
+    while(1) {process::yield();}
     __builtin_unreachable();
+}
+
+long long sys_exit(int status) {
+    thread* proc = current_proc;
+    proc->exit_request = 1;
+    proc->exit_code = (status & 0xFF) << 8;
+    arch::enable_paging(gobject::kernel_root);
+    while(1) {process::yield();}
+    __builtin_unreachable();
+}
+
+inline static long long get_array_len(char** arr) {
+    uint64_t counter = 0;
+
+    while(arr[counter]) {
+        counter++;
+        char* t = (char*)(arr[counter - 1]);
+        if(*t == '\0')
+            return counter - 1; // invalid
+    } 
+
+    return counter;
+}
+
+long long sys_execve(const char* path, char** argv, char** envp) {
+    thread* current_thread = current_proc;
+
+    if(!is_safe_to_rw(current_thread,(std::uint64_t)argv,PAGE_SIZE * 256))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(current_thread,(std::uint64_t)envp,PAGE_SIZE * 256))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(current_thread,(std::uint64_t)path,PAGE_SIZE * 256))
+        return -EFAULT;
+
+    std::uint64_t argv_len = get_array_len(argv);
+    std::uint64_t envp_len = get_array_len(envp);
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla-cxx-extension"
+    char* stack_argv[argv_len + 1];
+    klibc::memset(stack_argv, 0, sizeof(stack_argv));
+
+    char* stack_envp[envp_len + 1];
+    klibc::memset(stack_envp, 0, sizeof(stack_envp));
+#pragma clang diagnostic pop
+
+    for(std::uint64_t i = 0;i < argv_len; i++) {
+
+        char* str = argv[i];
+
+        char* new_str = (char*)kheap::malloc(klibc::strlen(str) + 1);
+
+        klibc::memcpy(new_str,str,klibc::strlen(str) + 1);
+
+        stack_argv[i] = new_str;
+
+    }
+
+    for(std::uint64_t i = 0;i < envp_len; i++) {
+
+        char* str = envp[i];
+
+        char* new_str = (char*)kheap::malloc(klibc::strlen(str) + 1);
+
+        klibc::memcpy(new_str,str,klibc::strlen(str));
+
+        stack_envp[i] = new_str;
+
+    }
+
+    char buffer1[4096] = {};
+    char buffer[4096] = {};
+    klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+    char* at = at_to_char(current_thread, AT_FDCWD);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current_proc->chroot, at, buffer1, buffer);
+
+    file_descriptor file = {};
+
+    int status = vfs::open(&file, buffer, true, false);
+
+    if(status != 0)
+        return status;
+
+    stat file_stat = {};
+
+    file.vnode.stat(&file, &file_stat);
+    if(!(file_stat.st_mode & S_IFREG) || !(file_stat.st_mode & S_IXUSR))
+        return -ENOEXEC;
+
+    char* bufferfv = (char*)(pmm::buddy::alloc(file_stat.st_size).phys + etc::hhdm());
+    file.vnode.read(&file, (char*)bufferfv, file_stat.st_size);
+
+    if(file.vnode.close)
+        file.vnode.close(&file);
+
+    bool is_valid = elf::is_valid_elf(current_thread, (char*)bufferfv);
+
+    pmm::buddy::free((std::uint64_t)bufferfv - etc::hhdm());
+    if(!is_valid) 
+        return -ENOEXEC;
+
+    current_thread->should_not_save_ctx = true;
+    current_thread->did_exec = true;
+    
+    arch::enable_paging(gobject::kernel_root);
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current_thread->fd;
+    manager->cloexec();
+
+    current_thread->vmem->free();
+
+    current_thread->original_root = pmm::freelist::alloc_4k();
+
+    current_thread->vmem = new vmm;
+    current_thread->vmem->root = current_thread->original_root;
+    current_thread->vmem->init_root();
+    current_thread->should_not_save_ctx = true;
+    
+    klibc::memset(&current_thread->ctx, 0, sizeof(current_thread->ctx));
+
+#if defined(__x86_64__)
+    bool is_user = true;
+    current_thread->ctx.ss = is_user ? (0x18 | 3) : 0;
+    current_thread->ctx.cs = is_user ? (0x20 | 3) : 0x08;
+    current_thread->ctx.rflags = (1 << 9);
+    current_thread->ctx.cr3 = current_thread->original_root;
+#endif
+
+    elf::exec(current_thread, buffer, stack_argv, stack_envp);
+
+    for(std::uint64_t i = 0;i < argv_len; i++) {
+        kheap::free(stack_argv[i]);
+    }
+
+    for(std::uint64_t i = 0;i < envp_len; i++) {
+        kheap::free(stack_envp[i]);
+    }
+
+    process::yield();
+
+    assert(0, "wtf !!?!?!?!?!?");
+    __builtin_unreachable();
+    return -ENOEXEC;
+}
+
+long long sys_gettid() {
+    return current_proc->id;
+}
+
+#define P_ALL           0
+#define P_PID           1
+#define P_PGID          2
+#define P_PIDFD         3
+
+long long sys_waitid(int which, int pid, siginfo* siginfo, int options, void* ru) {
+
+    (void)ru;
+    if(!is_safe_to_rw(current_proc, (std::uint64_t)siginfo, PAGE_SIZE))
+        return -EFAULT;
+
+    if(siginfo == nullptr)
+        return -EINVAL;
+
+    int waitpid_which = 0;
+    switch(which) {
+    case P_PID:
+        waitpid_which = pid;
+    case P_PGID:
+        waitpid_which = -pid;
+    case P_ALL:
+        waitpid_which = -1;
+    default:
+        assert(0,"waitid unimplemented which %d", which);
+    }
+
+    int res = sys_wait4(waitpid_which, &siginfo->si_code, options);
+    siginfo->si_code = (siginfo->si_code >> 8) & 0xFF;
+    return res;
 }

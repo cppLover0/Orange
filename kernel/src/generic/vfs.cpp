@@ -273,6 +273,30 @@ std::int32_t vfs::remove(char* path) {
     return status;
 }
 
+std::int32_t vfs::unlink(char* path) {
+    char out[4096];
+    klibc::memset(out,0,4096);
+
+    __vfs_symlink_resolve_no_at_symlink_follow(path, out);
+
+    node* node = find_node(out);
+
+    if(!node) { 
+        return -ENOENT; }
+    
+    char* fs_love_name = out + klibc::strlen(node->path) - 1;
+    if(!node->fs->unlink) { assert(0, "meow unlink :3");
+        return -ENOSYS; }
+
+    if(fs_love_name[0] == '\0' || klibc::strcmp(path,node->internal_path) == 0) {
+        fs_love_name[0] = '/';
+        fs_love_name[1] = '\0';
+    }
+
+    std::int32_t status = node->fs->unlink(node->fs, fs_love_name);
+    return status;
+}
+
 // will init default environment
 
 void vfs::init() {

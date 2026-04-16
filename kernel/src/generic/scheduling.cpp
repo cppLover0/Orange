@@ -17,12 +17,14 @@
 #include <arch/x86_64/cpu/sse.hpp>
 #endif
 
-#define KERNEL_STACK_SIZE (1024 * 32)
+#define KERNEL_STACK_SIZE (1024 * 128)
 
 std::atomic<void*> head_proc = nullptr;
 
 locks::preempt_spinlock scheduling_lock;
 std::uint32_t last_id = 0;
+
+std::uint32_t proc_count = 0;
 
 void scheduling_balance_cpus() {
     std::uint32_t cpu_ptr = 0;
@@ -62,6 +64,8 @@ thread* process::create_process(bool is_user) {
     new_thread->cwd[0] = '/';
     new_thread->cwd[1] = '\0';
 
+    proc_count++;
+
     bool state = scheduling_lock.lock();
     new_thread->next = (thread*)head_proc.load();
     head_proc = (void*)new_thread;
@@ -79,7 +83,16 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
     if(clarg.flags & CLONE_THREAD) {
         new_proc->pid = proc->pid;
         new_proc->pgrp = proc->pgrp;
-    }    
+    } else {
+        new_proc->pid = new_proc->id;
+        new_proc->pgrp = new_proc->id;
+    }
+
+    if(clarg.flags & CLONE_PARENT) {
+        new_proc->parent_pid = proc->parent_pid;
+    } else {
+        new_proc->parent_pid = proc->id;
+    }
 
     if(clarg.flags & CLONE_VM) {
         pmm::freelist::free(new_proc->original_root);
@@ -94,7 +107,7 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
         new_proc->ctx.cr3 = new_proc->original_root;
 #endif
         new_proc->vmem = new vmm;
-        new_proc->vmem->root = &new_proc->original_root;
+        new_proc->vmem->root = new_proc->original_root;
         proc->vmem->duplicate(new_proc->vmem);
         new_proc->vmem->init_root();
     }
@@ -111,7 +124,7 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
 #endif
 
 #if defined(__x86_64__)
-    if(clarg.stack_size > 0) {
+    if(clarg.stack) {
         new_proc->ctx.rsp = clarg.stack + clarg.stack_size;
     } 
 #endif
@@ -205,11 +218,62 @@ void process::wakeup(thread* thread) {
     thread->lock.unlock();
 }
 
+int process::futex_wake(thread* proc, int* lock, int count) {
+    thread* current = (thread*)(head_proc.load());
+    int c = 0;
+
+    if(count == 0)
+        return 0;
+
+    while(current) {
+        if(current->vmem == proc->vmem && current->futex.load() == (std::uint64_t)lock) {
+            current->futex.store(0);
+            if(current->is_debug) {
+                klibc::debug_printf("futex wake proc %d from proc %d futex 0x%p count %d c %d\n", current->id, proc->id, lock, count, c);
+            }
+            c++;
+        }
+
+        if(c == count) 
+            break;
+        current = current->next;
+    }
+    return c;
+}
+
+void process::futex_wait(thread* proc, int* lock) {
+    if(proc->is_debug) {
+        klibc::debug_printf("futex wait proc %d lock 0x%p\n", proc->id, lock);
+    }
+    proc->futex.store((std::uint64_t)lock);
+}
+
 void process::kill(thread* t, int status, bool exit_group) {
     auto exit = [status](thread* t) {
+
+        if(t->robust) {
+            arch::enable_paging(t->original_root);
+
+            robust_list* current = t->robust->list.next;
+            while(current) {
+
+                int* futex = *(int**)(current + t->robust->futex_offset);
+
+                futex_wake(t, futex, 99999999);
+
+                current = current->next;
+            
+                if((std::uint64_t)current == (std::uint64_t)t->robust)
+                    break;
+
+            }
+
+            arch::enable_paging(gobject::kernel_root);
+        }
+
         t->status = PROCESS_ZOMBIE;
         t->lock.try_lock();
-        if(t->syscall_stack) pmm::buddy::free(t->syscall_stack - etc::hhdm());
+        if(t->syscall_stack) pmm::buddy::free(t->original_syscall_stack - etc::hhdm());
         if(t->name) pmm::freelist::free((std::uint64_t)t->name - etc::hhdm());
         if(t->chroot) pmm::freelist::free((std::uint64_t)t->chroot - etc::hhdm());
         if(t->cwd) pmm::freelist::free((std::uint64_t)t->cwd - etc::hhdm());
@@ -219,9 +283,17 @@ void process::kill(thread* t, int status, bool exit_group) {
         t->chroot = 0;
         t->cwd = 0;
         t->sig = 0;
+        t->vmem->free();
+
+        t->did_exec = true;
+        vfs::fdmanager* manager = (vfs::fdmanager*)t->fd;
+        manager->kill();
+
+        proc_count--;
         t->vmem = 0;
         t->fd = 0;
         t->exit_code = status;
+
     };
     
     if(exit_group) {
@@ -245,6 +317,7 @@ void process::schedule(void* ctx) {
 #if defined(__x86_64__)
     current_thread = (thread*)CPU_LOCAL_READ(current_thread);
     current_cpu = (std::uint32_t)CPU_LOCAL_READ(cpu);
+
 #endif
 
     if(current_cpu == 0)
@@ -252,7 +325,7 @@ void process::schedule(void* ctx) {
 
     // save context
     if(current_thread) {
-        if(ctx) {
+        if(ctx && !current_thread->should_not_save_ctx) {
 #if defined(__x86_64__)
             klibc::memcpy(&current_thread->ctx, ctx, sizeof(current_thread->ctx));
             if(current_thread->sse_ctx)
@@ -260,6 +333,7 @@ void process::schedule(void* ctx) {
             current_thread->user_stack = (std::uint64_t)CPU_LOCAL_READ(user_stack);
 #endif
         }
+        current_thread->should_not_save_ctx = false;
         current_thread->lock.unlock();
         current_thread = current_thread->next;
     } else {
@@ -373,7 +447,7 @@ void process::schedule(void* ctx) {
                         arch::enable_paging(current_thread->original_root);
                         *current_thread->pending_child_settid = current_thread->id;
                         if(current_thread->is_debug) {
-                            klibc::debug_printf("setting settid 0x%p with %d\n", current_thread->pending_child_settid, current_thread->id);
+                            klibc::debug_printf("setting settid 0x%p with %d (bullshit)\n", current_thread->pending_child_settid, current_thread->id);
                         }
                         current_thread->pending_child_settid = nullptr;
                         arch::enable_paging(gobject::kernel_root);
@@ -391,4 +465,8 @@ happy:
         current_thread = (thread*)head_proc.load();
     }
 
+}
+
+thread* process::_head_proc() {
+    return (thread*)head_proc.load();
 }

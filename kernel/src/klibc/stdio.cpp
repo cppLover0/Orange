@@ -46,6 +46,12 @@ void klibc::printf(const char* fmt, ...) {
 }
 
 void klibc::debug_printf(const char* fmt, ...) {
+
+    if(current_proc) {
+        if(!current_proc->is_debug)
+            return;
+    }
+
     print_lock.lock();
     va_list val;
     va_start(val, fmt);
@@ -55,7 +61,7 @@ void klibc::debug_printf(const char* fmt, ...) {
 #if defined(__x86_64__)
     (void)len;
     char buffer2[4096] = {};
-    int len2 = klibc::__printfbuf(buffer2, 4096, "[pid %05d] %s", current_proc ? current_proc->id : -1, buffer);
+    int len2 = klibc::__printfbuf(buffer2, 4096, "[pid %05d] %s", current_proc ? current_proc->id : 11111, buffer);
 
     x86_64::serial::write_data(buffer2,len2);
 #endif

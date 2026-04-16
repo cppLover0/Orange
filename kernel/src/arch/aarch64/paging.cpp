@@ -33,7 +33,7 @@ int64_t* __paging_next_level_noalloc(std::uint64_t* table, std::uint16_t idx) {
 }
 
 std::int64_t __memory_paging_getphys(std::uint64_t* table, std::uint64_t virt, int level) {
-    if (!table && (std::int64_t) table == -1)
+    if (!table && (std::int64_t) table == (std::int64_t)-1)
         return -1;
     int max_level = bootloader::bootloader->is_5_level_paging() ? 4 : 3;
     if (max_level == level) {
