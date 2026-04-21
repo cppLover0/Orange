@@ -163,3 +163,9 @@ long long sys_sysinfo(sysinfo* out) {
     *out = info;
     return 0;
 }
+
+#include <generic/mp.hpp>
+
+long long sys_cpucount() {
+    return mp::cpu_count();
+}

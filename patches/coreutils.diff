@@ -1,0 +1,221 @@
+diff -Naur coreutils/lib/getlocalename_l-unsafe.c coreutils-clean/lib/getlocalename_l-unsafe.c
+--- coreutils/lib/getlocalename_l-unsafe.c	2026-04-05 14:27:04.000000000 +0300
++++ coreutils-clean/lib/getlocalename_l-unsafe.c	2026-04-21 16:33:28.937444645 +0300
+@@ -450,217 +450,7 @@
+ 
+   if (locale != LC_GLOBAL_LOCALE)
+     {
+-#if GNULIB_defined_locale_t
+-      struct gl_locale_category_t *plc =
+-        &locale->category[_gl_log2_lcmask_to_index (_gl_log2_lc_mask (category))];
+-      return (struct string_with_storage) { plc->name, STORAGE_OBJECT };
+-#elif __GLIBC__ >= 2 && !defined __UCLIBC__
+-      /* Work around an incorrect definition of the _NL_LOCALE_NAME macro in
+-         glibc < 2.12.
+-         See <https://sourceware.org/PR10968>.  */
+-      const char *name =
+-        nl_langinfo_l (_NL_ITEM ((category), _NL_ITEM_INDEX (-1)), locale);
+-      if (name[0] == '\0')
+-        /* Fallback code for glibc < 2.4, which did not implement
+-           nl_langinfo_l (_NL_LOCALE_NAME (category), locale).  */
+-        name = locale->__names[category];
+-      return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#elif defined __linux__ && HAVE_LANGINFO_H && defined NL_LOCALE_NAME
+-      /* musl libc */
+-      const char *name = nl_langinfo_l (NL_LOCALE_NAME (category), locale);
+-      return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#elif (defined __FreeBSD__ || defined __DragonFly__) || (defined __APPLE__ && defined __MACH__)
+-      /* FreeBSD >= 9.1, Mac OS X */
+-      int mask;
+-      switch (category)
+-        {
+-        case LC_CTYPE:
+-          mask = LC_CTYPE_MASK;
+-          break;
+-        case LC_NUMERIC:
+-          mask = LC_NUMERIC_MASK;
+-          break;
+-        case LC_TIME:
+-          mask = LC_TIME_MASK;
+-          break;
+-        case LC_COLLATE:
+-          mask = LC_COLLATE_MASK;
+-          break;
+-        case LC_MONETARY:
+-          mask = LC_MONETARY_MASK;
+-          break;
+-        case LC_MESSAGES:
+-          mask = LC_MESSAGES_MASK;
+-          break;
+-        default: /* We shouldn't get here.  */
+-          return (struct string_with_storage) { "", STORAGE_INDEFINITE };
+-        }
+-      const char *name = querylocale (mask, locale);
+-      return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#elif defined __NetBSD__
+-      /* NetBSD >= 7.0 */
+-      #define _LOCALENAME_LEN_MAX 33
+-      struct _locale {
+-        void *cache;
+-        char query[_LOCALENAME_LEN_MAX * 6];
+-        const char *part_name[7];
+-      };
+-      const char *name = ((struct _locale *) locale)->part_name[category];
+-      return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#elif defined __sun
+-# if HAVE_SOLARIS114_LOCALES
+-      /* Solaris >= 11.4.  */
+-      void *lcp = (*locale)->core.data->lcp;
+-      if (lcp != NULL)
+-        switch (category)
+-          {
+-          case LC_CTYPE:
+-          case LC_NUMERIC:
+-          case LC_TIME:
+-          case LC_COLLATE:
+-          case LC_MONETARY:
+-          case LC_MESSAGES:
+-            {
+-              const char *name = ((const char * const *) lcp)[category];
+-              return (struct string_with_storage) { name, STORAGE_OBJECT };
+-            }
+-          default: /* We shouldn't get here.  */
+-            return (struct string_with_storage) { "", STORAGE_INDEFINITE };
+-          }
+-      /* We shouldn't get here.  */
+-      return (struct string_with_storage) { "", STORAGE_INDEFINITE };
+-# else
+-      /* Solaris 11 OpenIndiana or Solaris 11 OmniOS.  */
+-#  if HAVE_GETLOCALENAME_L
+-      /* illumos after April 2025.  */
+-#   undef getlocalename_l
+-      const char *name = getlocalename_l (category, locale);
+-      return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#  else
+-      /* For the internal structure of locale objects, see
+-         https://github.com/OpenIndiana/illumos-gate/blob/master/usr/src/lib/libc/port/locale/localeimpl.h  */
+-      switch (category)
+-        {
+-        case LC_CTYPE:
+-        case LC_NUMERIC:
+-        case LC_TIME:
+-        case LC_COLLATE:
+-        case LC_MONETARY:
+-        case LC_MESSAGES:
+-          {
+-            const char *name = ((const char * const *) locale)[category];
+-            return (struct string_with_storage) { name, STORAGE_OBJECT };
+-          }
+-        default: /* We shouldn't get here.  */
+-          return (struct string_with_storage) { "", STORAGE_INDEFINITE };
+-        }
+-#  endif
+-# endif
+-#elif HAVE_NAMELESS_LOCALES
+-      /* OpenBSD >= 6.2, AIX >= 7.1 */
+-      return get_locale_t_name_unsafe (category, locale);
+-#elif defined __OpenBSD__ && HAVE_FAKE_LOCALES
+-      /* OpenBSD >= 6.2 has only fake locales.  */
+-      if (locale == (locale_t) 2)
+-        return (struct string_with_storage) { "C.UTF-8", STORAGE_INDEFINITE };
+       return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+-#elif defined __CYGWIN__
+-      /* Cygwin >= 2.6.
+-         Cygwin <= 2.6.1 lacks NL_LOCALE_NAME, requiring peeking inside
+-         an opaque struct.  */
+-# ifdef NL_LOCALE_NAME
+-      const char *name = nl_langinfo_l (NL_LOCALE_NAME (category), locale);
+-# else
+-      /* FIXME: Remove when we can assume new-enough Cygwin.  */
+-      struct __locale_t {
+-        char categories[7][32];
+-      };
+-      const char *name = ((struct __locale_t *) locale)->categories[category];
+-# endif
+-      return (struct string_with_storage) { name, STORAGE_OBJECT };
+-#elif defined __HAIKU__
+-# if HAVE_GETLOCALENAME_L
+-      /* Haiku revision hrev59293 (2026-01-07) or newer.  */
+-#  undef getlocalename_l
+-      const char *name = getlocalename_l (category, locale);
+-      if (strcmp (name, "POSIX") != 0)
+-        return (struct string_with_storage) { name, STORAGE_OBJECT };
+-      else
+-        return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+-# else
+-      /* Since 2022, Haiku has per-thread locales.  locale_t is 'void *',
+-         but in fact a 'LocaleBackendData *'.  */
+-      struct LocaleBackendData {
+-        int magic;
+-        void /*BPrivate::Libroot::LocaleBackend*/ *backend;
+-        void /*BPrivate::Libroot::LocaleDataBridge*/ *databridge;
+-      };
+-      void *locale_backend =
+-        ((struct LocaleBackendData *) locale)->backend;
+-      if (locale_backend != NULL)
+-        {
+-          /* The only existing concrete subclass of
+-             BPrivate::Libroot::LocaleBackend is
+-             BPrivate::Libroot::ICULocaleBackend.
+-             Invoke the (non-virtual) method
+-             BPrivate::Libroot::ICULocaleBackend::_QueryLocale on it.
+-             This method is located in a separate shared library,
+-             libroot-addon-icu.so.  */
+-          static void * volatile querylocale_method /* = NULL */;
+-          static int volatile querylocale_found /* = 0 */;
+-          /* Attempt to open this shared library, the first time we get
+-             here.  */
+-          if (querylocale_found == 0)
+-            {
+-              void *handle =
+-                dlopen ("/boot/system/lib/libroot-addon-icu.so", 0);
+-              if (handle != NULL)
+-                {
+-                  void *sym =
+-                    dlsym (handle, "_ZN8BPrivate7Libroot16ICULocaleBackend12_QueryLocaleEi");
+-                  if (sym != NULL)
+-                    {
+-                      querylocale_method = sym;
+-                      querylocale_found = 1;
+-                    }
+-                  else
+-                    /* Could not find the symbol.  */
+-                    querylocale_found = -1;
+-                }
+-              else
+-                /* Could not open the separate shared library.  */
+-                querylocale_found = -1;
+-            }
+-          if (querylocale_found > 0)
+-            {
+-              /* The _QueryLocale method is a non-static C++ method with
+-                 parameters (int category) and return type 'const char *'.
+-                 See
+-                   haiku/headers/private/libroot/locale/ICULocaleBackend.h
+-                   haiku/src/system/libroot/add-ons/icu/ICULocaleBackend.cpp
+-                 This is the same as a C function with parameters
+-                   (BPrivate::Libroot::LocaleBackend* this, int category)
+-                 and return type 'const char *'.  Invoke it.  */
+-              const char * (*querylocale_func) (void *, int) =
+-                (const char * (*) (void *, int)) querylocale_method;
+-              const char *name = querylocale_func (locale_backend, category);
+-              return (struct string_with_storage) { name, STORAGE_OBJECT };
+-            }
+-        }
+-      else
+-        /* It's the "C" or "POSIX" locale.  */
+-        return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+-# endif
+-#elif defined __ANDROID__
+-      /* Android API level >= 21 */
+-      struct __locale_t {
+-        size_t mb_cur_max;
+-      };
+-      const char *name = ((struct __locale_t *) locale)->mb_cur_max == 4 ? "C.UTF-8" : "C";
+-      return (struct string_with_storage) { name, STORAGE_INDEFINITE };
+-#else
+- #error "Please port gnulib getlocalename_l-unsafe.c to your platform! Report this to bug-gnulib."
+-#endif
+     }
+   else
+     {

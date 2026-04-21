@@ -1,0 +1,8 @@
+{
+    "name": "gcc-host",
+    "version": "15.1.0",
+    "deps": ["gcc-13.3.0", "mlibc", "binutils", "autoconf-host"],
+    "url": "http://mirror.dogado.de/gnu/gcc/gcc-15.1.0/gcc-15.1.0.tar.gz",
+    "should_patch": true,
+    "use_orange_prefix": true
+}

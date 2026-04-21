@@ -1,0 +1,20 @@
+diff -Naur bash/lib/intl/dcigettext.c bash-clean/lib/intl/dcigettext.c
+--- bash/lib/intl/dcigettext.c	2023-07-13 18:17:00.000000000 +0300
++++ bash-clean/lib/intl/dcigettext.c	2026-04-21 15:33:07.206727633 +0300
+@@ -137,16 +137,7 @@
+ # endif
+ # define tfind __tfind
+ #else
+-# if !defined HAVE_GETCWD
+-char *getwd ();
+-#  define getcwd(buf, max) getwd (buf)
+-# else
+-#  if VMS
+-#   define getcwd(buf, max) (getcwd) (buf, max, 0)
+-#  else
+ char *getcwd (char *, size_t);
+-#  endif
+-# endif
+ # ifndef HAVE_STPCPY
+ static char *stpcpy (char *dest, const char *src);
+ # endif

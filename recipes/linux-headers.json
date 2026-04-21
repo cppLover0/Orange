@@ -1,0 +1,8 @@
+{
+    "name": "linux-headers",
+    "version": "6.1.22",
+    "deps": [],
+    "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.1.22.tar.xz",
+    "should_patch": true,
+    "use_orange_prefix": false
+}

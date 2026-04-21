@@ -1,0 +1,8 @@
+{
+    "name": "bash",
+    "version": "5.3",
+    "deps": ["base-libs"],
+    "url": "http://mirror.dogado.de/gnu/bash/bash-5.3.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

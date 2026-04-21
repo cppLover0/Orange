@@ -1,0 +1,9 @@
+{
+    "name": "gcc-13.3.0",
+    "version": "13.3.0",
+    "deps": [],
+    "url": "http://mirror.dogado.de/gnu/gcc/gcc-13.3.0/gcc-13.3.0.tar.gz",
+    "should_patch": false,
+    "comment" : "i want this cuz EVERYTHING is fucking bugged with new gcc versions :/",
+    "use_orange_prefix": true
+}

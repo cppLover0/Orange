@@ -155,8 +155,10 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
 
     }
 
-    if(target_fd.type != file_descriptor_type::file)
-        return -EINVAL;
+    if(target_fd.type == file_descriptor_type::pipe) {
+        out->st_mode |= S_IFIFO;
+        return 0;
+    }
 
     assert(target_fd.vnode.stat, "no lol");
 
@@ -357,7 +359,7 @@ long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
         return -EBADF;
 
     if(file->type != file_descriptor_type::file)
-        return -EINVAL;
+        return -ENOTTY;
 
     if(!file->vnode.ioctl)
         return -ENOTTY;
@@ -400,6 +402,8 @@ long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
 
     process_path(current->chroot, at, buffer1, buffer);
 
+    target_fd.type = file_descriptor_type::file;
+
     int status = vfs::open(&target_fd, buffer, false, false);
     if(status != 0)
         return status;
@@ -408,7 +412,6 @@ long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
         return -EINVAL;
 
     std::int64_t ret = target_fd.vnode.read(&target_fd, buf, bufsize);
-
     if(target_fd.vnode.close)
         target_fd.vnode.close(&target_fd);
 
@@ -1094,7 +1097,48 @@ long long sys_chmod(const char* path, int mode) {
     process_path(current->chroot, at, buffer1, buffer);
 
     file_descriptor file = {};
-    
+    int res = vfs::open(&file, buffer, false, false);
+    if(res != 0)
+        return res;
+
+    if(!file.vnode.chmod)
+        return -ENOTSUP;
+
+    file.vnode.chmod(&file, mode);
+
+    return 0;
+}
+
+#define TIOCGWINSZ               0x5413
+
+long long sys_ttyname(int fd, char *buf, std::size_t size) {
+    thread* current = current_proc;
+
+    winsize wz = {};
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* file = manager->search(fd);
+
+    if(!file)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -ENOTTY;
+
+    if(!file->vnode.ioctl)
+        return -ENOTTY;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)buf, size + PAGE_SIZE))
+        return -EFAULT;
+
+    int ret = file->vnode.ioctl(file, TIOCGWINSZ, (void*)&wz);
+
+    if(ret != 0)
+        return -ENOTTY;
+
+    if((std::size_t)klibc::strlen(file->path) + 1 > size)
+        return -ERANGE;
+
+    klibc::memcpy(buf, file->path, klibc::strlen(file->path) + 1);
 
     return 0;
 }

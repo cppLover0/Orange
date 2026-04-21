@@ -70,7 +70,7 @@ bool elf::is_valid_elf(thread* proc, char* data) {
             char path[4096] = {};
             process_path(proc->chroot, proc->cwd, (char*)((uint64_t)data + current_head->p_offset), path);
             int status = vfs::open(&fd, path, true, false);
-            if (status) return false;
+            if (status) {log("elf", "no interp %s", path); return false;}
             if (fd.vnode.close) fd.vnode.close(&fd);
         }
     }

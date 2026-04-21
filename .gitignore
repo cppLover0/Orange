@@ -7,3 +7,9 @@ disk_gpt.img
 *.img
 orange_sysroot
 initrd.ustar
+/.jinx-cache
+sources
+build-x86_64
+.jinx-cache
+.orange-build
+initrd.tar.gz

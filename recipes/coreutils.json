@@ -1,0 +1,8 @@
+{
+    "name": "coreutils",
+    "version": "9.11",
+    "deps": ["base-libs"],
+    "url": "https://ftp.gnu.org/gnu/coreutils/coreutils-9.11.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

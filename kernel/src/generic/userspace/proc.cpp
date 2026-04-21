@@ -138,10 +138,6 @@ long long sys_getuid() {
     return current_proc->uid;
 }
 
-long long sys_getgid() {
-    return current_proc->gid;
-}
-
 long long sys_getcwd(char* buf, std::uint64_t len) {
     thread* current = current_proc;
     if(!is_safe_to_rw(current, (std::uint64_t)buf, PAGE_SIZE)) {
@@ -188,6 +184,21 @@ long long sys_setpgid(int pid, int pgid) {
     return 0;
 }
 
+long long sys_getpgid(int pid) {
+    thread* proc = nullptr;
+    if(pid > 0) 
+        proc = process::by_id(pid);
+    else if(pid == 0)
+        proc = current_proc;
+    else
+        return -EINVAL;
+
+    if(proc == nullptr)
+        return -ESRCH;
+
+    return proc->pgrp;
+}
+
 long long sys_getresuid(int* uid, int* euid, int* suid) {
     thread* proc = current_proc;
 
@@ -208,6 +219,10 @@ long long sys_getresuid(int* uid, int* euid, int* suid) {
     *suid = proc->uid;
         
     return 0;
+}
+
+long long sys_getgid() {
+    return current_proc->gid;
 }
 
 long long sys_getresgid(int* uid, int* euid, int* suid) {
@@ -403,6 +418,29 @@ long long sys_clone(void* frame, unsigned long flags, unsigned long newsp, int* 
     return clone3_impl(frame, &arg, sizeof(clone_args));
 }
 
+long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_stack) {
+
+    thread* current_thread = current_proc;
+
+    clone_args clarg = {};
+    clarg.flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+		| CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS;
+    clarg.stack = new_stack;
+
+    thread* new_proc = process::clone3(current_thread, clarg, frame);
+
+#if defined(__x86_64__)
+    new_proc->ctx.rax = 0;
+    new_proc->ctx.rip = new_ip;
+    new_proc->ctx.rsp = new_stack;
+#else
+#error "sh"
+#endif
+
+    process::wakeup(new_proc);
+    return new_proc->id;
+}
+
 long long sys_exit_group(int status) {
     thread* proc = current_proc;
     proc->exit_request = 2;
@@ -595,4 +633,9 @@ long long sys_waitid(int which, int pid, siginfo* siginfo, int options, void* ru
     int res = sys_wait4(waitpid_which, &siginfo->si_code, options);
     siginfo->si_code = (siginfo->si_code >> 8) & 0xFF;
     return res;
+}
+
+long long sys_yield() {
+    process::yield();
+    return 0;
 }

@@ -70,6 +70,8 @@ long long sys_getpid();
 long long sys_getppid();
 long long sys_getpgrp();
 
+long long sys_cpucount();
+long long sys_chmod(const char* path, int mode);
 long long sys_unlink_path(const char* path);
 long long sys_gettid();
 long long sys_open(const char* path, int flags, int mode);
@@ -99,7 +101,12 @@ long long sys_clone(void* frame, unsigned long flags, unsigned long newsp, int* 
 long long sys_gettimeofday(timeval* tv, void* tz);
 long long sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, std::uint64_t len);
 long long sys_sigprocaction(int sig, const sigaction* src, sigaction* old, std::uint64_t len);
+long long sys_yield();
+long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_stack);
+long long sys_getpgid(int pid);
 
+long long sys_ttyname(int fd, char *buf, size_t size);
+long long sys_getgid();
 long long sys_statx(int dfd, const char* path, int flags, std::uint32_t mask, statx* out);
 long long sys_execve(const char* path, char** argv, char** envp);
 long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts);
