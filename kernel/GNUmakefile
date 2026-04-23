@@ -100,7 +100,7 @@ override SHARED_FLAGS := \
 # Internal C/C++ preprocessor flags that should not be changed by the user.
 override CPPFLAGS_C := \
     -I src \
-    -I limine-protocol/include -I flanterm/src -I nanoprintf -I stb -I src/klibc/c -I kgz \
+    -I limine-protocol/include -I flanterm/src -I nanoprintf -I stb -I src/klibc/c \
     -isystem freestnd-c-hdrs/$(ARCH)/include \
     $(CPPFLAGS) \
     -MMD \

@@ -7,6 +7,7 @@
 #include <utils/errno.hpp>
 #include <utils/linux.hpp>
 #include <generic/userspace/robust.hpp>
+#include <utils/signal_ret.hpp>
 #include <generic/userspace/safety.hpp>
 #include <utils/random.hpp>
 #include <utils/kernel_info.hpp>
@@ -124,6 +125,9 @@ long long sys_nanosleep(int clock, int flags, timespec* rqtp, timespec* rmtp) {
     (void)clock;
     (void)flags;
     (void)rmtp;
+
+    assert(rqtp, ":(");
+
     std::uint64_t us = (rqtp->tv_nsec / 1000) + (rqtp->tv_sec * 1000000);
     thread* proc = current_proc;
     (void)proc;
@@ -135,6 +139,11 @@ long long sys_nanosleep(int clock, int flags, timespec* rqtp, timespec* rmtp) {
                 asm volatile("pause");
             } else
                 process::yield();
+
+            is_signal_ret(proc) {
+                signal_ret(proc);
+            }
+
         }
     } 
     return 0;

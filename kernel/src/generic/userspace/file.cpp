@@ -275,7 +275,7 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
     }
 
     if(current->is_debug) {
-        klibc::debug_printf("trying to write fd %d buffer 0x%p count %lli\n", fd, buffer, count);
+        klibc::debug_printf("trying to write fd %d buffer 0x%p count %lli %s\n", fd, buffer, count, buffer);
     }
 
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
@@ -773,6 +773,8 @@ long long sys_seek(int fd, long offset, int whence) {
                 return res;
 
             file->offset = statz.st_size + offset;
+            if(file->offset < 0)
+                file->offset = 0;
             break;
         }
 
@@ -780,6 +782,7 @@ long long sys_seek(int fd, long offset, int whence) {
             return -EINVAL;
     }
 
+    assert(file->offset >= 0, "wtf fd %d offset %lli whence %d", fd, offset, whence);
     return file->offset;
 }
 

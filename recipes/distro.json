@@ -1,7 +1,7 @@
 {
     "name": "distro",
     "version": "0.0.0",
-    "deps": ["base-libs", "bash", "coreutils"],
+    "deps": ["base-libs", "bash", "coreutils", "tests", "ncurses", "nano"],
     "url": "https://github.com/cppLover0/dummy/archive/refs/tags/wah.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

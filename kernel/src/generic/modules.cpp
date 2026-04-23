@@ -9,15 +9,15 @@
 #include <klibc/stdio.hpp>
 #include <klibc/string.hpp>
 
-// #define KGZ_USE_OWN_MACROS
-// #define KGZ_MALLOC(size) (void*)(pmm::buddy::alloc(size).phys + etc::hhdm())
-// #define KGZ_FREE(ptr) pmm::buddy::free((std::uint64_t)ptr - etc::hhdm())
-// #define KGZ_MEMCPY(dst, src, n) klibc::memcpy((dst), (src), (n))
-// #define KGZ_MEMSET(ptr, val, size) klibc::memset((ptr), (val), (size))
-// #define KGZ_PRINTF(...) log("kgz", __VA_ARGS__)
+#define KGZ_USE_OWN_MACROS
+#define KGZ_MALLOC(size) (void*)(pmm::buddy::alloc(size).phys + etc::hhdm()) 
+#define KGZ_FREE(ptr, sz) pmm::buddy::free((std::uint64_t)ptr - etc::hhdm())
+#define KGZ_MEMCPY(dst, src, n) klibc::memcpy((dst), (src), (n))
+#define KGZ_MEMSET(ptr, val, size) klibc::memset((ptr), (val), (size))
+#define KGZ_PRINTF(...) log("kgz", __VA_ARGS__)
 
-// #define KGZ_IMPLEMENTATION
-// #include <kgz_singleheader.h>
+#define KGZ_IMPLEMENTATION
+#include <utils/kgz_singleheader.h>
 #include <cstdint>
 
 bool is_there_initrd = false;
@@ -25,13 +25,14 @@ extern vfs::node* vfs_nodes;
 
 void process_module(char* address, std::size_t size) {
 
-    // std::size_t out_size = 0;
-    // std::size_t buffer_size = 0;
-    // char* decomp = (char*)kgz_gzip_decompress(address, size, &out_size, &buffer_size);
+    std::size_t out_size = 0;
+    std::size_t buffer_size = 0;
+    char* decomp = (char*)kgz_gzip_decompress(address, size, &out_size, &buffer_size);
 
-    // if(decomp != nullptr) {
-    //     process_module(decomp, out_size);
-    // }
+    if(decomp != nullptr) {
+        log("modules", "found .gz archive");
+        process_module(decomp, out_size);
+    }
 
     if(squashfs::is_valid((char*)address, size)) {
         squashfs::init((char*)address, size, &vfs_nodes[0]);

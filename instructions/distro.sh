@@ -25,6 +25,8 @@ install() {
     rm -rf "${dest_dir}"/usr/{,share}/{info,man,doc}
     rm -rf "${dest_dir}"/usr/lib/*.la
 
+    cp -rf "${distro_base_dir}"/* "${dest_dir}"
+
 }
 
 pkg_work

@@ -1,0 +1,8 @@
+{
+    "name": "ncurses",
+    "version": "6.5",
+    "deps": ["base-libs"],
+    "url": "https://mirror.dogado.de/gnu/ncurses/ncurses-6.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

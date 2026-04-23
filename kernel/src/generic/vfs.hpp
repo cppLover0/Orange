@@ -480,6 +480,19 @@ struct file_descriptor {
         bool is_non_block; 
         bool is_cloexec;
     } other;
+    
+    struct {
+        int socket_type;
+        int socket_specific;
+
+        bool is_listen;
+        bool is_connected;
+
+        // unix sockets specific
+        vfs::pipe* write_socket;
+        vfs::pipe* read_socket; 
+
+    } socket;
 
     struct {
         disk* target_disk;
@@ -598,6 +611,10 @@ namespace vfs {
 
 
         void kill() {
+
+            if(fd_usage_pointer == 0)
+                log("fd manager", "wtf ?");
+
             bool state = fd_lock.lock();
             fd_usage_pointer--;
             if(fd_usage_pointer > 0) {fd_lock.unlock(state); return; }

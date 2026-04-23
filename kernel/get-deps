@@ -66,11 +66,6 @@ clone_repo_commit \
     uacpi \
     e05715b2e6a3ae913aecdb86f4fd2dba30304e45
 
-clone_repo_commit \
-    https://git.sr.ht/~evalyn/kgz \
-    kgz \
-    079efb021001b634bbf65b7141d6fc214ca32ef3
-
 touch .deps-obtained
 
 printf "\nDependencies obtained successfully.\n"

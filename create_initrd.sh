@@ -1,1 +1,1 @@
-tar --format=ustar -cf baseiso/boot/initrd.ustar -C orange_sysroot .
+tar --format=ustar -czf baseiso/boot/initrd.tar.gz -C orange_sysroot .

@@ -136,6 +136,8 @@ extern "C" void main() {
     elf::exec(init_thread, init, argv, envp);    
 
     vfs::fdmanager* manager = (vfs::fdmanager*)init_thread->fd;
+
+    manager->new_usage();
     file_descriptor* stdio = manager->createlowest(-1);
     file_descriptor* stdout = manager->createlowest(-1);
     file_descriptor* stderr = manager->createlowest(-1);

@@ -58,14 +58,10 @@ __sigismember (sigset_t *set, int sig)
 }
 
 struct sigaction {
-    union {
-      void     (*sa_handler)(int);                
-      void     (*sa_sigaction)(int, void*, void *); 
-    } __sigaction_handler;                        
-
-    sigset_t   sa_mask;                           
-    int        sa_flags;                           
-    void     (*sa_restorer)(void);                  
+    void (*handler)(int);
+	unsigned long flags;
+	void (*sa_restorer)(void);
+	sigset_t sa_sigset;             
 };
 
 

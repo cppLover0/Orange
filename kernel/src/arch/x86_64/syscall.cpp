@@ -82,7 +82,10 @@ syscall_item syscall_table[] = {
     {false, 62, (void*)sys_getgid},
     {false, 63, (void*)sys_ttyname},
     {false, 64, (void*)sys_sysinfo},
-    {false, 65, (void*)sys_cpucount}
+    {false, 65, (void*)sys_cpucount},
+    {false, 66, (void*)sys_sigreturn},
+    {false, 67, (void*)sys_kill},
+    {false, 68, (void*)sys_pause}
 };
 
 syscall_item* find_syscall(long long num) {
@@ -100,6 +103,7 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
     }
 
     thread* current = current_proc;
+    current->signal_ctx = *ctx; // its used to return to userspace when there's signal 
 
     long long ret = 0;
 

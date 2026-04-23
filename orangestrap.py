@@ -155,6 +155,9 @@ def install_pkg(pkg):
     envp["build_support"] = os.path.realpath("build-support")
     envp["pkg_lib"] = os.path.realpath("build-support/pkg_lib.sh") # pkg lib is sh file with helpers
     envp["host_dest_dir"] = os.path.realpath(f".orange-build/prefix")
+    envp["tests_dir"] = os.path.realpath("tests")
+    envp["distro_base_dir"] = os.path.realpath("distro_base")
+
     if recipe_data["use_orange_prefix"] == True:
         envp["PATH"] = os.path.realpath(".orange-build/prefix/bin") + os.pathsep + os.environ.get("PATH", "")
 

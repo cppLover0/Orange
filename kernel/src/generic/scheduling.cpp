@@ -159,6 +159,7 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
         new_proc->fd = (void*)manager;
         vfs::fdmanager* src_manager = (vfs::fdmanager*)proc->fd;
         src_manager->duplicate(manager);
+        manager->fd_usage_pointer = 1;
     }
 
     if(clarg.flags & CLONE_PARENT_SETTID) {
@@ -171,6 +172,7 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
 
     assert(new_proc->ctx.cr3, "type shit");
     assert(new_proc->original_root, "type shit");
+    assert(new_proc->sig != proc->sig, "oh man");
 
     return new_proc;
 
@@ -179,8 +181,10 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
 thread* process::by_id(std::uint32_t id) {
     thread* current = (thread*)head_proc.load();
     while(current) {
-        if(current->id == id)
+        if(current->id == id) {
             return current;
+        }
+        current = current->next;
     }
     return nullptr;
 }
@@ -301,7 +305,9 @@ void process::kill(thread* t, int status, bool exit_group) {
         int target_pid = t->pid;
         while(current) {
             if(current->pid == (std::uint32_t)target_pid && (current->status == PROCESS_SLEEP || current->status == PROCESS_LIVE)) {
-                exit(current);
+                current->exit_request = 1;
+                if(current == t)
+                    exit(current);
             }
             current = current->next;
         }
@@ -331,7 +337,10 @@ void process::schedule(void* ctx) {
             if(current_thread->sse_ctx)
                 x86_64::sse::save(current_thread->sse_ctx);
             current_thread->user_stack = (std::uint64_t)CPU_LOCAL_READ(user_stack);
+#else
+#error MEOW MEOW MEOw
 #endif
+
         }
         current_thread->should_not_save_ctx = false;
         current_thread->lock.unlock();
@@ -383,6 +392,10 @@ void process::schedule(void* ctx) {
                                         current_thread->is_restore_sigset = 0;
                                     }
 
+                                    if(current_thread->is_debug) {
+                                        klibc::debug_printf("AAAA sig %d to proc %d 0x%p 0x%p\n", sig, current_thread->id, current_thread->signals_handlers[sig].handler, current_thread->signals_handlers[sig].restorer);
+                                    }
+
                                     signal_trace new_sigtrace;
 
                                     arch::enable_paging(current_thread->original_root);
@@ -390,12 +403,12 @@ void process::schedule(void* ctx) {
                                     std::uint64_t* new_stack = 0;
 
                                     if(!current_thread->sigtrace_obj) {
-                                        new_stack = (std::uint64_t*)(current_thread->alt_stack.ss_sp == 0 ? current_thread->ctx.rsp - 8 : (std::uint64_t)current_thread->alt_stack.ss_sp);
+                                        new_stack = (std::uint64_t*)(!(current_thread->signals_handlers[sig].flags & SA_ONSTACK) ? current_thread->ctx.rsp - 8 : (std::uint64_t)current_thread->alt_stack.ss_sp);
                                     } else {
                                         new_stack = (std::uint64_t*)(current_thread->ctx.rsp - 8);
                                     }
 
-                                    --new_stack;
+                                    new_stack = (std::uint64_t*)ALIGNDOWN(((std::uint64_t)new_stack - PAGE_SIZE),16);
 
                                     new_stack = (std::uint64_t*)stackmgr::memcpy((std::uint64_t)new_stack,current_thread->sse_ctx,x86_64::sse::size());
 
@@ -411,10 +424,12 @@ void process::schedule(void* ctx) {
                                     current_thread->sigtrace_obj = new_sigtrace_stack;
 
                                     --new_stack;
+
+                                    new_stack = (uint64_t*)ALIGNDOWN((uint64_t)new_stack, 16);
                                     *--new_stack = (std::uint64_t)current_thread->signals_handlers[sig].restorer;
 
-                                    // now setup new registers and stack
-
+                                    // // now setup new registers and stack
+                                    current_thread->ctx = {};
                                     current_thread->ctx.rdi = (std::uint64_t)sig;
                                     current_thread->ctx.rsi = 0;
                                     current_thread->ctx.rdx = 0;
@@ -422,7 +437,11 @@ void process::schedule(void* ctx) {
                                     current_thread->ctx.rip = (std::uint64_t)current_thread->signals_handlers[sig].handler;
                                     current_thread->ctx.cs = 0x20 | 3;
                                     current_thread->ctx.ss = 0x18 | 3;
+                                    current_thread->ctx.cr3 = current_thread->original_root;
                                     current_thread->ctx.rflags = (1 << 9);
+
+                                    arch::enable_paging(gobject::kernel_root);
+
                                 }
                             } else {
                                 kill(current_thread, 128 + SIGKILL, true);
@@ -452,6 +471,8 @@ void process::schedule(void* ctx) {
                         current_thread->pending_child_settid = nullptr;
                         arch::enable_paging(gobject::kernel_root);
                     }
+
+                    assert(current_thread->original_root == current_thread->ctx.cr3, ":(c");
 
                     return;
                 }

@@ -1,0 +1,8 @@
+{
+    "name": "nano",
+    "version": "9.0",
+    "deps": ["base-libs", "ncurses"],
+    "url": "https://mirror.dogado.de/gnu/nano/nano-9.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

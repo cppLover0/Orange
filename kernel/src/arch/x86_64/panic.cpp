@@ -16,11 +16,11 @@ void print_regs(x86_64::idt::int_frame_t* ctx) {
          "RSI: 0x%016llX  R8: 0x%016llX  R9: 0x%016llX R10: 0x%016llX R11: 0x%016llX\n\r"
          "R12: 0x%016llX R13: 0x%016llX R14: 0x%016llX R15: 0x%016llX RBP: 0x%016llX\n\r"
          "RSP: 0x%016llX CR2: 0x%016llX CR3: 0x%016llX\n\r"
-         "Vec: %d Err: %d cs: %p ss: %p\n\r",
+         "Vec: %d Err: %d cs: %p ss: %p fs_base 0x%p\n\r",
          ctx->rax, ctx->rbx, ctx->rdx, ctx->rcx, ctx->rdi,
          ctx->rsi, ctx->r8, ctx->r9, ctx->r10, ctx->r11,
          ctx->r12, ctx->r13, ctx->r14, ctx->r15, ctx->rbp,
-         ctx->rsp, cr2, ctx->cr3, ctx->vec, ctx->err_code, ctx->cs,ctx->ss);
+         ctx->rsp, cr2, ctx->cr3, ctx->vec, ctx->err_code, ctx->cs,ctx->ss, assembly::rdmsr(0xC0000100));
     klibc::printf("\n\r    Stacktrace\n\r\n\r");
   
     stackframe_t* rbp = (stackframe_t*)ctx->rbp;

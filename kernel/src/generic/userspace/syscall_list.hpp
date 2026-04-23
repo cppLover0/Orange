@@ -70,6 +70,9 @@ long long sys_getpid();
 long long sys_getppid();
 long long sys_getpgrp();
 
+long long sys_pause();
+long long sys_kill(int pid, int sig);
+long long sys_sigreturn();
 long long sys_cpucount();
 long long sys_chmod(const char* path, int mode);
 long long sys_unlink_path(const char* path);

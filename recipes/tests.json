@@ -1,0 +1,8 @@
+{
+    "name": "tests",
+    "version": "0.0.0",
+    "deps": ["base-libs"],
+    "url": "https://github.com/cppLover0/dummy/archive/refs/tags/wah.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}
