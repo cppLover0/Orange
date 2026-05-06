@@ -124,6 +124,9 @@ def download_and_extract(url, target_dir):
 
 
 def install_pkg(pkg):
+
+    os.system(f"rm -rf {sysroot}/usr/lib/*.la")
+
     recipe_data = {}
     if os.path.exists(f"recipes/{pkg}.json"):
         with open(f"recipes/{pkg}.json", 'r', encoding='utf-8') as f:
@@ -215,6 +218,21 @@ def install_pkg(pkg):
 
 if act == "build":
     install_pkg(sys.argv[3])
+
+if act == "weak_rebuild":
+    os.system(f"rm -rf .orange-build/sources/{sys.argv[3]}-workdir/.orange-build")
+
+    if "installed" not in data:
+        data["installed"] = {}
+        config_sync(data)
+
+    if sys.argv[3] in data["installed"]:
+        data["installed"][sys.argv[3]] = False
+
+    config_sync(data)
+
+    install_pkg(sys.argv[3])
+
 
 if act == "rebuild":
     os.system(f"rm -rf .orange-build/sources/{sys.argv[3]}-workdir .orange-build/builds/{sys.argv[3]}")

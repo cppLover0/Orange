@@ -1,0 +1,8 @@
+{
+    "name": "libudev-zero",
+    "version": "recent",
+    "deps": ["base-libs", "xorg-libs"],
+    "url": "git:https://github.com/illiliti/libudev-zero.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

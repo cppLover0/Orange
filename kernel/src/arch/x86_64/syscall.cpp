@@ -85,7 +85,24 @@ syscall_item syscall_table[] = {
     {false, 65, (void*)sys_cpucount},
     {false, 66, (void*)sys_sigreturn},
     {false, 67, (void*)sys_kill},
-    {false, 68, (void*)sys_pause}
+    {false, 68, (void*)sys_pause},
+    {false, 69, (void*)sys_listen},
+    {false, 70, (void*)sys_accept},
+    {false, 71, (void*)sys_socket},
+    {false, 72, (void*)sys_connect},
+    {false, 73, (void*)sys_bind},
+    {false, 74, (void*)sys_recvfrom},
+    {false, 75, (void*)sys_sendto},
+    {false, 76, (void*)sys_msg_recv},
+    {false, 77, (void*)sys_msg_send},
+    {false, 78, (void*)sys_link},
+    {false, 79, (void*)sys_linkat},
+    {false, 80, (void*)sys_getsockopt},
+    {false, 81, (void*)sys_setsockopt},
+    {false, 82, (void*)sys_libclog},
+    {false, 83, (void*)sys_ptsname},
+    {false, 84, (void*)sys_enabledebug},
+    {false, 85, (void*)sys_debugnum}
 };
 
 syscall_item* find_syscall(long long num) {
@@ -107,8 +124,8 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
 
     long long ret = 0;
 
-    if(current->is_debug)
-        klibc::debug_printf("sys %d rdi 0x%p rsi 0x%p rdx 0x%p cwd %s\n", current_sys->num, ctx->rdi, ctx->rsi, ctx->rdx, current->cwd);
+    //  if(current->is_debug)
+    //      klibc::debug_printf("sys %d rdi 0x%p rsi 0x%p rdx 0x%p cwd %s\n", current_sys->num, ctx->rdi, ctx->rsi, ctx->rdx, current->cwd);
 
     if(current_sys->is_ctx_passed) {
         auto func = (long long (*)(x86_64::idt::int_frame_t*, long long, long long, long long, long long, long long, long long))(current_sys->sys);
@@ -118,8 +135,8 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
         ret = func(ctx->rdi, ctx->rsi, ctx->rdx, ctx->r10, ctx->r8, ctx->r9);     
     }
 
-    if(current->is_debug)
-        klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);
+    // if(current->is_debug)
+    //      klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);
 
     assert(ctx->cr3 != 0, "uh nuh ");
 

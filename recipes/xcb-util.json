@@ -1,0 +1,8 @@
+{
+    "name": "xcb-util",
+    "version": "0.4.1",
+    "deps": ["base-libs", "libx11", "libxcb"],
+    "url": "https://xcb.freedesktop.org/dist/xcb-util-0.4.1.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

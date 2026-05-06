@@ -85,3 +85,42 @@ namespace utils {
     };
 
 }
+
+class list {
+private:
+    locks::spinlock lock;
+    utils::bitmap* bitmap;
+    std::uint64_t* sigs;
+public:
+    list() {
+        bitmap = new utils::bitmap(8);
+        sigs = new std::uint64_t[8];
+    }
+
+    std::int64_t pop() {
+        this->lock.lock();
+        for(int i = 0;i < 8; i++) {
+            if(this->bitmap->test(i)) {
+                std::uint64_t saved_sig = this->sigs[i];
+                this->bitmap->clear(i);
+                this->lock.unlock();
+                return (std::int64_t)saved_sig;
+            }
+        }
+        this->lock.unlock();
+        return 0;
+    }
+
+    void push(std::uint64_t sig) {
+        this->lock.lock();
+        for(int i = 0;i < 8; i++) {
+            if(!this->bitmap->test(i)) {
+                this->bitmap->set(i);
+                this->sigs[i] = sig;
+                this->lock.unlock();
+                return;
+            }
+        }
+        this->lock.unlock(); 
+    }
+};

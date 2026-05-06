@@ -1,0 +1,8 @@
+{
+    "name": "xterm",
+    "version": "410",
+    "deps": ["base-libs", "xorg-libs"],
+    "url": "https://invisible-mirror.net/archives/xterm/xterm-410.tgz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -1,0 +1,8 @@
+{
+    "name": "libpng",
+    "version": "1.6.37",
+    "deps": ["mlibc", "gcc-host", "zlib"],
+    "url": "https://downloads.sourceforge.net/libpng/libpng-1.6.37.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

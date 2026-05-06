@@ -44,6 +44,18 @@ void run_server(const char *mode) {
             n = recv(conn_fd, buffer, sizeof(buffer) - 1, 0);
         } else if (strcmp(mode, "recvfrom") == 0) {
             n = recvfrom(conn_fd, buffer, sizeof(buffer) - 1, 0, NULL, NULL);
+        } else if (strcmp(mode, "recvmsg") == 0) {
+            struct iovec iov[1];
+            struct msghdr msg;
+            
+            iov[0].iov_base = buffer;
+            iov[0].iov_len = sizeof(buffer) - 1;
+            
+            memset(&msg, 0, sizeof(msg));
+            msg.msg_iov = iov;
+            msg.msg_iovlen = 1;
+            
+            n = recvmsg(conn_fd, &msg, 0);
         }
 
         if (n <= 0) die("receive error");
@@ -59,7 +71,7 @@ void run_server(const char *mode) {
 void run_client(const char *mode) {
     int sock_fd;
     struct sockaddr_un addr;
-    const char *msg = "Hello";
+    const char *msg_text = "Hello";
 
     sleep(1);
     if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) die("socket client");
@@ -70,11 +82,23 @@ void run_client(const char *mode) {
     if (connect(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
 
     if (strcmp(mode, "write") == 0) {
-        if (write(sock_fd, msg, strlen(msg)) == -1) die("write");
+        if (write(sock_fd, msg_text, strlen(msg_text)) == -1) die("write");
     } else if (strcmp(mode, "send") == 0) {
-        if (send(sock_fd, msg, strlen(msg), 0) == -1) die("send");
+        if (send(sock_fd, msg_text, strlen(msg_text), 0) == -1) die("send");
     } else if (strcmp(mode, "sendto") == 0) {
-        if (sendto(sock_fd, msg, strlen(msg), 0, NULL, 0) == -1) die("sendto");
+        if (sendto(sock_fd, msg_text, strlen(msg_text), 0, NULL, 0) == -1) die("sendto");
+    } else if (strcmp(mode, "sendmsg") == 0) {
+        struct iovec iov[1];
+        struct msghdr msg;
+        
+        iov[0].iov_base = (void *)msg_text;
+        iov[0].iov_len = strlen(msg_text);
+        
+        memset(&msg, 0, sizeof(msg));
+        msg.msg_iov = iov;
+        msg.msg_iovlen = 1;
+        
+        if (sendmsg(sock_fd, &msg, 0) == -1) die("sendmsg");
     }
 
     close(sock_fd);
@@ -82,8 +106,8 @@ void run_client(const char *mode) {
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s <send_mode> <recv_mode>\n", argv[0]);
-        fprintf(stderr, "Send: write|send|sendto\nRecv: read|recv|recvfrom\n");
+        fprintf(stderr, "usage: %s <send_mode> <recv_mode>\n", argv[0]);
+        fprintf(stderr, "Send: write|send|sendto|sendmsg\nRecv: read|recv|recvfrom|recvmsg\n");
         return 1;
     }
 

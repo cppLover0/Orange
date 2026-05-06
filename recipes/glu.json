@@ -1,0 +1,8 @@
+{
+    "name": "glu",
+    "version": "9.0.3",
+    "deps": ["base-libs", "mesa", "xorg-libs"],
+    "url": "https://archive.mesa3d.org/glu/glu-9.0.3.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

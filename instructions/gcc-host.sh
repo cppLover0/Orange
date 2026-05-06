@@ -22,6 +22,7 @@ install() {
     make install-target-libgcc -j$(nproc) 
     make all-target-libstdc++-v3
     make install-target-libstdc++-v3 
+    cp -rf "${host_dest_dir}"/x86_64-orange-mlibc/lib/libstdc++.so* "${dest_dir}/usr/lib"
 }
 
 pkg_work

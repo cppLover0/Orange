@@ -1,0 +1,8 @@
+{
+    "name": "harfbuzz",
+    "version": "14.2.0",
+    "deps": ["base-libs", "glib-2.0", "cairo", "glib-2.0"],
+    "url": "https://codeload.github.com/harfbuzz/harfbuzz/tar.gz/refs/tags/14.2.0",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

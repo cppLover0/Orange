@@ -2,10 +2,18 @@
 trap "exit -1" USR1
 cd "${build_dir}"
 
-sysroot_path="${dest_dir}"
-export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
-export PKG_CONFIG_PATH="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig:$sysroot_path/usr/local/lib/pkgconfig:$sysroot_path/usr/local/share/pkgconfig"
+export SYSROOT="${dest_dir}"
+export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
+export PKG_CONFIG_PATH=""
+export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 export LIBTOOL=libtool
+export LLVM_CONFIG="${build_support}/cross-llvm-config"
+
+cp -rf "${build_support}/cross-llvm-config" "${host_dest_dir}/bin/llvm-config"
+chmod +x "${host_dest_dir}/bin/llvm-config"
+
+#no libtool :)
+find "${dest_dir}" -name "*.la" -delete
 
 set -e
 
@@ -17,6 +25,7 @@ pkg_work() {
 
     if [ "${action}" = "prepare" ]; then
         cd "${source_dir}"
+        touch ./*
         prepare
     fi
 
@@ -93,4 +102,54 @@ autotools_recursive_regen() {
             done
         fi
     fi
+}
+
+# i stole something from jinxfiles cuz why not
+
+meson_configure() {
+    meson_configure_noflags "$@"
+}
+
+meson_configure_noflags() {
+    if [ -z "${meson_source_dir}" ]; then
+        meson_source_dir="${source_dir}"
+    fi
+
+    meson setup "${meson_source_dir}" \
+        --cross-file "${build_support}/x86_64-orange.crossfile" \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --libdir=lib \
+        --sbindir=bin \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        "$@"
+}
+
+
+cmake_configure() {
+    cmake_configure_noflags \
+        "$@"
+}
+
+cmake_configure_noflags() {
+    if [ -z "${cmake_source_dir}" ]; then
+        cmake_source_dir="${source_dir}"
+    fi
+
+    cmake "${cmake_source_dir}" \
+        -DCMAKE_TOOLCHAIN_FILE="${build_support}/x86_64-orange.cmake" \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+        -DCMAKE_INSTALL_LOCALSTATEDIR=/var \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_INSTALL_SBINDIR=bin \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_STATIC_LIBS=OFF \
+        -DENABLE_STATIC=OFF \
+        -DCMAKE_COLOR_DIAGNOSTICS=ON \
+        -GNinja \
+        "$@"
 }

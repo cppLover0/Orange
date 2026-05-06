@@ -68,6 +68,8 @@ struct thread {
     std::uint64_t user_stack;
     std::uint64_t original_root;
     bool is_debug;
+    void* debug_file_descriptor;
+
     bool is_restore_sigset;
     int exit_request; // 1 signle exit, 2 group exit
     std::atomic<bool> did_exec;

@@ -5,7 +5,9 @@
 #include <generic/paging.hpp>
 #include <generic/arch.hpp>
 #include <utils/errno.hpp>
+#include <generic/unix_sockets.hpp>
 #include <generic/userspace/syscall_list.hpp>
+#include <generic/userspace/sockets.hpp>
 #include <generic/userspace/safety.hpp>
 #include <generic/time.hpp>
 
@@ -148,8 +150,19 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
 
         process_path(current->chroot, at, buffer1, buffer);
 
+        sockaddr_un un = {};
+        klibc::memcpy(un.sun_path, buffer, klibc::strlen(buffer) + 1);
+
+        if(unix_sockets::is_exists(&un, false)) {
+            klibc::debug_printf("socket\n");
+            unix_socket_node* node = unix_sockets::find(&un);
+            out->st_mode = node->mode | S_IFSOCK;
+            return 0;
+        }
+
+
         target_fd.type = file_descriptor_type::file;
-        int status = vfs::open(&target_fd, buffer, flags & AT_SYMLINK_NOFOLLOW ? false : true, false);
+        int status = vfs::open(&target_fd, buffer, (flags & AT_SYMLINK_NOFOLLOW) ? false : true, false);
         if(status != 0)
             return status;
 
@@ -254,6 +267,33 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
         return file->vnode.read(file, buffer, count);
     } else if(file->type == file_descriptor_type::pipe) {
         return file->fs_specific.pipe->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
+    } else if(file->type == file_descriptor_type::socket) {
+        if(file->socket.socket_type == PF_UNIX) {
+            if(file->socket.read_socket == nullptr)
+                return -ENOTCONN;
+
+            if(file->socket.socket_side == 1) {
+
+                if(current->is_debug) {
+                    klibc::debug_printf("sock c %d %d", file->socket.write_socket->socket_counter.load(), file->socket.read_socket->size.load());
+                }
+
+                if(file->socket.write_socket->socket_counter == 0 && file->socket.read_socket->size.load() == 0)
+                    return 0; 
+
+                return file->socket.read_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
+            } else {
+
+                if(current->is_debug) {
+                    klibc::debug_printf("sock c %d %d", file->socket.read_socket->socket_counter.load(), file->socket.write_socket->size.load());
+                }
+
+                if(file->socket.read_socket->socket_counter == 0 && file->socket.write_socket->size.load() == 0)
+                    return 0; 
+
+                return file->socket.write_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
+            }
+        }
     }
 
     assert(0, "unimplemented read fd %d, type %d", fd, file->type);
@@ -287,6 +327,23 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
         return file->vnode.write(file, buffer, count);
     } else if(file->type == file_descriptor_type::pipe) {
         return file->fs_specific.pipe->write(buffer, count);
+    } else if(file->type == file_descriptor_type::socket) {
+        if(file->socket.write_socket == nullptr)
+            return -ENOTCONN;
+
+        if(file->socket.socket_side == 1) {
+
+            if(file->socket.write_socket->socket_counter == 0)
+                return -EPIPE; 
+
+            return file->socket.write_socket->write(buffer, count);
+        } else {
+
+            if(file->socket.read_socket->socket_counter == 0)
+                return -EPIPE; 
+
+            return file->socket.read_socket->write(buffer, count);
+        }
     }
 
     assert(0, "unimplemented write fd %d, type %d", fd, file->type);
@@ -411,6 +468,16 @@ long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
     if(target_fd.type != file_descriptor_type::file)
         return -EINVAL;
 
+    stat ss = {};
+    target_fd.vnode.stat(&target_fd, &ss);
+
+    if(!((ss.st_mode & S_IFMT) == S_IFLNK)) {
+        if(target_fd.vnode.close)
+            target_fd.vnode.close(&target_fd);
+
+        return -EINVAL;
+    }
+
     std::int64_t ret = target_fd.vnode.read(&target_fd, buf, bufsize);
     if(target_fd.vnode.close)
         target_fd.vnode.close(&target_fd);
@@ -430,6 +497,11 @@ long long sys_dup(int fd) {
         return -EBADF;
 
     file_descriptor* new_fd = manager->createlowest(-1);
+
+    if(current->is_debug) {
+        klibc::debug_printf("doing dup from %d to %d\n", fd, new_fd->index);
+    }
+
     manager->do_dup(src, new_fd);
     return new_fd->index;
 }
@@ -440,6 +512,10 @@ long long sys_dup2(int old, int new_fd) {
     file_descriptor* src = manager->search(old);
     if(src == nullptr)
         return -EBADF;
+
+    if(current->is_debug) {
+        klibc::debug_printf("doing dup2 from %d to %d\n", old, new_fd);
+    }
 
     file_descriptor* new_fd_s = manager->try_dup2(src, new_fd);
     return new_fd_s->index;
@@ -575,7 +651,7 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
         if(current->is_debug) {
             char type[64] = {};
             poll_to_str(fds[i].events, type);
-            klibc::debug_printf("trying to poll fd %d, type %s (%d)\n", fds[i].fd, type ,fds[i].events);
+            klibc::debug_printf("trying to poll fd %d, type %s (%d), fd type %d socket_type %d, socket_specific 0x%p un_write 0x%p un_read 0x%p socket_pointer 0x%p socket_side %d\n", fds[i].fd, type ,fds[i].events, fd->type, fd->socket.socket_type, fd->socket.socket_specific, fd->socket.write_socket, fd->socket.read_socket, fd->socket.socket_pointer, fd->socket.socket_side);
         }
     }
 
@@ -593,6 +669,22 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 } else if(fd->type == file_descriptor_type::pipe) {
                     if(fd->fs_specific.pipe->size.load() != 0) 
                         ret = true;
+                } else if(fd->type == file_descriptor_type::socket && fd->socket.is_listen) {
+                    if(fd->socket.socket_type == PF_UNIX) {
+                        auto node = (unix_socket_node*)fd->socket.socket_pointer;
+                        if(node->conn_counter > 0)
+                            ret = true;
+                    }
+                } else if(fd->type == file_descriptor_type::socket && !fd->socket.is_listen) {
+                    if(fd->socket.socket_type ==  PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
+                        if(fd->socket.socket_side == 1) {
+                            if(fd->socket.read_socket->size.load() != 0)
+                                ret = true;
+                        } else {
+                            if(fd->socket.write_socket->size.load() != 0)
+                                ret = true;
+                        }
+                    }
                 }
 
                 if(ret == true) {
@@ -610,12 +702,41 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 } else if(fd->type == file_descriptor_type::pipe) {
                     if((std::uint64_t)fd->fs_specific.pipe->size.load() != fd->fs_specific.pipe->total_size) 
                         ret = true;
+                } else if(fd->type == file_descriptor_type::socket && !fd->socket.is_listen) {
+                    if(fd->socket.socket_type ==  PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
+                        if(fd->socket.socket_side == 1) {
+                            if((std::uint64_t)fd->socket.write_socket->size.load() != fd->socket.write_socket->total_size)
+                                ret = true;
+                        } else {
+                            if((std::uint64_t)fd->socket.read_socket->size.load() != fd->socket.read_socket->total_size)
+                                ret = true;
+                        }
+                    }
                 }
 
                 if(ret == true) {
                     fds[i].revents |= POLLOUT;
                     is_event = true;
                 }
+            }
+
+            bool pollhup_ret = false;
+
+            if(fd->type == file_descriptor_type::socket && !fd->socket.is_listen) {
+                if(fd->socket.socket_side == PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
+                    if(fd->socket.socket_side == 1) {
+                        if(fd->socket.write_socket->socket_counter.load() == 0)
+                            pollhup_ret = true;
+                    } else {
+                        if(fd->socket.read_socket->socket_counter.load() == 0)
+                            pollhup_ret = true;
+                    }
+                }
+            }
+
+            if(pollhup_ret) {
+                fds[i].revents |= POLLHUP;
+                is_event = true;
             }
 
             if(is_event)
@@ -789,6 +910,7 @@ long long sys_seek(int fd, long offset, int whence) {
 long long sys_writev(int fd, iovec* vecs, std::uint64_t vlen) {
     thread* current = current_proc;
     std::uint64_t total = 0;
+    klibc::debug_printf("writev fd %d vecs 0x%p vlen %lli\n", fd, vecs, vlen);
     if(!is_safe_to_rw(current, (std::uint64_t)vecs, (sizeof(iovec) * vlen) + PAGE_SIZE))
             return -EFAULT;
     for(std::uint64_t i = 0; i < vlen; i++) {
@@ -961,7 +1083,7 @@ long long sys_fchdir(int fd) {
     stat tmp_stat = {};
     file->vnode.stat(file, &tmp_stat);
 
-    if(!(tmp_stat.st_mode & S_IFDIR))
+    if((tmp_stat.st_mode & S_IFMT) != S_IFDIR)
         return -ENOTDIR;
 
     klibc::debug_printf("fchdir %s (fd %d)\n", file->path, fd);
@@ -1072,6 +1194,18 @@ long long sys_unlink(int dfd, const char* path, int flags) {
 
     process_path(current->chroot, at, buffer1, buffer);
 
+    // unix socket test
+    sockaddr_un un = {};
+    klibc::memcpy(un.sun_path, buffer, klibc::strlen(buffer) + 1);
+
+    klibc::debug_printf("trying to unlink %s\n", buffer);
+    if(unix_sockets::is_exists(&un, false)) {
+        klibc::debug_printf("socket\n");
+        unix_socket_node* node = unix_sockets::find(&un);
+        klibc::memset(&node->path, 0 , sizeof(node->path)); // todo free
+        return 0;
+    }
+
     int res = vfs::unlink(buffer);
     return res;
 }
@@ -1098,6 +1232,18 @@ long long sys_chmod(const char* path, int mode) {
         return -EBADF;
 
     process_path(current->chroot, at, buffer1, buffer);
+
+    // unix socket test
+    sockaddr_un un = {};
+    klibc::memcpy(un.sun_path, buffer, klibc::strlen(buffer) + 1);
+
+    klibc::debug_printf("trying to chmod %s with mdoe %d\n", buffer, mode);
+    if(unix_sockets::is_exists(&un, false)) {
+        klibc::debug_printf("socket\n");
+        unix_socket_node* node = unix_sockets::find(&un);
+        node->mode = mode & ~(S_IFBLK | S_IFCHR | S_IFDIR | S_IFREG | S_IFIFO);
+        return 0;
+    }
 
     file_descriptor file = {};
     int res = vfs::open(&file, buffer, false, false);
@@ -1142,6 +1288,88 @@ long long sys_ttyname(int fd, char *buf, std::size_t size) {
         return -ERANGE;
 
     klibc::memcpy(buf, file->path, klibc::strlen(file->path) + 1);
+
+    return 0;
+}
+
+// hard links are unimplemented so just convert to symlinks 
+long long sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags) {
+    (void)flags;
+
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)old_path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(old_path == nullptr)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)new_path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(new_path == nullptr)
+        return -EINVAL;
+
+    char buffer1[4096] = {};
+    char old_path1[4096] = {};
+    klibc::memcpy(buffer1, old_path, safe_strlen((char*)old_path, 4096));
+
+    char* at = at_to_char(current, olddirfd);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer1, old_path1);
+
+    char buffer12[4096] = {};
+    char new_path1[4096] = {};
+    klibc::memcpy(buffer12, new_path, safe_strlen((char*)new_path, 4096));
+
+    at = at_to_char(current, newdirfd);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer12, new_path1);
+
+    char tmp[4096] = {};
+
+    if(vfs::readlink(new_path1, tmp, 4096) != -ENOENT)
+        return -EEXIST;
+
+    if(vfs::readlink(old_path1, tmp, 4096) == ENOENT)
+        return -ENOENT;
+
+    return vfs::link(old_path1, new_path1, (flags & AT_SYMLINK_NOFOLLOW) ? false : true);
+}
+
+long long sys_link(const char *old_path, const char *new_path) {
+    return sys_linkat(AT_FDCWD, old_path, AT_FDCWD, new_path, 0);
+}  
+
+long long sys_ptsname(int fd, char *buffer, size_t length) {
+    thread* current = current_proc;
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* file = manager->search(fd);
+
+    if(!file)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -ENOTTY;
+
+    if(!file->vnode.ioctl)
+        return -ENOTTY;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)buffer, length + PAGE_SIZE))
+        return -EFAULT;
+
+    char built[4096] = {};
+    klibc::__printfbuf(built, 4096, "/dev/pts/%d", file->other.tty_num);
+    if((std::size_t)klibc::strlen(built) + 1 > length)
+        return -ERANGE;
+
+    klibc::memcpy(buffer, built, klibc::strlen(built) + 1);
 
     return 0;
 }

@@ -1,0 +1,8 @@
+{
+    "name": "libjpeg-turbo",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://github.com/libjpeg-turbo/libjpeg-turbo.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

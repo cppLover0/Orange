@@ -34,6 +34,13 @@ struct input_event {
 #define BTN_BACK		0x116
 #define BTN_TASK		0x117
 
+struct input_id {
+    uint16_t bustype;
+    uint16_t vendor; 
+    uint16_t product; 
+    uint16_t version;
+};
+
 #define EVIOC_MASK_SIZE(nr)     ((nr) & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT))
 #define EVIOCGVERSION           _IOR('E', 0x01, int)                   
 #define EVIOCGID                _IOR('E', 0x02, struct input_id)    
@@ -101,6 +108,8 @@ namespace evdev {
         bool is_root;
 
         utils::bitmap* ev_bitmap;
+        utils::bitmap* key_bitmap;
+        utils::bitmap* rel_bitmap;
         utils::ring_buffer<input_event>* main_ring;
 
         char path[64];

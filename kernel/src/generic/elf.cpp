@@ -343,6 +343,9 @@ void elf::exec(thread* proc, const char* path, char** argv, char** envp) {
     elfloadresult_t elfload = elf::load_elf(proc, file);
     pmm::buddy::free((std::uint64_t)file - etc::hhdm());
 
+    if(fd.vnode.close) 
+        fd.vnode.close(&fd);
+
     assert(elfload.status == 0, "shit fuck elf %d", elfload.status);
 
 #if defined(__x86_64__)

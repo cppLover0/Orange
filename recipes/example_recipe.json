@@ -1,0 +1,8 @@
+{
+    "name": "NAME",
+    "version": "VERSION",
+    "deps": ["base-libs"],
+    "url": "URL",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

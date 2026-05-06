@@ -15,8 +15,11 @@
 #include <drivers/xhci.hpp>
 #include <generic/lock/spinlock.hpp>
 #include <generic/tty.hpp>
+#include <generic/keyboard.hpp>
+#include <generic/mouse.hpp>
 #include <generic/fbdev.hpp>
 #include <generic/sysfs.hpp>
+#include <generic/null.hpp>
 #include <generic/modules.hpp>
 #include <utils/cmdline.hpp>
 #include <generic/elf.hpp>
@@ -79,6 +82,10 @@ extern "C" void main() {
     mp::sync();
     vfs::init();
 
+    keyboard::init();
+    mouse::init();
+    nulldev::init();
+
     random::reseed();
 
     if(!cmdline::parser->contains("noacpi")) {
@@ -129,6 +136,9 @@ extern "C" void main() {
 
     pmm::buddy::free((std::uint64_t)init_buffer - etc::hhdm());
 
+    if(initfd.vnode.close)
+        initfd.vnode.close(&initfd);
+
     char* argv[] = {(char*)init, 0};
     char* envp[] = {(char*)"TERM=linux", 0};
 
@@ -149,6 +159,10 @@ extern "C" void main() {
     assert(status == 0, "no tty :( %d",status);
     status = vfs::open(stderr, (char*)"/dev/pts/0", false, false);
     assert(status == 0, "no tty :( %d",status);
+
+    klibc::memcpy(stdio->path, "/dev/pts/0", sizeof("/dev/pts/0"));
+    klibc::memcpy(stdout->path, "/dev/pts/0", sizeof("/dev/pts/0"));
+    klibc::memcpy(stderr->path, "/dev/pts/0", sizeof("/dev/pts/0"));
     
     process::wakeup(init_thread);
     mp::sync();

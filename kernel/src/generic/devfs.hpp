@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <generic/vfs.hpp>
+#include <utils/ringbuffer.hpp>
 
 struct devfs_node {
     vfs::pipe* write_pipe;

@@ -5,11 +5,11 @@ prepare() {
 }
 
 configure() {
-    "${source_dir}"/configure --prefix="${host_dest_dir}" MAKEINFO=true
+    "${source_dir}"/configure --prefix="${host_dest_dir}" MAKEINFO=true 
 }
 
 build() {
-    make -j$(nproc)
+    make ACLOCAL=aclocal AUTOMAKE=automake -j$(nproc)
 }
 
 install() {

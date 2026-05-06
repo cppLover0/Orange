@@ -1,0 +1,12 @@
+diff -Naur gtk3/gdk/x11/gdkdevicemanager-x11.c gtk3-clean/gdk/x11/gdkdevicemanager-x11.c
+--- gtk3/gdk/x11/gdkdevicemanager-x11.c	2026-03-23 05:24:49.000000000 +0300
++++ gtk3-clean/gdk/x11/gdkdevicemanager-x11.c	2026-05-05 17:15:59.278363733 +0300
+@@ -34,7 +34,7 @@
+ GdkDeviceManager *
+ _gdk_x11_device_manager_new (GdkDisplay *display)
+ {
+-  if (!g_getenv ("GDK_CORE_DEVICE_EVENTS"))
++  if (!1)
+     {
+ #ifdef XINPUT_2
+       int opcode, firstevent, firsterror;

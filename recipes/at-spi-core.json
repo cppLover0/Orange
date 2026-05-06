@@ -1,0 +1,8 @@
+{
+    "name": "at-spi-core",
+    "version": "2.58.2",
+    "deps": ["base-libs", "xorg-libs", "dbus", "glib-2.0", "gsettings-desktop-schemas", "mesa", "libxml2"],
+    "url": "https://github.com/GNOME/at-spi2-core/archive/refs/tags/2.58.2.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

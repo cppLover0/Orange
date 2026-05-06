@@ -1,0 +1,12 @@
+diff -Naur libudev-zero/Makefile libudev-zero-clean/Makefile
+--- libudev-zero/Makefile	2026-04-27 23:17:26.070587968 +0300
++++ libudev-zero-clean/Makefile	2026-04-27 23:18:20.573187072 +0300
+@@ -1,7 +1,7 @@
+ # SPDX-License-Identifier: ISC
+ .POSIX:
+ 
+-PREFIX = /usr/local
++PREFIX = /usr
+ LIBDIR = ${PREFIX}/lib
+ INCLUDEDIR = ${PREFIX}/include
+ PKGCONFIGDIR = ${LIBDIR}/pkgconfig

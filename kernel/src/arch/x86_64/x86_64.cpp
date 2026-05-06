@@ -84,7 +84,7 @@ namespace arch {
             assert(time::timer != nullptr, "can't init orange without timer !");
             x86_64::gdt::init();
             x86_64::idt::init();
-            x86_64::lapic::init(1500);
+            x86_64::lapic::init(1000);
             drivers::ioapic::init();
             x86_64::schedule_timer::init();
             x86_64::sse::init();
@@ -99,7 +99,7 @@ namespace arch {
             }
             x86_64::gdt::init();
             x86_64::idt::init();
-            x86_64::lapic::init(1500);
+            x86_64::lapic::init(1000);
             x86_64::schedule_timer::init();
             x86_64::sse::init();
             syscall::init();

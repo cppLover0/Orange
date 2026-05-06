@@ -1,0 +1,8 @@
+{
+    "name": "automake-1.16.5-host",
+    "version": "1.16.5",
+    "deps": [],
+    "url": "https://ftp.gnu.org/gnu/automake/automake-1.16.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": false
+}

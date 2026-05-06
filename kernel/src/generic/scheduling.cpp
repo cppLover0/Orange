@@ -49,14 +49,14 @@ thread* process::create_process(bool is_user) {
 
 #if defined(__x86_64__)
     new_thread->sse_ctx = (std::uint8_t*)(pmm::buddy::alloc(x86_64::sse::size()).phys + etc::hhdm());
-    x86_64::sse::setup_headers((x86_64::sse::fpu_head_t*)new_thread->sse_ctx); // yes ik but why not 
+    x86_64::sse::setup_headers((x86_64::sse::fpu_head_t*)new_thread->sse_ctx); 
     new_thread->ctx.ss = is_user ? (0x18 | 3) : 0;
     new_thread->ctx.cs = is_user ? (0x20 | 3) : 0x08;
     new_thread->ctx.rflags = (1 << 9);
     new_thread->ctx.cr3 = new_thread->original_root;
 #endif
 
-    new_thread->is_debug = true;
+    new_thread->is_debug = false;
     new_thread->sig = new signal_manager;
     new_thread->original_syscall_stack = pmm::buddy::alloc(KERNEL_STACK_SIZE).phys;
     new_thread->syscall_stack = (std::uint64_t)(new_thread->original_syscall_stack + etc::hhdm() + (KERNEL_STACK_SIZE - PAGE_SIZE));
@@ -297,6 +297,7 @@ void process::kill(thread* t, int status, bool exit_group) {
         t->vmem = 0;
         t->fd = 0;
         t->exit_code = status;
+        t->exit_request = 0;
 
     };
     
@@ -378,7 +379,7 @@ void process::schedule(void* ctx) {
                                         case SIGTSTP:
                                         case SIGTTIN:
                                         case SIGTTOU:
-                                            log("scheduling", "unimplemented process stop sig %d proc %d", sig, current_thread->id);
+                                            klibc::debug_printf("unimplemented process stop sig %d proc %d", sig, current_thread->id);
                                             break;
                                         default: {
                                             kill(current_thread, 128 + sig, true);

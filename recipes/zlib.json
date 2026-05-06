@@ -1,0 +1,8 @@
+{
+    "name": "zlib",
+    "version": "recent",
+    "deps": ["mlibc", "gcc-host"],
+    "url": "https://zlib.net/current/zlib.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

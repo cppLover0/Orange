@@ -107,24 +107,8 @@ void ustar::load(char* archive, std::uint64_t len) {
 
                 int size = oct2bin((uint8_t*)current->file_size,klibc::strlen(current->file_size));
                 std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
-                file_descriptor fd = {};
-                vfs::create(file, vfs_file_type::file, actual_mode);
-                int status = vfs::open(&fd, file, false, false);
-                assert(status == 0, "svfddfm %d", status);
-                if(fd.vnode.write) {
-                    fd.vnode.write(&fd, (char*)((std::uint64_t)current + 512),size);
-                } else {
-                    log("ustar", "there's no write support for file %s !", file);
-                }
 
-                char buffer[256];
-                klibc::memset(buffer,0,256);
-                fd.offset = 0;
-                fd.vnode.read(&fd, buffer, 256);
-
-                if(fd.vnode.close) {
-                    fd.vnode.close(&fd);
-                }
+                tmpfs_opt_create(file, vfs_file_type::file, actual_mode, (char*)((std::uint64_t)current + 512), size, nullptr);
                 break;
             }
 
@@ -140,7 +124,7 @@ void ustar::load(char* archive, std::uint64_t len) {
                     
                 if(file[0] != '/' && file[1] != '0') {
                     std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
-                    vfs::create(file, vfs_file_type::directory, actual_mode);
+                    tmpfs_opt_create(file, vfs_file_type::directory, actual_mode, nullptr, 0, nullptr);
                 }
                 break;
             }
@@ -156,18 +140,7 @@ void ustar::load(char* archive, std::uint64_t len) {
                 }
 
                 std::uint64_t actual_mode = oct2bin((uint8_t*)current->file_mode,7);
-                file_descriptor fd = {};
-                vfs::create(file, vfs_file_type::symlink, actual_mode);
-                int status = vfs::open(&fd, file, false, false);
-                assert(status == 0, "svfddfm %d %s", status, file);
-                if(fd.vnode.write) {
-                    fd.vnode.write(&fd, current->name_linked,klibc::strlen(current->name_linked));
-                } else {
-                    log("ustar", "there's no write support for file %s !", file);
-                }
-                if(fd.vnode.close) {
-                    fd.vnode.close(&fd);
-                }
+                tmpfs_opt_create(file, vfs_file_type::symlink, actual_mode, current->name_linked, klibc::strlen(current->name_linked), nullptr);
                 break;
             }
         }

@@ -1,0 +1,8 @@
+{
+    "name": "libxrandr",
+    "version": "1.5.4",
+    "deps": ["base-libs", "libx11", "xorg-proto", "libxext", "libxrender"],
+    "url": "https://www.x.org/archive/individual/lib/libXrandr-1.5.4.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

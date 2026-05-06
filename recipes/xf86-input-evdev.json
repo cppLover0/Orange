@@ -1,0 +1,8 @@
+{
+    "name": "xf86-input-evdev",
+    "version": "2.11.0",
+    "deps": ["base-libs", "xorg-libs", "libevdev", "mtdev", "libudev-zero"],
+    "url": "https://www.x.org/archive/individual/driver/xf86-input-evdev-2.11.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

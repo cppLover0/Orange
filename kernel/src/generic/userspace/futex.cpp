@@ -33,11 +33,15 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
     case FUTEX_WAIT_BITSET:
     case FUTEX_WAIT: {
 
+        futex_lock2.lock();
+
         int v = 0;
         v = ((std::atomic<int>*)uaddr)->load();
 
-        if(v != (int)val)
+        if(v != (int)val) {
+            futex_lock2.unlock();
             return -EAGAIN;
+        }
 
         std::uint64_t t = 0;
         if(ts) {
@@ -66,7 +70,9 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
         return 0;
     };
     case FUTEX_WAKE: {
+        futex_lock2.lock();
         int c = process::futex_wake(proc, uaddr, val);
+        futex_lock2.unlock();
         return c;
     }
     default:

@@ -1,0 +1,8 @@
+{
+    "name": "libxau",
+    "version": "1.0.12",
+    "deps": ["base-libs", "xorg-macros-host"],
+    "url": "https://www.x.org/archive/individual/lib/libXau-1.0.12.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

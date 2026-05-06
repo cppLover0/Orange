@@ -1,0 +1,8 @@
+{
+    "name": "libxaw",
+    "version": "1.0.16",
+    "deps": ["base-libs", "libx11", "xorg-proto", "libxt", "libxmu", "libxpm"],
+    "url": "https://www.x.org/archive/individual/lib/libXaw-1.0.16.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

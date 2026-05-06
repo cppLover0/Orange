@@ -13,10 +13,10 @@
 #include <utils/kernel_info.hpp>
 #include <atomic>
 
-tmpfs::tmpfs_node sysfs_root_node = {};
+tmpfs::legacy_tmpfs_node sysfs_root_node = {};
 std::atomic<std::uint64_t> sysfs_id_ptr = 1;
 
-bool sysfs_find_child(tmpfs::tmpfs_node* node, char* name, tmpfs::tmpfs_node** out) {
+bool sysfs_find_child(tmpfs::legacy_tmpfs_node* node, char* name, tmpfs::legacy_tmpfs_node** out) {
     if(node->type != vfs_file_type::directory)
         return false;
 
@@ -34,11 +34,11 @@ bool sysfs_find_child(tmpfs::tmpfs_node* node, char* name, tmpfs::tmpfs_node** o
     return false;
 }
 
-tmpfs::tmpfs_node* sysfs_lookup(char* path) {
+tmpfs::legacy_tmpfs_node* sysfs_lookup(char* path) {
     if(klibc::strcmp(path,"/\0") == 0)
         return &sysfs_root_node;
     
-    tmpfs::tmpfs_node* current_node = &sysfs_root_node;
+    tmpfs::legacy_tmpfs_node* current_node = &sysfs_root_node;
 
     char path_copy[4096];
     klibc::memcpy(path_copy, path, klibc::strlen(path) + 1);
@@ -55,7 +55,7 @@ tmpfs::tmpfs_node* sysfs_lookup(char* path) {
     return current_node;
 }
 
-tmpfs::tmpfs_node* sysfs_get_parent(char* path) {
+tmpfs::legacy_tmpfs_node* sysfs_get_parent(char* path) {
     if (klibc::strcmp(path, "/") == 0 || klibc::strlen(path) == 0) {
         return nullptr;
     }
@@ -102,7 +102,7 @@ char* sysfs_get_name_from_path(char* path) {
 
 std::int32_t sysfs_readlink(filesystem* fs, char* path, char* buffer) {
     fs->lock.lock();
-    tmpfs::tmpfs_node* node = sysfs_lookup(path);
+    tmpfs::legacy_tmpfs_node* node = sysfs_lookup(path);
     if(node == nullptr) { fs->lock.unlock();
         return -ENOENT; }
  
@@ -119,7 +119,7 @@ std::int32_t sysfs_readlink(filesystem* fs, char* path, char* buffer) {
 
 signed long sysfs_ls(file_descriptor* file, char* out, std::size_t count) {
     file->vnode.fs->lock.lock();
-    auto node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
+    auto node = (tmpfs::legacy_tmpfs_node*)file->fs_specific.tmpfs_pointer;
 
     std::size_t current_offset = 0;
 
@@ -135,9 +135,9 @@ again:
     }
 
     while(true) {
-        auto current_node = node->directory_content[file->offset / sizeof(tmpfs::tmpfs_node**)];
+        auto current_node = node->directory_content[file->offset / sizeof(tmpfs::legacy_tmpfs_node**)];
 
-        file->offset += sizeof(tmpfs::tmpfs_node**);
+        file->offset += sizeof(tmpfs::legacy_tmpfs_node**);
 
         if(current_node == nullptr)
             goto again;
@@ -173,16 +173,16 @@ std::int32_t sysfs_create(filesystem* fs, char* path, vfs_file_type type, std::u
 
 std::int32_t sysfs_internal_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode) {
     fs->lock.lock();
-    tmpfs::tmpfs_node* parent = sysfs_get_parent(path);
+    tmpfs::legacy_tmpfs_node* parent = sysfs_get_parent(path);
 
     if(parent == nullptr) { fs->lock.unlock();
         return -ENOENT; }
 
-    parent->size += sizeof(tmpfs::tmpfs_node*);
+    parent->size += sizeof(tmpfs::legacy_tmpfs_node*);
 
     if(parent->physical_size < parent->size) {
-        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::tmpfs_node*));
-        tmpfs::tmpfs_node** new_dir = (tmpfs::tmpfs_node**)(res.phys + etc::hhdm());
+        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::legacy_tmpfs_node*));
+        tmpfs::legacy_tmpfs_node** new_dir = (tmpfs::legacy_tmpfs_node**)(res.phys + etc::hhdm());
         if(parent->directory_content) {
             klibc::memcpy(new_dir, parent->directory_content, parent->size);
             pmm::buddy::free((std::uint64_t)parent->directory_content - etc::hhdm());
@@ -191,14 +191,14 @@ std::int32_t sysfs_internal_create(filesystem* fs, char* path, vfs_file_type typ
         parent->physical_size = res.real_size;
     }
 
-    tmpfs::tmpfs_node* new_node = (tmpfs::tmpfs_node*)(pmm::freelist::alloc_4k() + etc::hhdm());
+    tmpfs::legacy_tmpfs_node* new_node = (tmpfs::legacy_tmpfs_node*)(pmm::freelist::alloc_4k() + etc::hhdm());
 
     new_node->type = type;
     new_node->ino = sysfs_id_ptr++;
     new_node->mode = mode;
     klibc::memcpy(new_node->name, sysfs_get_name_from_path(path), klibc::strlen(sysfs_get_name_from_path(path)) + 1);
 
-    parent->directory_content[(parent->size / sizeof(tmpfs::tmpfs_node**)) - 1] = new_node;
+    parent->directory_content[(parent->size / sizeof(tmpfs::legacy_tmpfs_node**)) - 1] = new_node;
 
     fs->lock.unlock();
     return 0;
@@ -206,7 +206,7 @@ std::int32_t sysfs_internal_create(filesystem* fs, char* path, vfs_file_type typ
 
 signed long sysfs_read(file_descriptor* file, void* buffer, std::size_t count) {
     file->vnode.fs->lock.lock();
-    tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)(file->fs_specific.tmpfs_pointer);
+    tmpfs::legacy_tmpfs_node* node = (tmpfs::legacy_tmpfs_node*)(file->fs_specific.tmpfs_pointer);
     if(node->type == vfs_file_type::directory) { file->vnode.fs->lock.unlock();
         return -EISDIR; }
     
@@ -227,7 +227,7 @@ signed long sysfs_read(file_descriptor* file, void* buffer, std::size_t count) {
 signed long sysfs_write(file_descriptor* file, void* buffer, std::size_t count) {
     assert(file->vnode.fs, "GSJGK");
     file->vnode.fs->lock.lock();
-    tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)(file->fs_specific.tmpfs_pointer);
+    tmpfs::legacy_tmpfs_node* node = (tmpfs::legacy_tmpfs_node*)(file->fs_specific.tmpfs_pointer);
 
     assert(node, "wtf!");
 
@@ -275,7 +275,7 @@ inline static std::int32_t type_to_mode(vfs_file_type type) {
 
 std::int32_t sysfs_stat(file_descriptor* file, stat* out) {
     file->vnode.fs->lock.lock();
-    tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
+    tmpfs::legacy_tmpfs_node* node = (tmpfs::legacy_tmpfs_node*)file->fs_specific.tmpfs_pointer;
     out->st_gid = 0;
     out->st_uid = 0;
     out->st_rdev = 0;
@@ -290,7 +290,7 @@ std::int32_t sysfs_stat(file_descriptor* file, stat* out) {
 
 std::int32_t sysfs_open(filesystem* fs, void* file_desc, char* path, bool is_directory) {
     fs->lock.lock();
-    tmpfs::tmpfs_node* node = sysfs_lookup(path);
+    tmpfs::legacy_tmpfs_node* node = sysfs_lookup(path);
     if(node == nullptr) { fs->lock.unlock();
         return -ENOENT; }
 
@@ -309,7 +309,7 @@ std::int32_t sysfs_open(filesystem* fs, void* file_desc, char* path, bool is_dir
     return 0;
 }
 
-void sysfs_dump_node(tmpfs::tmpfs_node* node, int depth, bool is_last) {
+void sysfs_dump_node(tmpfs::legacy_tmpfs_node* node, int depth, bool is_last) {
 
     for(int i = 0; i < depth; i++) {
         if(i == depth - 1 && !is_last)
@@ -367,7 +367,7 @@ void sysfs_dump_node(tmpfs::tmpfs_node* node, int depth, bool is_last) {
     klibc::printf("\n");
     
     if(node->type == vfs_file_type::directory && node->directory_content) {
-        std::uint64_t entry_count = node->size / sizeof(tmpfs::tmpfs_node*);
+        std::uint64_t entry_count = node->size / sizeof(tmpfs::legacy_tmpfs_node*);
         
         for(std::uint64_t i = 0; i < entry_count; i++) {
             if(node->directory_content[i] != nullptr) {
@@ -466,7 +466,7 @@ void sysfs::init(vfs::node* node) {
     klibc::memcpy(sysfs_root_node.name, "/\0", sizeof("/\0") + 1);
     klibc::memcpy(node->internal_path, "/sys", sizeof("/sys\0") + 1);
 
-    sysfs_root_node.directory_content = (tmpfs::tmpfs_node**)(root_alloc.phys + etc::hhdm());
+    sysfs_root_node.directory_content = (tmpfs::legacy_tmpfs_node**)(root_alloc.phys + etc::hhdm());
 
     create_dir("/devices");
     create_dir("/bus");

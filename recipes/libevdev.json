@@ -1,0 +1,8 @@
+{
+    "name": "libevdev",
+    "version": "1.13.6",
+    "deps": ["base-libs"],
+    "url": "https://www.freedesktop.org/software/libevdev/libevdev-1.13.6.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

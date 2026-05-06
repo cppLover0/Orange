@@ -1,0 +1,8 @@
+{
+    "name": "xcb-proto",
+    "version": "VERSION",
+    "deps": ["base-libs", "xorg-proto"],
+    "url": "https://www.x.org/archive/individual/proto/xcb-proto-1.17.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

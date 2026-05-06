@@ -11,6 +11,7 @@
 #include <atomic>
 
 std::int32_t fbdev_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
+    klibc::debug_printf("%s\n", node->path);
     fbdev::fbdev_arg* arg2 = (fbdev::fbdev_arg*)node->arg;
     switch(req) {
     case FBIOGET_VSCREENINFO:
@@ -19,8 +20,16 @@ std::int32_t fbdev_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
     case FBIOGET_FSCREENINFO:
         klibc::memcpy(arg, &arg2->fix, sizeof(arg2->fix));
         return 0;
+    case 0x4601:
+        return 0;
+    case 0x4611:
+        return 0;
+    case 0x4606:
+        return 0;
+    case 0x4605:
+        return 0;
     }
-    assert(0,"fbdev stfu");
+    assert(0,"fbdev stfu req 0x%p arg 0x%p %s", req, arg, node->path);
     return -EINVAL;
 }
 

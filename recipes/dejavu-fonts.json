@@ -1,0 +1,8 @@
+{
+    "name": "dejavu-fonts",
+    "version": "2.37",
+    "deps": ["base-libs"],
+    "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

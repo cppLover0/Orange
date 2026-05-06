@@ -1,0 +1,8 @@
+{
+    "name": "libxdmcp",
+    "version": "1.1.5",
+    "deps": ["base-libs", "libx11"],
+    "url": "https://www.x.org/archive/individual/lib/libXdmcp-1.1.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

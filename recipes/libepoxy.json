@@ -1,0 +1,8 @@
+{
+    "name": "libepoxy",
+    "version": "1.5.10",
+    "deps": ["base-libs", "xorg-libs", "mesa"],
+    "url": "https://github.com/anholt/libepoxy/archive/refs/tags/1.5.10.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

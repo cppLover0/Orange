@@ -1,0 +1,8 @@
+{
+    "name": "libxkbfile",
+    "version": "1.20",
+    "deps": ["base-libs", "libx11"],
+    "url": "https://www.x.org/archive/individual/lib/libxkbfile-1.2.0.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

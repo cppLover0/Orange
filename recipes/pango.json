@@ -1,0 +1,8 @@
+{
+    "name": "pango",
+    "version": "1.57.1",
+    "deps": ["base-libs", "cairo", "fontconfig", "xorg-libs", "fribidi", "harfbuzz"],
+    "url": "https://github.com/GNOME/pango/archive/refs/tags/1.57.1.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

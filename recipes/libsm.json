@@ -1,0 +1,8 @@
+{
+    "name": "libsm",
+    "version": "1.2.6",
+    "deps": ["base-libs", "libx11", "xorg-proto", "libice"],
+    "url": "https://www.x.org/archive/individual/lib/libSM-1.2.6.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

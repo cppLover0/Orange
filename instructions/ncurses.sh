@@ -25,8 +25,6 @@ install() {
     echo "INPUT(-lncursesw)" > "${dest_dir}/usr"/lib/libcursesw.so
     ln -sfv libncurses.so      "${dest_dir}/usr"/lib/libcurses.so
 
-    rm -rf "${dest_dir}/usr"/lib/*.a
-
 }
 
 pkg_work

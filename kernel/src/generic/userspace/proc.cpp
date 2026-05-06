@@ -378,6 +378,7 @@ long long clone3_impl(void* ctx, clone_args* clarg, std::uint64_t size) {
 #endif
     process::wakeup(new_proc);
     new_proc->is_debug = proc->is_debug;
+    new_proc->debug_file_descriptor = proc->debug_file_descriptor;
 
     if(clarg->flags & CLONE_VFORK) {
         while(1) {
@@ -485,6 +486,10 @@ long long sys_execve(const char* path, char** argv, char** envp) {
     if(!is_safe_to_rw(current_thread,(std::uint64_t)path,PAGE_SIZE * 256))
         return -EFAULT;
 
+    if(current_thread->is_debug) {
+        klibc::debug_printf("exec %s\n", path);
+    }
+
     std::uint64_t argv_len = get_array_len(argv);
     std::uint64_t envp_len = get_array_len(envp);
 
@@ -505,6 +510,10 @@ long long sys_execve(const char* path, char** argv, char** envp) {
 
         klibc::memcpy(new_str,str,klibc::strlen(str) + 1);
 
+        if(current_thread->is_debug) {
+            klibc::debug_printf("argv %s\n", str);
+        }
+
         stack_argv[i] = new_str;
 
     }
@@ -518,6 +527,10 @@ long long sys_execve(const char* path, char** argv, char** envp) {
         klibc::memcpy(new_str,str,klibc::strlen(str));
 
         stack_envp[i] = new_str;
+
+        if(current_thread->is_debug) {
+            klibc::debug_printf("envp %s\n", str);
+        }
 
     }
 
@@ -541,7 +554,7 @@ long long sys_execve(const char* path, char** argv, char** envp) {
     stat file_stat = {};
 
     file.vnode.stat(&file, &file_stat);
-    if(!(file_stat.st_mode & S_IFREG) || !(file_stat.st_mode & S_IXUSR))
+    if(!((file_stat.st_mode & S_IFMT) == S_IFREG) || !(file_stat.st_mode & S_IXUSR))
         return -ENOEXEC;
 
     char* bufferfv = (char*)(pmm::buddy::alloc(file_stat.st_size).phys + etc::hhdm());
@@ -566,6 +579,7 @@ long long sys_execve(const char* path, char** argv, char** envp) {
 
     current_thread->vmem->free();
 
+    pmm::freelist::alloc_4k();
     current_thread->original_root = pmm::freelist::alloc_4k();
 
     current_thread->vmem = new vmm;
@@ -582,6 +596,8 @@ long long sys_execve(const char* path, char** argv, char** envp) {
     current_thread->ctx.rflags = (1 << 9);
     current_thread->ctx.cr3 = current_thread->original_root;
 #endif
+
+    
 
     elf::exec(current_thread, buffer, stack_argv, stack_envp);
 
@@ -637,5 +653,33 @@ long long sys_waitid(int which, int pid, siginfo* siginfo, int options, void* ru
 
 long long sys_yield() {
     process::yield();
+    return 0;
+}
+
+#if defined(__x86_64__)
+#include <arch/x86_64/drivers/serial.hpp>
+#endif
+
+long long sys_libclog(const char* str) {
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)str, PAGE_SIZE))
+        return -EFAULT;
+    
+    if(current->is_debug) {
+        klibc::debug_printf("libc log: %s", str);
+    }
+
+    return 0;
+}
+
+long long sys_debugnum(long long num) {
+    log("debugnum", "got num %d from %d", num, current_proc->id);
+    return 0;
+}
+
+long long sys_enabledebug() {
+    current_proc->is_debug = true;
+    auto manager = (vfs::fdmanager*)current_proc->fd;
+    current_proc->debug_file_descriptor = (void*)manager->search(1);
     return 0;
 }

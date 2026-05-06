@@ -1,0 +1,8 @@
+{
+    "name": "startup-notification",
+    "version": "0.12",
+    "deps": ["base-libs", "xorg-libs"],
+    "url": "http://deb.debian.org/debian/pool/main/s/startup-notification/startup-notification_0.12.orig.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

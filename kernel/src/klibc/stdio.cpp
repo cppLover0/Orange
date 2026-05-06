@@ -45,11 +45,18 @@ void klibc::printf(const char* fmt, ...) {
     print_lock.unlock();
 }
 
+#include <generic/time.hpp>
+
+#include <generic/vfs.hpp>
+
 void klibc::debug_printf(const char* fmt, ...) {
 
-    if(current_proc) {
-        if(!current_proc->is_debug)
+    thread* cur = current_proc;
+    if(cur) {
+        if(!cur->is_debug)
             return;
+
+        
     }
 
     print_lock.lock();
@@ -61,9 +68,21 @@ void klibc::debug_printf(const char* fmt, ...) {
 #if defined(__x86_64__)
     (void)len;
     char buffer2[4096] = {};
-    int len2 = klibc::__printfbuf(buffer2, 4096, "[pid %05d] %s", current_proc ? current_proc->id : 11111, buffer);
+    int len2 = klibc::__printfbuf(buffer2, 4096, "(%lli) [pid %05d] %s", time::timer->current_nano() / 1000,  current_proc ? current_proc->id : 11111, buffer);
 
-    x86_64::serial::write_data(buffer2,len2);
+    if(cur->debug_file_descriptor) {
+        x86_64::serial::write_data(buffer2,len2);
+        file_descriptor* stdout = (file_descriptor*)cur->debug_file_descriptor;
+        if(stdout->type == file_descriptor_type::pipe) {
+            stdout->fs_specific.pipe->write(buffer2, len2);
+        } else if(stdout->type == file_descriptor_type::file) {
+            stdout->vnode.write(stdout, buffer2, len2);
+        }
+    } else {
+        x86_64::serial::write_data(buffer2,len2);
+    }
+
+    
 #endif
     va_end(val);
     print_lock.unlock();

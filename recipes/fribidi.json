@@ -1,0 +1,8 @@
+{
+    "name": "fribidi",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://github.com/fribidi/fribidi.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -1,0 +1,8 @@
+{
+    "name": "xorg-proto",
+    "version": "2025.1",
+    "deps": ["base-libs"],
+    "url": "https://www.x.org/archive/individual/proto/xorgproto-2025.1.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

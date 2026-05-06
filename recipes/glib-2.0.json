@@ -1,0 +1,8 @@
+{
+    "name": "glib-2.0",
+    "version": "2.86.5",
+    "deps": ["base-libs", "libpcre2", "libffi"],
+    "url": "https://github.com/GNOME/glib/archive/refs/tags/2.86.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

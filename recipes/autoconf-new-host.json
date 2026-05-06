@@ -1,0 +1,8 @@
+{
+    "name": "autoconf-new-host",
+    "version": "2.73",
+    "deps": [],
+    "url": "http://mirror.dogado.de/gnu/autoconf/autoconf-2.73.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": false
+}

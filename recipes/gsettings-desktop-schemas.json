@@ -1,0 +1,8 @@
+{
+    "name": "gsettings-desktop-schemas",
+    "version": "49.1",
+    "deps": ["base-libs", "xorg-libs", "glib-2.0", "dconf"],
+    "url": "https://github.com/GNOME/gsettings-desktop-schemas/archive/refs/tags/49.1.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -44,7 +44,7 @@ void nvme_submit_admin(nvme_controller* ctrl, nvme_command& cmd) {
 
     arch::memory_barrier();
 
-    uint32_t* sq_db = (uint32_t*)((uint8_t*)ctrl->bar0 + 0x1000);
+    volatile uint32_t* sq_db = (volatile uint32_t*)((uint8_t*)ctrl->bar0 + 0x1000);
     *sq_db = ctrl->admin_sq_tail;
     arch::memory_barrier();
 }
@@ -70,7 +70,7 @@ bool nvme_wait_admin(nvme_controller* ctrl, uint64_t timeout_ms) {
                 ctrl->admin_phase ^= 1;
             }
 
-            uint32_t* cq_db = (uint32_t*)((uint8_t*)ctrl->bar0 + 0x1000 + (1 * ctrl->stride));
+            volatile uint32_t* cq_db = (volatile uint32_t*)((uint8_t*)ctrl->bar0 + 0x1000 + (1 * ctrl->stride));
             *cq_db = ctrl->admin_cq_head;
             arch::memory_barrier();
 
@@ -186,7 +186,7 @@ bool nvme_identify_namespace(struct nvme_controller* ctrl, uint32_t nsid) {
     }
     ns->valid = true;
 
-    log("nvme", "detected namespace %d with lba_size %lli bytes and total size %lli bytes", nsid, ns->lba_size, ns->size * ns->lba_size);
+    klibc::printf("NVME: Detected namespace %d with lba_size %lli bytes and total size %lli bytes\r\n", nsid, ns->lba_size, ns->size * ns->lba_size);
     return true;
 }
 
@@ -438,7 +438,7 @@ bool nvme_identify(nvme_controller* ctrl) {
     char model[41];
     klibc::memcpy(model, (void*)(phys_buffer + etc::hhdm() + 24), 40);
     model[40] = '\0';
-    log("nvme", "controller Model: %s", model);
+    klibc::printf("NVME: Controller Model: %s\r\n", model);
 
     ctrl->identify = (void*)(phys_buffer + etc::hhdm());
 
@@ -505,7 +505,7 @@ void nvme_init(std::uint64_t base) {
 void nvme_pci_init(pci_t pci, std::uint8_t a, std::uint8_t b, std::uint8_t c) {
     if(pci.progIF == 2) { // nvme 
         std::uint32_t cmd = x86_64::pci::pci_read_config32(a,b,c,0x4);
-        log("nvme_pci", "bus mastering %d, memory access %d",(cmd & (1 << 2)) ? 1 : 0, (cmd & (1 << 1)) ? 1 : 0);
+        klibc::printf("NVME_PCI: Bus mastering %d, memory access %d\r\n",(cmd & (1 << 2)) ? 1 : 0, (cmd & (1 << 1)) ? 1 : 0);
         cmd |= 1 << 2;
         cmd |= 1 << 1;
         x86_64::pci::pci_write_config32(a,b,c,0x4,cmd);
@@ -515,6 +515,7 @@ void nvme_pci_init(pci_t pci, std::uint8_t a, std::uint8_t b, std::uint8_t c) {
 #endif
 
 void drivers::nvme::init() {
+    return;
     klibc::memset(nvme_controllers,0,sizeof(nvme_controllers));
 #if defined(__x86_64__)
     x86_64::pci::reg(nvme_pci_init,1,8);

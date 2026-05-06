@@ -1,0 +1,8 @@
+{
+    "name": "xcb-util-renderutil",
+    "version": "0.3.10",
+    "deps": ["base-libs", "libxcb", "xcb-util"],
+    "url": "https://www.x.org/archive/individual/lib/xcb-util-renderutil-0.3.10.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -1,0 +1,8 @@
+{
+    "name": "cairo",
+    "version": "1.18.4",
+    "deps": ["base-libs", "bash", "xorg-libs", "glib-2.0", "fontconfig", "fribidi"],
+    "url": "https://cairographics.org/releases/cairo-1.18.4.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

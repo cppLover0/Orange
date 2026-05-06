@@ -1,0 +1,8 @@
+{
+    "name": "dbus",
+    "version": "1.16.2",
+    "deps": ["base-libs", "xorg-libs", "libepoxy"],
+    "url": "https://gitlab.freedesktop.org/dbus/dbus/-/archive/dbus-1.16.2/dbus-dbus-1.16.2.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -2,8 +2,8 @@ set(CMAKE_SYSTEM_NAME Orange)
 
 set(CMAKE_FIND_ROOT_PATH /sysroot)
 
-set(CMAKE_C_COMPILER x86_64-orange-gcc)
-set(CMAKE_CXX_COMPILER x86_64-orange-g++)
+set(CMAKE_C_COMPILER x86_64-orange-mlibc-gcc)
+set(CMAKE_CXX_COMPILER x86_64-orange-mlibc-g++)
 
 # search for programs in the build host directories
 SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)

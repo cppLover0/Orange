@@ -1,0 +1,8 @@
+{
+    "name": "libiconv",
+    "version": "1.19",
+    "deps": ["mlibc", "gcc-host"],
+    "url": "https://mirror.dogado.de/gnu/libiconv/libiconv-1.19.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -1,0 +1,8 @@
+{
+    "name": "st",
+    "version": "recent",
+    "deps": ["base-libs", "xorg-libs"],
+    "url": "git:https://github.com/Shourai/st.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

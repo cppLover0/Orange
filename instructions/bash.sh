@@ -16,6 +16,7 @@ install() {
     set +e
     make install DESTDIR="${dest_dir}"
     echo if you got some error on j0 just ignore it 
+    ln -s bash "${dest_dir}"/usr/bin/sh
 }
 
 pkg_work

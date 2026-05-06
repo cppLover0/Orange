@@ -69,7 +69,9 @@ long long sys_getgid();
 long long sys_getpid();
 long long sys_getppid();
 long long sys_getpgrp();
+long long sys_enabledebug();
 
+long long sys_debugnum(long long num);
 long long sys_pause();
 long long sys_kill(int pid, int sig);
 long long sys_sigreturn();
@@ -107,7 +109,11 @@ long long sys_sigprocaction(int sig, const sigaction* src, sigaction* old, std::
 long long sys_yield();
 long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_stack);
 long long sys_getpgid(int pid);
+long long sys_getsockopt(int fd, int layer, int number, void* buffer, std::uint32_t* size); 
+long long sys_ptsname(int fd, char *buffer, size_t length);
 
+long long sys_libclog(const char* str);
+long long sys_setsockopt(int fd, int layer, int number, const void *buffer, std::uint32_t size);
 long long sys_ttyname(int fd, char *buf, size_t size);
 long long sys_getgid();
 long long sys_statx(int dfd, const char* path, int flags, std::uint32_t mask, statx* out);
@@ -136,3 +142,16 @@ long long sys_getrandom(char* buf, std::uint64_t count, std::uint32_t flags);
 long long sys_pread64(int fd, char* buffer, std::uint64_t count, std::uint64_t pos);
 long long sys_prlimit64(int pid, int res, rlimit64* new_rlimit, rlimit64* old_rlimit);
 long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, std::uint64_t flags, int fd, std::uint64_t off);
+
+long long sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags);
+long long sys_link(const char *old_path, const char *new_path);
+
+long long sys_msg_recv(int fd, struct msghdr *hdr, int flags);
+long long sys_msg_send(int fd, struct msghdr* hdr, int flags);
+long long sys_recvfrom(int fd, void *buffer, size_t size, int flags, struct sockaddr *sock_addr, std::uint32_t *addr_length);
+long long sys_sendto(int fd, const void *buffer, size_t size, int flags, const struct sockaddr *sock_addr, std::uint32_t addr_length);
+long long sys_listen(int fd, int backlog);
+long long sys_socket(int family, int type, int protocol);
+long long sys_bind(int fd, const struct sockaddr *addr_ptr, std::uint32_t addr_length);
+long long sys_connect(int fd, const struct sockaddr *addr_ptr, std::uint32_t addr_length);
+long long sys_accept(int fd, struct sockaddr *addr_ptr, std::uint32_t *addr_length, int flags);

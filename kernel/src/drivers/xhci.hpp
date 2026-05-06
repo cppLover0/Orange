@@ -1,15 +1,9 @@
 #include <cstdint>
+#include <generic/mouse.hpp>
 
 #pragma once
 
 #define XHCI_RESET_TIMEOUT 1000
-
-typedef struct {
-    unsigned char buttons;
-    unsigned char x;
-    unsigned char y;
-    unsigned char z;
-} __attribute__((packed)) mouse_packet_t;
 
 typedef struct {
     uint32_t maxslots : 8;
@@ -454,6 +448,7 @@ typedef struct xhci_interface {
     uint8_t type;
     void* data;
 
+    std::uint64_t intersubclass;
     uint64_t len;
     void* buffer;
     

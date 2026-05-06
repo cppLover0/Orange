@@ -3,6 +3,7 @@
 #include <generic/bootloader/bootloader.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/pmm.hpp>
+#include <arch/x86_64/cpu_local.hpp>
 #include <klibc/stdio.hpp>
 
 #define PTE_MASK_VALUE_5 0x000ffffffffffff000
@@ -154,7 +155,7 @@ namespace arch {
 
     [[gnu::weak]] void fill_root(std::uintptr_t root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
-        for (int i = 255; i < 512; i++) {
+        for (int i = 256; i < 512; i++) {
             if(virt_rootcr3[i] == 0) {
                 virt_rootcr3[i] = pmm::freelist::alloc_4k() | PTE_PRESENT | PTE_RW;
             } 
@@ -164,7 +165,7 @@ namespace arch {
     [[gnu::weak]] void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         std::uint64_t* virt_srccr3 = (std::uint64_t*) (src_root + etc::hhdm());
-        for (int i = 255; i < 512; i++) {
+        for (int i = 256; i < 512; i++) {
             virt_rootcr3[i] = virt_srccr3[i];
         }
     }

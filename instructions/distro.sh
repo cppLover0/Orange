@@ -27,6 +27,15 @@ install() {
 
     cp -rf "${distro_base_dir}"/* "${dest_dir}"
 
+    mkdir -p "${dest_dir}/tmp"
+    echo keep > "${dest_dir}"/tmp/.keep
+
+    mkdir -p "${dest_dir}/var/log"
+    echo keep > "${dest_dir}"/var/log/.keep
+
+    mkdir -p "${dest_dir}/etc/fonts"
+    echo keep > "${dest_dir}"/var/log/.keep
+
 }
 
 pkg_work

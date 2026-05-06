@@ -1,6 +1,13 @@
 #pragma once
 
 #include <utils/linux.hpp>
+#include <cstdint>
+
+struct sockaddr {
+	unsigned short sa_family;	/* address family, AF_xxx	*/
+	char		sa_data[14];	/* 14 bytes of protocol address	*/
+};
+
 
 struct msghdr {
 	void *msg_name;
@@ -44,6 +51,44 @@ struct cmsghdr {
 #define SCM_RIGHTS 1
 
 #define SCM_CREDENTIALS 2
+
+#define SCM_CREDENTIALS 2
+
+struct ucred {
+    int pid;  
+    int uid;    
+    int gid;  
+};
+
+#define __CMSG_ALIGN(s) (((s) + __alignof__(std::size_t) - 1) & \
+		~(__alignof__(std::size_t) - 1))
+
+#if defined(_DEFAULT_SOURCE)
+#define CMSG_ALIGN(s) __CMSG_ALIGN(s)
+#endif /* defined(_DEFAULT_SOURCE) */
+
+/* Basic macros to return content and padding size of a control message. */
+#define CMSG_LEN(s) (__CMSG_ALIGN(sizeof(struct cmsghdr)) + (s))
+#define CMSG_SPACE(s) (__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(s))
+
+/* Provides access to the data of a control message. */
+#define CMSG_DATA(c) ((unsigned char *)(c) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
+
+#define __MLIBC_CMSG_NEXT(c) ((char *)(c) + __CMSG_ALIGN((c)->cmsg_len))
+#define __MLIBC_MHDR_LIMIT(m) ((char *)(m)->msg_control + (m)->msg_controllen)
+
+/* For parsing control messages only. */
+/* Returns a pointer to the first header or nullptr if there is none. */
+#define CMSG_FIRSTHDR(m) ((size_t)(m)->msg_controllen <= sizeof(struct cmsghdr) \
+	? (struct cmsghdr *)0 : (struct cmsghdr *) (m)->msg_control)
+
+/* For parsing control messages only. */
+/* Returns a pointer to the next header or nullptr if there is none. */
+#define CMSG_NXTHDR(m, c) \
+	((c)->cmsg_len < sizeof(struct cmsghdr) || \
+		(std::int64_t)(sizeof(struct cmsghdr) + __CMSG_ALIGN((c)->cmsg_len)) \
+			>= __MLIBC_MHDR_LIMIT(m) - (char *)(c) \
+	? (struct cmsghdr *)0 : (struct cmsghdr *)__MLIBC_CMSG_NEXT(c))
 
 #define SHUT_RD 0
 #define SHUT_WR 1

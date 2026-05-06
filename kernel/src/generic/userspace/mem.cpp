@@ -35,20 +35,49 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
 
     std::uint64_t allocated = 0;
 
-    if(flags & MAP_FIXED) {
-        allocated = current->vmem->alloc_memory(hint, len, true);
-    } else {
-        allocated = current->vmem->alloc_memory(0, len, false);
+    if(flags & MAP_ANONYMOUS) {
+
+        if(flags & MAP_FIXED) {
+            allocated = current->vmem->alloc_memory(hint, len, true);
+        } else {
+            allocated = current->vmem->alloc_memory(0, len, false);
+        }
+
+        arch::tlb_flush(allocated, len);
     }
 
-    arch::tlb_flush(allocated, len);
-
     if(!(flags & MAP_ANONYMOUS)) {
+        if(file->vnode.mmap != nullptr) {
+            std::uint64_t phys, size = 0;
+            int status = file->vnode.mmap(file, &phys, &size);
+            if(status == 0) {
+                if(flags & MAP_FIXED) {
+                    allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, true);
+                } else {
+                    allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, false);
+                }
+
+                arch::tlb_flush(allocated, size);
+
+                goto end;
+            }
+        }
+
+        if(flags & MAP_FIXED) {
+            allocated = current->vmem->alloc_memory(hint, len, true);
+        } else {
+            allocated = current->vmem->alloc_memory(0, len, false);
+        }
+
+        arch::tlb_flush(allocated, len);
+
         std::uint64_t old = file->offset;
         file->offset = off;
         file->vnode.read(file, (void*)allocated, len);
         file->offset = old;
     }
+
+end:
 
     return allocated;
 }
@@ -63,7 +92,6 @@ long long sys_set_tid_address(int* tidptr) {
 }
 
 long long sys_munmap(std::uint64_t addr, std::uint64_t len) {
-    return 0;
     thread* current = current_proc;
     if(!is_safe_to_rw(current, (std::uint64_t)addr, len + PAGE_SIZE)) {
         return -EFAULT;

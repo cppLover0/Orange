@@ -286,6 +286,7 @@ public:
                             std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
                             current->len -= sz;
                             current->base += sz;
+                            
                             if(current->len == 0) {
                                 prev->next = current->next;
                                 delete current;

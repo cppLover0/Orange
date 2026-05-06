@@ -1,0 +1,8 @@
+{
+    "name": "libxtst",
+    "version": "1.2.5",
+    "deps": ["base-libs", "libx11", "libxext", "xorg-proto", "libxi"],
+    "url": "https://www.x.org/archive/individual/lib/libXtst-1.2.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -152,6 +152,12 @@ std::int32_t tty_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
         case 0x541c:
             tty_lock.unlock();
             return -ENOTTY;
+        case 0x540b:
+            tty_lock.unlock();
+            return 0;
+        case 0x540e:
+            tty_lock.unlock();
+            return 0;
 
     }
     assert(0,"tty shitfuck req %lli (0x%p), arg 0x%p", req, req, arg);
@@ -190,7 +196,7 @@ std::int32_t tty_open(file_descriptor* fd, devfs_node* node) {
 
 extern flanterm_context* ft_ctx0;
 
-void ptmx_open(file_descriptor* fd) {
+void _ptmx_open(file_descriptor* fd) {
     fd->other.is_master = true;
     tty::tty_arg* new_tty = new tty::tty_arg;
     new_tty->readpipe = new tty::pipe(0);
@@ -229,7 +235,7 @@ void ptmx_open(file_descriptor* fd) {
 
 std::int32_t ptmx_open(file_descriptor* fd, devfs_node* node) {
     (void)node;
-    ptmx_open(fd);
+    _ptmx_open(fd);
     return 0;
 }
 
@@ -313,6 +319,9 @@ static void doKeyWork(uint8_t key) {
     }
 }
 
+#if defined(__x86_64__)
+#include <arch/x86_64/drivers/serial.hpp>
+#endif
 
 void tty_work(void* arg) {
     (void)arg;
@@ -324,6 +333,9 @@ void tty_work(void* arg) {
         signed long c = ktty_fd.vnode.read(&ktty_fd, buffer, 512);
         if(c > 0) {
             utils::flanterm::write(buffer, c);
+#if defined(__x86_64__)
+            x86_64::serial::write_data(buffer,c);
+#endif
         }
 
         klibc::memset(buffer,0,512);

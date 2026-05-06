@@ -1,0 +1,8 @@
+{
+    "name": "xcb-util-cursor",
+    "version": "0.1.6",
+    "deps": ["base-libs", "libxcb", "xcb-util", "xcb-util-image", "xcb-util-renderutil"],
+    "url": "https://www.x.org/archive/individual/lib/xcb-util-cursor-0.1.6.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

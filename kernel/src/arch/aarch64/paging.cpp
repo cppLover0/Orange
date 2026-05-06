@@ -142,7 +142,7 @@ namespace arch {
     [[gnu::weak]] void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         std::uint64_t* virt_srccr3 = (std::uint64_t*) (src_root + etc::hhdm());
-        for (int i = 255; i < 512; i++) {
+        for (int i = 256; i < 512; i++) {
             virt_rootcr3[i] = virt_srccr3[i];
         }
     }

@@ -1,0 +1,8 @@
+{
+    "name": "xf86-input-keyboard",
+    "version": "2.1.0",
+    "deps": ["base-libs", "xorg-libs"],
+    "url": "https://www.x.org/releases/individual/driver/xf86-input-keyboard-2.1.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

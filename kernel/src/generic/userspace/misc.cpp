@@ -98,12 +98,17 @@ long long sys_time(std::uint64_t* time) {
 std::atomic<std::uint64_t> clk_mnt_sync = 0;
 
 long long sys_clock_gettime(clockid_t which_clock, struct timespec *tp) {
+
+    std::uint64_t ts = time::timer->current_nano();
+    if(ts < clk_mnt_sync) ts = clk_mnt_sync.load();
+    else clk_mnt_sync.store(ts);
+
     switch(which_clock) {
     case CLOCK_TAI:
     case CLOCK_REALTIME_COARSE:
     case CLOCK_REALTIME:
-        tp->tv_sec = time::current_unix_time;
-        tp->tv_nsec = 0;
+        tp->tv_sec = ts / 1000000000;
+        tp->tv_nsec = ts % 1000000000;
         return 0;
     case CLOCK_THREAD_CPUTIME_ID:
     case CLOCK_PROCESS_CPUTIME_ID:
@@ -111,9 +116,6 @@ long long sys_clock_gettime(clockid_t which_clock, struct timespec *tp) {
     case CLOCK_MONOTONIC_COARSE:
     case CLOCK_MONOTONIC_RAW:
     case CLOCK_MONOTONIC:
-        std::uint64_t ts = time::timer->current_nano();
-        if(ts < clk_mnt_sync) ts = clk_mnt_sync.load();
-        else clk_mnt_sync.store(ts);
         tp->tv_sec = ts / 1000000000;
         tp->tv_nsec = ts % 1000000000;
         return 0;

@@ -66,7 +66,8 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
         if(obj != nullptr) {
             bool status = current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
-            if(status == true) {
+            (void)status;
+            if(1) {
                 arch::tlb_flush(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
                 current_thread->vmem->lock.unlock(state);
 
@@ -87,13 +88,13 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
 
                 process::switch_ctx(frame);
                 __builtin_unreachable();
-            }
+            } 
         }
         current_thread->vmem->lock.unlock(state);
     }
 
-    x86_64::lapic::off();
-    locks::is_disabled = true;
+    //x86_64::lapic::off();
+    //locks::is_disabled = true;
     x86_64::panic::print_ascii_art();
     print_regs(frame);
     extern int k_breakpoint;
@@ -108,7 +109,7 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
                 if(current == current_thread->vmem->end)
                     break;
 
-                klibc::printf("memory 0x%p-0x%p len %lli, rip - base is 0x%p\n",current->base, current->base + current->len, current->len, frame->rip - current->base);
+                klibc::printf("memory 0x%p-0x%p len %lli, rip - base is 0x%p %s\n",current->base, current->base + current->len, current->len, frame->rip - current->base, (cr2 >= current->base && cr2 <= current->base + current->len) ? "<-- cr2 here" : "");
 
                 current = current->next;
             }

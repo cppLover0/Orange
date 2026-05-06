@@ -7,6 +7,8 @@
 #include <generic/time.hpp>
 #include <generic/scheduling.hpp>
 #include <generic/paging.hpp>
+#include <generic/mouse.hpp>
+#include <generic/keyboard.hpp>
 #include <utils/align.hpp>
 #include <generic/evdev.hpp>
 #include <utils/gobject.hpp>
@@ -735,15 +737,15 @@ void __xhci_get_hid_report(xhci_device_t* dev,xhci_usb_device_t* usbdev,uint8_t 
 }
 
 void __xhci_set_boot_protocol(xhci_device_t* dev, xhci_usb_device_t* usbdev, int internum) {
-    xhci_usb_command_t cmd;
+    xhci_usb_command_t cmd = {};
     cmd.index = internum;
     cmd.request = 0x0B;
     cmd.type = 0x21;
     cmd.len = 0;
     cmd.value = 0;
 
-    char data[4096];
-    __xhci_send_usb_request_packet(dev,usbdev,cmd,data,0);
+    log("xhci", "Setting boot protocol for usb device");
+    __xhci_send_usb_packet(dev,usbdev,cmd);
 }
 
 int __xhci_ep_to_type(xhci_endpoint_descriptor_t* desc) {
@@ -1011,15 +1013,15 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
         input->input_ctx.A = (1 << 0);
     }
 
-    uint16_t i = 0;
+    uint32_t i = 0;
     while(i < (cfg->len - cfg->head.len)) {
         xhci_usb_descriptor_header* current = (xhci_usb_descriptor_header*)(&cfg->data[i]);
         //INFO("Found descriptor with type %d (0x%p) and len %d (i %d)!",current->type,current->type,current->len,i);
         
         xhci_interface_t* inter = new xhci_interface_t;
+        klibc::memset(inter,0,sizeof(xhci_interface_t));
         inter->type = current->type;
         inter->data = current;
-        klibc::memset(inter,0,sizeof(xhci_interface_t));
         if(!usb_dev->interface) 
             usb_dev->interface = inter;
         else {
@@ -1045,38 +1047,10 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                         }
                     }
                 }
+                inter->intersubclass = interface->intersubclass;
                 break;
             }
 
-            case 0x21: {
-                xhci_hid_descriptor_t* hid = (xhci_hid_descriptor_t*)current;
-                for(int i = 0; i < hid->numdesc;i++) {
-                    xhci_hid_sub_desc* desc = &hid->desc[i];
-                    if(desc->desctype == 0x22) {
-                        
-                        xhci_interface_t* need_interface = usb_dev->interface;
-                        while(need_interface) {
-                            if(need_interface->type == 0x04)
-                                break;
-                            need_interface = need_interface->next;
-                        }
-                        
-                        if(!need_interface)
-                            continue;
-
-                        need_interface->buffer = klibc::malloc(desc->desclen + 1);
-                        klibc::memset(need_interface->buffer,0,desc->desclen + 1);
-                        need_interface->len = desc->desclen;
-
-                        xhci_interface_descriptor_t* interface = (xhci_interface_descriptor_t*)need_interface;
-
-                        __xhci_set_boot_protocol(dev,usb_dev,interface->num);
-                        __xhci_get_hid_report(dev,usb_dev,0,interface->num,need_interface->buffer,need_interface->len);
-
-                    }
-                }
-                break;
-            }
             // __xhci_setup_port_ring(256,slotid);
             case 0x05: {
                 xhci_endpoint_descriptor_t* ep = (xhci_endpoint_descriptor_t*)current;
@@ -1159,6 +1133,44 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
                     }
                 }
 
+                break;
+            }
+        }
+        
+        i += current->len;
+    }
+
+    i = 0;
+    while(i < (cfg->len - cfg->head.len)) {
+        xhci_usb_descriptor_header* current = (xhci_usb_descriptor_header*)(&cfg->data[i]);
+        //INFO("Found descriptor with type %d (0x%p) and len %d (i %d)!",current->type,current->type,current->len,i);
+
+        switch(current->type) {
+            case 0x21: {
+                xhci_hid_descriptor_t* hid = (xhci_hid_descriptor_t*)current;
+                for(int i = 0; i < hid->numdesc;i++) {
+                    xhci_hid_sub_desc* desc = &hid->desc[i];
+                    if(desc->desctype == 0x22) {
+                        
+                        xhci_interface_t* need_interface = usb_dev->interface;
+                        while(need_interface) {
+                            if(need_interface->type == 0x04)
+                                break;
+                            need_interface = need_interface->next;
+                        }
+                        
+                        if(!need_interface)
+                            continue;
+
+                        need_interface->buffer = klibc::malloc(desc->desclen + 1);
+                        klibc::memset(need_interface->buffer,0,desc->desclen + 1);
+                        need_interface->len = desc->desclen;
+
+                        xhci_interface_descriptor_t* interface = (xhci_interface_descriptor_t*)need_interface;
+
+                        __xhci_set_boot_protocol(dev,usb_dev,interface->num);
+                    }
+                }
                 break;
             }
         }
@@ -1535,17 +1547,8 @@ void hid_layout_init() {
 extern vfs::pipe* ktty_pipe;
 
 void input_send(int num, uint8_t key) {
-
-    std::uint64_t current_nano = time::timer->current_nano();
-
-    input_event ev;
-    ev.time.tv_sec = current_nano / 1000000000;
-    ev.time.tv_usec = (current_nano & 1000000000) / 1000;
-    ev.type = 1;
-    ev.code = key & ~(1 << 7);
-    ev.value = (key & (1 << 7)) ? 0 : 1;
-    evdev::submit(num,ev);
-
+    (void)num;
+    keyboard::submit(key);
     ktty_pipe->write((const char*)&key, 1);
 }
 
@@ -1643,10 +1646,9 @@ input0_fd = open("/dev/masterps2keyboard",O_RDWR);
 #define REL_MISC		0x09
 
 void __usbmouse_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
-    uint8_t* data = usbdev->buffers[trb->info_s.ep_id - 2];
+    uint8_t* data = (uint8_t*)usbdev->buffers[trb->info_s.ep_id - 2];
     
     mouse_packet_t packet;
-
     packet.buttons = 0;
 
     packet.buttons |= (data[0] & (1 << 0)) ? MOUSE_LB : 0;
@@ -1656,73 +1658,13 @@ void __usbmouse_handler(xhci_usb_device_t* usbdev, xhci_done_trb_t* trb) {
     packet.x = data[1];
     packet.y = -data[2];
     packet.z = 0; // todo: figure out how to get mouse scroll wheel data
-
-    std::uint64_t current_nano = time::timer->current_nano();
-    input_event ev;
-    ev.time.tv_sec = current_nano / 1000000000;
-    ev.time.tv_usec = (current_nano & 1000000000) / 1000;
-    if(packet.x) {
-        ev.code = REL_X;
-        ev.type = 2;
-        ev.value = (packet.x & 0x80) ? (packet.x | 0xFFFFFF00) : packet.x;
-        evdev::submit(usbdev->evdev_num,ev);
-    }
-
-    if(packet.y) {
-        ev.code = REL_Y;
-        ev.type = 2;
-        ev.value = (packet.y & 0x80) ? (packet.y | 0xFFFFFF00) : packet.y;
-        evdev::submit(usbdev->evdev_num,ev);
-    }
-
-    if(packet.z) {
-        ev.code = REL_Z;
-        ev.type = 2;
-        ev.value = (packet.z & 0x80) ? (packet.z | 0xFFFFFF00) : packet.z;
-        evdev::submit(usbdev->evdev_num,ev);
-    }
-
-    if((packet.buttons & MOUSE_LB) && !(usbdev->last_pack.buttons & MOUSE_LB)) {
-        ev.code = 272;
-        ev.type = 1;
-        ev.value = 1;
-        evdev::submit(usbdev->evdev_num,ev);
-    } else if(!(packet.buttons & MOUSE_LB) && (usbdev->last_pack.buttons & MOUSE_LB)) {
-        ev.code = 272;
-        ev.type = 1;
-        ev.value = 0;
-        evdev::submit(usbdev->evdev_num,ev);
-    }
-
-    if((packet.buttons & MOUSE_RB) && !(usbdev->last_pack.buttons & MOUSE_RB)) {
-        ev.code = 273;
-        ev.type = 1;
-        ev.value = 1;
-        evdev::submit(usbdev->evdev_num,ev);
-    } else if(!(packet.buttons & MOUSE_RB) && (usbdev->last_pack.buttons & MOUSE_RB)) {
-        ev.code = 273;
-        ev.type = 1;
-        ev.value = 0;
-        evdev::submit(usbdev->evdev_num,ev);
-    }
-
-    if((packet.buttons & MOUSE_MB) && !(usbdev->last_pack.buttons & MOUSE_MB)) {
-        ev.code = 274;
-        ev.type = 1;
-        ev.value = 1;
-        evdev::submit(usbdev->evdev_num,ev);
-    } else if(!(packet.buttons & MOUSE_MB) && (usbdev->last_pack.buttons & MOUSE_MB)) {
-        ev.code = 274;
-        ev.type = 1;
-        ev.value = 0;
-        evdev::submit(usbdev->evdev_num,ev);
-    }
+    
+    mouse::submit(packet);
 
     usbdev->last_pack = packet;
 
-    time::timer->sleep(1000); // actually hid wants this only after 1 ms
-
 }
+
 
 int xhci_init() { 
 

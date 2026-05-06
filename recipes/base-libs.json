@@ -1,7 +1,7 @@
 {
     "name": "base-libs",
     "version": "0.0.0",
-    "deps": ["gcc-host", "mlibc"],
+    "deps": ["gcc-host", "mlibc", "zlib", "openssl", "libpng", "freetype", "automake-1.17-host", "autoconf-new-host", "autoconf-host", "automake-1.16.5-host", "pkgconfig-host", "libiconv"],
     "url": "https://github.com/cppLover0/dummy/archive/refs/tags/wah.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

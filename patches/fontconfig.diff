@@ -1,0 +1,47 @@
+diff -Naur fontconfig/src/fcstat.c fontconfig-clean/src/fcstat.c
+--- fontconfig/src/fcstat.c	2025-07-02 07:46:34.000000000 +0300
++++ fontconfig-clean/src/fcstat.c	2026-05-01 10:27:42.256654536 +0300
+@@ -348,31 +348,11 @@
+     int         ret = -1;
+     FcBool      flag = FcFalse;
+ 
+-#if defined(HAVE_FSTATVFS) && (defined(HAVE_STRUCT_STATVFS_F_BASETYPE) || defined(HAVE_STRUCT_STATVFS_F_FSTYPENAME))
+-    struct statvfs buf;
+-
+-    memset (statb, 0, sizeof (FcStatFS));
+-
+-    if ((ret = fstatvfs (fd, &buf)) == 0) {
+-#  if defined(HAVE_STRUCT_STATVFS_F_BASETYPE)
+-	p = buf.f_basetype;
+-#  elif defined(HAVE_STRUCT_STATVFS_F_FSTYPENAME)
+-	p = buf.f_fstypename;
+-#  endif
+-    }
+-#elif defined(HAVE_FSTATFS) && (defined(HAVE_STRUCT_STATFS_F_FLAGS) || defined(HAVE_STRUCT_STATFS_F_FSTYPENAME) || defined(__linux__))
+     struct statfs buf;
+ 
+     memset (statb, 0, sizeof (FcStatFS));
+ 
+     if ((ret = fstatfs (fd, &buf)) == 0) {
+-#  if defined(HAVE_STRUCT_STATFS_F_FLAGS) && defined(MNT_LOCAL)
+-	statb->is_remote_fs = !(buf.f_flags & MNT_LOCAL);
+-	flag = FcTrue;
+-#  endif
+-#  if defined(HAVE_STRUCT_STATFS_F_FSTYPENAME)
+-	p = buf.f_fstypename;
+-#  elif defined(__linux__) || defined(__EMSCRIPTEN__)
+ 	switch (buf.f_type) {
+ 	case 0x6969: /* nfs */
+ 	    statb->is_remote_fs = FcTrue;
+@@ -385,11 +365,7 @@
+ 	}
+ 
+ 	return ret;
+-#  else
+-#    error "BUG: No way to figure out with fstatfs()"
+-#  endif
+     }
+-#endif
+     if (p) {
+ 	if (!flag && strcmp (p, "nfs") == 0)
+ 	    statb->is_remote_fs = FcTrue;

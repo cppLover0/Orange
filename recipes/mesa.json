@@ -1,0 +1,8 @@
+{
+    "name": "mesa",
+    "version": "25.3.1",
+    "deps": ["base-libs", "xorg-libs", "llvm"],
+    "url": "https://gitlab.freedesktop.org/mesa/mesa/-/archive/mesa-25.3.1/mesa-mesa-25.3.1.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

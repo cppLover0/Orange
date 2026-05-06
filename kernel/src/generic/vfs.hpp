@@ -5,8 +5,10 @@
 #include <utils/linux.hpp>
 #include <utils/assert.hpp>
 #include <generic/pmm.hpp>
+#include <generic/userspace/sockets.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/scheduling.hpp>
+#include <utils/ringbuffer.hpp>
 #include <generic/lock/spinlock.hpp>
 
 struct statfs {
@@ -270,6 +272,7 @@ struct filesystem {
     std::int32_t (*readlink)(filesystem* fs, char* path, char* buffer);
     std::int32_t (*create)(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode);
     std::int32_t (*unlink)(filesystem* fs, char* path);
+    std::int32_t (*link)(filesystem* fs, char* old_path, char* new_path);
 
     char path[2048];
 };
@@ -300,6 +303,7 @@ namespace vfs {
         std::uint64_t flags = 0;
 
         std::uint32_t zero_message_count = 0;
+        std::atomic<std::uint32_t> socket_counter = 1;
         
         int is_closed_socket = 0;
 
@@ -484,13 +488,23 @@ struct file_descriptor {
     struct {
         int socket_type;
         int socket_specific;
+        int socket_side; 
 
         bool is_listen;
         bool is_connected;
 
         // unix sockets specific
-        vfs::pipe* write_socket;
-        vfs::pipe* read_socket; 
+        vfs::pipe* write_socket; // master socket counter
+        vfs::pipe* read_socket; // slave socket counter
+
+        void* socket_pointer;
+
+        struct {
+            list* r_ucred;
+            list* r_fd;
+            list* w_ucred;
+            list* w_fd;
+        } un;
 
     } socket;
 
@@ -504,7 +518,7 @@ struct file_descriptor {
         std::int32_t (*stat)(file_descriptor* file, stat* out);
         void (*close)(file_descriptor* file);
 
-        void (*ondup)();
+        void (*ondup)(file_descriptor* file);
 
         std::int32_t (*mmap)(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size);
 
@@ -641,12 +655,24 @@ namespace vfs {
                 klibc::memcpy(new_fd, current, sizeof(file_descriptor));
                 new_fd->next = dest->head_fd;
                 dest->head_fd = new_fd;
-            
+
                 if(new_fd->type == file_descriptor_type::pipe) {
                     new_fd->fs_specific.pipe->create(new_fd->other.pipe_side);
                 } else if(new_fd->type == file_descriptor_type::file) {
                     if(new_fd->vnode.ondup)
-                        new_fd->vnode.ondup();
+                        new_fd->vnode.ondup(new_fd);
+                } else if(new_fd->type == file_descriptor_type::socket) {
+                    if(new_fd->socket.socket_type == PF_UNIX && !new_fd->socket.is_listen && new_fd->socket.write_socket && new_fd->socket.read_socket) {
+                        if(new_fd->socket.socket_side == 1) {
+                            new_fd->socket.read_socket->socket_counter++;
+                            new_fd->socket.read_socket->create(PIPE_SIDE_READ);
+                            new_fd->socket.write_socket->create(PIPE_SIDE_WRITE);
+                        } else {
+                            new_fd->socket.write_socket->socket_counter++;
+                            new_fd->socket.write_socket->create(PIPE_SIDE_READ);
+                            new_fd->socket.read_socket->create(PIPE_SIDE_WRITE);
+                        }
+                    }
                 }
 
                 current = current->next;
@@ -656,13 +682,27 @@ namespace vfs {
 
         void do_dup(file_descriptor* src, file_descriptor* new_fd) {
             bool state = fd_lock.lock();
+            std::uint32_t old_idx = new_fd->index;
             file_descriptor* next = new_fd->next;
             klibc::memcpy(new_fd, src, sizeof(file_descriptor));
+            new_fd->index = old_idx;
             if(new_fd->type == file_descriptor_type::pipe) {
                 new_fd->fs_specific.pipe->create(new_fd->other.pipe_side);
             } else if(new_fd->type == file_descriptor_type::file) {
                 if(new_fd->vnode.ondup)
-                    new_fd->vnode.ondup();
+                    new_fd->vnode.ondup(new_fd);
+            } else if(new_fd->type == file_descriptor_type::socket) {
+                if(new_fd->socket.socket_type == PF_UNIX && !new_fd->socket.is_listen && new_fd->socket.write_socket && new_fd->socket.read_socket) {
+                    if(new_fd->socket.socket_side == 1) {
+                        new_fd->socket.read_socket->socket_counter++;
+                        new_fd->socket.read_socket->create(PIPE_SIDE_READ);
+                        new_fd->socket.write_socket->create(PIPE_SIDE_WRITE);
+                    } else {
+                        new_fd->socket.write_socket->socket_counter++;
+                        new_fd->socket.write_socket->create(PIPE_SIDE_READ);
+                        new_fd->socket.read_socket->create(PIPE_SIDE_WRITE);
+                    }
+                }
             }
             new_fd->next = next;
             fd_lock.unlock(state);
@@ -721,7 +761,19 @@ namespace vfs {
                 lowest->fs_specific.pipe->create(lowest->other.pipe_side);
             } else if(lowest->type == file_descriptor_type::file) {
                 if(lowest->vnode.ondup)
-                    lowest->vnode.ondup();
+                    lowest->vnode.ondup(lowest);
+            } else if(lowest->type == file_descriptor_type::socket) {
+                if(lowest->socket.socket_type == PF_UNIX && !lowest->socket.is_listen && lowest->socket.write_socket && lowest->socket.read_socket) {
+                    if(lowest->socket.socket_side == 1) {
+                        lowest->socket.read_socket->socket_counter++;
+                        lowest->socket.read_socket->create(PIPE_SIDE_READ);
+                        lowest->socket.write_socket->create(PIPE_SIDE_WRITE);
+                    } else {
+                        lowest->socket.write_socket->socket_counter++;
+                        lowest->socket.write_socket->create(PIPE_SIDE_READ);
+                        lowest->socket.read_socket->create(PIPE_SIDE_WRITE);
+                    }
+                }
             }
 
             this->fd_lock.unlock(state);
@@ -734,6 +786,18 @@ namespace vfs {
                     file->vnode.close(file);
             } else if(file->type == file_descriptor_type::pipe) {
                 file->fs_specific.pipe->close(file->other.pipe_side);
+            } else if(file->type == file_descriptor_type::socket) {
+                if(file->socket.socket_type == PF_UNIX && !file->socket.is_listen && file->socket.write_socket && file->socket.read_socket) {
+                    if(file->socket.socket_side == 1) {
+                        file->socket.read_socket->socket_counter--;
+                        file->socket.read_socket->close(PIPE_SIDE_READ);
+                        file->socket.write_socket->close(PIPE_SIDE_WRITE);
+                    } else {
+                        file->socket.write_socket->socket_counter--;
+                        file->socket.write_socket->close(PIPE_SIDE_READ);
+                        file->socket.read_socket->close(PIPE_SIDE_WRITE);
+                    }
+                }
             } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);
             }
@@ -767,6 +831,8 @@ namespace vfs {
     std::int32_t rename(char* path, char* newpath);
     std::int32_t unlink(char* path);
     std::int32_t remove(char* path);
+    std::int32_t link(char* old_path, char* new_path, bool follow_symlinks);
+
 }
 
 typedef unsigned char cc_t;

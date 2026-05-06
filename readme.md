@@ -25,7 +25,7 @@ sh create-initrd.sh
 
 requirements:
 ```
-rsync, meson, ninja, gcc 15 with g++, cmake, make, git, python3, coreutils, sh (bash), llvm, clang (for kernel, im tesing with clang 20 also clang++), tar, qemu, xorriso, texinfo, bison, flex, autoconf, automake, libtool, patchelf
+rsync, meson, ninja, gcc 15 with g++, cmake, make, git, python3, coreutils, sh (bash), llvm, clang (for kernel, im tesing with clang 20, also clang++), tar, qemu, xorriso, texinfo, bison, flex, autoconf, automake, libtool, patchelf, cmake, help2man, meson >= 1.6.1 libglib2.0-dev-bin
 ```
 
 there's also cmdline for some stuff: init=path, notsc, noacpi
