@@ -1,0 +1,8 @@
+{
+    "name": "vte",
+    "version": "0.82.2",
+    "deps": ["base-libs", "gtk3", "icu", "liblz4"],
+    "url": "https://gitlab.gnome.org/GNOME/vte/-/archive/0.82.2/vte-0.82.2.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

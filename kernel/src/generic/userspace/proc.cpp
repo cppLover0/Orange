@@ -101,10 +101,19 @@ long long sys_prlimit64(int pid, int res, rlimit64* new_rlimit, rlimit64* old_rl
     if(new_rlimit || !old_rlimit)
         return 0;
 
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)new_rlimit, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)old_rlimit, PAGE_SIZE))
+        return -EFAULT;
+
     switch(res) {
         case RLIMIT_NOFILE:
-            old_rlimit->rlim_cur = 512*1024;
-            old_rlimit->rlim_max = 512*1024;
+            
+            old_rlimit->rlim_cur = 1024;
+            old_rlimit->rlim_max = 1024;
             return 0;
         case RLIMIT_STACK:
             old_rlimit->rlim_cur = (4 * 1024 * 1024) - PAGE_SIZE;
@@ -135,6 +144,7 @@ long long sys_prlimit64(int pid, int res, rlimit64* new_rlimit, rlimit64* old_rl
 }
 
 long long sys_getuid() {
+    klibc::debug_printf("getuid\n");
     return current_proc->uid;
 }
 
@@ -157,19 +167,23 @@ long long sys_getcwd(char* buf, std::uint64_t len) {
 }
 
 long long sys_getpid() {
+    klibc::debug_printf("getpid\n");
     return current_proc->pid;
 }
 
 long long sys_getppid() {
+    klibc::debug_printf("getppid\n");
     return current_proc->parent_pid;
 }
 
 long long sys_getpgrp() {
+    klibc::debug_printf("getpgrp\n");
     return current_proc->pgrp;
 }
 
 long long sys_setpgid(int pid, int pgid) {
     thread* proc = nullptr;
+    klibc::debug_printf("setpgid %d %d\n", pid, pgid);
     if(pid > 0) 
         proc = process::by_id(pid);
     else if(pid == 0)
@@ -186,6 +200,7 @@ long long sys_setpgid(int pid, int pgid) {
 
 long long sys_getpgid(int pid) {
     thread* proc = nullptr;
+    klibc::debug_printf("getpgid %d\n", pid);
     if(pid > 0) 
         proc = process::by_id(pid);
     else if(pid == 0)
@@ -197,6 +212,13 @@ long long sys_getpgid(int pid) {
         return -ESRCH;
 
     return proc->pgrp;
+}
+
+long long sys_setsid() {
+    klibc::debug_printf("setsid\n");
+    current_proc->pid = current_proc->id;
+    current_proc->pgrp = current_proc->pid;
+    return current_proc->pid;
 }
 
 long long sys_getresuid(int* uid, int* euid, int* suid) {
@@ -217,11 +239,14 @@ long long sys_getresuid(int* uid, int* euid, int* suid) {
     *uid = proc->uid;
     *euid = proc->uid;
     *suid = proc->uid;
+
+    klibc::debug_printf("getresuid\n");
         
     return 0;
 }
 
 long long sys_getgid() {
+    klibc::debug_printf("getgid\n");
     return current_proc->gid;
 }
 
@@ -245,6 +270,8 @@ long long sys_getresgid(int* uid, int* euid, int* suid) {
     *euid = proc->gid;
     *suid = proc->gid;
         
+    klibc::debug_printf("getresgid\n");
+
     return 0;
 }
 
@@ -429,6 +456,7 @@ long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_sta
     clarg.stack = new_stack;
 
     thread* new_proc = process::clone3(current_thread, clarg, frame);
+    new_proc->is_debug = current_thread->is_debug;
 
 #if defined(__x86_64__)
     new_proc->ctx.rax = 0;
@@ -446,6 +474,7 @@ long long sys_exit_group(int status) {
     thread* proc = current_proc;
     proc->exit_request = 2;
     proc->exit_code = (status & 0xFF) << 8;
+    klibc::debug_printf("exit group status %d\n", status);
     arch::enable_paging(gobject::kernel_root);
     process::yield();
     while(1) {process::yield();}
@@ -456,6 +485,7 @@ long long sys_exit(int status) {
     thread* proc = current_proc;
     proc->exit_request = 1;
     proc->exit_code = (status & 0xFF) << 8;
+    klibc::debug_printf("exit status %d\n", status);
     arch::enable_paging(gobject::kernel_root);
     while(1) {process::yield();}
     __builtin_unreachable();

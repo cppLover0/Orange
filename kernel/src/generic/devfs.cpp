@@ -66,7 +66,7 @@ std::int32_t devfs_ioctl(file_descriptor* file, std::uint64_t req, void* arg) {
     if(node->is_directory)
         return -EISDIR;
     if(node->ioctl == nullptr)
-        return -ENOTSUP;
+        return -ENOTTY;
     return node->ioctl(node, req, arg);
 }
 

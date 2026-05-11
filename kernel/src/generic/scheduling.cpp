@@ -224,25 +224,18 @@ void process::wakeup(thread* thread) {
 
 int process::futex_wake(thread* proc, int* lock, int count) {
     thread* current = (thread*)(head_proc.load());
-    int c = 0;
-
-    if(count == 0)
-        return 0;
 
     while(current) {
         if(current->vmem == proc->vmem && current->futex.load() == (std::uint64_t)lock) {
             current->futex.store(0);
             if(current->is_debug) {
-                klibc::debug_printf("futex wake proc %d from proc %d futex 0x%p count %d c %d\n", current->id, proc->id, lock, count, c);
+                klibc::debug_printf("futex wake proc %d from proc %d futex 0x%p count %d c %d\n", current->id, proc->id, lock, count, 1);
             }
-            c++;
         }
 
-        if(c == count) 
-            break;
         current = current->next;
     }
-    return c;
+    return 0;
 }
 
 void process::futex_wait(thread* proc, int* lock) {

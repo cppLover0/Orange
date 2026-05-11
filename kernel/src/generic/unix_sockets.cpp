@@ -50,11 +50,14 @@ long long unix_sockets::bind(file_descriptor* file, sockaddr_un* path) {
     new_node->path = *path;
     insert_unix_socket(new_node);
 
+    new_node->link_counter++;
+    new_node->open_counter = 1; 
+
     file->socket.socket_pointer = (void*)new_node;
     return 0;
 }
 
-long long unix_sockets::connect(file_descriptor* file, sockaddr_un* path) {
+long long unix_sockets::connect(thread* proc, file_descriptor* file, sockaddr_un* path) {
     auto node = unsock_find(path);
     if(node == nullptr)
         return -ENOENT;
@@ -67,6 +70,7 @@ long long unix_sockets::connect(file_descriptor* file, sockaddr_un* path) {
             node->pend_conns[i].is_used = true;
             node->pend_conns[i].is_accepted.unlock();
             node->pend_conns[i].file = file;
+            node->pend_conns[i].proc = proc;
             conn = &node->pend_conns[i];
             break;
         }
@@ -105,7 +109,7 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
         for(std::size_t i = 0;i < sizeof(node->pend_conns) / sizeof(unix_socket_pending_connection); i++) {
             unix_socket_pending_connection* current = &node->pend_conns[i];
             if(current->is_used == true && !current->is_accepted.test()) {
-                file_descriptor* dest = current->file;
+                file_descriptor* dest = (file_descriptor*)current->file;
                 dest->socket.socket_side = 1;
                 fd->socket.socket_side = 0;
 
@@ -130,6 +134,11 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
                 fd->socket.un.w_ucred = dest->socket.un.w_ucred;
                 fd->socket.un.r_ucred = dest->socket.un.r_ucred;
 
+                fd->socket.un.cred.gid = current->proc->gid;
+                fd->socket.un.cred.pid = current->proc->id;
+                fd->socket.un.cred.uid = current->proc->uid;
+
+                dest->socket.un.cred = fd->socket.un.cred;
                 dest->socket.socket_type = PF_UNIX;
 
                 fd->socket.socket_type = PF_UNIX;
@@ -140,7 +149,11 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
 
                 node->conn_counter--;
 
+                node->open_counter += 2;
+
                 current->is_accepted.try_lock();
+                current->is_used = false;
+
                 un_lock.unlock();
                 goto end;
 
@@ -152,6 +165,29 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
 
 end:
     return fd->index;
+}
+
+void process_close(void* node1) {
+
+    unix_socket_node* node = (unix_socket_node*)node1;
+
+    node->open_counter--;
+    if(node->open_counter == 0 && node->link_counter == 0) {
+        un_lock.lock();
+        unix_socket_node* parent = head_unsock_node;
+        while(parent) {
+            if(parent->next == node)
+                break;
+        }
+
+        if(parent) {
+            parent->next = node->next;
+        }
+
+        pmm::freelist::free((std::uint64_t)node - etc::hhdm());
+
+        un_lock.unlock();
+    }
 }
 
 unix_socket_node* unix_sockets::find(sockaddr_un* path) {

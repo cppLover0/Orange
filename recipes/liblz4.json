@@ -1,0 +1,8 @@
+{
+    "name": "liblz4",
+    "version": "1.10.0",
+    "deps": ["base-libs"],
+    "url": "https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -1,0 +1,8 @@
+{
+    "name": "xwallpaper",
+    "version": "recent",
+    "deps": ["base-libs", "xorg-libs", "libpng"],
+    "url": "git:https://github.com/stoeckmann/xwallpaper.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

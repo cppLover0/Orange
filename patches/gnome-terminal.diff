@@ -1,0 +1,12 @@
+diff -Naur gnome-terminal/meson.build gnome-terminal-clean/meson.build
+--- gnome-terminal/meson.build	2026-03-14 23:54:54.000000000 +0300
++++ gnome-terminal-clean/meson.build	2026-05-07 13:35:10.628810140 +0300
+@@ -45,7 +45,7 @@
+ # Requirements
+ 
+ vte_req                      = 'vte-2.91'
+-vte_req_version              = '0.84.0'
++vte_req_version              = '0.82.2'
+ vte_default_options          = [
+   'docs=false',
+   'gir=false',

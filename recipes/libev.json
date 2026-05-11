@@ -1,8 +1,8 @@
 {
-    "name": "libjpeg-turbo",
+    "name": "libev",
     "version": "recent",
     "deps": ["base-libs"],
-    "url": "git:https://github.com/libjpeg-turbo/libjpeg-turbo.git",
+    "url": "git:https://github.com/enki/libev.git",
     "should_patch": false,
     "use_orange_prefix": true
 }

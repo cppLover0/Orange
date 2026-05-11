@@ -1,7 +1,7 @@
 {
     "name": "i3wm",
     "version": "recent",
-    "deps": ["base-libs", "xorg-libs", "gtk3", "startup-notification"],
+    "deps": ["base-libs", "xorg-libs", "gtk3", "startup-notification", "yajl", "libev"],
     "url": "git:https://github.com/i3/i3.git",
     "should_patch": false,
     "use_orange_prefix": true

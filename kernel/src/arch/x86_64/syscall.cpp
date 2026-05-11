@@ -102,7 +102,14 @@ syscall_item syscall_table[] = {
     {false, 82, (void*)sys_libclog},
     {false, 83, (void*)sys_ptsname},
     {false, 84, (void*)sys_enabledebug},
-    {false, 85, (void*)sys_debugnum}
+    {false, 85, (void*)sys_debugnum},
+    {false, 86, (void*)sys_fchmod},
+    {false, 87, (void*)sys_rename},
+    {false, 88, (void*)sys_renameat},
+    {false, 89, (void*)sys_getsockname},
+    {false, 90, (void*)sys_socketpair},
+    {false, 91, (void*)sys_pwrite64},
+    {false, 92, (void*)sys_setsid}
 };
 
 syscall_item* find_syscall(long long num) {
@@ -135,8 +142,8 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
         ret = func(ctx->rdi, ctx->rsi, ctx->rdx, ctx->r10, ctx->r8, ctx->r9);     
     }
 
-    // if(current->is_debug)
-    //      klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);
+    if(current->is_debug && current_sys->num != 6)
+         klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);
 
     assert(ctx->cr3 != 0, "uh nuh ");
 

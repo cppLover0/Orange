@@ -70,17 +70,9 @@ void klibc::debug_printf(const char* fmt, ...) {
     char buffer2[4096] = {};
     int len2 = klibc::__printfbuf(buffer2, 4096, "(%lli) [pid %05d] %s", time::timer->current_nano() / 1000,  current_proc ? current_proc->id : 11111, buffer);
 
-    if(cur->debug_file_descriptor) {
+    #if defined(__x86_64__)
         x86_64::serial::write_data(buffer2,len2);
-        file_descriptor* stdout = (file_descriptor*)cur->debug_file_descriptor;
-        if(stdout->type == file_descriptor_type::pipe) {
-            stdout->fs_specific.pipe->write(buffer2, len2);
-        } else if(stdout->type == file_descriptor_type::file) {
-            stdout->vnode.write(stdout, buffer2, len2);
-        }
-    } else {
-        x86_64::serial::write_data(buffer2,len2);
-    }
+#endif
 
     
 #endif

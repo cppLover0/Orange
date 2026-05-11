@@ -1,0 +1,35 @@
+diff -Naur libuuid/randutils.c libuuid-clean/randutils.c
+--- libuuid/randutils.c	2026-05-07 13:39:04.090149801 +0300
++++ libuuid-clean/randutils.c	2026-05-07 13:40:09.816454172 +0300
+@@ -13,14 +13,14 @@
+ #include <string.h>
+ #include <sys/time.h>
+ 
+-#ifndef _WIN32
+-#include <sys/syscall.h>
+-#else
+-static int getuid (void)
+-{
+-	return 1;
+-}
+-#endif
++// #ifndef _WIN32
++// #include <sys/syscall.h>
++// #else
++// static int getuid (void)
++// {
++// 	return 1;
++// }
++// #endif
+ 
+ #include "randutils.h"
+ 
+@@ -106,7 +106,7 @@
+ 		unsigned short tmp_seed[3];
+ 
+ 		memcpy(tmp_seed, ul_jrand_seed, sizeof(tmp_seed));
+-		ul_jrand_seed[2] = ul_jrand_seed[2] ^ syscall(__NR_gettid);
++		ul_jrand_seed[2] = ul_jrand_seed[2] ^ gettid();
+ 		for (cp = buf, i = 0; i < nbytes; i++)
+ 			*cp++ ^= (jrand48(tmp_seed) >> 7) & 0xFF;
+ 		memcpy(ul_jrand_seed, tmp_seed,

@@ -32,7 +32,7 @@ inline static int is_printable(char c) {
 
 signed long tty_read(file_descriptor* fd, devfs_node* node, void* buffer, std::size_t count) {
     tty::tty_arg* arg = (tty::tty_arg*)node->arg;
-    return fd->other.is_master ? arg->writepipe->read((char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0) : arg->readpipe->ttyread((char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
+    return fd->other.is_master ? arg->writepipe->read((char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0, arg->is_packet_mode) : arg->readpipe->ttyread((char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
 }
 
 signed long tty_write(file_descriptor* fd, devfs_node* node, void* buffer, std::size_t count) {
@@ -156,6 +156,10 @@ std::int32_t tty_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
             tty_lock.unlock();
             return 0;
         case 0x540e:
+            tty_lock.unlock();
+            return 0; 
+        case 0x5420:
+            arg2->is_packet_mode = *(int*)arg;
             tty_lock.unlock();
             return 0;
 

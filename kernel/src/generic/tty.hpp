@@ -200,6 +200,7 @@ namespace tty {
     };
 
     struct tty_arg {
+        int is_packet_mode;
         termios_t termios;
         winsize winsz;
         vfs::pipe* writepipe;

@@ -9,6 +9,7 @@
 #include <generic/tmpfs.hpp>
 #include <generic/devfs.hpp>
 #include <generic/unix_sockets.hpp>
+
 #include <generic/evdev.hpp>
 #include <generic/userspace/syscall_list.hpp>
 #include <generic/sysfs.hpp>
@@ -159,6 +160,48 @@ vfs::node* find_node(char* path) {
 
     }
     return match;
+}
+
+std::int32_t vfs::rename(char* old_path, char* new_path, bool follow_symlinks) {
+
+    char out[4096];
+    klibc::memset(out,0,4096);
+
+    if(follow_symlinks) {
+        __vfs_symlink_resolve(old_path, out, 0);
+    } else {
+        __vfs_symlink_resolve_no_at_symlink_follow(old_path, out);
+    }
+
+    char out1[4096];
+    klibc::memcpy(out1, new_path, klibc::strlen(new_path) + 1);
+
+    node* node1 = find_node(out);
+    node* node2 = find_node(out1);
+
+    if(!node1) { 
+        return -ENOENT; }
+
+    if(node1 != node2)
+        return -EXDEV;
+    
+    char* fs_love_name = out + klibc::strlen(node1->path) - 1;
+    if(!node1->fs->rename) { assert(0, "meow :3");
+        return -ENOSYS; }
+
+    if(fs_love_name[0] == '\0') {
+        fs_love_name[0] = '/';
+        fs_love_name[1] = '\0';
+    }
+
+    char* fs_love_name1 = out1 + klibc::strlen(node1->path) - 1;
+    if(fs_love_name1[0] == '\0') {
+        fs_love_name1[0] = '/';
+        fs_love_name1[1] = '\0';
+    }
+
+    std::int32_t status = node1->fs->rename(node1->fs, fs_love_name, fs_love_name1);
+    return status;
 }
 
 std::int32_t vfs::link(char* old_path, char* new_path, bool follow_symlinks) {

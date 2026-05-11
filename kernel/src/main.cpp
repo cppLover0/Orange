@@ -23,6 +23,7 @@
 #include <generic/modules.hpp>
 #include <utils/cmdline.hpp>
 #include <generic/elf.hpp>
+#include <generic/dev_log.hpp>
 #include <utils/random.hpp>
 
 #if defined(__x86_64__)
@@ -85,6 +86,7 @@ extern "C" void main() {
     keyboard::init();
     mouse::init();
     nulldev::init();
+    logdev::init();
 
     random::reseed();
 

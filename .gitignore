@@ -13,3 +13,6 @@ build-x86_64
 .jinx-cache
 .orange-build
 initrd.tar.gz
+/t
+/tt
+/serial.log

@@ -52,7 +52,8 @@ long long sys_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, std::u
 
 long long sys_sigprocaction(int sig, const sigaction* src, sigaction* old, std::uint64_t len) {
     (void)len;
-    assert(sig < 34, "m %d", sig);
+    if(sig > 33)
+        return -EINVAL;
 
     thread* proc = current_proc;
     if(!is_safe_to_rw(proc, (std::uint64_t)src, PAGE_SIZE))
@@ -185,9 +186,7 @@ long long sys_kill(int pid, int sig) {
 
         
         assert(stack_protect == 0xAB1C2DEA, "stack is fucked :(");
-        assert(current != target, "1 %d %d %d 0x%p 0x%p", current->id, target->id, current->id != target->id, stack_protect, 0xAB1C2DEA);
-        assert(current->sig != target->sig, "man");
-
+        
         if(target->id != 1 && (target->status == PROCESS_LIVE || target->status == PROCESS_SLEEP)) {
             if(sig != 0) {
                 target->sig->push(sig);

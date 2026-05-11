@@ -27,7 +27,9 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
     if(!is_safe_to_rw(proc, (std::uint64_t)ts, PAGE_SIZE))
         return -EFAULT;
 
-    if(proc->is_debug) klibc::debug_printf("futex op %d, val %d, uaddr 0x%p, flags %d, raw_op %d\n",operation,val,uaddr,flags,op);
+    (void)flags;
+
+    //if(proc->is_debug) klibc::debug_printf("futex op %d, val %d, uaddr 0x%p, flags %d, raw_op %d\n",operation,val,uaddr,flags,op);
 
     switch(operation) {
     case FUTEX_WAIT_BITSET:

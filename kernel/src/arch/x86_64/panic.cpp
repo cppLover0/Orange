@@ -95,25 +95,36 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
 
     //x86_64::lapic::off();
     //locks::is_disabled = true;
-    x86_64::panic::print_ascii_art();
-    print_regs(frame);
-    extern int k_breakpoint;
-    klibc::printf("k_breakpoint is %d, proc is %d, cpu is %d, target_cpu %d\r\n",k_breakpoint, current_thread == nullptr ? 0 : current_thread->id, CPU_LOCAL_READ(cpu),current_thread == nullptr ? 0 : current_thread->cpu.load());
     
-    if(current_thread) {
-        if(current_thread->vmem) {
-            klibc::printf("memory map\n");
-            vmm_obj* current = current_thread->vmem->start;
-            while(current) {
+    if(1) {
+        x86_64::panic::print_ascii_art();
+        print_regs(frame);
+        extern int k_breakpoint;
+        klibc::printf("k_breakpoint is %d, proc is %d, cpu is %d, target_cpu %d\r\n",k_breakpoint, current_thread == nullptr ? 0 : current_thread->id, CPU_LOCAL_READ(cpu),current_thread == nullptr ? 0 : current_thread->cpu.load());
+        
+        if(current_thread) {
+            if(current_thread->vmem) {
+                klibc::printf("memory map\n");
+                vmm_obj* current = current_thread->vmem->start;
+                while(current) {
 
-                if(current == current_thread->vmem->end)
-                    break;
+                    if(current == current_thread->vmem->end)
+                        break;
 
-                klibc::printf("memory 0x%p-0x%p len %lli, rip - base is 0x%p %s\n",current->base, current->base + current->len, current->len, frame->rip - current->base, (cr2 >= current->base && cr2 <= current->base + current->len) ? "<-- cr2 here" : "");
+                    klibc::printf("memory 0x%p-0x%p len %lli, rip - base is 0x%p %s\n",current->base, current->base + current->len, current->len, frame->rip - current->base, (cr2 >= current->base && cr2 <= current->base + current->len) ? "<-- cr2 here" : "");
 
-                current = current->next;
+                    current = current->next;
+                }
             }
         }
+    } else {
+        klibc::debug_printf("got panic proc %d !\n", current_thread->id);
+        current_thread->exit_request = 2;
+        current_thread->exit_code = (1 & 0xFF) << 8;
+        arch::enable_paging(gobject::kernel_root);
+        process::yield();
+        while(1) {process::yield();}
+        __builtin_unreachable();
     }
     
     arch::hcf();

@@ -1,0 +1,8 @@
+{
+    "name": "icu",
+    "version": "78.1",
+    "deps": ["base-libs", "bash"],
+    "url": "https://github.com/unicode-org/icu/releases/download/release-78.1/icu4c-78.1-sources.tgz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

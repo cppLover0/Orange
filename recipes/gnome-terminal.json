@@ -1,0 +1,8 @@
+{
+    "name": "gnome-terminal",
+    "version": "3.60.0",
+    "deps": ["base-libs", "gtk3", "vte", "libuuid", "libhandy"],
+    "url": "https://gitlab.gnome.org/GNOME/gnome-terminal/-/archive/3.60.0/gnome-terminal-3.60.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

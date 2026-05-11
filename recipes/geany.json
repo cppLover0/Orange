@@ -1,0 +1,8 @@
+{
+    "name": "geany",
+    "version": "2.1",
+    "deps": ["base-libs", "gtk3"],
+    "url": "https://download.geany.org/geany-2.1.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -486,3 +486,6 @@ struct clone_args {
     u64 cgroup;       /* File descriptor for target cgroup
                          of child (since Linux 5.7) */
 };
+
+#define SOCK_CLOEXEC   02000000
+#define SOCK_NONBLOCK  04000

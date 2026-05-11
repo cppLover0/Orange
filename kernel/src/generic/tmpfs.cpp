@@ -214,6 +214,11 @@ std::int32_t tmpfs_link(filesystem* fs, char* old_path, char* new_path) {
         return -ENOENT;
     }
 
+    if(tmpfs_lookup(new_path) != nullptr) {
+        fs->lock.unlock();
+        return -EEXIST;
+    }
+
     if(old_node->type == vfs_file_type::directory) {
         fs->lock.unlock();
         return -EPERM;
@@ -634,6 +639,92 @@ std::int32_t tmpfs_unlink(filesystem* fs, char* path) {
     return 0;
 }
 
+void fast_unlink(char* new_path, tmpfs::tmpfs_node* new_node) {
+
+    if(new_node == nullptr)
+        return;
+
+    char name[257] = {};
+    klibc::memcpy(name, tmpfs_get_name_from_path(new_path), klibc::strlen(tmpfs_get_name_from_path(new_path)) + 1);
+
+    tmpfs::tmpfs_node* parentz = tmpfs_get_parent(new_path);
+
+    for(std::uint64_t i = 0;i < parentz->size / sizeof(tmpfs::directory_cont); i++) {
+        if(klibc::strcmp(name, parentz->dirents[i].name) == 0) {
+            parentz->dirents[i].node = nullptr;
+            klibc::memset(parentz->dirents[i].name, 0, sizeof(parentz->dirents[i].name));
+        }
+    }
+
+    new_node->nlink--;
+
+    if(new_node->nlink == 0) {
+        tmpfs_internal_remove(new_node);
+    }
+}
+
+std::int32_t tmpfs_rename(filesystem* fs, char* old_path, char* new_path) {
+    fs->lock.lock();
+
+    tmpfs::tmpfs_node* old_node = tmpfs_lookup(old_path);
+    if(old_node == nullptr) { fs->lock.unlock();
+        return -ENOENT; }
+
+    tmpfs::tmpfs_node* new_node = tmpfs_lookup(new_path);
+
+    if(new_node != nullptr) {
+        if(tmpfs_test_for_busy(new_node)) {
+            fs->lock.unlock();
+            return -EBUSY;
+        }
+    }
+
+    if(tmpfs_test_for_busy(old_node)) {
+        fs->lock.unlock();
+        return -EBUSY;
+    }
+
+    tmpfs::tmpfs_node* parent = tmpfs_get_parent(new_path);
+    if(parent == nullptr) {
+        fs->lock.unlock();
+        return -ENOENT;
+    }
+
+    fast_unlink(new_path, new_node);
+
+    bool is_pasted = false;
+
+    again_paste:
+    for(std::uint64_t i = 0;i < parent->size / sizeof(tmpfs::directory_cont); i++) {
+        if(parent->dirents[i].node == nullptr)  {
+            parent->dirents[i].node = old_node;
+            klibc::memcpy(parent->dirents[i].name, tmpfs_get_name_from_path(new_path), klibc::strlen(tmpfs_get_name_from_path(new_path)) + 1);
+            is_pasted = true;
+            break;
+        }
+    }
+
+    if(is_pasted == false) {
+        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
+        if(parent->dirents) {
+            klibc::memcpy(new_dir, parent->dirents, parent->size);
+            pmm::buddy::free((std::uint64_t)parent->dirents - etc::hhdm());
+        }
+        parent->dirents = new_dir;
+        parent->physical_size = res.real_size;
+        parent->size = parent->physical_size;
+        goto again_paste;
+    }
+    
+    old_node->nlink++;
+
+    fast_unlink(old_path, old_node);
+
+    fs->lock.unlock();
+    return 0;
+}
+
 void tmpfs::init_default(vfs::node* node) {
     filesystem* new_fs = new filesystem;
     node->fs = new_fs;
@@ -643,6 +734,7 @@ void tmpfs::init_default(vfs::node* node) {
     node->fs->remove = tmpfs_remove;
     node->fs->link = tmpfs_link;
     node->fs->unlink = tmpfs_unlink;
+    node->fs->rename = tmpfs_rename;
     klibc::memcpy(node->path, "/\0\0", sizeof("/\0\0") + 1);
 
     alloc_t root_alloc = pmm::buddy::alloc(PAGE_SIZE);
