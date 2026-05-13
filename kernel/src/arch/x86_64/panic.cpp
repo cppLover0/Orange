@@ -96,7 +96,7 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
     //x86_64::lapic::off();
     //locks::is_disabled = true;
     
-    if(1) {
+    if(frame->cs != 0x08) {
         x86_64::panic::print_ascii_art();
         print_regs(frame);
         extern int k_breakpoint;

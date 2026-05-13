@@ -877,41 +877,41 @@ namespace vfs {
             } else if(file->type == file_descriptor_type::socket) {
                 if(file->socket.socket_type == PF_UNIX && !file->socket.is_listen && file->socket.write_socket && file->socket.read_socket) {
 
-                    if(file->socket.socket_pointer) {
-                        process_close(file->socket.socket_pointer);
-                        file->socket.socket_pointer = 0;
-                    }
+                    // if(file->socket.socket_pointer) {
+                    //     process_close(file->socket.socket_pointer);
+                    //     file->socket.socket_pointer = 0;
+                    // }
 
-                    if(file->socket.read_socket->connected_to_pipe == 1 && file->socket.write_socket->connected_to_pipe == 1) {
-                        delete file->socket.un.r_fd;
-                        delete file->socket.un.w_fd;
-                        delete file->socket.un.r_ucred;
-                        delete file->socket.un.w_ucred;
-                        file->socket.un.r_fd = 0;
-                        file->socket.un.w_fd = 0;
-                        file->socket.un.r_ucred = 0;
-                        file->socket.un.w_ucred = 0;
-                    }
+                    // if(file->socket.read_socket->connected_to_pipe == 1 && file->socket.write_socket->connected_to_pipe == 1) {
+                    //     delete file->socket.un.r_fd;
+                    //     delete file->socket.un.w_fd;
+                    //     delete file->socket.un.r_ucred;
+                    //     delete file->socket.un.w_ucred;
+                    //     file->socket.un.r_fd = 0;
+                    //     file->socket.un.w_fd = 0;
+                    //     file->socket.un.r_ucred = 0;
+                    //     file->socket.un.w_ucred = 0;
+                    // }
 
                     if(file->socket.socket_side == 1) {
-                        file->socket.read_socket->socket_counter--;
-                        file->socket.read_socket->close(PIPE_SIDE_READ);
-                        file->socket.write_socket->close(PIPE_SIDE_WRITE);
+                        //file->socket.read_socket->socket_counter--;
+                        //file->socket.read_socket->close(PIPE_SIDE_READ);
+                        //file->socket.write_socket->close(PIPE_SIDE_WRITE);
                     } else {
-                        file->socket.write_socket->socket_counter--;
-                        file->socket.write_socket->close(PIPE_SIDE_READ);
-                        file->socket.read_socket->close(PIPE_SIDE_WRITE);
+                        //file->socket.write_socket->socket_counter--;
+                        //file->socket.write_socket->close(PIPE_SIDE_READ);
+                        //file->socket.read_socket->close(PIPE_SIDE_WRITE);
                     }
                 }
             } else if(file->type == file_descriptor_type::socketpair) {
                 if(file->socketpair.is_slave) {
-                    file->socketpair.read_socket->socket_counter--;
-                    file->socketpair.read_socket->close(PIPE_SIDE_READ);
-                    file->socketpair.write_socket->close(PIPE_SIDE_WRITE);
+                    //file->socketpair.read_socket->socket_counter--;
+                    //file->socketpair.read_socket->close(PIPE_SIDE_READ);
+                    //file->socketpair.write_socket->close(PIPE_SIDE_WRITE);
                 } else {
-                    file->socketpair.write_socket->socket_counter--;
-                    file->socketpair.write_socket->close(PIPE_SIDE_READ);
-                    file->socketpair.read_socket->close(PIPE_SIDE_WRITE);
+                    //file->socketpair.write_socket->socket_counter--;
+                    //file->socketpair.write_socket->close(PIPE_SIDE_READ);
+                    //file->socketpair.read_socket->close(PIPE_SIDE_WRITE);
                 }
             } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);

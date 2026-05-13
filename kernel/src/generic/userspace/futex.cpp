@@ -62,6 +62,7 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
             if(ts) {
                 if(t < (time::timer->current_nano() / 1000)) {
                     proc->futex.store(0); 
+                    klibc::debug_printf("futex timeout end\n");
                     return -ETIMEDOUT;
                 }
             }
@@ -69,6 +70,7 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
                process::yield();
         }
             
+        klibc::debug_printf("futex end\n");
         return 0;
     };
     case FUTEX_WAKE: {

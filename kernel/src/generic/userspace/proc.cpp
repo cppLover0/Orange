@@ -457,6 +457,7 @@ long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_sta
 
     thread* new_proc = process::clone3(current_thread, clarg, frame);
     new_proc->is_debug = current_thread->is_debug;
+    new_proc->debug_file_descriptor = current_thread->debug_file_descriptor;
 
 #if defined(__x86_64__)
     new_proc->ctx.rax = 0;

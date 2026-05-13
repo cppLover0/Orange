@@ -177,6 +177,11 @@ long long sys_recvfrom(int fd, void *buffer, size_t size, int flags, struct sock
     (void)addr_length;
     // i have unix sockets sock stream now so no sock_addr 
 
+    if(flags != 0) {
+        klibc::debug_printf("MEOWW !! MEOW RECV !!! %d\n", flags);
+    }
+
+
     return sys_read(fd, (char*)buffer, size);
 }
 
@@ -184,6 +189,10 @@ long long sys_sendto(int fd, const void *buffer, size_t size, int flags, const s
     (void)flags;
     (void)sock_addr;
     (void)addr_length;
+
+    if(flags != 0) {
+        klibc::debug_printf("MEOWW !! MEOW !!! %d\n", flags);
+    }
 
     return sys_write(fd, (char*)buffer, size);
 }
@@ -367,7 +376,7 @@ long long sys_msg_recv(int fd, struct msghdr *hdr, int flags) {
 
         for (int i = 0; i < hdr->msg_iovlen; i++) {
             std::int64_t recv_bytes = 0;
-            recv_bytes = target_pipe->read((char*)hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len,((fd_s->flags & O_NONBLOCK) ? 1 : 0));
+            recv_bytes = target_pipe->read((char*)hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len,(((fd_s->flags & O_NONBLOCK) ? 1 : 0)) | ((flags & MSG_DONTWAIT) ? 1 : 0));
             if(recv_bytes == -EAGAIN) {
                 klibc::debug_printf("EAGAIN fd %d\n", fd);
                 return -EAGAIN;
@@ -489,7 +498,20 @@ long long sys_getsockopt(int fd, int layer, int number, void* buffer, unsigned* 
             *(int*)buffer = 65536;
             *size = 4;
             return 0;
+
+        case 3: // SO_TYPE
+
+            if(file->type == file_descriptor_type::socketpair) {
+                *(int*)buffer = SOCK_STREAM;
+                *size = 4;
+                return 0;
+            }
+
+            *(int*)buffer = file->socket.socket_specific;
+            *size = 4;
+            return 0;
         }
+
     };
     }
     assert(0, "getsockopt fd %d layer %d number %d buffer 0x%p size 0x%p", fd, layer, number, buffer, size);

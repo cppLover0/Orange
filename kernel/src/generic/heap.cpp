@@ -1,4 +1,3 @@
-// i used clanker to optimize some stuff that idk how to optimize/fix
 #include <cstdint>
 #include <generic/pmm.hpp>
 #include <generic/heap.hpp>

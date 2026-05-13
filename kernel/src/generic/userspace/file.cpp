@@ -10,6 +10,8 @@
 #include <generic/userspace/sockets.hpp>
 #include <generic/userspace/safety.hpp>
 #include <generic/time.hpp>
+#include <utils/signal_ret.hpp>
+#include <utils/signal.hpp>
 
 long long sys_access(const char* path, int mode) {
     (void)mode;
@@ -663,7 +665,8 @@ long long sys_fcntl(int fd, int request, std::uint64_t arg) {
         }
 
         default: {
-            assert(0,"unsupported fcntl");
+            return -EINVAL;
+            assert(0,"unsupported fcntl fd %d req %d arg 0x%p from proc %d",fd,request,arg);
         }
     }
     return -EINVAL;
@@ -876,6 +879,11 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
             int ret = poll_body(cached);
             if(ret != 0)
                 return ret;
+
+            is_signal_ret(current) {
+                signal_ret(current);
+            }
+
             process::yield();
         }
     } else {
@@ -887,6 +895,11 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 return ret;
             
             if(time::timer->current_nano() / 1000 < end_timestamp) {
+
+                is_signal_ret(current) {
+                    signal_ret(current);
+                }
+
                 process::yield();
             }
         }

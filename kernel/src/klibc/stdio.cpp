@@ -50,6 +50,7 @@ void klibc::printf(const char* fmt, ...) {
 #include <generic/vfs.hpp>
 
 void klibc::debug_printf(const char* fmt, ...) {
+    return;
 
     thread* cur = current_proc;
     if(cur) {
@@ -70,9 +71,7 @@ void klibc::debug_printf(const char* fmt, ...) {
     char buffer2[4096] = {};
     int len2 = klibc::__printfbuf(buffer2, 4096, "(%lli) [pid %05d] %s", time::timer->current_nano() / 1000,  current_proc ? current_proc->id : 11111, buffer);
 
-    #if defined(__x86_64__)
-        x86_64::serial::write_data(buffer2,len2);
-#endif
+    x86_64::serial::write_data(buffer2,len2);
 
     
 #endif
