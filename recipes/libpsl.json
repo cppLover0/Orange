@@ -1,0 +1,8 @@
+{
+    "name": "libpsl",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "https://github.com/rockdaboot/libpsl/releases/download/0.21.5/libpsl-0.21.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

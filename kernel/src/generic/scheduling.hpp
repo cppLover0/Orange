@@ -59,7 +59,7 @@ struct thread {
     signal_manager* sig;
     signal_member signals_handlers[34];
     sig_stack signal_stack;
-    locks::spinlock lock;
+    std::atomic<bool> lock;
     std::atomic<std::uint32_t> futex;
     std::atomic<std::uint32_t> status;
     std::atomic<std::uint32_t> cpu;
@@ -70,6 +70,7 @@ struct thread {
     bool is_debug;
     void* debug_file_descriptor;
 
+    long long last_syscall;
     bool is_restore_sigset;
     int exit_request; // 1 signle exit, 2 group exit
     std::atomic<bool> did_exec;

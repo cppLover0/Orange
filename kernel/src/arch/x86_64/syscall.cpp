@@ -128,6 +128,7 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
 
     thread* current = current_proc;
     current->signal_ctx = *ctx; // its used to return to userspace when there's signal 
+    current->last_syscall = ctx->rax;
 
     long long ret = 0;
 

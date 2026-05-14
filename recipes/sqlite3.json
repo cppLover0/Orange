@@ -1,0 +1,8 @@
+{
+    "name": "sqlite",
+    "version": "3.51.1",
+    "deps": ["base-libs", "zlib"],
+    "url": "https://sqlite.org/2025/sqlite-autoconf-3510100.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

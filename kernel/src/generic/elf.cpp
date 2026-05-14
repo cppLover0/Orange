@@ -340,6 +340,8 @@ void elf::exec(thread* proc, const char* path, char** argv, char** envp) {
     status = fd.vnode.read(&fd, file, elf_stat.st_size);
     assert(status >= 0, "m");
 
+    proc->did_exec = true;
+
     elfloadresult_t elfload = elf::load_elf(proc, file);
     pmm::buddy::free((std::uint64_t)file - etc::hhdm());
 
@@ -398,6 +400,8 @@ void elf::exec(thread* proc, const char* path, char** argv, char** envp) {
 
     proc->ctx.rsp = (std::uint64_t)_stack;
     proc->ctx.rip = elfload.interp_entry;
+
+    assert(proc->ctx.rip, "hhhhh");
 
     kheap::free(stack_argv);
     kheap::free(stack_envp);

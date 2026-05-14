@@ -1,0 +1,8 @@
+{
+    "name": "libsoup2",
+    "version": "2.74.3",
+    "deps": ["base-libs", "glib-2.0", "zlib", "libnghttp2", "sqlite3", "libpsl"],
+    "url": "https://download.gnome.org/sources/libsoup/2.74/libsoup-2.74.3.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -50,7 +50,6 @@ void klibc::printf(const char* fmt, ...) {
 #include <generic/vfs.hpp>
 
 void klibc::debug_printf(const char* fmt, ...) {
-    return;
 
     thread* cur = current_proc;
     if(cur) {

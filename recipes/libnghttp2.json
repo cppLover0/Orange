@@ -1,0 +1,8 @@
+{
+    "name": "libnghttp2",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://github.com/nghttp2/nghttp2.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

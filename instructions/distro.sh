@@ -49,6 +49,9 @@ install() {
     mkdir -p "${dest_dir}"/usr/lib/locale
     localedef --prefix="${dest_dir}" -i C -f UTF-8 C.UTF-8 --no-archive
 
+    glib-compile-schemas "${dest_dir}/usr"/share/glib-2.0/schemas
+    rm "${dest_dir}/usr"/share/glib-2.0/schemas/gschemas.compiled
+
 }
 
 pkg_work

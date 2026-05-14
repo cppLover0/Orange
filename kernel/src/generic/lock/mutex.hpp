@@ -5,6 +5,7 @@
 #include <generic/lock/spinlock.hpp>
 #include <generic/scheduling.hpp>
 
+// todo
 namespace locks {
     class mutex {
     private:
@@ -16,7 +17,7 @@ namespace locks {
                 return;
                     
             while (flag.test_and_set(std::memory_order_acquire)) {
-                process::yield();
+                arch::pause();
             }
         }
 

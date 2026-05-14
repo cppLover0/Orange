@@ -43,7 +43,7 @@ thread* process::create_process(bool is_user) {
     thread* new_thread = (thread*)(pmm::freelist::alloc_4k() + etc::hhdm());
     new_thread->id = ++last_id;
     new_thread->status = PROCESS_SLEEP;
-    new_thread->lock.lock();
+    new_thread->lock.store(true);
     new_thread->pid = new_thread->id;
     new_thread->original_root = pmm::freelist::alloc_4k();
 
@@ -193,7 +193,7 @@ thread* process::kthread(void (*func)(void*), void* arg) {
     thread* new_thread = (thread*)(pmm::freelist::alloc_4k() + etc::hhdm());
     new_thread->id = ++last_id;
     new_thread->status = PROCESS_SLEEP;
-    new_thread->lock.lock();
+    new_thread->lock.store(true);
     new_thread->pid = new_thread->id;
 #if defined(__x86_64__)
     new_thread->sse_ctx = (std::uint8_t*)(pmm::buddy::alloc(x86_64::sse::size()).phys + etc::hhdm());
@@ -219,7 +219,7 @@ thread* process::kthread(void (*func)(void*), void* arg) {
 
 void process::wakeup(thread* thread) {
     thread->status = PROCESS_LIVE;
-    thread->lock.unlock();
+    thread->lock.store(false);
 }
 
 int process::futex_wake(thread* proc, int* lock, int count) {
@@ -269,7 +269,7 @@ void process::kill(thread* t, int status, bool exit_group) {
         }
 
         t->status = PROCESS_ZOMBIE;
-        t->lock.try_lock();
+        t->lock.store(true);
         if(t->syscall_stack) pmm::buddy::free(t->original_syscall_stack - etc::hhdm());
         if(t->name) pmm::freelist::free((std::uint64_t)t->name - etc::hhdm());
         if(t->chroot) pmm::freelist::free((std::uint64_t)t->chroot - etc::hhdm());
@@ -336,8 +336,15 @@ void process::schedule(void* ctx) {
 #endif
 
         }
+
+#if defined(__x86_64__)
+        if(current_thread->ctx.rip == 0) {
+            assert(0, "holy shitd id %d did_exec %d last_syscall %lli curen cpu %d cpu %d prempt from 0x%p is_premted %d", current_thread->id, current_thread->did_exec.load(), current_thread->last_syscall, current_thread->cpu.load(), current_cpu, ((x86_64::idt::int_frame_t*)(ctx))->rip, ((x86_64::idt::int_frame_t*)(ctx))->rflags & (1 << 9));
+        }
+#endif
+  
         current_thread->should_not_save_ctx = false;
-        current_thread->lock.unlock();
+        current_thread->lock.store(false);
         current_thread = current_thread->next;
     } else {
         current_thread = (thread*)head_proc.load();
@@ -348,7 +355,8 @@ void process::schedule(void* ctx) {
            // klibc::printf("current_proc %d cpu %d lock %d status %d\r\n",current_thread->id,current_thread->cpu.load(), current_thread->lock.test(), current_thread->status.load());
             
            if(current_thread->cpu == current_cpu && current_thread->status == PROCESS_LIVE) {
-                if(!current_thread->lock.try_lock()) {
+                bool excepted = false;
+                if(current_thread->lock.compare_exchange_strong(excepted, true)) {
 
                     if(current_thread->exit_request != 0) {
                         kill(current_thread, current_thread->exit_code, current_thread->exit_request == 2 ? true : false);
@@ -434,6 +442,10 @@ void process::schedule(void* ctx) {
                                     current_thread->ctx.cr3 = current_thread->original_root;
                                     current_thread->ctx.rflags = (1 << 9);
 
+                                    if(current_thread->ctx.rsp == 0) {
+                                        assert(0, "holy shit sig id %d did_exec %d", current_thread->id, current_thread->did_exec.load());
+                                    }
+
                                     arch::enable_paging(gobject::kernel_root);
 
                                 }
@@ -447,6 +459,7 @@ void process::schedule(void* ctx) {
 
                     klibc::memcpy(ctx, &current_thread->ctx, sizeof(current_thread->ctx));
 #if defined(__x86_64__)
+
                     assembly::wrmsr(0xC0000100, current_thread->fs_base);
                     if(current_thread->sse_ctx)
                         x86_64::sse::load(current_thread->sse_ctx);
@@ -465,6 +478,8 @@ void process::schedule(void* ctx) {
                         current_thread->pending_child_settid = nullptr;
                         arch::enable_paging(gobject::kernel_root);
                     }
+
+                    current_thread->lock.store(true);
 
                     assert(current_thread->original_root == current_thread->ctx.cr3, ":(c");
 

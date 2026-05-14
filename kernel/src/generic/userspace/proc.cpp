@@ -601,7 +601,6 @@ long long sys_execve(const char* path, char** argv, char** envp) {
         return -ENOEXEC;
 
     current_thread->should_not_save_ctx = true;
-    current_thread->did_exec = true;
     
     arch::enable_paging(gobject::kernel_root);
 
@@ -610,7 +609,6 @@ long long sys_execve(const char* path, char** argv, char** envp) {
 
     current_thread->vmem->free();
 
-    pmm::freelist::alloc_4k();
     current_thread->original_root = pmm::freelist::alloc_4k();
 
     current_thread->vmem = new vmm;
@@ -627,8 +625,6 @@ long long sys_execve(const char* path, char** argv, char** envp) {
     current_thread->ctx.rflags = (1 << 9);
     current_thread->ctx.cr3 = current_thread->original_root;
 #endif
-
-    
 
     elf::exec(current_thread, buffer, stack_argv, stack_envp);
 
