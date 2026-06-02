@@ -1,0 +1,8 @@
+{
+    "name": "gnome-desktop-3.0",
+    "version": "3.38.7",
+    "deps": ["base-libs", "gtk3", "gobject-introspection", "gtk4"],
+    "url": "https://gitlab.gnome.org/GNOME/gnome-desktop/-/archive/3.38.7/gnome-desktop-3.38.7.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

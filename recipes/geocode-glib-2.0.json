@@ -1,0 +1,8 @@
+{
+    "name": "geocode-glib-2.0",
+    "version": "recent",
+    "deps": ["base-libs", "gtk3", "libsoup", "json-glib", "libsoup", "libsoup2"],
+    "url": "git:https://gitlab.gnome.org/GNOME/geocode-glib.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

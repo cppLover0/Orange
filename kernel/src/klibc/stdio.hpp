@@ -18,6 +18,7 @@ namespace klibc {
     }
 
     void debug_printf(const char* fmt, ...);
+    void serial_printf(const char* fmt, ...);
     void printf(const char* fmt, ...);
 };
 

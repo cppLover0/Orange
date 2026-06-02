@@ -1,0 +1,8 @@
+{
+    "name": "launch_xorg",
+    "version": "wahhh",
+    "deps": ["base-libs"],
+    "url": "src:tools/launch_xorg",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

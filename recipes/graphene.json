@@ -1,0 +1,8 @@
+{
+    "name": "graphene",
+    "version": "recent",
+    "deps": ["base-libs", "gobject-introspection", "glib-2.0"],
+    "url": "git:https://github.com/ebassi/graphene.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

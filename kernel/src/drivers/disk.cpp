@@ -45,7 +45,6 @@ partition_style determine_disk_type(disk* target_disk) {
         return partition_style::mbr;
     }
 
-    assert(0, "Unknown partition style");
     return partition_style::err;
 }
 
@@ -185,8 +184,7 @@ void drivers::init_disk(disk* new_disk) {
         break;
     default:
         bool status = disk_try_linux(new_disk);
-        if(status == false)
-            assert(0,"unsupported disk\r\n");
+        (void)status;
         break;
     }
 }

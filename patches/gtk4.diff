@@ -1,0 +1,236 @@
+diff -Naur gtk4/gdk/loaders/gdkpng.c gtk4-clean/gdk/loaders/gdkpng.c
+--- gtk4/gdk/loaders/gdkpng.c	2026-04-19 02:33:20.000000000 +0300
++++ gtk4-clean/gdk/loaders/gdkpng.c	2026-05-29 12:14:53.696240327 +0300
+@@ -345,7 +345,7 @@
+   png_set_read_user_chunk_fn (png, &cicp, png_read_chunk_func);
+ #endif
+ 
+-  if (sigsetjmp (png_jmpbuf (png), 1))
++  if (setjmp (png_jmpbuf (png)))
+     {
+       g_free (buffer);
+       g_free (row_pointers);
+@@ -664,7 +664,7 @@
+   gdk_color_state_ref (color_state);
+   bytes = NULL;
+ 
+-  if (sigsetjmp (png_jmpbuf (png), 1))
++  if (setjmp (png_jmpbuf (png)))
+     {
+       gdk_color_state_unref (color_state);
+       g_clear_pointer (&bytes, g_bytes_unref);
+diff -Naur gtk4/gdk/x11/gdkdisplay-x11.c gtk4-clean/gdk/x11/gdkdisplay-x11.c
+--- gtk4/gdk/x11/gdkdisplay-x11.c	2026-04-19 02:33:20.000000000 +0300
++++ gtk4-clean/gdk/x11/gdkdisplay-x11.c	2026-05-29 11:56:52.592339960 +0300
+@@ -56,8 +56,6 @@
+ #include <errno.h>
+ #include <unistd.h>
+ 
+-#include <epoxy/egl.h>
+-
+ #include <X11/Xatom.h>
+ #include <X11/Xlibint.h>
+ 
+@@ -2965,6 +2963,8 @@
+     visinfo->visual->blue_mask  == 0x0000ff;
+ }
+ 
++#if 0
++
+ static guint
+ gdk_x11_display_rate_egl_config (GdkDisplay *display,
+                                  gpointer    egl_display,
+@@ -2992,6 +2992,8 @@
+   return distance;
+ }
+ 
++#endif
++
+ static gboolean
+ gdk_x11_display_init_gl_backend (GdkX11Display  *self,
+                                  Visual        **out_visual,
+@@ -3000,7 +3002,6 @@
+ {
+   GdkDisplay *display = GDK_DISPLAY (self);
+   Display *dpy = gdk_x11_display_get_xdisplay (GDK_DISPLAY (self));
+-  EGLDisplay egl_display;
+   XVisualInfo *visinfo;
+   int visualid;
+ 
+@@ -3015,7 +3016,7 @@
+    * EGL, we want to avoid using it in favor of GLX.
+    */
+ 
+-  if (!gdk_display_init_egl (display, EGL_PLATFORM_X11_KHR, dpy, FALSE, error))
++  if (1)
+     {
+       g_clear_error (error);
+ 
+@@ -3023,30 +3024,11 @@
+         return TRUE;
+       
+       g_clear_error (error);
+-      if (!gdk_display_init_egl (display, EGL_PLATFORM_X11_KHR, dpy, TRUE, error))
++      if (1)
+         return FALSE;
+     }
+ 
+-  if (!eglGetConfigAttrib (gdk_display_get_egl_display (display),
+-                           gdk_display_get_egl_config (display, GDK_MEMORY_U8),
+-                           EGL_NATIVE_VISUAL_ID,
+-                           &visualid))
+-    {
+-      /* We guarantee this when rating configs */
+-      g_assert_not_reached ();
+-    }
+-  visinfo = gdk_x11_display_get_visual_info_for_visual (self, visualid);
+-  g_assert (visinfo);
+-  *out_visual = visinfo->visual;
+-  *out_depth = visinfo->depth;
+-
+-  egl_display = gdk_display_get_egl_display (display);
+-
+-  self->egl_version = epoxy_egl_version (egl_display);
+-
+-  XFree (visinfo);
+-
+-  return TRUE;
++  return FALSE;
+ }
+ 
+ static GdkGLContext *
+@@ -3062,8 +3044,6 @@
+ 
+   if (self->glx_config != NULL)
+     return g_object_new (GDK_TYPE_X11_GL_CONTEXT_GLX, "surface", self->leader_gdk_surface, NULL);
+-  else if (gdk_display_get_egl_display (display))
+-    return g_object_new (GDK_TYPE_X11_GL_CONTEXT_EGL, "surface", self->leader_gdk_surface, NULL);
+   else
+     g_return_val_if_reached (NULL);
+ }
+@@ -3101,7 +3081,6 @@
+   display_class->get_keymap = gdk_x11_display_get_keymap;
+ 
+   display_class->init_gl = gdk_x11_display_init_gl;
+-  display_class->rate_egl_config = gdk_x11_display_rate_egl_config;
+ 
+   display_class->get_default_seat = gdk_x11_display_get_default_seat;
+ 
+diff -Naur gtk4/gdk/x11/meson.build gtk4-clean/gdk/x11/meson.build
+--- gtk4/gdk/x11/meson.build	2026-04-19 02:33:20.000000000 +0300
++++ gtk4-clean/gdk/x11/meson.build	2026-05-29 11:53:53.146643984 +0300
+@@ -8,7 +8,6 @@
+   'gdkdevicemanager-x11.c',
+   'gdkdevicemanager-xi2.c',
+   'gdkdisplay-x11.c',
+-  'gdkglcontext-egl.c',
+   'gdkglcontext-glx.c',
+   'gdkglcontext-x11.c',
+   'gdkkeys-x11.c',
+diff -Naur gtk4/gtk/inspector/general.c gtk4-clean/gtk/inspector/general.c
+--- gtk4/gtk/inspector/general.c	2026-04-19 02:33:20.000000000 +0300
++++ gtk4-clean/gtk/inspector/general.c	2026-05-29 12:22:26.796460535 +0300
+@@ -49,7 +49,6 @@
+ #ifdef GDK_WINDOWING_X11
+ #include "x11/gdkx.h"
+ #include <epoxy/glx.h>
+-#include <epoxy/egl.h>
+ #endif
+ 
+ #ifdef GDK_WINDOWING_WIN32
+@@ -606,7 +605,7 @@
+   g_strfreev (items);
+ }
+ 
+-#if defined(GDK_WINDOWING_X11) || defined(GDK_WINDOWING_WAYLAND) || (defined(GDK_WINDOWING_WIN32) && defined(GDK_WIN32_ENABLE_EGL))
++#if 0
+ static EGLDisplay
+ get_egl_display (GdkDisplay *display)
+ {
+@@ -669,7 +668,7 @@
+       gtk_string_list_append (GTK_STRING_LIST (gen->gl_extensions_list), gl_ext);
+     }
+ 
+-#if defined(GDK_WINDOWING_X11) || defined(GDK_WINDOWING_WAYLAND) || (defined(GDK_WINDOWING_WIN32) && defined(GDK_WIN32_ENABLE_EGL))
++#if 0
+   EGLDisplay egl_display = get_egl_display (gen->display);
+   if (egl_display)
+     {
+@@ -782,7 +781,7 @@
+ 
+   ext = g_string_new ("");
+ 
+-#if defined(GDK_WINDOWING_X11) || defined(GDK_WINDOWING_WAYLAND) || (defined(GDK_WINDOWING_WIN32) && defined(GDK_WIN32_ENABLE_EGL))
++#if 0
+   EGLDisplay egl_display = get_egl_display (display);
+   if (egl_display)
+     {
+diff -Naur gtk4/meson.build gtk4-clean/meson.build
+--- gtk4/meson.build	2026-04-19 02:33:20.000000000 +0300
++++ gtk4-clean/meson.build	2026-05-29 12:11:54.038340744 +0300
+@@ -608,28 +608,12 @@
+   cdata.set('HAVE_XDAMAGE', 1)
+   cdata.set('HAVE_XFIXES', 1)
+ 
+-  if not cc.has_function('XkbQueryExtension', dependencies: x11_dep,
+-                         prefix : '#include <X11/XKBlib.h>')
+-    error('X11 backend enabled, but Xkb not found.')
+-  endif
+   cdata.set('HAVE_XKB', 1)
+ 
+-  if not cc.has_function('XSyncQueryExtension', dependencies: xext_dep,
+-                         prefix: '''#include <X11/Xlib.h>
+-                                    #include <X11/extensions/sync.h>''')
+-    error('X11 backend enabled, but Xsync not found.')
+-  endif
+   cdata.set('HAVE_XSYNC', 1)
+ 
+-  if not cc.has_function('XGetEventData', dependencies: x11_dep)
+-    error('X11 backend enabled, but no generic event support.')
+-  endif
+   cdata.set('HAVE_XGENERICEVENTS', 1)
+ 
+-  if not xi_dep.found() or not cc.has_header('X11/extensions/XInput2.h', dependencies: xi_dep)
+-    error('X11 backend enabled, but XInput2 not found.')
+-  endif
+-
+   # Note that we also check that the XIScrollClassInfo struct is defined,
+   # because at least Ubuntu Oneiric seems to have XIAllowTouchEvents(),
+   #   but not the XIScrollClassInfo struct
+@@ -637,24 +621,11 @@
+   has_scroll_class_info = cc.has_member('XIScrollClassInfo', 'number', dependencies: xi_dep,
+                                         prefix: '''#include <X11/Xlib.h>
+                                                    #include <X11/extensions/XInput2.h>''')
+-  if not has_allow_touch_events or not has_scroll_class_info
+-    error('X11 backend enabled, but XInput2.2 not found.')
+-  endif
+-  cdata.set('XINPUT_2_2', 1)
+-
+-  has_gesture_pinch_event = cc.has_member('XIGesturePinchEvent', 'type', dependencies: xi_dep,
+-                                          prefix: '''#include <X11/Xlib.h>
+-                                                     #include <X11/extensions/XInput2.h>''')
+-  if has_gesture_pinch_event
+-    cdata.set('XINPUT_2_4', 1)
+-  endif
++  cdata.set('XINPUT_2_2', 0)
++  cdata.set('XINPUT_2_4', 0)
+ 
+   xinerama_dep = dependency('xinerama')
+-  if not cc.has_header_symbol('X11/extensions/Xinerama.h', 'XineramaQueryExtension', dependencies: xinerama_dep)
+-    error('X11 backend enabled, but Xinerama extension does not work.')
+-  endif
+   cdata.set('HAVE_XFREE_XINERAMA', 1)
+-
+   cdata.set('HAVE_RANDR', xrandr_dep.found())
+   cdata.set('HAVE_RANDR15', xrandr15_dep.found())
+ endif
+@@ -726,9 +697,6 @@
+   cdata.set('HAVE_DRM_DRM_FOURCC_H', have_drm_fourcc)
+ endif
+ 
+-cdata.set('HAVE_DMABUF', cc.has_header('linux/dma-buf.h'))
+-cdata.set('HAVE_UDMABUF', cc.has_header('linux/udmabuf.h'))
+-
+ cloudproviders_dep = dependency('cloudproviders',
+   required: get_option('cloudproviders'),
+   version: cloudproviders_req,

@@ -1,0 +1,8 @@
+{
+    "name": "gnome-calculator",
+    "version": "40.0",
+    "deps": ["base-libs", "gtk3", "libsoup", "libgee", "libmpc", "libsoup2", "gtksourceview4"],
+    "url": "https://gitlab.gnome.org/GNOME/gnome-calculator/-/archive/40.0/gnome-calculator-40.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -12,6 +12,8 @@ sysroot=sys.argv[1]
 cfg=f"{sysroot}/etc/packages.json"
 act=sys.argv[2]
 
+from_dir=os.getcwd()
+
 print(f"config: {cfg}, sysroot: {sysroot}")
 
 try:
@@ -71,7 +73,15 @@ def download_and_extract(url, target_dir):
     if os.path.exists(target_dir) and os.listdir(target_dir):
         return
 
-    if url.startswith("git:"):
+    if url.startswith("src:"):
+        actual_url = url[4:]
+        print(f"orangestrap: using from source dir {actual_url}")
+        try:
+            os.system(f"cp -rf \"{from_dir}/{actual_url}\" \"{target_dir}\"")
+        except:
+            print("orangestrap: failed to copy source dir")
+            sys.exit(1)
+    elif url.startswith("git:"):
         actual_url = url[4:]
         print(f"orangestrap: cloning git repo {actual_url}")
         try:

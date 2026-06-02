@@ -1,0 +1,8 @@
+{
+    "name": "libxcursor",
+    "version": "recent",
+    "deps": ["base-libs", "libx11", "libxext", "libxfixes", "libxrender"],
+    "url": "git:https://gitlab.freedesktop.org/xorg/lib/libxcursor.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

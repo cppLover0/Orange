@@ -1,0 +1,8 @@
+{
+    "name": "python",
+    "version": "3.13.9",
+    "deps": ["base-libs", "libffi", "sqlite3", "glib-2.0"],
+    "url": "https://www.python.org/ftp/python/3.13.9/Python-3.13.9.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

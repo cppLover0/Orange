@@ -6,6 +6,7 @@
 #include <klibc/stdio.hpp>
 #include <utils/errno.hpp>
 #include <generic/userspace/syscall_list.hpp>
+#include <generic/time.hpp>
 
 long long sys_stub() {
     return 0;
@@ -18,6 +19,7 @@ long long sys_enosys_stub() {
 extern "C" void syscall_handler();
 
 syscall_item syscall_table[] = {
+    {false, 0, (void*)sys_enosys_stub},
     {false, 1, (void*)sys_read},
     {false, 2, (void*)sys_write},
     {false, 3, (void*)sys_mmap},
@@ -109,8 +111,20 @@ syscall_item syscall_table[] = {
     {false, 89, (void*)sys_getsockname},
     {false, 90, (void*)sys_socketpair},
     {false, 91, (void*)sys_pwrite64},
-    {false, 92, (void*)sys_setsid}
+    {false, 92, (void*)sys_setsid},
+    {false, 93, (void*)sys_getitimer},
+    {false, 94, (void*)sys_setitimer},
+    {false, 95, (void*)sys_shmat},
+    {false, 96, (void*)sys_shmctl},
+    {false, 97, (void*)sys_shmget},
+    {false, 98, (void*)sys_shmdt},
+    {false, 99, (void*)sys_getaffinity}
 };
+
+long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);
+long long sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
+long long sys_shmget(int key, size_t size, int shmflg);
+long long sys_shmdt(std::uint64_t base);
 
 syscall_item* find_syscall(long long num) {
     for(uint64_t i = 0; i < sizeof(syscall_table) / sizeof(syscall_item);i++) {
@@ -132,6 +146,10 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
 
     long long ret = 0;
 
+#ifdef SYSCALL_PROFILING
+    std::uint64_t start = time::timer->current_nano();
+#endif
+
     //  if(current->is_debug)
     //      klibc::debug_printf("sys %d rdi 0x%p rsi 0x%p rdx 0x%p cwd %s\n", current_sys->num, ctx->rdi, ctx->rsi, ctx->rdx, current->cwd);
 
@@ -142,6 +160,13 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
         auto func = (long long (*)(long long, long long, long long, long long, long long, long long))(current_sys->sys);
         ret = func(ctx->rdi, ctx->rsi, ctx->rdx, ctx->r10, ctx->r8, ctx->r9);     
     }
+
+#ifdef SYSCALL_PROFILING
+    std::uint64_t end = time::timer->current_nano();
+    if(current_sys->num != 6 && current_sys->num != 21 && current_sys->num != 76 && current_sys->num != 72 && current_sys->num != 74) {
+        klibc::serial_printf("sys %d took %lli us, %lli ms\n", current_sys->num, (end - start) / 1000, ((end - start) / 1000) / 1000);
+    }
+#endif
 
     if(current->is_debug && current_sys->num != 6)
          klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);

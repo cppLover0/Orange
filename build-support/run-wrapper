@@ -1,0 +1,18 @@
+#!/bin/bash
+
+unset LD_LIBRARY_PATH
+
+_path="$1"
+shift 1
+
+if patchelf --print-interpreter "${_path}" | grep /lib/ld64.so.1 2>&1 >/dev/null; then
+    _temp=$(mktemp)
+    cp -p "${_path}" "${_temp}"
+    execstack -c "${_temp}"
+    patchelf --set-interpreter "${RUN_WRAPPER_INTERP}" "${_temp}"
+    patchelf --print-interpreter "${_temp}" 
+    export LD_LIBRARY_PATH="${RUN_WRAPPER_LD_LIBRARY_PATH}"
+    _path="${_temp}"
+fi
+
+"${_path}" "$@"

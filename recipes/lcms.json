@@ -1,0 +1,8 @@
+{
+    "name": "lcms",
+    "version": "recent",
+    "deps": ["base-libs", "gtk3", "libpng"],
+    "url": "git:https://github.com/mm2/Little-CMS.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

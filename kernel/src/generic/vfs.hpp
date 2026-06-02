@@ -25,7 +25,7 @@ struct statfs {
    long    f_spare[6];
 };
 
-#define USERSPACE_PIPE_SIZE (512 * 1024)
+#define USERSPACE_PIPE_SIZE (128 * 1024)
 #define S_IFMT  00170000
 #define S_IFSOCK 0140000
 #define S_IFLNK	 0120000
@@ -362,7 +362,7 @@ namespace vfs {
             return count;
         }
 
-        std::uint64_t write(const char* src_buffer, std::uint64_t count) {
+        std::uint64_t write(const char* src_buffer, std::uint64_t count, int is_nonblock = 0) {
 
             std::uint64_t written = 0;
 
@@ -371,6 +371,12 @@ namespace vfs {
 
                 std::uint64_t space_left = this->total_size - this->size;
                 if (space_left == 0) {
+
+                    if(flags & O_NONBLOCK || is_nonblock) {
+                        this->lock.unlock(state);
+                        return written > 0 ? written : -11;
+                    }
+
                     this->lock.unlock(state);
                     process::yield();
                     continue;
@@ -421,12 +427,6 @@ namespace vfs {
 
             std::uint64_t read_bytes = 0;
 
-            if(is_packet) {
-                dest_buffer[0] = 0;
-                count--;
-                dest_buffer++;
-            }
-
             while (true) {
                 bool state = this->lock.lock();
 
@@ -450,11 +450,21 @@ namespace vfs {
                     process::yield();
                     continue;
                 }
+
+                if(is_packet) {
+                    dest_buffer[0] = 0;
+                    count--;
+                    dest_buffer++;
+                }
+
                 
                 read_bytes = (count < (std::uint64_t)this->size) ? count : (std::uint64_t)this->size;
                 klibc::memcpy(dest_buffer, this->buffer, read_bytes);
                 klibc::memmove(this->buffer, this->buffer + read_bytes, this->size - read_bytes);
                 this->size -= read_bytes;
+
+                if(is_packet)
+                    read_bytes++;
 
                 this->lock.unlock(state);
                 break;
@@ -877,41 +887,41 @@ namespace vfs {
             } else if(file->type == file_descriptor_type::socket) {
                 if(file->socket.socket_type == PF_UNIX && !file->socket.is_listen && file->socket.write_socket && file->socket.read_socket) {
 
-                    // if(file->socket.socket_pointer) {
-                    //     process_close(file->socket.socket_pointer);
-                    //     file->socket.socket_pointer = 0;
-                    // }
+                    if(file->socket.socket_pointer) {
+                        process_close(file->socket.socket_pointer);
+                        file->socket.socket_pointer = 0;
+                    }
 
-                    // if(file->socket.read_socket->connected_to_pipe == 1 && file->socket.write_socket->connected_to_pipe == 1) {
-                    //     delete file->socket.un.r_fd;
-                    //     delete file->socket.un.w_fd;
-                    //     delete file->socket.un.r_ucred;
-                    //     delete file->socket.un.w_ucred;
-                    //     file->socket.un.r_fd = 0;
-                    //     file->socket.un.w_fd = 0;
-                    //     file->socket.un.r_ucred = 0;
-                    //     file->socket.un.w_ucred = 0;
-                    // }
+                    if(file->socket.read_socket->connected_to_pipe == 1 && file->socket.write_socket->connected_to_pipe == 1) {
+                        delete file->socket.un.r_fd;
+                        delete file->socket.un.w_fd;
+                        delete file->socket.un.r_ucred;
+                        delete file->socket.un.w_ucred;
+                        file->socket.un.r_fd = 0;
+                        file->socket.un.w_fd = 0;
+                        file->socket.un.r_ucred = 0;
+                        file->socket.un.w_ucred = 0;
+                    }
 
                     if(file->socket.socket_side == 1) {
                         //file->socket.read_socket->socket_counter--;
-                        //file->socket.read_socket->close(PIPE_SIDE_READ);
-                        //file->socket.write_socket->close(PIPE_SIDE_WRITE);
+                        file->socket.read_socket->close(PIPE_SIDE_READ);
+                        file->socket.write_socket->close(PIPE_SIDE_WRITE);
                     } else {
                         //file->socket.write_socket->socket_counter--;
-                        //file->socket.write_socket->close(PIPE_SIDE_READ);
-                        //file->socket.read_socket->close(PIPE_SIDE_WRITE);
+                        file->socket.write_socket->close(PIPE_SIDE_READ);
+                        file->socket.read_socket->close(PIPE_SIDE_WRITE);
                     }
                 }
             } else if(file->type == file_descriptor_type::socketpair) {
                 if(file->socketpair.is_slave) {
                     //file->socketpair.read_socket->socket_counter--;
-                    //file->socketpair.read_socket->close(PIPE_SIDE_READ);
-                    //file->socketpair.write_socket->close(PIPE_SIDE_WRITE);
+                    file->socketpair.read_socket->close(PIPE_SIDE_READ);
+                    file->socketpair.write_socket->close(PIPE_SIDE_WRITE);
                 } else {
                     //file->socketpair.write_socket->socket_counter--;
-                    //file->socketpair.write_socket->close(PIPE_SIDE_READ);
-                    //file->socketpair.read_socket->close(PIPE_SIDE_WRITE);
+                    file->socketpair.write_socket->close(PIPE_SIDE_READ);
+                    file->socketpair.read_socket->close(PIPE_SIDE_WRITE);
                 }
             } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);

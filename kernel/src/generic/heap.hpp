@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-#define KHEAP_SIZE (16 * 1024 * 1024)
+#define KHEAP_SIZE (36 * 1024 * 1024)
 #define HEAP_SIZE KHEAP_SIZE
 struct heap_block {
     std::uint32_t size;

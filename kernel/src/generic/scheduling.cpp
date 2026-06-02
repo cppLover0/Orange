@@ -43,7 +43,7 @@ thread* process::create_process(bool is_user) {
     thread* new_thread = (thread*)(pmm::freelist::alloc_4k() + etc::hhdm());
     new_thread->id = ++last_id;
     new_thread->status = PROCESS_SLEEP;
-    new_thread->lock.store(true);
+    new_thread->lock.try_lock();
     new_thread->pid = new_thread->id;
     new_thread->original_root = pmm::freelist::alloc_4k();
 
@@ -63,6 +63,10 @@ thread* process::create_process(bool is_user) {
     new_thread->cwd = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
     new_thread->cwd[0] = '/';
     new_thread->cwd[1] = '\0';
+
+    new_thread->real_next = -1;
+    new_thread->prof_next = -1;
+    new_thread->virt_next = -1;
 
     proc_count++;
 
@@ -170,6 +174,8 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
         new_proc->pending_child_settid = (int*)clarg.child_tid;
     }
 
+    //klibc::serial_printf("clon3 %d vmem 0x%p\n", new_proc->id, new_proc->vmem);
+
     assert(new_proc->ctx.cr3, "type shit");
     assert(new_proc->original_root, "type shit");
     assert(new_proc->sig != proc->sig, "oh man");
@@ -193,7 +199,7 @@ thread* process::kthread(void (*func)(void*), void* arg) {
     thread* new_thread = (thread*)(pmm::freelist::alloc_4k() + etc::hhdm());
     new_thread->id = ++last_id;
     new_thread->status = PROCESS_SLEEP;
-    new_thread->lock.store(true);
+    new_thread->lock.try_lock();
     new_thread->pid = new_thread->id;
 #if defined(__x86_64__)
     new_thread->sse_ctx = (std::uint8_t*)(pmm::buddy::alloc(x86_64::sse::size()).phys + etc::hhdm());
@@ -208,6 +214,10 @@ thread* process::kthread(void (*func)(void*), void* arg) {
 #endif
     new_thread->original_root = gobject::kernel_root;
 
+    new_thread->real_next = -1;
+    new_thread->prof_next = -1;
+    new_thread->virt_next = -1;
+
     bool state = scheduling_lock.lock();
     new_thread->next = (thread*)head_proc.load();
     head_proc = (void*)new_thread;
@@ -219,7 +229,7 @@ thread* process::kthread(void (*func)(void*), void* arg) {
 
 void process::wakeup(thread* thread) {
     thread->status = PROCESS_LIVE;
-    thread->lock.store(false);
+    thread->lock.unlock();
 }
 
 int process::futex_wake(thread* proc, int* lock, int count) {
@@ -269,8 +279,9 @@ void process::kill(thread* t, int status, bool exit_group) {
         }
 
         t->status = PROCESS_ZOMBIE;
-        t->lock.store(true);
+        t->lock.try_lock();
         if(t->syscall_stack) pmm::buddy::free(t->original_syscall_stack - etc::hhdm());
+        if(t->sse_ctx) pmm::buddy::free((std::uint64_t)t->sse_ctx - etc::hhdm());
         if(t->name) pmm::freelist::free((std::uint64_t)t->name - etc::hhdm());
         if(t->chroot) pmm::freelist::free((std::uint64_t)t->chroot - etc::hhdm());
         if(t->cwd) pmm::freelist::free((std::uint64_t)t->cwd - etc::hhdm());
@@ -343,8 +354,20 @@ void process::schedule(void* ctx) {
         }
 #endif
   
+
+        if(current_thread->virt_next != -1) {
+            std::int64_t delta = (time::timer->current_nano() / 1000) - current_thread->schedule_us_ts;
+            current_thread->virt_next = current_thread->virt_next > delta ? current_thread->virt_next - delta : 0;
+        }
+
+        if(current_thread->prof_next != -1) {
+            std::int64_t delta = (time::timer->current_nano() / 1000) - current_thread->schedule_us_ts;
+            current_thread->prof_next = current_thread->prof_next > delta ? current_thread->prof_next - delta : 0;
+        }
+
+        current_thread->schedule_us_ts = 0;
         current_thread->should_not_save_ctx = false;
-        current_thread->lock.store(false);
+        current_thread->lock.unlock();
         current_thread = current_thread->next;
     } else {
         current_thread = (thread*)head_proc.load();
@@ -354,18 +377,55 @@ void process::schedule(void* ctx) {
         while(current_thread) {
            // klibc::printf("current_proc %d cpu %d lock %d status %d\r\n",current_thread->id,current_thread->cpu.load(), current_thread->lock.test(), current_thread->status.load());
             
-           if(current_thread->cpu == current_cpu && current_thread->status == PROCESS_LIVE) {
-                bool excepted = false;
-                if(current_thread->lock.compare_exchange_strong(excepted, true)) {
+           if(current_thread->cpu.load() == current_cpu && current_thread->status.load() == PROCESS_LIVE) {
+                if(current_thread->lock.try_lock() == false) {
 
                     if(current_thread->exit_request != 0) {
+                        arch::enable_paging(gobject::kernel_root);
                         kill(current_thread, current_thread->exit_code, current_thread->exit_request == 2 ? true : false);
                         goto happy;
                     }
 
+                    if(current_thread->real_next != -1 && current_thread->real_next != 0) {
+                        if((std::int64_t)(time::timer->current_nano() / 1000) > current_thread->real_next) {
+                            if(current_thread->sig) {
+                                current_thread->real.it_value = current_thread->real.it_interval;
+                                current_thread->real_next = process::itimer_calculate(&current_thread->real);
+                                current_thread->sig->push(SIGALRM);
+                            }
+                        }
+                    }
+
+                    if(current_thread->virt_next != -1) {
+                        if(current_thread->virt_next == 0) {
+                            if(current_thread->sig) {
+                                current_thread->virt.it_value = current_thread->virt.it_interval;
+                                current_thread->virt_next = process::itimer_calculate(&current_thread->virt, false);
+                                current_thread->sig->push(SIGVTALRM);
+                            }
+                        }
+                    }
+
+                    if(current_thread->prof_next != -1) {
+                        if(current_thread->prof_next == 0) {
+                            if(current_thread->sig) {
+                                current_thread->prof.it_value = current_thread->prof.it_interval;
+                                current_thread->prof_next = process::itimer_calculate(&current_thread->prof, false);
+                                current_thread->sig->push(SIGPROF);
+                            }
+                        }
+                    }
+
 // signals for now only for x86_64 at least cuz i have no idea how this shit works on other arches
 #if defined(__x86_64__)
-                    if(current_thread->sig && current_thread->ctx.cs != 0x08) {
+
+                    if(current_thread->sig && current_thread->ctx.cs == 0x08) {
+                        if(current_thread->sig->is_not_empty_sigset(&current_thread->sigset)) {
+                            log("m", "cant do sig rn rip 0x%p\n", current_thread->ctx.rip);
+                        }
+                    }
+
+                    if(current_thread->sig && current_thread->ctx.cs != 0x08 && current_thread->should_block_signals_next == false) {
                         std::int8_t sig = current_thread->sig->pop(&current_thread->sigset);
                         if(sig != -1) {
                             if(sig != SIGKILL) {
@@ -395,7 +455,7 @@ void process::schedule(void* ctx) {
                                     }
 
                                     if(current_thread->is_debug) {
-                                        klibc::debug_printf("AAAA sig %d to proc %d 0x%p 0x%p\n", sig, current_thread->id, current_thread->signals_handlers[sig].handler, current_thread->signals_handlers[sig].restorer);
+                                        //klibc::debug_printf("AAAA sig %d to proc %d 0x%p 0x%p\n", sig, current_thread->id, current_thread->signals_handlers[sig].handler, current_thread->signals_handlers[sig].restorer);
                                     }
 
                                     signal_trace new_sigtrace;
@@ -404,10 +464,27 @@ void process::schedule(void* ctx) {
 
                                     std::uint64_t* new_stack = 0;
 
+                                    if(current_thread->vmem) {
+                                        if(current_thread->vmem->getlen(current_thread->ctx.rsp) == nullptr) {
+                                            klibc::printf("invalid stack 0x%p for proc %d !", current_thread->ctx.rsp);
+#if defined(__x86_64__)
+                                            asm volatile("ud2");
+#else
+                                            assert(0, "meow");
+#endif
+                                        }
+                                    }
+
                                     if(!current_thread->sigtrace_obj) {
                                         new_stack = (std::uint64_t*)(!(current_thread->signals_handlers[sig].flags & SA_ONSTACK) ? current_thread->ctx.rsp - 8 : (std::uint64_t)current_thread->alt_stack.ss_sp);
                                     } else {
                                         new_stack = (std::uint64_t*)(current_thread->ctx.rsp - 8);
+                                    }
+
+                                    if(current_thread->vmem->getlen((std::uint64_t)new_stack) == nullptr) {
+                                        // i cant do anything :(
+                                        kill(current_thread, 128 + 11, true);
+                                        goto happy;
                                     }
 
                                     new_stack = (std::uint64_t*)ALIGNDOWN(((std::uint64_t)new_stack - PAGE_SIZE),16);
@@ -479,9 +556,16 @@ void process::schedule(void* ctx) {
                         arch::enable_paging(gobject::kernel_root);
                     }
 
-                    current_thread->lock.store(true);
+                    if((current_thread->prof_next != 0 && current_thread->prof_next != -1) || (current_thread->virt_next != 0 && current_thread->virt_next != -1)) {
+                        current_thread->schedule_us_ts = time::timer->current_nano() / 1000;
+                    }
 
-                    assert(current_thread->original_root == current_thread->ctx.cr3, ":(c");
+                    current_thread->should_block_signals_next = false;
+
+                    current_thread->lock.try_lock();
+
+                    assert(current_thread->original_root == current_thread->ctx.cr3, ":(c ip 0x%p", current_thread->ctx.rip);
+                    assert(current_cpu == CPU_LOCAL_READ(cpu), "stack coruption city boy !!");
 
                     return;
                 }

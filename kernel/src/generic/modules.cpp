@@ -23,7 +23,7 @@
 bool is_there_initrd = false;
 extern vfs::node* vfs_nodes;
 
-void process_module(char* address, std::size_t size) {
+void process_module(char* address, std::size_t size, bool should_free = false) {
 
     std::size_t out_size = 0;
     std::size_t buffer_size = 0;
@@ -31,13 +31,22 @@ void process_module(char* address, std::size_t size) {
 
     if(decomp != nullptr) {
         log("modules", "found .gz archive");
-        process_module(decomp, out_size);
+        process_module(decomp, out_size, true);
+        std::uint64_t align_start = (std::uint64_t)ALIGNPAGEUP((std::uint64_t)address);
+        std::uint64_t proc_len = size - (align_start - (std::uint64_t)address);
+        std::uint64_t align_len = ALIGNPAGEDOWN(proc_len);
+        for(std::uint64_t i = 0; i < align_len; i += PAGE_SIZE) {
+            pmm::freelist::free((align_start - etc::hhdm()) + i);
+        }
     }
 
     if(squashfs::is_valid((char*)address, size)) {
         squashfs::init((char*)address, size, &vfs_nodes[0]);
     } else if(ustar::is_valid_ustar((char*)address, size)) {
         ustar::load((char*)address, size);
+        if(should_free) {
+            pmm::buddy::free((std::uint64_t)address - etc::hhdm());
+        }
         is_there_initrd = true;
     }
 }

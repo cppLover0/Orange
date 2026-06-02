@@ -10,6 +10,7 @@
 #include <utils/errno.hpp>
 #include <generic/scheduling.hpp>
 #include <atomic>
+#include <utils/utf8.hpp>
 #include <utils/flanterm.hpp>
 
 #define PTMX "/ptmx"
@@ -21,12 +22,19 @@
 #define TCSETS2 0x402c542b
 #define TCSETSW2 0x402c542c
 #define TCSETSF2 0x402c542d
+#define OCRNL   0000010
+#define IUTF8 0040000
+#define ECHOE   0000020  
+#define ECHOK   0000040  
+#define ECHONL  0000100 
+#define ECHOCTL 0001000
 
 std::atomic<std::uint32_t> tty_ptr = 0;
 locks::spinlock tty_lock;
 
 inline static int is_printable(char c) {
-    return (c >= 32 && c <= 126) || c == 10; 
+    (void)c;
+    return 1;
 }
 
 
@@ -35,68 +43,102 @@ signed long tty_read(file_descriptor* fd, devfs_node* node, void* buffer, std::s
     return fd->other.is_master ? arg->writepipe->read((char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0, arg->is_packet_mode) : arg->readpipe->ttyread((char*)buffer,count,(fd->flags & O_NONBLOCK) ? 1 : 0);
 }
 
+#include <arch/x86_64/drivers/serial.hpp>
+
+#define ONLCR 0x00004
+
 signed long tty_write(file_descriptor* fd, devfs_node* node, void* buffer, std::size_t count) {
     bool is_slave = !fd->other.is_master;
     tty::tty_arg* arg = (tty::tty_arg*)node->arg;
-    if(!is_slave) { // handle stdio logic from /dev/pty writing 
-        for(std::size_t i = 0;i < count;i++) {
-
+    if(!is_slave) { 
+        for(std::size_t i = 0; i < count; i++) {
             char c = ((char*)buffer)[i];
 
-            if(!(arg->termios.c_lflag & ICANON)) {
-                if(c == '\n') c = 13;
-            }
+            if(arg->termios.c_iflag & ICRNL && c == '\r')
+                c = '\n';
 
-            if((arg->termios.c_lflag & ECHO) && (is_printable(c) || c == 13)) {
-                if(c == 13) {
-                    arg->writepipe->write("\n",1);
-                } else if(c == '\n') 
-                    arg->writepipe->write("\r",1);
-                asm volatile("cli");
-                arg->writepipe->write(&((char*)buffer)[i],1);
-                asm volatile("cli"); 
-            }
-
-            if(c == '\b' || c == '\x7f' || c == '\x08') {
-                if(arg->readpipe->size > 0) {
-                    if(arg->termios.c_lflag & ECHO) {
-                        const char* back = "\b \b";
-                        arg->writepipe->write(back,klibc::strlen(back));
-                        asm volatile("cli");
+            if(c == '\n' || c == '\r') {
+                if(arg->termios.c_lflag & ECHO) {
+                    if(arg->termios.c_lflag & ECHONL) {
+                        arg->writepipe->write("\n", 1);
                     }
-                    bool state = arg->readpipe->lock.lock();
-                    arg->readpipe->read_counter--;
-                    arg->readpipe->buffer[arg->readpipe->size--] = '\0';
-                    arg->readpipe->lock.unlock(state); 
+                }
+                if(arg->termios.c_lflag & ICANON) {
+                    arg->readpipe->write("\n", 1);
+                    arg->readpipe->set_tty_ret();
+                    if(arg->termios.c_lflag & ECHO) {
+                        if(!(arg->termios.c_lflag & ECHONL)) {
+                            arg->writepipe->write("\n", 1);
+                        }
+                    }
+                    continue;
                 }
             }
 
-            if(is_printable(c) || !(arg->termios.c_lflag & ICANON)) {
-                arg->readpipe->write(&c,1);
-                asm volatile("cli");
-            } else if(c == 13) {
-                arg->readpipe->write("\n",1);
-                asm volatile("cli");
+            if((c == '\b' || c == '\x7f') && (arg->termios.c_lflag & ICANON)) {
+                std::size_t bytes_to_drop = 1;
+                if(arg->termios.c_iflag & IUTF8) {
+                    if(arg->readpipe->size > 0) {
+                        bytes_to_drop = utf8::bytes_to_backspace(arg->readpipe->buffer, arg->readpipe->size);
+                    }
+                }
+
+                if(arg->readpipe->size >= (int)bytes_to_drop) {
+                    if(arg->termios.c_lflag & ECHO) {
+                        if(arg->termios.c_lflag & ECHOE) {
+                            for(std::size_t j = 0; j < bytes_to_drop; j++) {
+                                arg->writepipe->write("\b \b", 3);
+                            }
+                        }
+                    }
+                    bool state = arg->readpipe->lock.lock();
+                    arg->readpipe->read_counter--;
+                    arg->readpipe->size -= bytes_to_drop;
+                    arg->readpipe->lock.unlock(state);
+                } else if(arg->termios.c_lflag & ECHO) {
+                    arg->writepipe->write("\a", 1);
+                }
+                continue;
             }
 
-            if((c == '\n' || c == 13) && (arg->termios.c_lflag & ICANON)) {
-                arg->readpipe->set_tty_ret(); 
+            if(arg->termios.c_lflag & ECHO) {
+                if(is_printable(c)) {
+                    arg->writepipe->write(&((char*)buffer)[i], 1);
+                } else if(c == '\t' && (arg->termios.c_lflag & ECHOCTL)) {
+                    arg->writepipe->write("^\t", 2);
+                }
             }
 
-            if(!(arg->termios.c_lflag & ICANON) && arg->readpipe->size >= arg->termios.c_cc[VMIN]) {
-                arg->readpipe->set_tty_ret(); 
+            if(!(arg->termios.c_lflag & ICANON)) {
+                arg->readpipe->write(&c, 1);
+                if(arg->readpipe->size >= arg->termios.c_cc[VMIN]) {
+                    arg->readpipe->set_tty_ret();
+                }
+            } else if(is_printable(c) || c == '\t') {
+                arg->readpipe->write(&c, 1);
+                if(arg->termios.c_lflag & ECHO) {
+                    if(c == '\t') {
+                        arg->writepipe->write("\t", 1);
+                    }
+                }
             }
-
         }
-
         return count;
     } else if(is_slave) {
-        for(std::size_t i = 0;i < count;i++) {
-            char c = ((char*)buffer)[i]; 
-            if(c == '\n') {
-                arg->writepipe->write("\r\n",2);
-            } else
-                arg->writepipe->write(&c,1);
+        for(std::size_t i = 0; i < count; i++) {
+            char c = ((char*)buffer)[i];
+            
+            if(arg->termios.c_oflag & OPOST) {
+                if(c == '\n' && (arg->termios.c_oflag & ONLCR)) {
+                    arg->writepipe->write("\r\n", 2);
+                    continue;
+                }
+                if(c == '\r' && (arg->termios.c_oflag & OCRNL)) {
+                    c = '\n';
+                }
+            }
+            
+            arg->writepipe->write(&c, 1);
         }
         return count;
     }
@@ -162,6 +204,9 @@ std::int32_t tty_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
             arg2->is_packet_mode = *(int*)arg;
             tty_lock.unlock();
             return 0;
+        default:
+            tty_lock.unlock();
+            return 0;
 
     }
     assert(0,"tty shitfuck req %lli (0x%p), arg 0x%p", req, req, arg);
@@ -208,10 +253,10 @@ void _ptmx_open(file_descriptor* fd) {
     
     new_tty->readpipe->ttyflags = (termios_t*)&new_tty->termios;
     
-    new_tty->termios.c_lflag |= (ICANON | ECHO);
+    new_tty->termios.c_lflag |= (ICANON | ECHO | ECHOE);
 
-    new_tty->termios.c_iflag = IGNPAR | ICRNL;
-    new_tty->termios.c_oflag = OPOST;         
+    new_tty->termios.c_iflag = IGNPAR;
+    new_tty->termios.c_oflag = OPOST | ONLCR;         
     new_tty->termios.c_cflag |= (CS8); 
 
     std::uint32_t num = tty_ptr++;

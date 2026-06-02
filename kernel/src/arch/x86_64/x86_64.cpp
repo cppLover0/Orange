@@ -93,7 +93,7 @@ namespace arch {
         case ARCH_INIT_MP:
             enable_paging(gobject::kernel_root);
             x86_64::init_cpu_data();
-            drivers::pvclock::init();
+            drivers::pvclock::init(); 
             if(!cmdline::parser->contains("notsc")) {
                 drivers::tsc::init();
             }

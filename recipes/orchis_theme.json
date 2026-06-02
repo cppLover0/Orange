@@ -1,0 +1,8 @@
+{
+    "name": "orchis_theme",
+    "version": "recent",
+    "deps": ["base-libs", "gtk3"],
+    "url": "git:https://github.com/vinceliuice/Orchis-theme.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

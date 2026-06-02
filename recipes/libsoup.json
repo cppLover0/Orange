@@ -1,7 +1,7 @@
 {
     "name": "libsoup",
     "version": "3.6.5",
-    "deps": ["base-libs", "glib-2.0", "zlib", "libnghttp2", "sqlite3", "libpsl"],
+    "deps": ["base-libs", "glib-2.0", "zlib", "libnghttp2", "sqlite3", "libpsl", "gobject-introspection"],
     "url": "https://gitlab.gnome.org/GNOME/libsoup/-/archive/3.6.5/libsoup-3.6.5.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

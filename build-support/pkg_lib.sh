@@ -2,15 +2,27 @@
 trap "exit -1" USR1
 cd "${build_dir}"
 
+export LD_LIBRARY_PATH="${host_dest_dir}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 export SYSROOT="${dest_dir}"
 export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
 export PKG_CONFIG_PATH=""
 export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 export LIBTOOL=libtool
 export LLVM_CONFIG="${build_support}/cross-llvm-config"
+export INTROSPECTION_SCANNER_ENV="${host_dest_dir}/bin/g-ir-scanner"
+export INTROSPECTION_COMPILER_ENV="${host_dest_dir}/bin/g-ir-compiler"
+export INTROSPECTION_GENERATE_ENV="${host_dest_dir}/bin/g-ir-generate"
 
 cp -rf "${build_support}/cross-llvm-config" "${host_dest_dir}/bin/llvm-config"
 chmod +x "${host_dest_dir}/bin/llvm-config"
+
+chmod +x "${build_support}/cross-valac"
+chmod +x "${build_support}/cross-vapigen"
+
+export VAPIGEN="${build_support}/cross-vapigen"
+export VALAC="${build_support}/cross-valac"
+export VALADIR="${dest_dir}/usr/share/vala/vapi"
 
 #no libtool :)
 find "${dest_dir}" -name "*.la" -delete
@@ -19,6 +31,28 @@ set -e
 
 im_exit() {
     kill -s USR1 $$
+}
+
+gir_patch_configure() {
+    sed -i '/if test "x\$found_introspection" = "xyes"; then/,/INTROSPECTION_GENERATE=/ {
+        s|INTROSPECTION_SCANNER=.*|INTROSPECTION_SCANNER="$INTROSPECTION_SCANNER_ENV"|
+        s|INTROSPECTION_COMPILER=.*|INTROSPECTION_COMPILER="$INTROSPECTION_COMPILER_ENV"|
+        s|INTROSPECTION_GENERATE=.*|INTROSPECTION_GENERATE="$INTROSPECTION_GENERATE_ENV"|
+    }' ./configure
+}
+
+chmod +x "${build_support}"/ldd-wrapper
+chmod +x "${build_support}"/run-wrapper
+cp -rf "${build_support}"/ldd-wrapper "${build_support}"/run-wrapper "${host_dest_dir}/bin"
+
+export RUN_WRAPPER_LD_LIBRARY_PATH="${host_dest_dir}/mlibc-host/usr/lib:${dest_dir}/usr/lib"
+export RUN_WRAPPER_INTERP="${host_dest_dir}/mlibc-host/usr/lib/ld.so"
+export GI_LDD_WRAPPER="ldd-wrapper"
+export GI_CROSS_LAUNCHER="run-wrapper"
+export GI_GIR_PATH="${dest_dir}/usr/share/gir-1.0"
+
+gir_prepare() {
+    true
 }
 
 pkg_work() {
@@ -122,11 +156,32 @@ meson_configure_noflags() {
         --localstatedir=/var \
         --libdir=lib \
         --sbindir=bin \
+        --native-file "${build_support}/native-file-meson" \
         --buildtype=release \
         -Ddefault_library=shared \
         "$@"
 }
 
+meson_host_configure() {
+    meson_host_configure_noflags "$@"
+}
+
+meson_host_configure_noflags() {
+    if [ -z "${meson_source_dir}" ]; then
+        meson_source_dir="${source_dir}"
+    fi
+
+    meson setup "${meson_source_dir}" \
+        --prefix="${host_dest_dir}" \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --libdir=lib \
+        --sbindir=bin \
+        --native-file "${build_support}/native-file-meson" \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        "$@"
+}
 
 cmake_configure() {
     cmake_configure_noflags \
@@ -153,3 +208,6 @@ cmake_configure_noflags() {
         -GNinja \
         "$@"
 }
+
+export CFLAGS="-O3"
+export CXXFLAGS="$CFLAGS"

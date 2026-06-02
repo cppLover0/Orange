@@ -4,7 +4,10 @@
 #include <generic/hhdm.hpp>
 #include <generic/paging.hpp>
 #include <utils/assert.hpp>
+#include <generic/time.hpp>
 #include <atomic>
+
+#include <generic/shm.hpp>
 
 #define MAP_FAILED ((void *)(-1))
 #define MAP_FILE    0x00
@@ -23,6 +26,7 @@ struct vmm_obj {
 
     uint8_t is_free;
     uint8_t is_mapped;
+    shm_seg* shm;
 
     struct vmm_obj* next;
 };
@@ -172,12 +176,14 @@ public:
                 break;
 
             if(current->base != 0) {
-                if(current->is_mapped) {
+                if(current->is_mapped && !current->shm) {
                     dest->map_memory(current->base, current->phys, current->flags, current->len, true);
-                } else {
+                } else if(!current->shm) {
                     vmm_obj* obj = dest->v_find(current->base, current->len);
                     (void)obj;
                     paging::duplicate_range(dest->root, this->root, current->base, current->len, PAGING_PRESENT | PAGING_RW | PAGING_USER);
+                } else if(current->shm) {
+                    dest->map_memory(current->base, current->phys, current->flags, current->len, true, current->shm);
                 }
             }
 
@@ -224,7 +230,7 @@ public:
         return 0;
     }
 
-    void unmap(std::uint64_t base, std::uint64_t len, bool should_lock = true) {
+    void unmap(std::uint64_t base, std::uint64_t len, bool should_lock = true, int shm_pid = 0) {
         bool state = false;
         if(should_lock)
             state = this->lock.lock();
@@ -247,13 +253,30 @@ public:
             }
         }
 
+        auto free_shm = [this, shm_pid](vmm_obj* current) { 
+
+            current->shm->ctl.shm_dtime = time::current_unix_time;
+            current->shm->ctl.shm_lpid = shm_pid;
+            current->shm->ctl.shm_nattch--;
+            paging::zero_range(this->root,(std::uint64_t)current->base,current->len);
+
+            if(current->shm->ctl.shm_nattch == 0 && current->shm->is_pending_rm) {
+                shm::shm_rm(current->shm);
+            }
+
+            current->shm = 0;
+
+        };
+
         current = start->next;
         prev = start;
 
         if(before == after && before != 0 && after != 0) {
 
-            if(before->is_mapped) {
+            if(before->is_mapped && !before->shm) {
                 paging::zero_range(this->root, before->base,before->len);
+            } else if(before->shm) {
+                free_shm(before);
             }
 
             vmm_obj* split = new vmm_obj;
@@ -271,17 +294,21 @@ public:
                 if(prev) {
                     if(current == before && before != 0) {
                         if(before->base + before->len > base) {
-                            if(before->is_mapped) {
+                            if(before->is_mapped && !before->shm) {
                                 paging::zero_range(this->root, before->base,before->len);
-                                
+                            } else if(before->shm) {
+                                free_shm(before);
                             }
+
                             before->len -= ((before->base + before->len) - base);
                         }
                     } else {
                         
                         if(current->base >= base && current->base < (base + len)) {
-                            if(current->is_mapped) {
+                            if(current->is_mapped && !current->shm) {
                                 paging::zero_range(this->root, current->base,current->len);
+                            } else if(current->shm) {
+                                free_shm(current);
                             }
                             std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
                             current->len -= sz;
@@ -328,9 +355,16 @@ end:
         return current->base;
     }
 
-    std::uint64_t map_memory(std::uint64_t hint, std::uint64_t phys, std::uint64_t paging_flags, std::uint64_t len, bool is_fixed) {
+    std::uint64_t map_memory(std::uint64_t hint, std::uint64_t phys, std::uint64_t paging_flags, std::uint64_t len, bool is_fixed, shm_seg* shm = nullptr) {
         vmm_obj* current = nullptr;
         bool state = this->lock.lock();
+
+        if(shm != nullptr) {
+            phys = shm->phys;
+            len = shm->len;
+            paging_flags = PAGING_RW | PAGING_USER | PAGING_PRESENT;
+        }
+
         if(is_fixed) {
             this->unmap(ALIGNDOWN(hint, PAGE_SIZE), ALIGNUP(len, PAGE_SIZE), false);
             current = this->v_find(ALIGNDOWN(hint, PAGE_SIZE), ALIGNUP(len, PAGE_SIZE));
@@ -339,6 +373,7 @@ end:
         }
 
         current->is_mapped = true;
+        current->shm = shm;
         current->phys = phys;
         current->flags = paging_flags;
 

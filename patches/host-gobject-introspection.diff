@@ -1,0 +1,32 @@
+diff -Naur gobject-introspection/giscanner/shlibs.py gobject-introspection-clean/giscanner/shlibs.py
+--- gobject-introspection/giscanner/shlibs.py	2025-09-13 14:08:06.000000000 +0300
++++ gobject-introspection-clean/giscanner/shlibs.py	2026-05-28 17:18:49.922609373 +0300
+@@ -97,9 +97,12 @@
+             args.extend(libtool)
+             args.append('--mode=execute')
+         platform_system = platform.system()
++        ldd_wrapper_from_env = os.environ.get("GI_LDD_WRAPPER")
+         if options.ldd_wrapper:
+             args.extend(options.ldd_wrapper)
+             args.append(binary.args[0])
++        elif ldd_wrapper_from_env:
++            args.extend([ldd_wrapper_from_env, binary.args[0]])
+         elif platform_system == 'Darwin':
+             args.extend(['otool', '-L', binary.args[0]])
+         else:
+diff -Naur gobject-introspection/m4/introspection.m4 gobject-introspection-clean/m4/introspection.m4
+--- gobject-introspection/m4/introspection.m4	2025-09-13 14:08:06.000000000 +0300
++++ gobject-introspection-clean/m4/introspection.m4	2026-05-28 17:19:13.689276926 +0300
+@@ -102,9 +102,9 @@
+     INTROSPECTION_GIRDIR=
+     INTROSPECTION_TYPELIBDIR=
+     if test "x$found_introspection" = "xyes"; then
+-       INTROSPECTION_SCANNER=$PKG_CONFIG_SYSROOT_DIR`$PKG_CONFIG --variable=g_ir_scanner gobject-introspection-1.0`
+-       INTROSPECTION_COMPILER=$PKG_CONFIG_SYSROOT_DIR`$PKG_CONFIG --variable=g_ir_compiler gobject-introspection-1.0`
+-       INTROSPECTION_GENERATE=$PKG_CONFIG_SYSROOT_DIR`$PKG_CONFIG --variable=g_ir_generate gobject-introspection-1.0`
++       INTROSPECTION_SCANNER=$INTROSPECTION_SCANNER_ENV
++       INTROSPECTION_COMPILER=$INTROSPECTION_COMPILER_ENV
++       INTROSPECTION_GENERATE=$INTROSPECTION_GENERATE_ENV
+        INTROSPECTION_GIRDIR=`$PKG_CONFIG --define-variable=datadir="${_GI_EXP_DATADIR}" --variable=girdir gobject-introspection-1.0`
+        INTROSPECTION_TYPELIBDIR="$($PKG_CONFIG --define-variable=libdir="${_GI_EXP_LIBDIR}" --variable=typelibdir gobject-introspection-1.0)"
+        INTROSPECTION_CFLAGS=`$PKG_CONFIG --cflags gobject-introspection-1.0`

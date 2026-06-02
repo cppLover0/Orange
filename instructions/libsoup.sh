@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dvapi=disabled -Dintrospection=disabled -Dgssapi=disabled -Dsysprof=disabled -Dtests=false -Dtls_check=false
+    meson_configure -Dvapi=enabled -Dintrospection=enabled -Dgssapi=disabled -Dsysprof=disabled -Dtests=false -Dtls_check=false
 }
 
 build() {

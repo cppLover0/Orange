@@ -12,6 +12,8 @@
 #include <utils/kernel_info.hpp>
 #include <generic/time.hpp>
 #include <generic/userspace/futex.hpp>
+#include <utils/signal_ret.hpp>
+#include <utils/signal.hpp>
 
 locks::spinlock futex_lock2;
 
@@ -67,7 +69,11 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
                 }
             }
 
-               process::yield();
+            is_signal_ret(proc) {
+                signal_ret(proc);
+            }
+
+            process::yield();
         }
             
         klibc::debug_printf("futex end\n");

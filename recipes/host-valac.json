@@ -1,0 +1,8 @@
+{
+    "name": "host-valac",
+    "version": "meow meow meow mrrp",
+    "deps": ["vala", "vala-host"],
+    "url": "https://github.com/cppLover0/dummy/archive/refs/tags/wah.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

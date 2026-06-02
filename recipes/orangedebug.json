@@ -1,0 +1,8 @@
+{
+    "name": "orangedebug",
+    "version": "meoww",
+    "deps": ["base-libs"],
+    "url": "src:tools/orangedebug",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

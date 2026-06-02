@@ -109,6 +109,9 @@ extern "C" void main() {
     time::update_unix_time();
 
     modules::init();
+    
+    extern std::atomic<std::uint64_t> tmpfs_used_mem;
+    log("kernel", "total tmpfs memory %lli mb", (tmpfs_used_mem.load() / 1024) / 1024);
 
     // thread* thread = process::kthread(scheduling_test, (void*)1);
     // process::wakeup(thread);

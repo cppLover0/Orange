@@ -5,7 +5,14 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dglx=xlib -Dplatforms=x11 -Dgallium-drivers=llvmpipe,softpipe -Dvulkan-drivers="" -Dvideo-codecs=all_free
+    meson_configure \
+        -Dglx=xlib \
+        -Dplatforms=x11 \
+        -Dgles1=enabled \
+        -Dgles2=enabled \
+        -Dgallium-drivers=llvmpipe \
+        -Dvulkan-drivers="" \
+        -Dvideo-codecs=all_free
 }
 
 build() {

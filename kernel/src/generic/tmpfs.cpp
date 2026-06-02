@@ -12,6 +12,8 @@
 tmpfs::tmpfs_node root_node = {};
 std::atomic<std::uint64_t> tmpfs_id_ptr = 1;
 
+std::atomic<std::uint64_t> tmpfs_used_mem = 0;
+
 bool tmpfs_find_child(tmpfs::tmpfs_node* node, char* name, tmpfs::tmpfs_node** out) {
     if(node->type != vfs_file_type::directory)
         return false;
@@ -238,6 +240,7 @@ std::int32_t tmpfs_link(filesystem* fs, char* old_path, char* new_path) {
 
     if(is_pasted == false) {
         alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        tmpfs_used_mem += parent->size * sizeof(tmpfs::directory_cont);
         tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
         if(parent->dirents) {
             klibc::memcpy(new_dir, parent->dirents, parent->size);
@@ -308,6 +311,7 @@ again_paste:
         goto again_paste;
     }
 
+    tmpfs_used_mem += PAGE_SIZE;
     new_node->type = type;
     new_node->ino = tmpfs_id_ptr++;
     new_node->mode = mode;
@@ -357,6 +361,7 @@ again_paste:
 
     if(is_pasted == false) {
         alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        tmpfs_used_mem += res.real_size;
         tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
         if(parent->dirents) {
             klibc::memcpy(new_dir, parent->dirents, parent->size);
@@ -368,6 +373,7 @@ again_paste:
         goto again_paste;
     }
 
+    tmpfs_used_mem += PAGE_SIZE;
     new_node->type = type;
     new_node->ino = tmpfs_id_ptr++;
     new_node->mode = mode;
@@ -376,6 +382,7 @@ again_paste:
 
     if(new_node->type != vfs_file_type::directory) {
         alloc_t new_content = pmm::buddy::alloc(size);
+        tmpfs_used_mem += new_content.real_size;
         char* new_cont = (char*)(new_content.phys + etc::hhdm());
         new_node->physical_size = new_content.real_size;
         new_node->size = size;

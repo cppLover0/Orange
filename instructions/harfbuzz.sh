@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dgraphite2=disabled -Ddocs=disabled -Dglib=enabled -Dgobject=disabled -Dicu=disabled -Dfreetype=enabled -Dcairo=enabled -Dintrospection=disabled -Dtests=disabled
+    meson_configure -Dgraphite2=disabled -Ddocs=disabled -Dglib=enabled -Dgobject=enabled -Dicu=disabled -Dfreetype=enabled -Dcairo=enabled -Dintrospection=enabled -Dtests=disabled
 }
 
 build() {

@@ -1,7 +1,7 @@
 {
     "name": "gdk-pixbuf",
     "version": "2.44.6",
-    "deps": ["base-libs"],
+    "deps": ["base-libs", "shared-mime-info"],
     "url": "https://github.com/GNOME/gdk-pixbuf/archive/refs/tags/2.44.6.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

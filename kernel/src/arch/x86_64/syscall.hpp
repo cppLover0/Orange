@@ -13,3 +13,5 @@ struct syscall_item {
 namespace syscall {
     void init();
 }
+
+// #define SYSCALL_PROFILING

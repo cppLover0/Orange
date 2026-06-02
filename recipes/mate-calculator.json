@@ -1,8 +1,0 @@
-{
-    "name": "mate-calculator",
-    "version": "40.0",
-    "deps": ["base-libs", "gtk3", "libsoup", "libgee", "libmpc", "libsoup2"],
-    "url": "git:https://github.com/mate-desktop/mate-calc.git",
-    "should_patch": false,
-    "use_orange_prefix": true
-}

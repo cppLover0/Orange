@@ -1,0 +1,8 @@
+{
+    "name": "shared-mime-info",
+    "version": "2.4",
+    "deps": ["base-libs", "glib-2.0", "libxml2"],
+    "url": "https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/2.4/shared-mime-info-2.4.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

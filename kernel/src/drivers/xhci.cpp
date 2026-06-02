@@ -1089,8 +1089,6 @@ void __xhci_init_dev(xhci_device_t* dev,int portnum) {
 
                     //log("xhci","new ep %d", idx + 2);
 
-                    /* thanks n00byedge for tips */
-
                     if(port_speed == XHCI_USB_SPEED_HIGH_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED || port_speed == XHCI_USB_SPEED_SUPER_SPEED_PLUS)
                         ep1->interval = interval - 1;
                     else if(port_speed == XHCI_USB_SPEED_FULL_SPEED && (epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_IN || epty == XHCI_ENDPOINTTYPE_ISOCHRONOUS_OUT))

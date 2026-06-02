@@ -1,8 +1,8 @@
 {
     "name": "linux-headers",
-    "version": "6.1.22",
+    "version": "7.0.10",
     "deps": [],
-    "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.1.22.tar.xz",
+    "url": "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.0.10.tar.xz",
     "should_patch": true,
     "use_orange_prefix": false
 }

@@ -186,7 +186,7 @@ bool nvme_identify_namespace(struct nvme_controller* ctrl, uint32_t nsid) {
     }
     ns->valid = true;
 
-    klibc::printf("NVME: Detected namespace %d with lba_size %lli bytes and total size %lli bytes\r\n", nsid, ns->lba_size, ns->size * ns->lba_size);
+    log("nvme","detected namespace %d with lba_size %lli bytes and total size %lli bytes", nsid, ns->lba_size, ns->size * ns->lba_size);
     return true;
 }
 
@@ -438,7 +438,7 @@ bool nvme_identify(nvme_controller* ctrl) {
     char model[41];
     klibc::memcpy(model, (void*)(phys_buffer + etc::hhdm() + 24), 40);
     model[40] = '\0';
-    klibc::printf("NVME: Controller Model: %s\r\n", model);
+    log("nvme","controller model: %s", model);
 
     ctrl->identify = (void*)(phys_buffer + etc::hhdm());
 
@@ -461,11 +461,17 @@ void nvme_init(std::uint64_t base) {
     controller->stride = 4 << ((cap >> 32) & 0xf);
     controller->admin_phase = 1;
 
+    // std::uint32_t cc = nvme::read32(controller, NVME_REG_CC);
+    // cc &= ~NVME_CC_EN;
+    // cc |= NVME_CC_SHN_NORMAL;
+    // nvme::write32(controller, NVME_REG_CC, cc);
+    // while(nvme::read32(controller, NVME_REG_CSTS) & 1) arch::pause();
+
     std::uint8_t mpsmin = (cap >> 48) & 0xf;
     controller->mpsmin = mpsmin;
     controller->page_size = 1 << (12 + mpsmin);
     if(!((cap >> 37) & 1)) {
-        klibc::printf("NVME: Impossible to init because nvm is not supported\r\n");
+        log("nvme","impossible to init because nvm is not supported");
         return;
     }
 
@@ -484,18 +490,18 @@ void nvme_init(std::uint64_t base) {
     while(!(nvme::read32(controller, NVME_REG_CSTS) & 1)) arch::pause();
 
     if(!nvme_identify(controller)) {
-        klibc::printf("NVME: Failed to identify !\r\n");
+        log("nvme","failed to identify !");
         return;
     }
 
     controller->main_io_queue = nvme_create_io_queue(controller);
     if(controller->main_io_queue == nullptr) {
-        klibc::printf("NVME: Failed to create io queue\r\n");
+        log("nvme","failed to create io queue");
         return;
     }
 
     if(!nvme_init_namespaces(controller)) {
-        klibc::printf("NVME: Failed to init namespaces\r\n");
+        log("nvme","failed to init namespaces");
     }
 
     nvme_controllers[nvme_controller_ptr++] = controller;
@@ -505,7 +511,7 @@ void nvme_init(std::uint64_t base) {
 void nvme_pci_init(pci_t pci, std::uint8_t a, std::uint8_t b, std::uint8_t c) {
     if(pci.progIF == 2) { // nvme 
         std::uint32_t cmd = x86_64::pci::pci_read_config32(a,b,c,0x4);
-        klibc::printf("NVME_PCI: Bus mastering %d, memory access %d\r\n",(cmd & (1 << 2)) ? 1 : 0, (cmd & (1 << 1)) ? 1 : 0);
+        log("nvme","bus mastering %d, memory access %d",(cmd & (1 << 2)) ? 1 : 0, (cmd & (1 << 1)) ? 1 : 0);
         cmd |= 1 << 2;
         cmd |= 1 << 1;
         x86_64::pci::pci_write_config32(a,b,c,0x4,cmd);
@@ -515,7 +521,6 @@ void nvme_pci_init(pci_t pci, std::uint8_t a, std::uint8_t b, std::uint8_t c) {
 #endif
 
 void drivers::nvme::init() {
-    return;
     klibc::memset(nvme_controllers,0,sizeof(nvme_controllers));
 #if defined(__x86_64__)
     x86_64::pci::reg(nvme_pci_init,1,8);

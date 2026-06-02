@@ -9,6 +9,10 @@ typedef uint64_t  nlink_t;
 typedef uint32_t  uid_t;    
 typedef uint32_t  gid_t;     
 
+#define ITIMER_REAL	0
+#define ITIMER_VIRTUAL	1
+#define ITIMER_PROF	2
+
 #define SA_NOCLDSTOP 0x00000001
 #define SA_NOCLDWAIT 0x00000002
 #define SA_SIGINFO   0x00000004
@@ -489,3 +493,12 @@ struct clone_args {
 
 #define SOCK_CLOEXEC   02000000
 #define SOCK_NONBLOCK  04000
+
+typedef unsigned long __cpu_mask;
+
+#define __CPU_SETSIZE 1024
+#define __NCPUBITS (8 * sizeof(__cpu_mask))
+
+typedef struct {
+	__cpu_mask __bits[__CPU_SETSIZE / __NCPUBITS];
+} cpu_set_t;

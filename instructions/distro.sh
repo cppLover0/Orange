@@ -52,6 +52,8 @@ install() {
     glib-compile-schemas "${dest_dir}/usr"/share/glib-2.0/schemas
     rm "${dest_dir}/usr"/share/glib-2.0/schemas/gschemas.compiled
 
+    update-mime-database "${dest_dir}"/usr/share/mime
+
 }
 
 pkg_work

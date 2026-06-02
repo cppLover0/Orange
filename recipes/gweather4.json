@@ -1,0 +1,8 @@
+{
+    "name": "gweather4",
+    "version": "43.0",
+    "deps": ["base-libs", "gtk4", "gtk3", "json-glib", "libsoup", "libsoup2", "libxml2", "gjs"],
+    "url": "https://gitlab.gnome.org/GNOME/gnome-weather/-/archive/43.0/gnome-weather-43.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

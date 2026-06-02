@@ -49,6 +49,24 @@ void klibc::printf(const char* fmt, ...) {
 
 #include <generic/vfs.hpp>
 
+void klibc::serial_printf(const char* fmt, ...) {
+
+    va_list val;
+    va_start(val, fmt);
+    char buffer[4096];
+    memset(buffer,0,4096);
+    int len = _snprintf(buffer,4096,fmt,val);
+#if defined(__x86_64__)
+    (void)len;
+    char buffer2[4096] = {};
+    int len2 = klibc::__printfbuf(buffer2, 4096, "(%lli) [pid %05d] %s", time::timer->current_nano() / 1000,  current_proc ? current_proc->id : 11111, buffer);
+
+    x86_64::serial::write_data(buffer2,len2);
+    
+#endif
+    va_end(val);
+}
+
 void klibc::debug_printf(const char* fmt, ...) {
 
     thread* cur = current_proc;

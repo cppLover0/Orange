@@ -1,0 +1,12 @@
+diff -Naur graphene/meson.build graphene-clean/meson.build
+--- graphene/meson.build	2026-05-28 22:08:54.323149696 +0300
++++ graphene-clean/meson.build	2026-05-29 12:32:48.028343100 +0300
+@@ -232,7 +232,7 @@
+ #
+ # We only build introspection if we can run binaries on the host.
+ gir = find_program('g-ir-scanner', required: get_option('introspection'))
+-build_gir = get_option('introspection').allowed() and build_gobject and gir.found() and meson.can_run_host_binaries()
++build_gir = get_option('introspection').allowed()
+ 
+ # Check for InitOnce on Windows
+ if host_system == 'windows'

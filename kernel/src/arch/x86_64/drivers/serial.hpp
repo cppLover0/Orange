@@ -1,4 +1,6 @@
 
+#pragma once
+
 namespace x86_64 {
     namespace serial {
         void init();

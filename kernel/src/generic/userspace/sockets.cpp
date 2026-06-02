@@ -25,6 +25,11 @@ long long sys_socket(int family, int type, int protocol) {
         klibc::debug_printf("unimplemented socket family %d for type %d\n", family, type);
     } 
 
+    if(family == PF_NETLINK) {
+        // wtf ???
+        return -EINVAL;
+    }
+
     thread* current = current_proc;
     auto manager = (vfs::fdmanager*)current->fd;
 

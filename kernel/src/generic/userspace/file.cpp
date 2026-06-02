@@ -333,19 +333,19 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
         return -EFAULT;
     }
 
-    if(current->is_debug) {
-        klibc::debug_printf("trying to write fd %d buffer 0x%p count %lli %s\n", fd, buffer, count, buffer);
-    }
-
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
     file_descriptor* file = manager->search(fd);
     if(file == nullptr)
         return -EBADF;
 
+    if(proc->is_debug) {
+        klibc::debug_printf("trying to write %s fd %d buffer 0x%p type %d count %lli %s\n", file->path , fd, buffer, file->type, count, buffer);
+    }
+
     if(file->type == file_descriptor_type::file) {
         return file->vnode.write(file, buffer, count);
     } else if(file->type == file_descriptor_type::pipe) {
-        return file->fs_specific.pipe->write(buffer, count);
+        return file->fs_specific.pipe->write(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
     } else if(file->type == file_descriptor_type::socket) {
         if(file->socket.socket_type == PF_UNIX) {
             if(file->socket.write_socket == nullptr)
@@ -356,13 +356,13 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
                 if(file->socket.write_socket->socket_counter == 0)
                     return -EPIPE; 
 
-                return file->socket.write_socket->write(buffer, count);
+                return file->socket.write_socket->write(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
             } else {
 
                 if(file->socket.read_socket->socket_counter == 0)
                     return -EPIPE; 
 
-                return file->socket.read_socket->write(buffer, count);
+                return file->socket.read_socket->write(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
             }
         }
     } else if(file->type == file_descriptor_type::socketpair) {
@@ -835,10 +835,10 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
             if(fd->type == file_descriptor_type::socket && !fd->socket.is_listen) {
                 if(fd->socket.socket_side == PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
                     if(fd->socket.socket_side == 1) {
-                        if(fd->socket.write_socket->socket_counter.load() == 0)
+                        if(fd->socket.write_socket->connected_to_pipe_write == 0 && fd->socket.write_socket->size != 0)
                             pollhup_ret = true;
                     } else {
-                        if(fd->socket.read_socket->socket_counter.load() == 0)
+                        if(fd->socket.read_socket->connected_to_pipe_write == 0 && fd->socket.read_socket->size != 0)
                             pollhup_ret = true;
                     }
                 }
@@ -846,10 +846,10 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
 
             if(fd->type == file_descriptor_type::socketpair) {
                 if(fd->socketpair.is_slave) {
-                    if(fd->socketpair.write_socket->socket_counter.load() == 0)
+                    if(fd->socketpair.write_socket->connected_to_pipe_write == 0 && fd->socketpair.write_socket->size != 0)
                         pollhup_ret = true;
                 } else {
-                    if(fd->socketpair.read_socket->socket_counter.load() == 0)
+                    if(fd->socketpair.read_socket->connected_to_pipe_write == 0 && fd->socketpair.read_socket->size != 0)
                         pollhup_ret = true;
                 }
             }

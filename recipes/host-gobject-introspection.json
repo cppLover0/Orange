@@ -1,0 +1,8 @@
+{
+    "name": "host-gobject-introspection",
+    "version": "1.86.0",
+    "deps": ["base-libs"],
+    "url": "https://gitlab.gnome.org/GNOME/gobject-introspection/-/archive/1.86.0/gobject-introspection-1.86.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": false
+}

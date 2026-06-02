@@ -162,3 +162,13 @@ long long sys_socket(int family, int type, int protocol);
 long long sys_bind(int fd, const struct sockaddr *addr_ptr, std::uint32_t addr_length);
 long long sys_connect(int fd, const struct sockaddr *addr_ptr, std::uint32_t addr_length);
 long long sys_accept(int fd, struct sockaddr *addr_ptr, std::uint32_t *addr_length, int flags);
+long long sys_getitimer(int timer, itimerval* out);
+
+long long sys_setitimer(int timer, itimerval* out, itimerval* old);
+
+long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);
+long long sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
+long long sys_shmget(int key, size_t size, int shmflg);
+long long sys_shmdt(std::uint64_t base);
+
+long long sys_getaffinity(int pid, size_t cpusetsize, cpu_set_t *mask);

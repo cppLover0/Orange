@@ -1,0 +1,8 @@
+{
+    "name": "xinerama",
+    "version": "1.1.6",
+    "deps": ["base-libs", "libx11", "libxext"],
+    "url": "https://www.x.org/releases/individual/lib/libXinerama-1.1.6.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -12,6 +12,7 @@
 #include <utils/random.hpp>
 #include <utils/kernel_info.hpp>
 #include <generic/time.hpp>
+#include <generic/mp.hpp>
 
 long long sys_getrandom(char* buf, std::uint64_t count, std::uint32_t flags) {
     (void)flags;
@@ -179,4 +180,81 @@ long long sys_sysinfo(sysinfo* out) {
 
 long long sys_cpucount() {
     return mp::cpu_count();
+}
+
+#define CHAR_BIT 8
+#define CPU_MASK_BITS (CHAR_BIT * sizeof(__cpu_mask))
+
+std::uint64_t __mlibc_cpu_alloc_size(int num_cpus) {
+	/* calculate the (unaligned) remainder that doesn't neatly fit in one __cpu_mask; 0 or 1 */
+	std::uint64_t remainder = ((num_cpus % CPU_MASK_BITS) + CPU_MASK_BITS - 1) / CPU_MASK_BITS;
+	return sizeof(__cpu_mask) * (num_cpus / CPU_MASK_BITS + remainder);
+}
+
+#define CPU_ALLOC_SIZE(n) __mlibc_cpu_alloc_size((n))
+
+void __mlibc_cpu_zero(const std::uint64_t setsize, cpu_set_t *set) {
+	memset(set, 0, CPU_ALLOC_SIZE(setsize));
+}
+
+void __mlibc_cpu_set(const int cpu, const std::uint64_t setsize, cpu_set_t *set) {
+	if(cpu >= static_cast<int>(setsize * CHAR_BIT)) {
+		return;
+	}
+
+	unsigned char *ptr = reinterpret_cast<unsigned char *>(set);
+	std::uint64_t off = cpu / CHAR_BIT;
+	std::uint64_t mask = 1 << (cpu % CHAR_BIT);
+
+	ptr[off] |= mask;
+}
+
+#define CPU_ZERO_S(setsize, set) __mlibc_cpu_zero((setsize), (set))
+#define CPU_ZERO(set) CPU_ZERO_S(sizeof(cpu_set_t), set)
+#define CPU_SET_S(cpu, setsize, set) __mlibc_cpu_set((cpu), (setsize), (set))
+#define CPU_SET(cpu, set) CPU_SET_S(cpu, sizeof(cpu_set_t), set)
+
+void __fill_cpu_set(cpu_set_t* cpuset) {
+
+    extern int how_much_cpus;
+    
+    CPU_ZERO(cpuset);
+    
+    for(int i = 0; i < how_much_cpus; i++) {
+        CPU_SET(i, cpuset); 
+    }
+}
+
+long long sys_getaffinity(int pid, size_t cpusetsize, cpu_set_t *mask) {
+
+    thread* proc = current_proc;
+
+    if(cpusetsize > sizeof(cpu_set_t))
+        cpusetsize = sizeof(cpu_set_t);
+
+    
+    if(!is_safe_to_rw(proc, (std::uint64_t)mask, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!mask)
+        return -EINVAL;
+
+    if(pid == 0) {
+        proc = current_proc;
+    } else if(pid > 0) {
+        proc = process::by_id(pid);
+        if(!proc)
+            return -ESRCH;
+    } else 
+        return -EINVAL;
+
+    cpu_set_t temp_set;
+    klibc::memset(&temp_set,0,sizeof(cpu_set_t));
+
+    __fill_cpu_set(&temp_set);
+
+    klibc::memset(mask,0,cpusetsize);
+    klibc::memcpy(mask,&temp_set,cpusetsize);
+
+    return 0;
 }

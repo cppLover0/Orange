@@ -1,0 +1,8 @@
+{
+    "name": "vala",
+    "version": "0.56.19",
+    "deps": ["base-libs", "glib-2.0", "gobject-introspection"],
+    "url": "https://download.gnome.org/sources/vala/0.56/vala-0.56.19.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

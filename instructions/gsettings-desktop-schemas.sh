@@ -6,7 +6,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dintrospection=false
+    meson_configure -Dintrospection=true
 }
 
 build() {

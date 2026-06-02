@@ -1,11 +1,13 @@
 . "${pkg_lib}"
 
+gir_prepare
+
 prepare() {
     autotools_recursive_regen
 }
 
 configure() {
-    meson_configure -Dgio_sniffing=false -Dman=false
+    meson_configure -Dgio_sniffing=true -Dman=false -Dintrospection=enabled -Dbuiltin_loaders=all
 }
 
 build() {

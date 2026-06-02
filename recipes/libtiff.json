@@ -1,0 +1,8 @@
+{
+    "name": "libtiff",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://gitlab.com/libtiff/libtiff.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

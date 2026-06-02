@@ -1,11 +1,12 @@
 . "${pkg_lib}"
 
 prepare() {
+    gir_patch_configure
     autotools_recursive_regen
 }
 
 configure() {
-    "${source_dir}"/configure --host=x86_64-orange-mlibc --prefix=/usr --disable-introspection
+    "${source_dir}"/configure --host=x86_64-orange-mlibc --prefix=/usr --enable-introspection INTROSPECTION_COMPILER=/usr/bin/g-ir-compiler
 }
 
 build() {

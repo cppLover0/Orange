@@ -112,7 +112,7 @@ long long sys_sigreturn() {
     assert(current_trace, "meow ?");
 
     if(current_thread->is_debug) {
-        klibc::debug_printf("sigreturn proc %d",current_thread->id);
+        //klibc::debug_printf("sigreturn proc %d",current_thread->id);
     }
 
 #if defined(__x86_64__)
@@ -124,6 +124,7 @@ long long sys_sigreturn() {
 #else
 #error "gfsf"
 #endif
+    current_thread->should_block_signals_next = true;
     process::yield();
     assert(0, ".");
     __builtin_unreachable();
@@ -214,4 +215,79 @@ long long sys_pause() {
     }
     assert(0, "pause ssss");
     return -EFAULT;
+}
+
+long long sys_getitimer(int timer, itimerval* out) {
+    thread* proc = current_proc;
+    if(out == nullptr)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)out, PAGE_SIZE))
+        return -EFAULT;
+
+    switch(timer) {
+    case ITIMER_REAL: 
+        *out = proc->real;
+        return 0;
+    case ITIMER_PROF:
+        *out = proc->prof;
+        return 0;
+    case ITIMER_VIRTUAL:
+        *out = proc->virt;
+        return 0;
+    default: 
+        return -EINVAL;
+    }
+
+    return -EINVAL;
+}
+
+long long sys_setitimer(int timer, itimerval* out, itimerval* old) {
+    thread* proc = current_proc;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)out, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)old, PAGE_SIZE))
+        return -EFAULT;
+
+    itimerval* target_timer = nullptr;
+
+    switch(timer) {
+    case ITIMER_REAL: 
+        target_timer = &proc->real;
+        break;
+    case ITIMER_PROF:
+        target_timer = &proc->prof;
+        break;
+    case ITIMER_VIRTUAL:
+        target_timer = &proc->virt;
+        break;
+    default: 
+        return -EINVAL;
+    }
+
+    if(old != nullptr)
+        *old = *target_timer;
+
+    if(out != nullptr)
+        *target_timer = *out;
+
+    if(out != nullptr) {
+        switch(timer) {
+        case ITIMER_REAL: 
+            proc->real_next = process::itimer_calculate(target_timer);
+            return 0;
+        case ITIMER_PROF:
+            proc->prof_next = process::itimer_calculate(target_timer, false);
+            return 0;
+        case ITIMER_VIRTUAL:
+            proc->virt_next = process::itimer_calculate(target_timer, false);
+            return 0;
+        default: 
+            return -EINVAL;
+        }
+    }
+
+    return 0;
 }

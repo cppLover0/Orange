@@ -692,8 +692,8 @@ long long sys_libclog(const char* str) {
     if(!is_safe_to_rw(current, (std::uint64_t)str, PAGE_SIZE))
         return -EFAULT;
     
-    if(current->is_debug) {
-        klibc::debug_printf("libc log: %s", str);
+    if(1) {
+        klibc::serial_printf("libc log: %s", str);
     }
 
     return 0;

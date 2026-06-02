@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dintrospection=disabled
+    meson_configure -Dintrospection=enabled
 }
 
 build() {

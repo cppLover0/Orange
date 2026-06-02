@@ -91,7 +91,7 @@ void ustar::load(char* archive, std::uint64_t len) {
 
     std::uint64_t actual_tar_ptr_end = ((uint64_t)archive + len) - 1024;
 
-    log("ustar", "loading initrd with total elements %lli", total);
+    log("ustar", "loading initrd with total elements %lli, size %lli mb", total, (len / 1024) / 1024);
     while((std::uint64_t)current < actual_tar_ptr_end) {
         std::uint8_t type = oct2bin((uint8_t*)&current->type,1);
         switch(type) {
@@ -151,11 +151,4 @@ skip:
     
     __tmpfs__create_parent_dirs_by_default = 0;
     log("ustar", "doing initrd free rn");
-    std::uint64_t align_start = (std::uint64_t)ALIGNPAGEUP((std::uint64_t)archive);
-    std::uint64_t proc_len = len - (align_start - (std::uint64_t)archive);
-    std::uint64_t align_len = ALIGNPAGEDOWN(proc_len);
-    for(std::uint64_t i = 0; i < align_len; i += PAGE_SIZE) {
-        pmm::freelist::free((align_start - etc::hhdm()) + i);
-    }
-
 }

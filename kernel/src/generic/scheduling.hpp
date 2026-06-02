@@ -9,6 +9,7 @@
 #include <generic/lock/spinlock.hpp>
 #include <generic/userspace/robust.hpp>
 #include <utils/linux.hpp>
+#include <generic/time.hpp>
 #include <generic/vmm.hpp>
 #include <atomic>
 
@@ -36,6 +37,16 @@ struct signal_trace {
     signal_trace* next;
 };
 
+struct itimeval {
+    long tv_sec;             
+    long tv_usec;              
+};
+
+struct itimerval {
+    struct itimeval it_interval; 
+    struct itimeval it_value;    
+};
+
 struct thread {
     std::uint32_t id;
     std::uint32_t pid;
@@ -44,6 +55,8 @@ struct thread {
     std::uint32_t exit_code;
     std::uint32_t exit_signal;
     std::uint32_t waitpid_state;
+
+    bool should_block_signals_next;
     bool should_not_save_ctx;
 #if defined(__x86_64__)
     std::uint8_t* sse_ctx;
@@ -59,7 +72,7 @@ struct thread {
     signal_manager* sig;
     signal_member signals_handlers[34];
     sig_stack signal_stack;
-    std::atomic<bool> lock;
+    locks::spinlock lock;
     std::atomic<std::uint32_t> futex;
     std::atomic<std::uint32_t> status;
     std::atomic<std::uint32_t> cpu;
@@ -69,6 +82,16 @@ struct thread {
     std::uint64_t original_root;
     bool is_debug;
     void* debug_file_descriptor;
+
+    itimerval real;
+    itimerval virt;
+    itimerval prof;
+
+    std::int64_t real_next;
+    std::int64_t virt_next;
+    std::int64_t prof_next;
+
+    std::uint64_t schedule_us_ts;
 
     long long last_syscall;
     bool is_restore_sigset;
@@ -117,4 +140,9 @@ namespace process {
     extern "C" void yield();
 
     thread* _head_proc();
+
+    inline std::int64_t itimer_calculate(itimerval* itimer, bool is_absolute = true) {
+        std::uint64_t calc = itimer->it_value.tv_usec + (itimer->it_value.tv_sec * (1024 * 1024)) + (is_absolute == true ? (time::timer->current_nano() / 1024) : 0);
+        return (itimer->it_value.tv_sec == 0 && itimer->it_value.tv_usec == 0) ? -1 : calc;
+    }
 };

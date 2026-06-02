@@ -61,7 +61,19 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
 
     thread* current_thread = CPU_LOCAL_READ(current_thread);
 
+    if(current_thread != nullptr) {
+        if(current_thread->status != PROCESS_LIVE) {
+            klibc::serial_printf("holy shit %d %d %d 0x%p", current_thread->id, current_thread->status.load(), current_thread->cpu.load(), frame->rip);
+        }
+    }
+
     if(frame->vec == 14 && cr2 > PAGE_SIZE && current_thread != nullptr) {
+
+        if(current_thread->vmem == nullptr) {
+            //log("wtf ", "wtf ");
+            goto meow;
+        }
+
         bool state = current_thread->vmem->lock.lock();
         vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
         if(obj != nullptr) {
@@ -92,11 +104,12 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         }
         current_thread->vmem->lock.unlock(state);
     }
+meow:
 
     //x86_64::lapic::off();
     //locks::is_disabled = true;
     
-    if(frame->cs != 0x08) {
+    if(frame->cs == 0x08) {
         x86_64::panic::print_ascii_art();
         print_regs(frame);
         extern int k_breakpoint;
@@ -119,8 +132,9 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         }
     } else {
         klibc::debug_printf("got panic proc %d !\n", current_thread->id);
-        current_thread->exit_request = 2;
-        current_thread->exit_code = (1 & 0xFF) << 8;
+        current_thread->sig->push(11); // sigsegv
+        current_thread->should_not_save_ctx = true;
+        current_thread->ctx = *frame;
         arch::enable_paging(gobject::kernel_root);
         process::yield();
         while(1) {process::yield();}

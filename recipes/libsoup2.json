@@ -1,7 +1,7 @@
 {
     "name": "libsoup2",
     "version": "2.74.3",
-    "deps": ["base-libs", "glib-2.0", "zlib", "libnghttp2", "sqlite3", "libpsl"],
+    "deps": ["base-libs", "glib-2.0", "zlib", "libnghttp2", "sqlite3", "libpsl", "gobject-introspection"],
     "url": "https://download.gnome.org/sources/libsoup/2.74/libsoup-2.74.3.tar.xz",
     "should_patch": false,
     "use_orange_prefix": true

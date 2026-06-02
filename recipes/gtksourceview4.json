@@ -1,0 +1,8 @@
+{
+    "name": "gtksourceview4",
+    "version": "4.8.2",
+    "deps": ["base-libs", "gtk3", "libxml2", "gobject-introspection"],
+    "url": "https://gitlab.gnome.org/GNOME/gtksourceview/-/archive/4.8.2/gtksourceview-4.8.2.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

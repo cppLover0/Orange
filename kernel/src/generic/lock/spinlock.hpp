@@ -46,8 +46,6 @@ namespace locks {
         std::atomic_flag flag = ATOMIC_FLAG_INIT;
     public:
             void lock() {
-                if(is_disabled)
-                    return;
                     
                 while (flag.test_and_set(std::memory_order_acquire)) {
                     arch::pause();

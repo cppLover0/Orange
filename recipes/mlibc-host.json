@@ -1,0 +1,8 @@
+{
+    "name": "mlibc-host",
+    "version": "meowww",
+    "deps": ["linux-headers"],
+    "url": "git:https://github.com/cppLover0/mlibc.git",
+    "should_patch": false,
+    "use_orange_prefix": false
+}

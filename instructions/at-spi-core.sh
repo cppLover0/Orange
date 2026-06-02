@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    CFLAGS="$CFLAGS -lXau -lXdmcp" meson_configure -Dsystemd_user_dir=/remove_later -Dintrospection=disabled
+    CFLAGS="$CFLAGS -lXau -lXdmcp" meson_configure -Dsystemd_user_dir=/remove_later -Dintrospection=enabled
 }
 
 build() {

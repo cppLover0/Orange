@@ -6,6 +6,9 @@ nm = 'x86_64-orange-mlibc-nm'
 strip = 'x86_64-orange-mlibc-strip'
 pkg-config = 'pkg-config'
 llvm-config = 'llvm-config'
+g-ir-scanner = 'orange-g-ir-scanner'
+g-ir-generate = 'orange-g-ir-generate'
+g-ir-compiler = 'orange-g-ir-compiler'
 
 [host_machine]
 system = 'orange'

@@ -1,7 +1,7 @@
 {
     "name": "libgee",
     "version": "recent",
-    "deps": ["base-libs", "glib-2.0"],
+    "deps": ["base-libs", "glib-2.0", "gobject-introspection"],
     "url": "https://download.gnome.org/sources/libgee/0.20/libgee-0.20.8.tar.xz",
     "should_patch": false,
     "use_orange_prefix": true

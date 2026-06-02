@@ -256,6 +256,7 @@ std::uint64_t pmm::freelist::alloc_4k() {
     std::uint64_t mem = (std::uint64_t)freelist_hhdm - etc::hhdm();
     freelist_hhdm = (std::uint64_t*)(*freelist_hhdm);
     klibc::memset((void*)(mem + etc::hhdm()),0,PAGE_SIZE);
+    free_mem -= PAGE_SIZE;
     pmm_lock.unlock();
     return mem;
 }
@@ -265,6 +266,7 @@ void pmm::freelist::nlfree(std::uint64_t phys) {
     klibc::memset((void*)virt, 1, PAGE_SIZE);
     *(std::uint64_t**)virt = freelist_hhdm;
     freelist_hhdm = (std::uint64_t*)virt;
+    free_mem += PAGE_SIZE;
 }
 
 void pmm::freelist::free(std::uint64_t phys) {

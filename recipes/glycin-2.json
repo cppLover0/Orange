@@ -1,0 +1,8 @@
+{
+    "name": "glycin-2",
+    "version": "2.1.1",
+    "deps": ["base-libs", "gtk3"],
+    "url": "https://gitlab.gnome.org/GNOME/glycin/-/archive/2.1.1/glycin-2.1.1.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}
