@@ -421,7 +421,7 @@ void process::schedule(void* ctx) {
 
                     if(current_thread->sig && current_thread->ctx.cs == 0x08) {
                         if(current_thread->sig->is_not_empty_sigset(&current_thread->sigset)) {
-                            log("m", "cant do sig rn rip 0x%p\n", current_thread->ctx.rip);
+                            //log("m", "cant do sig rn rip 0x%p\n", current_thread->ctx.rip);
                         }
                     }
 

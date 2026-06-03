@@ -7,6 +7,8 @@
 #include <klibc/string.hpp>
 #include <klibc/stdio.hpp>
 #include <utils/errno.hpp>
+#include <utils/signal_ret.hpp>
+#include <utils/signal.hpp>
 
 unix_socket_node* head_unsock_node = nullptr;
 locks::spinlock un_lock;
@@ -84,7 +86,12 @@ long long unix_sockets::connect(thread* proc, file_descriptor* file, sockaddr_un
 
     node->conn_counter++;
 
-    while(!conn->is_accepted.test()) {process::yield();}
+    while(!conn->is_accepted.test()) {
+        is_signal_ret(proc) {
+            signal_ret(proc);
+        }
+        process::yield();
+    }
 
     klibc::debug_printf("connected meow\n");
 

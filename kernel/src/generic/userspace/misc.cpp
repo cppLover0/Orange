@@ -194,7 +194,7 @@ std::uint64_t __mlibc_cpu_alloc_size(int num_cpus) {
 #define CPU_ALLOC_SIZE(n) __mlibc_cpu_alloc_size((n))
 
 void __mlibc_cpu_zero(const std::uint64_t setsize, cpu_set_t *set) {
-	memset(set, 0, CPU_ALLOC_SIZE(setsize));
+	klibc::memset(set, 0, CPU_ALLOC_SIZE(setsize));
 }
 
 void __mlibc_cpu_set(const int cpu, const std::uint64_t setsize, cpu_set_t *set) {

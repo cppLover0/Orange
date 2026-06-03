@@ -127,11 +127,7 @@ long long sys_shmget(int key, size_t size, int shmflg);
 long long sys_shmdt(std::uint64_t base);
 
 syscall_item* find_syscall(long long num) {
-    for(uint64_t i = 0; i < sizeof(syscall_table) / sizeof(syscall_item);i++) {
-        if(syscall_table[i].num == num)
-            return &syscall_table[i];
-    }
-    return nullptr;
+    return &syscall_table[num];
 }
 
 extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {

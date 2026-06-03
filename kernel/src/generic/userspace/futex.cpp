@@ -58,7 +58,6 @@ long long sys_futex(int* uaddr, int op, uint32_t val, timespec* ts) {
         process::futex_wait(proc, uaddr);
 
         futex_lock2.unlock();
-        process::yield();
             
         while(proc->futex.load() != 0) {
             if(ts) {
