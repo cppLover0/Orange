@@ -1,0 +1,8 @@
+{
+    "name": "rust-targetlexicon",
+    "version": "0.13.3",
+    "deps": ["base-libs"],
+    "url": "https://github.com/bytecodealliance/target-lexicon/archive/refs/tags/v0.13.3.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

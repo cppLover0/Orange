@@ -1,0 +1,64 @@
+diff -Naur rust-ipc-channel/Cargo.toml rust-ipc-channel-clean/Cargo.toml
+--- rust-ipc-channel/Cargo.toml	1970-01-01 03:00:01.000000000 +0300
++++ rust-ipc-channel-clean/Cargo.toml	2026-06-10 13:18:52.159919253 +0300
+@@ -97,15 +97,15 @@
+ memfd = ["sc"]
+ win32-trace = []
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "openbsd", target_os = "freebsd"))'.dependencies.mio]
++[target.'cfg(any(target_os = "linux", target_os = "openbsd", target_os = "freebsd", target_os = "orange"))'.dependencies.mio]
+ version = "1.0"
+ features = ["os-ext"]
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "openbsd", target_os = "freebsd"))'.dependencies.sc]
++[target.'cfg(any(target_os = "linux", target_os = "openbsd", target_os = "freebsd", target_os = "orange"))'.dependencies.sc]
+ version = "0.2.2"
+ optional = true
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "openbsd", target_os = "freebsd"))'.dependencies.tempfile]
++[target.'cfg(any(target_os = "linux", target_os = "openbsd", target_os = "freebsd", target_os = "orange"))'.dependencies.tempfile]
+ version = "3.4"
+ 
+ [target.'cfg(target_os = "windows")'.dependencies.windows]
+diff -Naur rust-ipc-channel/src/platform/mod.rs rust-ipc-channel-clean/src/platform/mod.rs
+--- rust-ipc-channel/src/platform/mod.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-ipc-channel-clean/src/platform/mod.rs	2026-06-10 13:18:36.636659761 +0300
+@@ -9,12 +9,12 @@
+ 
+ #[cfg(all(
+     not(feature = "force-inprocess"),
+-    any(target_os = "linux", target_os = "openbsd", target_os = "freebsd")
++    any(target_os = "linux", target_os = "openbsd", target_os = "freebsd", target_os = "orange")
+ ))]
+ mod unix;
+ #[cfg(all(
+     not(feature = "force-inprocess"),
+-    any(target_os = "linux", target_os = "openbsd", target_os = "freebsd")
++    any(target_os = "linux", target_os = "openbsd", target_os = "freebsd", target_os = "orange")
+ ))]
+ mod os {
+     pub use super::unix::*;
+diff -Naur rust-ipc-channel/src/platform/test.rs rust-ipc-channel-clean/src/platform/test.rs
+--- rust-ipc-channel/src/platform/test.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-ipc-channel-clean/src/platform/test.rs	2026-06-10 13:21:17.346743469 +0300
+@@ -224,7 +224,7 @@
+ // These tests only apply to platforms that need fragmentation.
+ #[cfg(all(
+     not(feature = "force-inprocess"),
+-    any(target_os = "linux", target_os = "freebsd", target_os = "windows")
++    any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange")
+ ))]
+ mod fragment_tests {
+     use super::with_n_fds;
+diff -Naur rust-ipc-channel/src/platform/unix/mod.rs rust-ipc-channel-clean/src/platform/unix/mod.rs
+--- rust-ipc-channel/src/platform/unix/mod.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-ipc-channel-clean/src/platform/unix/mod.rs	2026-06-10 15:27:53.961847462 +0300
+@@ -1149,6 +1149,8 @@
+                 #[cfg(target_os = "freebsd")]
+                 const POLLRDHUP: libc::c_short = 0x4000;
+ 
++                const POLLRDHUP: libc::c_short = 0x10;
++
+                 let events = libc::POLLIN | libc::POLLPRI | POLLRDHUP;
+ 
+                 let mut fd = [libc::pollfd {

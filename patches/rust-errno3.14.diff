@@ -1,0 +1,11 @@
+diff -Naur rust-errno3.14/src/unix.rs rust-errno3.14-clean/src/unix.rs
+--- rust-errno3.14/src/unix.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-errno3.14-clean/src/unix.rs	2026-06-13 22:16:40.596716903 +0300
+@@ -95,6 +95,7 @@
+             target_os = "redox",
+             target_os = "dragonfly",
+             target_os = "emscripten",
++            target_os = "orange"
+         ),
+         link_name = "__errno_location"
+     )]

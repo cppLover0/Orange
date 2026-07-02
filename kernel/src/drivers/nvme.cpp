@@ -31,7 +31,7 @@ void nvme::disable() {
 }
 
 void nvme_submit_admin(nvme_controller* ctrl, nvme_command& cmd) {
-    nvme_command* sq = (nvme_command*)ctrl->admin_sq.address;
+    volatile nvme_command* sq = (nvme_command*)ctrl->admin_sq.address;
     
 #ifdef NVME_ORANGE_TRACE
     klibc::printf("NVME Trace: Submitting admin command to controller 0x%p with opcode %d\r\n",ctrl, cmd.cdw0);
@@ -482,6 +482,8 @@ void nvme_init(std::uint64_t base) {
     controller->admin_sq.address = pmm::freelist::alloc_4k();
     controller->admin_cq.size = 63;
     controller->admin_sq.size = 63;
+
+    arch::memory_barrier();
     nvme::write64(controller, 0x30, controller->admin_cq.address);
     nvme::write64(controller, 0x28, controller->admin_sq.address);
     nvme::write32(controller, 0x24, 63 | (63 << 16));

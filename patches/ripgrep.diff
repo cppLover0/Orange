@@ -1,0 +1,12 @@
+diff -Naur ripgrep/Cargo.lock ripgrep-clean/Cargo.lock
+--- ripgrep/Cargo.lock	2026-06-10 07:49:03.717098998 +0300
++++ ripgrep-clean/Cargo.lock	2026-06-10 07:49:49.141278301 +0300
+@@ -280,7 +280,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.177"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+ 

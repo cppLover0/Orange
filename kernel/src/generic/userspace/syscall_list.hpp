@@ -172,3 +172,14 @@ long long sys_shmget(int key, size_t size, int shmflg);
 long long sys_shmdt(std::uint64_t base);
 
 long long sys_getaffinity(int pid, size_t cpusetsize, cpu_set_t *mask);
+long long sys_pidstat(int pid);
+
+long long sys_selfexe(char* buffer, std::uint32_t size);
+
+long long sys_epoll_create(int flags);
+long long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *ev);
+long long sys_epoll_wait(int epfd, struct epoll_event *ev, int n, int timeout, const sigset_t *sigmask);
+
+long long sys_shutdown(int sockfd, int how);
+long long sys_ftruncate(int fd, std::size_t new_size);
+long long sys_fchownat(int dfd, const char* path, uid_t owner, gid_t group, int flags);

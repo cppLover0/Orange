@@ -25,6 +25,8 @@
 #include <generic/elf.hpp>
 #include <generic/dev_log.hpp>
 #include <utils/random.hpp>
+#include <generic/randomdev.hpp>
+#include <generic/mmap_syncer.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
@@ -87,6 +89,7 @@ extern "C" void main() {
     mouse::init();
     nulldev::init();
     logdev::init();
+    randomdev::init();
 
     random::reseed();
 
@@ -109,6 +112,7 @@ extern "C" void main() {
     time::update_unix_time();
 
     modules::init();
+    mmap_syncer::init();
     
     extern std::atomic<std::uint64_t> tmpfs_used_mem;
     log("kernel", "total tmpfs memory %lli mb", (tmpfs_used_mem.load() / 1024) / 1024);

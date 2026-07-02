@@ -1,0 +1,12 @@
+diff -Naur rust-errno2.8/src/unix.rs rust-errno2.8-clean/src/unix.rs
+--- rust-errno2.8/src/unix.rs	1973-11-30 00:33:09.000000000 +0300
++++ rust-errno2.8-clean/src/unix.rs	2026-06-13 22:15:53.452178051 +0300
+@@ -68,7 +68,7 @@
+     #[cfg_attr(any(target_os = "solaris",
+                    target_os = "illumos"),
+                link_name = "___errno")]
+-    #[cfg_attr(target_os = "linux",
++    #[cfg_attr(any(target_os = "linux", target_os = "orange"),
+                link_name = "__errno_location")]
+     fn errno_location() -> *mut c_int;
+ 

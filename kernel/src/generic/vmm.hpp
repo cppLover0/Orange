@@ -26,6 +26,13 @@ struct vmm_obj {
 
     uint8_t is_free;
     uint8_t is_mapped;
+
+    struct {
+        void* copied_file_desc;
+        void (*close)(void* file);
+        void (*dup)(void* file);
+    } mmap_info;
+
     shm_seg* shm;
 
     struct vmm_obj* next;
@@ -176,14 +183,16 @@ public:
                 break;
 
             if(current->base != 0) {
-                if(current->is_mapped && !current->shm) {
+                if(current->is_mapped && !current->shm && !current->mmap_info.copied_file_desc) {
                     dest->map_memory(current->base, current->phys, current->flags, current->len, true);
-                } else if(!current->shm) {
+                } else if(!current->shm && !current->mmap_info.copied_file_desc) {
                     vmm_obj* obj = dest->v_find(current->base, current->len);
                     (void)obj;
                     paging::duplicate_range(dest->root, this->root, current->base, current->len, PAGING_PRESENT | PAGING_RW | PAGING_USER);
-                } else if(current->shm) {
+                } else if(current->shm && !current->mmap_info.copied_file_desc) {
                     dest->map_memory(current->base, current->phys, current->flags, current->len, true, current->shm);
+                } else if(current->mmap_info.copied_file_desc) {
+                    
                 }
             }
 
@@ -228,6 +237,24 @@ public:
         }
         this->lock.unlock(state);
         return 0;
+    }
+
+    void dumb_unmap(std::uint64_t base) {
+        vmm_obj* prev = this->start;
+        vmm_obj* current = prev->next;
+
+        while(current) {
+            vmm_obj* next = current->next;
+
+            if(current->base == base) {
+                prev->next = current->next;
+                delete current;
+                return;
+            }
+
+            prev = current;
+            current = next;
+        }
     }
 
     void unmap(std::uint64_t base, std::uint64_t len, bool should_lock = true, int shm_pid = 0) {
@@ -275,8 +302,13 @@ public:
 
             if(before->is_mapped && !before->shm) {
                 paging::zero_range(this->root, before->base,before->len);
+                dumb_unmap(before->base);
             } else if(before->shm) {
                 free_shm(before);
+                dumb_unmap(before->base);
+                                
+            } else {
+                before->len -= ((before->base + before->len) - base);
             }
 
             vmm_obj* split = new vmm_obj;
@@ -296,19 +328,28 @@ public:
                         if(before->base + before->len > base) {
                             if(before->is_mapped && !before->shm) {
                                 paging::zero_range(this->root, before->base,before->len);
+                                dumb_unmap(before->base);
                             } else if(before->shm) {
                                 free_shm(before);
+                                dumb_unmap(before->base);
+                                
+                            } else {
+                                before->len -= ((before->base + before->len) - base);
                             }
-
-                            before->len -= ((before->base + before->len) - base);
+                            
                         }
                     } else {
                         
                         if(current->base >= base && current->base < (base + len)) {
-                            if(current->is_mapped && !current->shm) {
-                                paging::zero_range(this->root, current->base,current->len);
-                            } else if(current->shm) {
-                                free_shm(current);
+                            if(before->is_mapped && !before->shm) {
+                                paging::zero_range(this->root, before->base,before->len);
+                                dumb_unmap(before->base);
+                            } else if(before->shm) {
+                                free_shm(before);
+                                dumb_unmap(before->base);
+                                
+                            } else {
+                                before->len -= ((before->base + before->len) - base);
                             }
                             std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
                             current->len -= sz;
@@ -355,7 +396,7 @@ end:
         return current->base;
     }
 
-    std::uint64_t map_memory(std::uint64_t hint, std::uint64_t phys, std::uint64_t paging_flags, std::uint64_t len, bool is_fixed, shm_seg* shm = nullptr) {
+    std::uint64_t map_memory(std::uint64_t hint, std::uint64_t phys, std::uint64_t paging_flags, std::uint64_t len, bool is_fixed, shm_seg* shm = nullptr, void* file_desc = nullptr, void* dup = nullptr, void* close = nullptr) {
         vmm_obj* current = nullptr;
         bool state = this->lock.lock();
 
@@ -371,6 +412,8 @@ end:
         } else {
             current = this->v_alloc(ALIGNUP(len, PAGE_SIZE));
         }
+
+        current.
 
         current->is_mapped = true;
         current->shm = shm;

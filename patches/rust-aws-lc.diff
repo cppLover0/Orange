@@ -1,0 +1,12 @@
+diff -Naur rust-aws-lc/include/openssl/thread.h rust-aws-lc-clean/include/openssl/thread.h
+--- rust-aws-lc/include/openssl/thread.h	2026-06-09 14:44:25.653149876 +0300
++++ rust-aws-lc-clean/include/openssl/thread.h	2026-06-09 14:20:34.872209193 +0300
+@@ -25,7 +25,7 @@
+   void *handle;
+ } CRYPTO_MUTEX;
+ #elif !defined(__GLIBC__)
+-#if defined(OPENSSL_OPENBSD) || defined(__orange__)
++#if defined(OPENSSL_OPENBSD)
+ #include <pthread.h>
+ #endif
+ typedef pthread_rwlock_t CRYPTO_MUTEX;

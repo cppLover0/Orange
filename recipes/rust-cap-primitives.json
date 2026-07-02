@@ -1,0 +1,8 @@
+{
+    "name": "rust-cap-primitives",
+    "version": "3.3.4",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/cap-primitives/cap-primitives-3.4.4.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

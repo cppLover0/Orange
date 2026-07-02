@@ -1,0 +1,35 @@
+diff -Naur rust-getrandom4/Cargo.toml rust-getrandom4-clean/Cargo.toml
+--- rust-getrandom4/Cargo.toml	2026-02-03 11:40:18.000000000 +0300
++++ rust-getrandom4-clean/Cargo.toml	2026-06-10 17:03:20.388616566 +0300
+@@ -57,7 +57,7 @@
+ libc = { version = "0.2.154", default-features = false }
+ 
+ # getrandom
+-[target.'cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "hurd", target_os = "illumos", target_os = "cygwin", all(target_os = "horizon", target_arch = "arm")))'.dependencies]
++[target.'cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "hurd", target_os = "illumos", target_os = "orange", target_os = "cygwin", all(target_os = "horizon", target_arch = "arm")))'.dependencies]
+ libc = { version = "0.2.154", default-features = false }
+ 
+ # netbsd
+diff -Naur rust-getrandom4/src/backends.rs rust-getrandom4-clean/src/backends.rs
+--- rust-getrandom4/src/backends.rs	2026-02-03 11:40:18.000000000 +0300
++++ rust-getrandom4-clean/src/backends.rs	2026-06-10 17:03:42.610033535 +0300
+@@ -113,6 +113,7 @@
+         target_os = "hurd",
+         target_os = "illumos",
+         target_os = "cygwin",
++        target_os = "orange",
+         // Check for target_arch = "arm" to only include the 3DS. Does not
+         // include the Nintendo Switch (which is target_arch = "aarch64").
+         all(target_os = "horizon", target_arch = "arm"),
+diff -Naur rust-getrandom4/src/utils/get_errno.rs rust-getrandom4-clean/src/utils/get_errno.rs
+--- rust-getrandom4/src/utils/get_errno.rs	2026-02-03 11:40:18.000000000 +0300
++++ rust-getrandom4-clean/src/utils/get_errno.rs	2026-06-10 17:03:34.187497745 +0300
+@@ -1,7 +1,7 @@
+ cfg_if! {
+     if #[cfg(any(target_os = "netbsd", target_os = "openbsd", target_os = "android", target_os = "cygwin"))] {
+         use libc::__errno as errno_location;
+-    } else if #[cfg(any(target_os = "linux", target_os = "emscripten", target_os = "hurd", target_os = "redox", target_os = "dragonfly"))] {
++    } else if #[cfg(any(target_os = "linux", target_os = "emscripten", target_os = "hurd", target_os = "redox", target_os = "dragonfly", target_os = "orange"))] {
+         use libc::__errno_location as errno_location;
+     } else if #[cfg(target_os = "illumos")] {
+         use libc::___errno as errno_location;

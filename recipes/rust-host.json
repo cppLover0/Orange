@@ -1,0 +1,9 @@
+{
+    "name": "rust-host",
+    "version": "1.92.0",
+    "deps": ["base-libs", "llvm", "rust-libc", "openssl-host", "rust-getrandom3", "rust-rustix", "rust-rustix0.38", "rust-nix", "rust-nix0.29", "rust-mio1.2.0", "rust-socket2", "rust-tokio1.52.1", "rust-targetlexicon", "rust-scap", "rust-zed-scap", "rust-nix0.27.1", "tree-sitter", "rust-wasmtime", "rust-aws-lc-sys", "rust-ring", "rust-cap-primitives", "rust-socket2-0.5.10", "rust-libloading", "rust-sysinterface", "rust-nix0.28", "rust-ipc-channel", "rust-getrandom4", "rust-open", "rust-polling", "rust-errno2.8", "rust-errno3.14"],
+    "url": "https://static.rust-lang.org/dist/rustc-1.92.0-src.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true,
+    "tarball_mode": true
+}

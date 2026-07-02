@@ -29,6 +29,44 @@ find "${dest_dir}" -name "*.la" -delete
 
 set -e
 
+cat << EOF > "${build_support}/config.toml"
+[build]
+rustc = "${host_dest_dir}/bin/rustc"
+
+[target.x86_64-unknown-orange-mlibc]
+linker = "x86_64-orange-mlibc-gcc"
+
+[patch.crates-io]
+backtrace = { path = "${sources}/rust-backtrace-workdir" }
+libc = { path = "${sources}/rust-libc-workdir" }
+getrandom-03 = { path = "${sources}/rust-getrandom3-workdir", package = "getrandom" }
+getrandom-04 = { path = "${sources}/rust-getrandom4-workdir", package = "getrandom" }
+rustix = { path = "${sources}/rust-rustix-workdir", package = "rustix" }
+rustix-038 = { path = "${sources}/rust-rustix0.38-workdir", package = "rustix" }
+nix-030 = { path = "${sources}/rust-nix-workdir", package = "nix" }
+nix-029 = { path = "${sources}/rust-nix0.29-workdir", package = "nix" }
+nix-028 = { path = "${sources}/rust-nix0.28-workdir", package = "nix" }
+nix-0271 = { path = "${sources}/rust-nix0.27.1-workdir", package = "nix" }
+mio-120 = { path = "${sources}/rust-mio1.2.0-workdir", package = "mio" }
+socket2 = { path = "${sources}/rust-socket2-workdir", package = "socket2" }
+socket2-0510 = { path = "${sources}/rust-socket2-0.5.10-workdir", package = "socket2" }
+tokio1521 = { path = "${sources}/rust-tokio1.52.1-workdir/tokio", package = "tokio" }
+target-lexicon = { path = "${sources}/rust-targetlexicon-workdir", package = "target-lexicon" }
+scap = { path = "${sources}/rust-zed-scap-workdir", package = "zed-scap" }
+treesitter = { path = "${sources}/tree-sitter-workdir", package = "tree-sitter" }
+wasmtime = { path = "${sources}/rust-wasmtime-workdir/crates/wasmtime", package = "wasmtime" }
+awslcsys = { path = "${sources}/rust-aws-lc-sys-workdir/aws-lc-sys", package = "aws-lc-sys" }
+ring = { path = "${sources}/rust-ring-workdir", package = "ring" }
+libloading = { path = "${sources}/rust-libloading-workdir", package = "libloading" }
+sysinterface = { path = "${sources}/rust-sysinterface-workdir", package = "system-interface" }
+cap-primitives = { path = "${sources}/rust-cap-primitives-workdir", package = "cap-primitives" }
+ipchcannel = { path = "${sources}/rust-ipc-channel-workdir", package = "ipc-channel" }
+open = { path = "${sources}/rust-open-workdir", package = "open" }
+polling = { path = "${sources}/rust-polling-workdir", package = "polling" }
+errno = { path = "${sources}/rust-errno2.8-workdir", package = "errno" }
+errno2 = { path = "${sources}/rust-errno3.14-workdir", package = "errno" }
+EOF
+
 im_exit() {
     kill -s USR1 $$
 }

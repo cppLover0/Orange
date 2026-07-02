@@ -12,7 +12,7 @@ namespace time {
         virtual void sleep(std::uint64_t us) = 0;
     };
 
-    inline std::atomic<std::uint64_t> current_unix_time = 0;
+    inline std::atomic<std::uint64_t> current_unix_time = 1782675086;
     inline std::atomic<std::uint64_t> last_timestamp = 0;
 
     inline generic_timer* timer = nullptr;

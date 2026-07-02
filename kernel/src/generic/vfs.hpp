@@ -256,7 +256,7 @@ inline static std::uint32_t vfs_to_dt_type(vfs_file_type type) {
         case vfs_file_type::symlink:
             return DT_LNK;
         default:
-            assert(0,"fsaifsi");
+            assert(0,"fsaifsi %d", type);
             return 0; //
     }
     return 0;
@@ -269,10 +269,16 @@ struct filesystem {
         std::uint64_t partition;
     } fs_specific;
 
+    struct {
+        locks::spinlock lock;
+        std::size_t ptr;
+        void* list;
+    } flock_related;
+
     std::int32_t (*remove)(filesystem* fs, char* path);
     std::int32_t (*open)(filesystem* fs, void* file_desc, char* path, bool is_directory);
     std::int32_t (*readlink)(filesystem* fs, char* path, char* buffer);
-    std::int32_t (*create)(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode);
+    std::int32_t (*create)(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid);
     std::int32_t (*unlink)(filesystem* fs, char* path);
     std::int32_t (*link)(filesystem* fs, char* old_path, char* new_path);
 
@@ -481,6 +487,28 @@ namespace vfs {
     };
 }
 
+typedef union epoll_data {
+	void *ptr;
+	int fd;
+	uint32_t u32;
+	uint64_t u64;
+} epoll_data_t;
+
+struct epoll_event {
+	uint32_t events;
+	epoll_data_t data;
+}
+#if defined(__x86_64__) || defined(__i386__)
+__attribute__((__packed__))
+#endif
+;
+
+struct epoll_member {
+    bool is_used;
+    int target_fd;
+    epoll_event ev;
+};
+
 struct file_descriptor {
     
     file_descriptor_type type;
@@ -488,6 +516,8 @@ struct file_descriptor {
     std::size_t offset;
     std::uint32_t flags;
     std::int32_t index;
+
+    std::uint64_t inode; // must be filled by fs
 
     union {
         std::uint64_t ino;
@@ -512,6 +542,13 @@ struct file_descriptor {
         vfs::pipe* read_socket;
         vfs::pipe* write_socket;
     } socketpair;
+
+    struct {
+        locks::spinlock* epoll_lock;
+        std::atomic<std::uint32_t>* epoll_usage_counter;
+        std::size_t* epoll_ptr;
+        epoll_member** info;
+    } epoll;
     
     struct {
         int socket_type;
@@ -556,6 +593,9 @@ struct file_descriptor {
 
         std::int32_t (*chmod)(file_descriptor* file, int new_mode);
         std::int32_t (*zero)(file_descriptor* file);
+
+        void (*chown)(file_descriptor* file, int uid, int gid);
+        void (*truncate)(file_descriptor* file, std::size_t size);
     } vnode;
 
     file_descriptor* next;
@@ -724,6 +764,8 @@ namespace vfs {
                         new_fd->socketpair.write_socket->create(PIPE_SIDE_READ);
                         new_fd->socketpair.read_socket->create(PIPE_SIDE_WRITE);
                     }
+                } else if(new_fd->type == file_descriptor_type::epoll) {
+                    new_fd->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
                 }
 
                 current = current->next;
@@ -771,6 +813,8 @@ namespace vfs {
                     new_fd->socketpair.write_socket->create(PIPE_SIDE_READ);
                     new_fd->socketpair.read_socket->create(PIPE_SIDE_WRITE);
                 }
+            } else if(new_fd->type == file_descriptor_type::epoll) {
+                new_fd->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
             }
             new_fd->next = next;
             fd_lock.unlock(state);
@@ -872,6 +916,8 @@ namespace vfs {
                     lowest->socketpair.write_socket->create(PIPE_SIDE_READ);
                     lowest->socketpair.read_socket->create(PIPE_SIDE_WRITE);
                 }
+            } else if(lowest->type == file_descriptor_type::epoll) {
+                lowest->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
             }
 
             this->fd_lock.unlock(state);
@@ -923,6 +969,17 @@ namespace vfs {
                     file->socketpair.write_socket->close(PIPE_SIDE_READ);
                     file->socketpair.read_socket->close(PIPE_SIDE_WRITE);
                 }
+            } else if(file->type == file_descriptor_type::epoll) {
+                file->epoll.epoll_usage_counter->fetch_sub(1, std::memory_order_relaxed);
+                if(file->epoll.epoll_usage_counter->load() == 0) {
+                    delete file->epoll.epoll_usage_counter;
+                    delete file->epoll.epoll_lock;
+                    delete file->epoll.epoll_ptr;
+                    if(*file->epoll.info != nullptr) {
+                        klibc::free((void*)*file->epoll.info);
+                    }
+                    delete file->epoll.info;
+                }
             } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);
             }
@@ -951,7 +1008,7 @@ namespace vfs {
 
     void init();
     std::int32_t open(file_descriptor* fd, char* path, bool follow_symlinks, bool is_directory);
-    std::int32_t create(char* path, vfs_file_type type, std::uint32_t mode); 
+    std::int32_t create(char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid); 
     std::int32_t readlink(char* path, char* out, std::uint32_t out_len);
     std::int32_t rename(char* path, char* newpath);
     std::int32_t unlink(char* path);

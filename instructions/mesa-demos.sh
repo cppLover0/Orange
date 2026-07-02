@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    LDFLAGS="${LDFLAGS} -lstdc++ -lXau -lXdmcp" CFLAGS="${CFLAGS} -D_XOPEN_SOURCE -D_GNU_SOURCE" meson_configure -Dgles1=disabled -Dosmesa=disabled -Dlibdrm=disabled -Dx11=enabled -Dwith-system-data-files=true
+    LDFLAGS="${LDFLAGS} -lstdc++ -lXau -lXdmcp" CFLAGS="${CFLAGS} -D_XOPEN_SOURCE -D_GNU_SOURCE" meson_configure -Dgles1=enabled -Dvulkan=enabled -Dosmesa=disabled -Dlibdrm=disabled -Dx11=enabled -Dwith-system-data-files=true
 }
 
 build() {

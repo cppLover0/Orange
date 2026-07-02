@@ -1,0 +1,335 @@
+diff -Naur rust-rustix/src/backend/libc/conv.rs rust-rustix-clean/src/backend/libc/conv.rs
+--- rust-rustix/src/backend/libc/conv.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/backend/libc/conv.rs	2026-06-13 19:41:41.651592739 +0300
+@@ -79,7 +79,7 @@
+ #[cfg(any(
+     linux_kernel,
+     all(target_os = "illumos", feature = "event"),
+-    all(target_os = "redox", feature = "event")
++    all(target_os = "redox", feature = "event"), target_os = "orange"
+ ))]
+ #[inline]
+ pub(super) fn ret_u32(raw: c::c_int) -> io::Result<u32> {
+diff -Naur rust-rustix/src/backend/libc/event/mod.rs rust-rustix-clean/src/backend/libc/event/mod.rs
+--- rust-rustix/src/backend/libc/event/mod.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/backend/libc/event/mod.rs	2026-06-13 19:35:50.113427325 +0300
+@@ -5,5 +5,5 @@
+ #[cfg_attr(windows, path = "windows_syscalls.rs")]
+ pub(crate) mod syscalls;
+ 
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub mod epoll;
+diff -Naur rust-rustix/src/backend/libc/event/syscalls.rs rust-rustix-clean/src/backend/libc/event/syscalls.rs
+--- rust-rustix/src/backend/libc/event/syscalls.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/backend/libc/event/syscalls.rs	2026-06-13 19:40:53.983946872 +0300
+@@ -1,10 +1,10 @@
+ //! libc syscalls supporting `rustix::event`.
+ 
+ use crate::backend::c;
+-#[cfg(any(linux_kernel, solarish, target_os = "redox"))]
++#[cfg(any(linux_kernel, solarish, target_os = "redox", target_os = "orange"))]
+ use crate::backend::conv::ret;
+ use crate::backend::conv::ret_c_int;
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ use crate::backend::conv::ret_u32;
+ #[cfg(bsd)]
+ use crate::event::kqueue::Event;
+@@ -21,7 +21,7 @@
+ use crate::event::FdSetElement;
+ use crate::event::{PollFd, Timespec};
+ use crate::io;
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ use crate::utils::as_ptr;
+ #[cfg(solarish)]
+ use core::mem::MaybeUninit;
+@@ -35,9 +35,9 @@
+     target_os = "wasi"
+ ))]
+ use core::ptr::null;
+-#[cfg(any(bsd, linux_kernel, solarish, target_os = "redox", target_os = "wasi"))]
++#[cfg(any(bsd, linux_kernel, solarish, target_os = "redox", target_os = "wasi", target_os = "orange"))]
+ use core::ptr::null_mut;
+-#[cfg(any(bsd, linux_kernel, solarish, target_os = "redox"))]
++#[cfg(any(bsd, linux_kernel, solarish, target_os = "redox", target_os = "orange"))]
+ use {crate::backend::conv::borrowed_fd, crate::fd::BorrowedFd};
+ #[cfg(any(
+     bsd,
+@@ -46,7 +46,7 @@
+     target_os = "freebsd",
+     target_os = "illumos",
+     target_os = "espidf",
+-    target_os = "redox"
++    target_os = "redox", target_os = "orange"
+ ))]
+ use {crate::backend::conv::ret_owned_fd, crate::fd::OwnedFd};
+ 
+@@ -494,13 +494,13 @@
+ }
+ 
+ #[inline]
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub(crate) fn epoll_create(flags: super::epoll::CreateFlags) -> io::Result<OwnedFd> {
+     unsafe { ret_owned_fd(c::epoll_create1(bitflags_bits!(flags))) }
+ }
+ 
+ #[inline]
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub(crate) fn epoll_add(
+     epoll: BorrowedFd<'_>,
+     source: BorrowedFd<'_>,
+@@ -521,7 +521,7 @@
+ }
+ 
+ #[inline]
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub(crate) fn epoll_mod(
+     epoll: BorrowedFd<'_>,
+     source: BorrowedFd<'_>,
+@@ -539,7 +539,7 @@
+ }
+ 
+ #[inline]
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub(crate) fn epoll_del(epoll: BorrowedFd<'_>, source: BorrowedFd<'_>) -> io::Result<()> {
+     unsafe {
+         ret(c::epoll_ctl(
+@@ -552,7 +552,7 @@
+ }
+ 
+ #[inline]
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub(crate) unsafe fn epoll_wait(
+     epoll: BorrowedFd<'_>,
+     events: (*mut crate::event::epoll::Event, usize),
+diff -Naur rust-rustix/src/backend/libc/fs/types.rs rust-rustix-clean/src/backend/libc/fs/types.rs
+--- rust-rustix/src/backend/libc/fs/types.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/backend/libc/fs/types.rs	2026-06-07 13:49:43.447839144 +0300
+@@ -809,6 +809,7 @@
+             target_os = "l4re",
+             target_os = "linux",
+             target_os = "wasi",
++            target_os = "orange"
+         )))]
+         const NO_HIDE_STALE = bitcast!(c::FALLOC_FL_NO_HIDE_STALE);
+         /// `FALLOC_FL_COLLAPSE_RANGE`
+@@ -820,6 +821,7 @@
+             target_os = "hurd",
+             target_os = "emscripten",
+             target_os = "wasi",
++            target_os = "orange"
+         )))]
+         const COLLAPSE_RANGE = bitcast!(c::FALLOC_FL_COLLAPSE_RANGE);
+         /// `FALLOC_FL_ZERO_RANGE`
+@@ -831,6 +833,7 @@
+             target_os = "hurd",
+             target_os = "emscripten",
+             target_os = "wasi",
++            target_os = "orange"
+         )))]
+         const ZERO_RANGE = bitcast!(c::FALLOC_FL_ZERO_RANGE);
+         /// `FALLOC_FL_INSERT_RANGE`
+@@ -842,6 +845,7 @@
+             target_os = "hurd",
+             target_os = "emscripten",
+             target_os = "wasi",
++            target_os = "orange"
+         )))]
+         const INSERT_RANGE = bitcast!(c::FALLOC_FL_INSERT_RANGE);
+         /// `FALLOC_FL_UNSHARE_RANGE`
+@@ -853,6 +857,7 @@
+             target_os = "hurd",
+             target_os = "emscripten",
+             target_os = "wasi",
++            target_os = "orange"
+         )))]
+         const UNSHARE_RANGE = bitcast!(c::FALLOC_FL_UNSHARE_RANGE);
+ 
+diff -Naur rust-rustix/src/backend/libc/mm/types.rs rust-rustix-clean/src/backend/libc/mm/types.rs
+--- rust-rustix/src/backend/libc/mm/types.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/backend/libc/mm/types.rs	2026-06-07 14:39:18.831138776 +0300
+@@ -89,6 +89,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const SHARED_VALIDATE = bitcast!(c::MAP_SHARED_VALIDATE);
+         /// `MAP_PRIVATE`
+@@ -103,6 +104,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const DENYWRITE = bitcast!(c::MAP_DENYWRITE);
+         /// `MAP_FIXED`
+@@ -120,6 +122,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const FIXED_NOREPLACE = bitcast!(c::MAP_FIXED_NOREPLACE);
+         /// `MAP_GROWSDOWN`
+@@ -132,6 +135,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const GROWSDOWN = bitcast!(c::MAP_GROWSDOWN);
+         /// `MAP_HUGETLB`
+@@ -144,6 +148,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const HUGETLB = bitcast!(c::MAP_HUGETLB);
+         /// `MAP_HUGE_2MB`
+@@ -159,6 +164,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const HUGE_2MB = bitcast!(c::MAP_HUGE_2MB);
+         /// `MAP_HUGE_1GB`
+@@ -174,6 +180,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const HUGE_1GB = bitcast!(c::MAP_HUGE_1GB);
+         /// `MAP_LOCKED`
+@@ -186,6 +193,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const LOCKED = bitcast!(c::MAP_LOCKED);
+         /// `MAP_NOCORE`
+@@ -198,6 +206,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const NORESERVE = bitcast!(c::MAP_NORESERVE);
+         /// `MAP_NOSYNC`
+@@ -213,6 +222,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const POPULATE = bitcast!(c::MAP_POPULATE);
+         /// `MAP_STACK`
+@@ -224,6 +234,7 @@
+             target_os = "haiku",
+             target_os = "hurd",
+             target_os = "redox",
++            target_os = "orange",
+         )))]
+         const STACK = bitcast!(c::MAP_STACK);
+         /// `MAP_PREFAULT_READ`
+@@ -242,6 +253,7 @@
+             target_os = "hurd",
+             target_os = "nto",
+             target_os = "redox",
++            target_os = "orange",
+             all(
+                 linux_kernel,
+                 any(target_arch = "mips", target_arch = "mips32r6", target_arch = "mips64", target_arch = "mips64r6"),
+diff -Naur rust-rustix/src/backend/libc/net/msghdr.rs rust-rustix-clean/src/backend/libc/net/msghdr.rs
+--- rust-rustix/src/backend/libc/net/msghdr.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/backend/libc/net/msghdr.rs	2026-06-07 15:01:10.582526815 +0300
+@@ -110,7 +110,7 @@
+     msghdr.msg_iov = iov.as_mut_ptr().cast();
+     msghdr.msg_iovlen = msg_iov_len(iov.len());
+     msghdr.msg_control = control.as_control_ptr().cast();
+-    msghdr.msg_controllen = msg_control_len(control.control_len());
++    msghdr.msg_controllen = msg_control_len(control.control_len()) as u32;
+ 
+     let res = f(&mut msghdr);
+ 
+@@ -138,7 +138,7 @@
+     h.msg_iov = iov.as_ptr() as _;
+     h.msg_iovlen = msg_iov_len(iov.len());
+     h.msg_control = control.as_control_ptr().cast();
+-    h.msg_controllen = msg_control_len(control.control_len());
++    h.msg_controllen = msg_control_len(control.control_len()) as u32;
+     h
+ }
+ 
+@@ -165,7 +165,7 @@
+         h.msg_iov = iov.as_ptr() as _;
+         h.msg_iovlen = msg_iov_len(iov.len());
+         h.msg_control = control.as_control_ptr().cast();
+-        h.msg_controllen = msg_control_len(control.control_len());
++        h.msg_controllen = msg_control_len(control.control_len()) as u32;
+         // Pass a reference to the `c::msghdr` instead of passing it by value
+         // because it may contain pointers to temporary objects that won't
+         // live beyond the call to `with_sockaddr`.
+diff -Naur rust-rustix/src/event/mod.rs rust-rustix-clean/src/event/mod.rs
+--- rust-rustix/src/event/mod.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/event/mod.rs	2026-06-13 19:34:09.530931216 +0300
+@@ -1,6 +1,6 @@
+ //! Event operations.
+ 
+-#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
++#[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox", target_os = "orange"))]
+ pub mod epoll;
+ #[cfg(any(
+     linux_kernel,
+diff -Naur rust-rustix/src/ioctl/mod.rs rust-rustix-clean/src/ioctl/mod.rs
+--- rust-rustix/src/ioctl/mod.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/ioctl/mod.rs	2026-06-07 13:49:43.448014649 +0300
+@@ -309,6 +309,10 @@
+ ))]
+ type _Opcode = c::c_int;
+ 
++// mlibc uses `c_ulong`
++#[cfg(target_env = "mlibc")]
++type _Opcode = c::c_ulong;
++
+ // Android uses `c_int`.
+ #[cfg(all(not(linux_raw), target_os = "android"))]
+ type _Opcode = c::c_int;
+diff -Naur rust-rustix/src/signal.rs rust-rustix-clean/src/signal.rs
+--- rust-rustix/src/signal.rs	2026-02-22 19:22:49.000000000 +0300
++++ rust-rustix-clean/src/signal.rs	2026-06-07 14:55:10.763840203 +0300
+@@ -96,6 +96,7 @@
+         target_os = "hurd",
+         target_os = "nto",
+         target_os = "vita",
++        target_os = "orange",
+         all(
+             linux_kernel,
+             any(
+@@ -317,6 +318,7 @@
+                 target_os = "hurd",
+                 target_os = "nto",
+                 target_os = "vita",
++                target_os = "orange",
+                 all(
+                     linux_kernel,
+                     any(
+@@ -425,6 +427,7 @@
+                 target_os = "hurd",
+                 target_os = "nto",
+                 target_os = "vita",
++                target_os = "orange",
+                 all(
+                     linux_kernel,
+                     any(

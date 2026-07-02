@@ -1,0 +1,71 @@
+diff -Naur rust-targetlexicon/src/targets.rs rust-targetlexicon-clean/src/targets.rs
+--- rust-targetlexicon/src/targets.rs	2025-09-09 20:22:55.000000000 +0300
++++ rust-targetlexicon-clean/src/targets.rs	2026-06-08 12:22:13.464196048 +0300
+@@ -710,6 +710,7 @@
+     /// [darwin-wiki]: https://en.wikipedia.org/wiki/Darwin_(operating_system)
+     Darwin(Option<DeploymentTarget>),
+     Dragonfly,
++    Orange,
+     Emscripten,
+     Espidf,
+     Freebsd,
+@@ -776,6 +777,7 @@
+             Cygwin => Cow::Borrowed("cygwin"),
+             Darwin(deployment_target) => darwin_version("darwin", deployment_target),
+             Dragonfly => Cow::Borrowed("dragonfly"),
++            Orange => Cow::Borrowed("orange"),
+             Emscripten => Cow::Borrowed("emscripten"),
+             Espidf => Cow::Borrowed("espidf"),
+             Freebsd => Cow::Borrowed("freebsd"),
+@@ -856,6 +858,7 @@
+     LinuxKernel,
+     Macabi,
+     Musl,
++    Mlibc,
+     Musleabi,
+     Musleabihf,
+     Muslabi64,
+@@ -898,6 +901,7 @@
+             HurdKernel => Cow::Borrowed("hurdkernel"),
+             LinuxKernel => Cow::Borrowed("linuxkernel"),
+             Macabi => Cow::Borrowed("macabi"),
++            Mlibc => Cow::Borrowed("mlibc"),
+             Musl => Cow::Borrowed("musl"),
+             Musleabi => Cow::Borrowed("musleabi"),
+             Musleabihf => Cow::Borrowed("musleabihf"),
+@@ -1630,6 +1634,7 @@
+             "cuda" => Cuda,
+             "cygwin" => Cygwin,
+             "dragonfly" => Dragonfly,
++            "orange" => Orange,
+             "emscripten" => Emscripten,
+             "freebsd" => Freebsd,
+             "fuchsia" => Fuchsia,
+@@ -1692,6 +1697,7 @@
+             "linuxkernel" => LinuxKernel,
+             "macabi" => Macabi,
+             "musl" => Musl,
++            "mlibc" => Mlibc,
+             "musleabi" => Musleabi,
+             "musleabihf" => Musleabihf,
+             "muslabi64" => Muslabi64,
+@@ -1991,6 +1997,8 @@
+             "x86_64-unknown-cloudabi",
+             "x86_64-unikraft-linux-musl",
+             "x86_64-unknown-dragonfly",
++            "x86_64-unknown-orange-mlibc",
++            "x86_64-orange-mlibc",
+             "x86_64-unknown-freebsd",
+             "x86_64-unknown-fuchsia",
+             "x86_64-unknown-haiku",
+diff -Naur rust-targetlexicon/src/triple.rs rust-targetlexicon-clean/src/triple.rs
+--- rust-targetlexicon/src/triple.rs	2025-09-09 20:22:55.000000000 +0300
++++ rust-targetlexicon-clean/src/triple.rs	2026-06-08 12:08:33.391480979 +0300
+@@ -129,6 +129,7 @@
+             | OperatingSystem::Bitrig
+             | OperatingSystem::Cloudabi
+             | OperatingSystem::Dragonfly
++            | OperatingSystem::Orange
+             | OperatingSystem::Freebsd
+             | OperatingSystem::Fuchsia
+             | OperatingSystem::Haiku

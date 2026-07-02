@@ -26,7 +26,7 @@ extern "C" void timer_tick(x86_64::idt::int_frame_t* ctx) {
 
     process::schedule((void*)ctx);
     if(ctx->cs & 3)
-        ctx->ss |= 3;
+        ctx->ss |= 3; 
                             
     if(ctx->ss & 3)
         ctx->cs |= 3;

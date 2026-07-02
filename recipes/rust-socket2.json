@@ -1,0 +1,8 @@
+{
+    "name": "rust-socket2",
+    "version": "0.6.3",
+    "deps": ["base-libs"],
+    "url": "https://github.com/rust-lang/socket2/archive/refs/tags/v0.6.3.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

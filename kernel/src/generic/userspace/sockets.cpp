@@ -100,6 +100,21 @@ long long sys_bind(int fd, const struct sockaddr *addr_ptr, std::uint32_t addr_l
     return -EFAULT;
 }
 
+static inline void print_ipv4_address(const void *sockaddr_ptr) {
+    const struct sockaddr_in *addr = (const struct sockaddr_in *)sockaddr_ptr;
+
+    uint32_t ip = addr->sin_addr.s_addr;
+    uint8_t ip1 = (ip      ) & 0xFF;
+    uint8_t ip2 = (ip >>  8) & 0xFF;
+    uint8_t ip3 = (ip >> 16) & 0xFF;
+    uint8_t ip4 = (ip >> 24) & 0xFF;
+
+    uint16_t raw_port = addr->sin_port;
+    uint16_t port = ((raw_port & 0xFF) << 8) | ((raw_port >> 8) & 0xFF);
+
+    klibc::debug_printf("ip: %d.%d.%d.%d:%d\n", ip1, ip2, ip3, ip4, port);
+}
+
 long long sys_connect(int fd, const struct sockaddr *addr_ptr, std::uint32_t addr_length) {
     (void)addr_length;
 
@@ -130,8 +145,11 @@ long long sys_connect(int fd, const struct sockaddr *addr_ptr, std::uint32_t add
         }
         //log("sockets", "ret is %d", ret);
         return ret;
-    } else if(file->socket.socket_type == PF_INET)
-        return -ENOENT;
+    } else if(file->socket.socket_type == PF_INET) {
+        klibc::debug_printf("unimplemented ipv4 connect\n");
+        print_ipv4_address((const void*)addr_ptr);
+        return -EHOSTUNREACH;
+    }
 
     assert(0, "SGDGcXXXXXSSGD type %d", file->socket.socket_type);
     return -EFAULT;
@@ -599,4 +617,9 @@ long long sys_socketpair(int* fds, int flags) {
     }
 
     return 0;
+}
+
+long long sys_shutdown(int sockfd, int how) {
+    (void)how;
+    return sys_close(sockfd);
 }

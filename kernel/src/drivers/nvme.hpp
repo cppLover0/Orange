@@ -129,7 +129,7 @@ struct nvme_pair_queue {
 };
 
 struct nvme_controller {
-    void* bar0; 
+    volatile void* bar0; 
     uint32_t stride; 
     uint32_t page_size;
     uint16_t max_queue_entries; 
@@ -173,9 +173,9 @@ namespace drivers {
             return value;
         }
 
-        static inline void write64(struct nvme_controller* ctrl, std::uint32_t offset, std::uint32_t value) {
+        static inline void write64(struct nvme_controller* ctrl, std::uint32_t offset, std::uint64_t value) {
             volatile std::uint64_t* reg = (volatile std::uint64_t*)((std::uint8_t*)ctrl->bar0 + offset);
-            *reg = value;
+            *reg = value;  
             arch::memory_barrier();
         }
 

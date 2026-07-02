@@ -1,0 +1,8 @@
+{
+    "name": "rust-libc",
+    "version": "0.2.186",
+    "deps": ["base-libs"],
+    "url": "https://github.com/rust-lang/libc/archive/refs/tags/0.2.186.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

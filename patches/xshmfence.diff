@@ -1,0 +1,52 @@
+diff -Naur xshmfence/src/xshmfence_futex.h xshmfence-clean/src/xshmfence_futex.h
+--- xshmfence/src/xshmfence_futex.h	2018-02-26 20:26:59.000000000 +0300
++++ xshmfence-clean/src/xshmfence_futex.h	2026-06-06 19:00:51.301318099 +0300
+@@ -26,7 +26,7 @@
+ 
+ #include <errno.h>
+ 
+-#ifdef HAVE_UMTX
++#if 0
+ 
+ #include <sys/types.h>
+ #include <sys/umtx.h>
+@@ -49,21 +49,34 @@
+ 
+ #include <stdint.h>
+ #include <values.h>
+-#include <linux/futex.h>
+ #include <sys/time.h>
+-#include <sys/syscall.h>
+ 
+ static inline long sys_futex(void *addr1, int op, int val1, struct timespec *timeout, void *addr2, int val3)
+ {
+-	return syscall(SYS_futex, addr1, op, val1, timeout, addr2, val3);
++#if defined(__x86_64__)
++	volatile long ret;
++
++	register uint64_t r4 asm("r10") = (uint64_t)timeout;
++	register uint64_t r5 asm("r8") = (uint64_t)addr2;
++	register uint64_t r6 asm("r9") = (uint64_t)val3;
++
++	asm volatile("syscall"
++		: "=a"(ret)
++		: "a"(6), "D"((uint64_t)addr1), "S"(op), "d"(val1), "r"(r4),
++		"r"(r5), "r"(r6)
++		: "memory", "rcx", "r11");
++    return ret;
++#else
++#error "meoww :("
++#endif
+ }
+ 
+ static inline int futex_wake(int32_t *addr) {
+-	return sys_futex(addr, FUTEX_WAKE, MAXINT, NULL, NULL, 0);
++	return sys_futex(addr, 1, MAXINT, NULL, NULL, 0);
+ }
+ 
+ static inline int futex_wait(int32_t *addr, int32_t value) {
+-	return sys_futex(addr, FUTEX_WAIT, value, NULL, NULL, 0);
++	return sys_futex(addr, 0, value, NULL, NULL, 0);
+ }
+ 
+ #endif

@@ -1,7 +1,7 @@
 {
     "name": "mesa-demos",
     "version": "9.0.0",
-    "deps": ["base-libs", "xorg-libs", "opengl"],
+    "deps": ["base-libs", "xorg-libs", "opengl", "libvulkan"],
     "url": "https://archive.mesa3d.org/demos/mesa-demos-9.0.0.tar.xz",
     "should_patch": false,
     "use_orange_prefix": true

@@ -1,0 +1,8 @@
+{
+    "name": "rust-ring",
+    "version": "0.17.14",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/ring/ring-0.17.14.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

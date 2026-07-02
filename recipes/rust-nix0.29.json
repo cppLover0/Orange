@@ -1,0 +1,8 @@
+{
+    "name": "rust-nix",
+    "version": "0.29.0",
+    "deps": ["base-libs"],
+    "url": "https://github.com/nix-rust/nix/archive/refs/tags/v0.29.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

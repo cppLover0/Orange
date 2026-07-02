@@ -1,0 +1,8 @@
+{
+    "name": "zed",
+    "version": "recent",
+    "deps": ["base-libs", "rust-host", "mesa", "libvulkan", "pipewire", "xorg-libs"],
+    "url": "git:https://github.com/zed-industries/zed.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

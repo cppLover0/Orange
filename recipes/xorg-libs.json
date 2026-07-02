@@ -1,7 +1,7 @@
 {
     "name": "xorg-libs",
     "version": "0.0.0",
-    "deps": ["base-libs", "libx11", "xorg", "libxt", "libxext", "libxmu", "libxi", "libxtst", "libxkbcommon", "libxrandr", "libxrender", "libxaw", "libxpm", "libxft", "xcb-util", "xcb-util-renderutil", "xcb-util-image", "xcb-util-cursor", "xcb-util-keysyms", "xcb-util-wm", "xcb-util-xrm", "libxcursor", "libxdamage", "xinerama"],
+    "deps": ["base-libs", "libx11", "xorg", "libxt", "libxext", "libxmu", "libxi", "libxtst", "libxkbcommon", "libxrandr", "libxrender", "libxaw", "libxpm", "libxft", "xcb-util", "xcb-util-renderutil", "xcb-util-image", "xcb-util-cursor", "xcb-util-keysyms", "xcb-util-wm", "xcb-util-xrm", "libxcursor", "libxdamage", "xinerama", "xshmfence"],
     "url": "https://github.com/cppLover0/dummy/archive/refs/tags/wah.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

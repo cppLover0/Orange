@@ -1,5 +1,13 @@
 . "${pkg_lib}"
 
+unset SYSROOT
+unset PKG_CONFIG_LIBDIR
+unset PKG_CONFIG_PATH
+unset PKG_CONFIG_SYSROOT_DIR
+unset LLVM_CONFIG
+unset VAPIGEN
+unset VALAC
+
 prepare() {
     autotools_recursive_regen
     ./contrib/download_prerequisites
@@ -23,6 +31,7 @@ install() {
     make all-target-libstdc++-v3
     make install-target-libstdc++-v3 
     cp -rf "${host_dest_dir}"/x86_64-orange-mlibc/lib/libstdc++.so* "${dest_dir}/usr/lib"
+    cp -rf "${host_dest_dir}"/lib/gcc/x86_64-orange-mlibc/15.1.0/libgcc.a "${dest_dir}/usr/lib/libgcc_s.a"
 }
 
 pkg_work

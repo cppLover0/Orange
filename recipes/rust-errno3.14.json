@@ -1,0 +1,8 @@
+{
+    "name": "rust-errno",
+    "version": "0.3.14",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/errno/errno-0.3.14.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

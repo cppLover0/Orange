@@ -1,0 +1,9 @@
+{
+    "name": "pipewire",
+    "comment": "its just stub library for something",
+    "version": "1.6.6",
+    "deps": ["base-libs", "dbus", "ncurses", "glib-2.0"],
+    "url": "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.6/pipewire-1.6.6.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

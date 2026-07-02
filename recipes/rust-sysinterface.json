@@ -1,0 +1,8 @@
+{
+    "name": "rust-system-interface",
+    "version": "0.27.3",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/system-interface/system-interface-0.27.3.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -75,6 +75,7 @@ long long sys_uname(old_utsname* utsname) {
 
     klibc::memset(utsname, 0, sizeof(old_utsname));
     klibc::memcpy(utsname->sysname, "Orange", sizeof("Orange"));
+    klibc::memcpy(utsname->nodename, "orange", sizeof("orange"));
     klibc::memcpy(utsname->release, kernel_info::version(), klibc::strlen(kernel_info::version()) + 1);
     klibc::memcpy(utsname->machine, "x86_64", sizeof("x86_64"));
 

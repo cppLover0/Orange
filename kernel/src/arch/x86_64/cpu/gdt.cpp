@@ -25,11 +25,11 @@ void x86_64::gdt::init() {
     gdt_pointer_t* gdtr = new gdt_pointer_t;
     klibc::memcpy(new_gdt,&original_gdt,sizeof(gdt_t));
 
-    tss->rsp[0] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm());
-    tss->ist[0] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* Exceptions */
-    tss->ist[1] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* Timer */
-    tss->ist[2] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* IRQ Layout */
-    tss->ist[3] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()); /* For ignorestub */
+    tss->rsp[0] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()) + KERNEL_STACK_SIZE - PAGE_SIZE;
+    tss->ist[0] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()) + KERNEL_STACK_SIZE - PAGE_SIZE; /* Exceptions */
+    tss->ist[1] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()) + KERNEL_STACK_SIZE - PAGE_SIZE; /* Timer */
+    tss->ist[2] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()) + KERNEL_STACK_SIZE - PAGE_SIZE; /* IRQ Layout */
+    tss->ist[3] = (std::uint64_t)(pmm::buddy::alloc(KERNEL_STACK_SIZE).phys + etc::hhdm()) + KERNEL_STACK_SIZE - PAGE_SIZE; /* For ignorestub */
 
     tss->iopb_offsset = sizeof(tss_t);
     new_gdt->tss.baselow16 = (std::uint64_t)tss & 0xFFFF;

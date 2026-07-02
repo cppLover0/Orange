@@ -1,0 +1,107 @@
+diff -Naur rust-minidumper/src/errors.rs rust-minidumper-clean/src/errors.rs
+--- rust-minidumper/src/errors.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-minidumper-clean/src/errors.rs	2026-06-10 12:59:03.642389985 +0300
+@@ -21,7 +21,7 @@
+     #[error("client process requesting crash dump has an unknown or invalid pid")]
+     UnknownClientPid,
+     /// An error occurred during minidump generation
+-    #[cfg(any(target_os = "linux", target_os = "android"))]
++    #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))]
+     #[error(transparent)]
+     Writer(Box<minidump_writer::minidump_writer::errors::WriterError>),
+     /// An error occurred during minidump generation
+@@ -40,7 +40,7 @@
+     ProtocolError(&'static str),
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "android"))]
++#[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))]
+ impl From<minidump_writer::minidump_writer::errors::WriterError> for Error {
+     fn from(we: minidump_writer::minidump_writer::errors::WriterError) -> Self {
+         Self::Writer(Box::new(we))
+diff -Naur rust-minidumper/src/ipc/client.rs rust-minidumper-clean/src/ipc/client.rs
+--- rust-minidumper/src/ipc/client.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-minidumper-clean/src/ipc/client.rs	2026-06-10 12:59:13.327578190 +0300
+@@ -23,7 +23,7 @@
+     /// with a server
+     pub fn with_name<'scope>(sn: SocketName<'scope>) -> Result<Self, Error> {
+         cfg_if::cfg_if! {
+-            if #[cfg(any(target_os = "linux", target_os = "android"))] {
++            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+                 let socket_addr = match sn {
+                     SocketName::Path(path) => {
+                         uds::UnixSocketAddr::from_path(path).map_err(|_err| Error::InvalidName)?
+@@ -97,7 +97,7 @@
+     /// this method
+     pub fn request_dump(&self, crash_context: &crash_context::CrashContext) -> Result<(), Error> {
+         cfg_if::cfg_if! {
+-            if #[cfg(any(target_os = "linux", target_os = "android"))] {
++            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+                 let crash_ctx_buffer = crash_context.as_bytes();
+             } else if #[cfg(target_os = "windows")] {
+                 use scroll::Pwrite;
+diff -Naur rust-minidumper/src/ipc/server.rs rust-minidumper-clean/src/ipc/server.rs
+--- rust-minidumper/src/ipc/server.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-minidumper-clean/src/ipc/server.rs	2026-06-10 12:57:31.223725603 +0300
+@@ -38,7 +38,7 @@
+ 
+         let mut hdr_buf = [0u8; std::mem::size_of::<Header>()];
+         cfg_if::cfg_if! {
+-            if #[cfg(any(target_os = "linux", target_os = "android"))] {
++            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+                 let len = self.socket.0.peek(&mut hdr_buf).ok()?;
+             } else {
+                 let len = self.socket.peek(&mut hdr_buf).ok()?;
+@@ -94,7 +94,7 @@
+         };
+ 
+         cfg_if::cfg_if! {
+-            if #[cfg(any(target_os = "linux", target_os = "android"))] {
++            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+                 let socket_addr = match sn {
+                     SocketName::Path(path) => {
+                         uds::UnixSocketAddr::from_path(path).map_err(|_err| Error::InvalidName)?
+@@ -294,7 +294,7 @@
+                                     let cc = polling.clients.swap_remove(pos);
+ 
+                                     cfg_if::cfg_if! {
+-                                        if #[cfg(any(target_os = "linux", target_os = "android"))] {
++                                        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+                                             let peer_creds = cc.socket.0.initial_peer_credentials()?;
+ 
+                                             let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
+@@ -452,7 +452,7 @@
+         let (mut minidump_file, minidump_path) = handler.create_minidump_file()?;
+ 
+         cfg_if::cfg_if! {
+-            if #[cfg(any(target_os = "linux", target_os = "android"))] {
++            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+                 #[allow(unsafe_code)]
+                 let crash_context = minidump_writer::crash_context::CrashContext {
+                     inner: unsafe { std::mem::transmute_copy(&crash_context) },
+diff -Naur rust-minidumper/src/ipc.rs rust-minidumper-clean/src/ipc.rs
+--- rust-minidumper/src/ipc.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-minidumper-clean/src/ipc.rs	2026-06-10 12:59:22.123751224 +0300
+@@ -1,5 +1,5 @@
+ cfg_if::cfg_if! {
+-    if #[cfg(any(target_os = "linux", target_os = "android"))] {
++    if #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))] {
+         use std::os::{
+             unix::{prelude::{RawFd, BorrowedFd}, io::AsRawFd},
+             fd::AsFd,
+@@ -161,13 +161,13 @@
+     /// The path to the domain socket
+     Path(&'scope std::path::Path),
+     /// An abstract Linux socket
+-    #[cfg(any(target_os = "linux", target_os = "android"))]
++    #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))]
+     Abstract(&'scope str),
+ }
+ 
+ impl<'scope> SocketName<'scope> {
+     /// Create an abstract Linux socket name
+-    #[cfg(any(target_os = "linux", target_os = "android"))]
++    #[cfg(any(target_os = "linux", target_os = "android", target_os = "orange"))]
+     #[inline]
+     pub fn abstract_namespace(name: &'scope str) -> Self {
+         Self::Abstract(name)

@@ -1,0 +1,70 @@
+diff -Naur libvulkan/CMakeLists.txt libvulkan-clean/CMakeLists.txt
+--- libvulkan/CMakeLists.txt	2024-10-25 19:22:43.000000000 +0300
++++ libvulkan-clean/CMakeLists.txt	2026-06-06 22:34:24.148971337 +0300
+@@ -52,7 +52,7 @@
+     set(BUILD_DLL_VERSIONINFO "" CACHE STRING "Set the version to be used in the loader.rc file. Default value is the currently generated header version")
+ endif()
+ 
+-find_package(VulkanHeaders CONFIG QUIET)
++find_package(VulkanHeaders CONFIG)
+ 
+ include(GNUInstallDirs)
+ 
+@@ -108,10 +108,10 @@
+     if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+         target_compile_definitions(platform_wsi INTERFACE VK_USE_PLATFORM_MACOS_MVK)
+     endif()
+-elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|BSD|DragonFly|GNU")
++elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|BSD|DragonFly|GNU|Orange")
+     option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" ON)
+     option(BUILD_WSI_XLIB_SUPPORT "Build Xlib WSI support" ON)
+-    option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" ON)
++    option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" OFF)
+     option(BUILD_WSI_DIRECTFB_SUPPORT "Build DirectFB WSI support" OFF)
+ 
+     find_package(PkgConfig REQUIRED QUIET) # Use PkgConfig to find Linux system libraries
+diff -Naur libvulkan/loader/vk_loader_platform.h libvulkan-clean/loader/vk_loader_platform.h
+--- libvulkan/loader/vk_loader_platform.h	2024-10-25 19:22:43.000000000 +0300
++++ libvulkan-clean/loader/vk_loader_platform.h	2026-06-06 22:34:57.040983351 +0300
+@@ -44,7 +44,7 @@
+ 
+ // Set of platforms with a common set of functionality which is queried throughout the program
+ #if defined(__linux__) || defined(__APPLE__) || defined(__Fuchsia__) || defined(__QNX__) || defined(__FreeBSD__) || \
+-    defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || defined(__GNU__)
++    defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || defined(__GNU__) || defined(__orange__)
+ #define COMMON_UNIX_PLATFORMS 1
+ #else
+ #define COMMON_UNIX_PLATFORMS 0
+@@ -295,6 +295,32 @@
+     buffer[count] = '\0';
+     return buffer;
+ }
++#elif defined(__orange__) // no procfs 
++
++#ifdef SYSCONFDIR
++#undef SYSCONFDIR
++#endif
++#define SYSCONFDIR "/etc"
++
++#ifdef FALLBACK_CONFIG_DIRS
++#undef FALLBACK_CONFIG_DIRS
++#endif
++#define FALLBACK_CONFIG_DIRS "/etc/xdg"
++
++#ifdef FALLBACK_DATA_DIRS
++#undef FALLBACK_DATA_DIRS
++#endif
++#define FALLBACK_DATA_DIRS "/usr/share"
++
++static inline char *loader_platform_executable_path(char *buffer, size_t size) {
++#if defined(__x86_64__)
++    long long ret = 0;
++    __asm__ volatile("syscall" : "=a"(ret) : "a"(101), "D"((uint64_t)buffer), "S"(size) : "rcx", "r11");
++    return buffer;
++#else
++#error "balls"
++#endif
++}
+ #elif defined(__APPLE__)
+ #include <TargetConditionals.h>
+ // TARGET_OS_IPHONE isn't just iOS it's also iOS/tvOS/watchOS. See TargetConditionals.h documentation.

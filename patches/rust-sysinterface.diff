@@ -1,0 +1,13 @@
+diff -Naur rust-sysinterface/src/fs/fd_flags.rs rust-sysinterface-clean/src/fs/fd_flags.rs
+--- rust-sysinterface/src/fs/fd_flags.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-sysinterface-clean/src/fs/fd_flags.rs	2026-06-09 20:44:25.278287776 +0300
+@@ -102,7 +102,8 @@
+             target_os = "ios",
+             target_os = "macos",
+             target_os = "freebsd",
+-            target_os = "fuchsia"
++            target_os = "fuchsia",
++            target_os = "orange"
+         )))]
+         {
+             fd_flags.set(FdFlags::RSYNC, flags.contains(OFlags::RSYNC));

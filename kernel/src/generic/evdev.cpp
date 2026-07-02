@@ -216,7 +216,9 @@ std::int32_t evdev_readlink(filesystem* fs, char* path, char* buffer) {
     return -EINVAL;
 }
 
-std::int32_t evdev_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode) {
+std::int32_t evdev_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid) {
+    (void)uid;
+    (void)gid;
     (void)fs;
     (void)path;
     (void)type;

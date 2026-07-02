@@ -66,7 +66,7 @@ import sys
 import subprocess
 import tarfile
 
-def download_and_extract(url, target_dir):
+def download_and_extract(url, target_dir, gitflags = None):
     parent_dir = os.path.dirname(target_dir)
     os.makedirs(parent_dir, exist_ok=True)
     
@@ -83,12 +83,21 @@ def download_and_extract(url, target_dir):
             sys.exit(1)
     elif url.startswith("git:"):
         actual_url = url[4:]
-        print(f"orangestrap: cloning git repo {actual_url}")
+        print(f"orangestrap: cloning git repo {url[4:]}")
+        
+        cmd = ['git', 'clone', '--depth', '1']
+        
+        if isinstance(gitflags, list):
+            cmd.extend(gitflags)
+        
+        cmd.extend([actual_url, target_dir])
+
+        print(f"orangestrap: git cmd {cmd}, git flags {gitflags}")
+        
         try:
-            subprocess.run(['git', 'clone', '--depth', '1', actual_url, target_dir], check=True)
-        except subprocess.CalledProcessError:
-            print("orangestrap: failed to clone repo")
-            os.system(f'rm -rf "{target_dir}"')
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"orangestrap: failed to clone git repo: {e}")
             sys.exit(1)
             
     else:
@@ -170,11 +179,17 @@ def install_pkg(pkg):
     envp["host_dest_dir"] = os.path.realpath(f".orange-build/prefix")
     envp["tests_dir"] = os.path.realpath("tests")
     envp["distro_base_dir"] = os.path.realpath("distro_base")
+    envp["sources"] = os.path.realpath(f".orange-build/sources/")
 
     if recipe_data["use_orange_prefix"] == True:
         envp["PATH"] = os.path.realpath(".orange-build/prefix/bin") + os.pathsep + os.environ.get("PATH", "")
 
-    download_and_extract(recipe_data["url"], f".orange-build/sources/{pkg}")
+    gitflags1 = []
+
+    if "git_flags" in recipe_data:
+        gitflags1 = recipe_data["git_flags"]
+
+    download_and_extract(recipe_data["url"], f".orange-build/sources/{pkg}", gitflags=gitflags1)
 
     if not os.path.exists(f".orange-build/sources/{pkg}-workdir/.orange-patched") and os.path.exists(f"patches/{pkg}.diff"):
         full_patch=os.path.realpath(f"patches/{pkg}.diff")

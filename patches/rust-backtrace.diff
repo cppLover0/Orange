@@ -1,0 +1,40 @@
+diff -Naur rust-backtrace/src/backtrace/libunwind.rs rust-backtrace-clean/src/backtrace/libunwind.rs
+--- rust-backtrace/src/backtrace/libunwind.rs	2025-01-04 05:37:47.000000000 +0300
++++ rust-backtrace-clean/src/backtrace/libunwind.rs	2026-06-06 09:58:17.087333056 +0300
+@@ -168,7 +168,7 @@
+     pub type _Unwind_Trace_Fn =
+         extern "C" fn(ctx: *mut _Unwind_Context, arg: *mut c_void) -> _Unwind_Reason_Code;
+ 
+-    extern "C" {
++    unsafe extern "C" {
+         pub fn _Unwind_Backtrace(
+             trace: _Unwind_Trace_Fn,
+             trace_argument: *mut c_void,
+@@ -185,7 +185,7 @@
+             not(all(target_os = "rtems", target_arch = "arm")),
+             not(all(target_os = "vita", target_arch = "arm")),
+         ))] {
+-            extern "C" {
++            unsafe extern "C" {
+                 pub fn _Unwind_GetIP(ctx: *mut _Unwind_Context) -> libc::uintptr_t;
+                 pub fn _Unwind_FindEnclosingFunction(pc: *mut c_void) -> *mut c_void;
+ 
+diff -Naur rust-backtrace/src/symbolize/gimli.rs rust-backtrace-clean/src/symbolize/gimli.rs
+--- rust-backtrace/src/symbolize/gimli.rs	2025-01-04 05:37:47.000000000 +0300
++++ rust-backtrace-clean/src/symbolize/gimli.rs	2026-06-06 09:58:28.829188930 +0300
+@@ -43,6 +43,7 @@
+         target_os = "solaris",
+         target_os = "illumos",
+         target_os = "aix",
++        target_os = "orange",
+     ))] {
+         #[path = "gimli/mmap_unix.rs"]
+         mod mmap;
+@@ -228,6 +229,7 @@
+             target_os = "netbsd",
+             target_os = "nto",
+             target_os = "android",
++            target_os = "orange",
+         ),
+         not(target_env = "uclibc"),
+     ))] {

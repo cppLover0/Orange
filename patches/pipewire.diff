@@ -1,0 +1,103 @@
+From 74ce12fece4abc144035321234e50c178e38208c Mon Sep 17 00:00:00 2001
+From: Qwinci <qwinci222@gmail.com>
+Date: Fri, 29 May 2026 14:38:20 +0300
+Subject: [PATCH] Add Managarm support
+
+---
+ meson.build                               | 8 ++++++--
+ spa/plugins/meson.build                   | 2 +-
+ src/modules/module-protocol-native.c      | 2 +-
+ src/modules/module-protocol-pulse/utils.c | 2 +-
+ src/modules/module-rt.c                   | 3 +++
+ src/pipewire/mem.c                        | 4 ++++
+ 6 files changed, 16 insertions(+), 5 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index a9cc5d6..8be47ee 100644
+--- a/meson.build
++++ b/meson.build
+@@ -277,8 +277,12 @@ foreach h : check_headers
+   cdata.set(h.get(1), cc.has_header(h.get(0)))
+ endforeach
+ 
+-cdata.set('HAVE_PIDFD_OPEN',
+-          cc.get_define('SYS_pidfd_open', prefix: '#include <sys/syscall.h>') != '')
++if host_machine.system() == 'orange'
++   cdata.set('HAVE_PIDFD_OPEN', false)
++else
++   cdata.set('HAVE_PIDFD_OPEN',
++             cc.get_define('SYS_pidfd_open', prefix: '#include <sys/syscall.h>') != '')
++endif
+ 
+ systemd_dep = dependency('libsystemd', required: get_option('libsystemd'))
+ summary({'libsystemd': systemd_dep.found()}, bool_yn: true)
+diff --git a/spa/plugins/meson.build b/spa/plugins/meson.build
+index 42aec7e..ccbe3fc 100644
+--- a/spa/plugins/meson.build
++++ b/spa/plugins/meson.build
+@@ -1,4 +1,4 @@
+-if alsa_dep.found() and host_machine.system() == 'linux'
++if alsa_dep.found() and (host_machine.system() == 'linux' or host_machine.system() == 'orange')
+   subdir('alsa')
+ endif
+ if get_option('avb').require(host_machine.system() == 'linux', error_message: 'AVB support is only available on Linux').allowed()
+diff --git a/src/modules/module-protocol-native.c b/src/modules/module-protocol-native.c
+index 98a4382..284cf0d 100644
+--- a/src/modules/module-protocol-native.c
++++ b/src/modules/module-protocol-native.c
+@@ -614,7 +614,7 @@ static struct client_data *client_new(struct server *s, int fd)
+ 	if (props == NULL)
+ 		goto exit;
+ 
+-#if defined(__linux__)
++#if defined(__linux__) || defined(__orange__)
+ 	len = sizeof(ucred);
+ 	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &ucred, &len) < 0) {
+ 		pw_log_warn("server %p: no peercred: %m", s);
+diff --git a/src/modules/module-protocol-pulse/utils.c b/src/modules/module-protocol-pulse/utils.c
+index e6b24e7..3efed56 100644
+--- a/src/modules/module-protocol-pulse/utils.c
++++ b/src/modules/module-protocol-pulse/utils.c
+@@ -125,7 +125,7 @@ int check_flatpak(struct client *client, pid_t pid)
+ pid_t get_client_pid(struct client *client, int client_fd)
+ {
+ 	socklen_t len;
+-#if defined(__linux__)
++#if defined(__linux__) || defined(__orange__)
+ 	struct ucred ucred;
+ 	len = sizeof(ucred);
+ 	if (getsockopt(client_fd, SOL_SOCKET, SO_PEERCRED, &ucred, &len) < 0) {
+diff --git a/src/modules/module-rt.c b/src/modules/module-rt.c
+index 703923d..16a614f 100644
+--- a/src/modules/module-rt.c
++++ b/src/modules/module-rt.c
+@@ -44,7 +44,10 @@
+ #include <unistd.h>
+ #include <pthread.h>
+ #include <sys/resource.h>
++
++#ifdef __linux__
+ #include <sys/syscall.h>
++#endif
+ 
+ #include <spa/utils/result.h>
+ #include <spa/utils/string.h>
+diff --git a/src/pipewire/mem.c b/src/pipewire/mem.c
+index 3072c99..be1583d 100644
+--- a/src/pipewire/mem.c
++++ b/src/pipewire/mem.c
+@@ -12,7 +12,11 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <stdlib.h>
++
++#ifdef __linux__
+ #include <sys/syscall.h>
++#endif
++
+ #include <sys/stat.h>
+ 
+ #include <spa/utils/list.h>
+-- 
+2.53.0
+

@@ -1,0 +1,65 @@
+diff -Naur rust-mio1.2.0/src/poll.rs rust-mio1.2.0-clean/src/poll.rs
+--- rust-mio1.2.0/src/poll.rs	2026-03-27 14:32:07.000000000 +0300
++++ rust-mio1.2.0-clean/src/poll.rs	2026-06-08 09:58:46.279182499 +0300
+@@ -12,6 +12,7 @@
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "cygwin",
++        target_os = "orange"
+     )),
+ ))]
+ use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
+@@ -455,6 +456,7 @@
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "cygwin",
++        target_os = "orange"
+     )),
+ ))]
+ impl AsRawFd for Poll {
+@@ -757,6 +759,7 @@
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "cygwin",
++        target_os = "orange"
+     )),
+ ))]
+ impl AsFd for Registry {
+@@ -779,6 +782,7 @@
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "cygwin",
++        target_os = "orange"
+     )),
+ ))]
+ impl AsRawFd for Registry {
+diff -Naur rust-mio1.2.0/src/sys/unix/mod.rs rust-mio1.2.0-clean/src/sys/unix/mod.rs
+--- rust-mio1.2.0/src/sys/unix/mod.rs	2026-03-27 14:32:07.000000000 +0300
++++ rust-mio1.2.0-clean/src/sys/unix/mod.rs	2026-06-08 09:58:40.641017611 +0300
+@@ -40,6 +40,7 @@
+     ), path = "selector/kqueue.rs")]
+     #[cfg_attr(any(
+         mio_unsupported_force_poll_poll,
++        target_os = "orange",
+         target_os = "aix",
+         target_os = "espidf",
+         target_os = "fuchsia",
+@@ -103,6 +104,7 @@
+         target_os = "redox",
+         target_os = "solaris",
+         target_os = "vita",
++        target_os = "orange",
+         target_os = "cygwin",
+         all(target_os = "wasi", target_env = "p1")
+     ), path = "waker/pipe.rs")]
+diff -Naur rust-mio1.2.0/src/sys/unix/tcp.rs rust-mio1.2.0-clean/src/sys/unix/tcp.rs
+--- rust-mio1.2.0/src/sys/unix/tcp.rs	2026-03-27 14:32:07.000000000 +0300
++++ rust-mio1.2.0-clean/src/sys/unix/tcp.rs	2026-06-08 10:02:57.563526612 +0300
+@@ -102,6 +102,7 @@
+         target_os = "hermit",
+         target_os = "nto",
+         target_os = "wasi",
++        target_os = "orange",
+         all(target_arch = "x86", target_os = "android"),
+     ))]
+     let stream = {

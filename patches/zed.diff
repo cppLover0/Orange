@@ -1,0 +1,1472 @@
+diff -Naur zed/Cargo.lock zed-clean/Cargo.lock
+--- zed/Cargo.lock	2026-06-07 13:37:34.863275879 +0300
++++ zed-clean/Cargo.lock	2026-06-08 13:01:01.878165129 +0300
+@@ -15577,7 +15577,7 @@
+ 
+ [[package]]
+ name = "rustix"
+-version = "1.1.2"
++version = "1.1.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "cd15f8a2c5551a84d56efdc1cd049089e409ac19a3072d5037a17fd70719ff3e"
+ dependencies = [
+diff -Naur zed/Cargo.toml zed-clean/Cargo.toml
+--- zed/Cargo.toml	2026-06-07 13:37:34.863275879 +0300
++++ zed-clean/Cargo.toml	2026-06-09 17:21:37.455624548 +0300
+@@ -714,7 +714,7 @@
+ rustls = { version = "0.23.26" }
+ rustls-platform-verifier = "0.5.0"
+ # WARNING: If you change this, you must also publish a new version of zed-scap to crates.io
+-scap = { git = "https://github.com/zed-industries/scap", rev = "4afea48c3b002197176fb19cd0f9b180dd36eaac", default-features = false, package = "zed-scap", version = "0.0.8-zed" }
++scap = { package = "zed-scap", version = "0.0.8-zed" }
+ schemars = { version = "1.0", features = ["indexmap2"] }
+ semver = { version = "1.0", features = ["serde"] }
+ serde = { version = "1.0.221", features = ["derive", "rc"] }
+diff -Naur zed/crates/audio/Cargo.toml zed-clean/crates/audio/Cargo.toml
+--- zed/crates/audio/Cargo.toml	2026-06-07 13:37:34.918938628 +0300
++++ zed-clean/crates/audio/Cargo.toml	2026-06-10 09:47:46.706746703 +0300
+@@ -26,5 +26,5 @@
+ thiserror.workspace = true
+ util.workspace = true
+ 
+-[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd")))'.dependencies]
++[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", target_os = "orange")))'.dependencies]
+ libwebrtc.workspace = true
+diff -Naur zed/crates/audio/src/audio_pipeline/echo_canceller.rs zed-clean/crates/audio/src/audio_pipeline/echo_canceller.rs
+--- zed/crates/audio/src/audio_pipeline/echo_canceller.rs	2026-06-07 13:37:34.919251356 +0300
++++ zed-clean/crates/audio/src/audio_pipeline/echo_canceller.rs	2026-06-10 09:55:58.497368555 +0300
+@@ -1,4 +1,4 @@
+-#[cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd")))]
++#[cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", target_os = "orange")))]
+ mod real_implementation {
+     use anyhow::Context;
+     use libwebrtc::native::apm;
+@@ -38,7 +38,7 @@
+     }
+ }
+ 
+-#[cfg(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd"))]
++#[cfg(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", target_os = "orange"))]
+ mod fake_implementation {
+     #[derive(Clone, Default)]
+     pub struct EchoCanceller;
+@@ -51,7 +51,7 @@
+     }
+ }
+ 
+-#[cfg(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd"))]
++#[cfg(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", target_os = "orange"))]
+ pub use fake_implementation::EchoCanceller;
+-#[cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd")))]
++#[cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", target_os = "orange")))]
+ pub use real_implementation::EchoCanceller;
+diff -Naur zed/crates/call/src/call_impl/diagnostics.rs zed-clean/crates/call/src/call_impl/diagnostics.rs
+--- zed/crates/call/src/call_impl/diagnostics.rs	2026-06-07 13:37:34.923474563 +0300
++++ zed-clean/crates/call/src/call_impl/diagnostics.rs	2026-06-10 09:46:01.068562005 +0300
+@@ -132,7 +132,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     )
+ ))]
+ fn extract_metrics(
+@@ -150,7 +151,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     ))
+ ))]
+ fn extract_metrics(
+diff -Naur zed/crates/cli/Cargo.toml zed-clean/crates/cli/Cargo.toml
+--- zed/crates/cli/Cargo.toml	2026-06-07 13:37:34.924049471 +0300
++++ zed-clean/crates/cli/Cargo.toml	2026-06-28 23:38:29.413516733 +0300
+@@ -41,7 +41,7 @@
+ serde_json.workspace = true
+ util = { workspace = true, features = ["test-support"] }
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))'.dependencies]
+ exec.workspace = true
+ fork.workspace = true
+ 
+diff -Naur zed/crates/cli/src/main.rs zed-clean/crates/cli/src/main.rs
+--- zed/crates/cli/src/main.rs	2026-06-07 13:37:34.924616684 +0300
++++ zed-clean/crates/cli/src/main.rs	2026-06-28 23:38:08.111855641 +0300
+@@ -3,7 +3,7 @@
+     reason = "We are not in an async environment, so std::process::Command is fine"
+ )]
+ #![cfg_attr(
+-    any(target_os = "linux", target_os = "freebsd", target_os = "windows"),
++    any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange"),
+     allow(dead_code)
+ )]
+ 
+@@ -563,7 +563,7 @@
+     };
+ 
+     let env = {
+-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+         {
+             use collections::HashMap;
+ 
+@@ -586,7 +586,7 @@
+             None
+         }
+ 
+-        #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "windows")))]
++        #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange")))]
+         {
+             use collections::HashMap;
+ 
+@@ -777,7 +777,7 @@
+         let file = unsafe { fs::File::from_raw_fd(fd) };
+         Some(file)
+     }
+-    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
++    #[cfg(any(target_os = "macos", target_os = "freebsd", target_os = "orange"))]
+     {
+         use std::os::{
+             fd::{self, FromRawFd},
+@@ -795,7 +795,7 @@
+         let file = unsafe { fs::File::from_raw_fd(fd) };
+         Some(file)
+     }
+-    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "freebsd")))]
++    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "freebsd", target_os = "orange")))]
+     {
+         _ = path;
+         // not implemented for bsd, windows. Could be, but isn't yet
+@@ -840,7 +840,7 @@
+     })
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ mod linux {
+     use std::{
+         env,
+diff -Naur zed/crates/client/src/telemetry.rs zed-clean/crates/client/src/telemetry.rs
+--- zed/crates/client/src/telemetry.rs	2026-06-07 13:37:34.925316892 +0300
++++ zed-clean/crates/client/src/telemetry.rs	2026-06-09 15:32:28.103154480 +0300
+@@ -117,75 +117,90 @@
+     {
+         "Windows".to_string()
+     }
++
++    #[cfg(target_os = "orange")]
++    {
++        format!("Orange {}", gpui::guess_compositor())
++    }
++}
++
++#[cfg(feature = "test-support")]
++pub fn os_version() -> String {
++    // MacOS branch in particular is quite slow, hence we ought to "avoid" it in tests.
++    "test binary".to_owned()
++}
++
++#[cfg(all(not(feature = "test-support"), target_os = "macos"))]
++pub fn os_version() -> String {
++    static MACOS_VERSION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
++        Regex::new(r"(\s*\(Build [^)]*[0-9]\))").unwrap()
++    });
++    use objc2_foundation::NSProcessInfo;
++    let process_info = NSProcessInfo::processInfo();
++    let version_nsstring = process_info.operatingSystemVersionString();
++    let version_string = version_nsstring.to_string().replace("Version ", "");
++    MACOS_VERSION_REGEX
++        .replace_all(&version_string, "")
++        .to_string()
++}
++
++#[cfg(all(not(feature = "test-support"), any(target_os = "linux", target_os = "freebsd")))]
++pub fn os_version() -> String {
++    use std::path::Path;
++
++    let content = if let Ok(file) = std::fs::read_to_string(&Path::new("/etc/os-release")) {
++        file
++    } else if let Ok(file) = std::fs::read_to_string(&Path::new("/usr/lib/os-release")) {
++        file
++    } else if let Ok(file) = std::fs::read_to_string(&Path::new("/var/run/os-release")) {
++        file
++    } else {
++        log::error!(
++            "Failed to load /etc/os-release, /usr/lib/os-release, or /var/run/os-release"
++        );
++        "".to_string()
++    };
++    let mut name = "unknown";
++    let mut version = "unknown";
++
++    for line in content.lines() {
++        match line.split_once('=') {
++            Some(("ID", val)) => name = val.trim_matches('"'),
++            Some(("VERSION_ID", val)) => version = val.trim_matches('"'),
++            _ => {}
++        }
++    }
++
++    format!("{} {}", name, version)
+ }
+ 
+-/// Note: This might do blocking IO! Only call from background threads
++#[cfg(all(not(feature = "test-support"), target_os = "windows"))]
+ pub fn os_version() -> String {
+-    cfg_select! {
+-       feature = "test-support" => {
+-           // MacOS branch in particular is quite slow, hence we ought to "avoid" it in tests.
+-           "test binary".to_owned()
+-       }
+-       target_os = "macos" => {
+-           static MACOS_VERSION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+-               Regex::new(r"(\s*\(Build [^)]*[0-9]\))").unwrap()
+-           });
+-           use objc2_foundation::NSProcessInfo;
+-           let process_info = NSProcessInfo::processInfo();
+-           let version_nsstring = process_info.operatingSystemVersionString();
+-           // "Version 15.6.1 (Build 24G90)" -> "15.6.1 (Build 24G90)"
+-           let version_string = version_nsstring.to_string().replace("Version ", "");
+-           // "15.6.1 (Build 24G90)" -> "15.6.1"
+-           // "26.0.0 (Build 25A5349a)" -> unchanged (Beta or Rapid Security Response; ends with letter)
+-           MACOS_VERSION_REGEX
+-               .replace_all(&version_string, "")
+-               .to_string()
+-       }
+-       any(target_os = "linux", target_os = "freebsd") => {
+-           use std::path::Path;
+-
+-           let content = if let Ok(file) = std::fs::read_to_string(&Path::new("/etc/os-release")) {
+-               file
+-           } else if let Ok(file) = std::fs::read_to_string(&Path::new("/usr/lib/os-release")) {
+-               file
+-           } else if let Ok(file) = std::fs::read_to_string(&Path::new("/var/run/os-release")) {
+-               file
+-           } else {
+-               log::error!(
+-                   "Failed to load /etc/os-release, /usr/lib/os-release, or /var/run/os-release"
+-               );
+-               "".to_string()
+-           };
+-           let mut name = "unknown";
+-           let mut version = "unknown";
+-
+-           for line in content.lines() {
+-               match line.split_once('=') {
+-                   Some(("ID", val)) => name = val.trim_matches('"'),
+-                   Some(("VERSION_ID", val)) => version = val.trim_matches('"'),
+-                   _ => {}
+-               }
+-           }
+-
+-           format!("{} {}", name, version)
+-       }
+-       target_os = "windows" => {
+-           let mut info = unsafe { std::mem::zeroed() };
+-           let status = unsafe { windows::Wdk::System::SystemServices::RtlGetVersion(&mut info) };
+-           if status.is_ok() {
+-               semver::Version::new(
+-                   info.dwMajorVersion as _,
+-                   info.dwMinorVersion as _,
+-                   info.dwBuildNumber as _,
+-               )
+-               .to_string()
+-           } else {
+-               "unknown".to_string()
+-           }
+-       }
++    let mut info = unsafe { std::mem::zeroed() };
++    let status = unsafe { windows::Wdk::System::SystemServices::RtlGetVersion(&mut info) };
++    if status.is_ok() {
++        semver::Version::new(
++            info.dwMajorVersion as _,
++            info.dwMinorVersion as _,
++            info.dwBuildNumber as _,
++        )
++        .to_string()
++    } else {
++        "unknown".to_string()
+     }
+ }
+ 
++#[cfg(all(
++    not(feature = "test-support"),
++    not(target_os = "macos"),
++    not(any(target_os = "linux", target_os = "freebsd")),
++    not(target_os = "windows")
++))]
++pub fn os_version() -> String {
++    "unknown".to_string()
++}
++
++
+ impl Telemetry {
+     pub fn new(
+         clock: Arc<dyn SystemClock>,
+diff -Naur zed/crates/editor/src/element/mouse.rs zed-clean/crates/editor/src/element/mouse.rs
+--- zed/crates/editor/src/element/mouse.rs	2026-06-07 13:37:34.969901076 +0300
++++ zed-clean/crates/editor/src/element/mouse.rs	2026-06-28 23:36:38.176066261 +0300
+@@ -904,7 +904,7 @@
+ 
+         if end_selection && pending_nonempty_selections {
+             cx.stop_propagation();
+-        } else if cfg!(any(target_os = "linux", target_os = "freebsd"))
++        } else if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))
+             && event.button == MouseButton::Middle
+         {
+             #[allow(
+@@ -916,7 +916,7 @@
+                 return;
+             }
+ 
+-            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++            #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+             if EditorSettings::get_global(cx).middle_click_paste {
+                 if let Some(text) = cx.read_from_primary().and_then(|item| item.text()) {
+                     let point_for_position = position_map.point_for_position(event.position);
+diff -Naur zed/crates/extension/src/extension_builder.rs zed-clean/crates/extension/src/extension_builder.rs
+--- zed/crates/extension/src/extension_builder.rs	2026-06-07 13:37:34.978323725 +0300
++++ zed-clean/crates/extension/src/extension_builder.rs	2026-06-09 15:40:26.956803446 +0300
+@@ -28,16 +28,7 @@
+ /// Once Clang 17 and its wasm target are available via system package managers, we won't need
+ /// to download this.
+ const WASI_SDK_URL: &str = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/";
+-const WASI_SDK_ASSET_NAME: Option<&str> = cfg_select! {
+-    all(target_os = "macos", target_arch = "x86_64") => Some("wasi-sdk-25.0-x86_64-macos.tar.gz"),
+-    all(target_os = "macos", target_arch = "aarch64") => Some("wasi-sdk-25.0-arm64-macos.tar.gz"),
+-    all(target_os = "linux", target_arch = "x86_64") => Some("wasi-sdk-25.0-x86_64-linux.tar.gz"),
+-    all(target_os = "linux", target_arch = "aarch64") => Some("wasi-sdk-25.0-arm64-linux.tar.gz"),
+-    all(target_os = "freebsd", target_arch = "x86_64") => Some("wasi-sdk-25.0-x86_64-linux.tar.gz"),
+-    all(target_os = "freebsd", target_arch = "aarch64") => Some("wasi-sdk-25.0-arm64-linux.tar.gz"),
+-    all(target_os = "windows", target_arch = "x86_64") => Some("wasi-sdk-25.0-x86_64-windows.tar.gz"),
+-    _ => None
+-};
++const WASI_SDK_ASSET_NAME: Option<&str> = Some("wasi-sdk-25.0-x86_64-linux.tar.gz");
+ 
+ pub struct ExtensionBuilder {
+     cache_dir: PathBuf,
+diff -Naur zed/crates/fs/src/fs.rs zed-clean/crates/fs/src/fs.rs
+--- zed/crates/fs/src/fs.rs	2026-06-07 13:37:34.986574636 +0300
++++ zed-clean/crates/fs/src/fs.rs	2026-06-08 17:28:24.816969545 +0300
+@@ -408,7 +408,7 @@
+ }
+ 
+ impl FileHandle for std::fs::File {
+-    #[cfg(target_os = "macos")]
++    #[cfg(any(target_os = "macos", target_os = "orange"))]
+     fn current_path(&self, _: &Arc<dyn Fs>) -> Result<PathBuf> {
+         use std::{
+             ffi::{CStr, OsStr},
+@@ -416,7 +416,7 @@
+         };
+ 
+         let fd = self.as_fd();
+-        let mut path_buf = MaybeUninit::<[u8; libc::PATH_MAX as usize]>::uninit();
++        let mut path_buf = std::mem::MaybeUninit::<[u8; libc::PATH_MAX as usize]>::uninit();
+ 
+         let result = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETPATH, path_buf.as_mut_ptr()) };
+         anyhow::ensure!(result != -1, "fcntl returned -1");
+diff -Naur zed/crates/gpui/Cargo.toml zed-clean/crates/gpui/Cargo.toml
+--- zed/crates/gpui/Cargo.toml	2026-06-07 13:37:34.994600777 +0300
++++ zed-clean/crates/gpui/Cargo.toml	2026-06-10 16:47:59.190455104 +0300
+@@ -17,12 +17,11 @@
+ workspace = true
+ 
+ [features]
+-default = ["font-kit", "wayland", "x11", "windows-manifest"]
++default = ["font-kit", "x11", "windows-manifest"]
+ test-support = [
+     "leak-detection",
+     "collections/test-support",
+     "http_client/test-support",
+-    "wayland",
+     "x11",
+     "proptest",
+ ]
+@@ -135,14 +134,12 @@
+ #TODO: replace with "objc2"
+ metal.workspace = true
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "macos"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "macos", target_os = "orange"))'.dependencies]
+ pathfinder_geometry = "0.5"
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange"))'.dependencies]
+ scap = { workspace = true, optional = true }
+ 
+-
+-
+ [target.'cfg(target_os = "windows")'.dependencies]
+ windows = { version = "0.61", features = ["Win32_Foundation"] }
+ 
+@@ -151,7 +148,7 @@
+ backtrace.workspace = true
+ collections = { workspace = true, features = ["test-support"] }
+ env_logger.workspace = true
+-gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }
++gpui_platform = { workspace = true, features = ["font-kit", "x11"] }
+ gpui_util = { workspace = true }
+ lyon = { version = "1.0", features = ["extra"] }
+ proptest = { workspace = true }
+diff -Naur zed/crates/gpui/src/app.rs zed-clean/crates/gpui/src/app.rs
+--- zed/crates/gpui/src/app.rs	2026-06-07 13:37:35.017756860 +0300
++++ zed-clean/crates/gpui/src/app.rs	2026-06-08 12:30:12.519761892 +0300
+@@ -1271,14 +1271,14 @@
+ 
+     /// Reads data from the primary selection buffer.
+     /// Only available on Linux.
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     pub fn read_from_primary(&self) -> Option<ClipboardItem> {
+         self.platform.read_from_primary()
+     }
+ 
+     /// Writes data to the primary selection buffer.
+     /// Only available on Linux.
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     pub fn write_to_primary(&self, item: ClipboardItem) {
+         self.platform.write_to_primary(item)
+     }
+diff -Naur zed/crates/gpui/src/gpui.rs zed-clean/crates/gpui/src/gpui.rs
+--- zed/crates/gpui/src/gpui.rs	2026-06-07 13:37:35.021298525 +0300
++++ zed-clean/crates/gpui/src/gpui.rs	2026-06-13 19:49:41.577125130 +0300
+@@ -35,7 +35,7 @@
+ pub mod prelude;
+ /// Profiling utilities for task timing and thread performance tracking.
+ pub mod profiler;
+-#[cfg(any(target_os = "windows", target_os = "linux", target_family = "wasm"))]
++#[cfg(any(target_os = "windows", target_os = "linux", target_family = "wasm", target_os = "orange"))]
+ #[expect(missing_docs)]
+ pub mod queue;
+ mod scene;
+@@ -131,7 +131,7 @@
+ pub use path_builder::*;
+ pub use platform::*;
+ pub use profiler::*;
+-#[cfg(any(target_os = "windows", target_os = "linux", target_family = "wasm"))]
++#[cfg(any(target_os = "windows", target_os = "linux", target_family = "wasm", target_os = "orange"))]
+ pub use queue::{PriorityQueueReceiver, PriorityQueueSender};
+ pub use refineable::*;
+ pub use scene::*;
+diff -Naur zed/crates/gpui/src/keymap/context.rs zed-clean/crates/gpui/src/keymap/context.rs
+--- zed/crates/gpui/src/keymap/context.rs	2026-06-07 13:37:35.022017368 +0300
++++ zed-clean/crates/gpui/src/keymap/context.rs	2026-06-08 12:29:33.190470689 +0300
+@@ -32,7 +32,7 @@
+         let mut context = Self::default();
+         #[cfg(target_os = "macos")]
+         context.set("os", "macos");
+-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+         context.set("os", "linux");
+         #[cfg(target_os = "windows")]
+         context.set("os", "windows");
+@@ -40,7 +40,7 @@
+             target_os = "macos",
+             target_os = "linux",
+             target_os = "freebsd",
+-            target_os = "windows"
++            target_os = "windows", target_os = "orange"
+         )))]
+         context.set("os", "unknown");
+         context
+diff -Naur zed/crates/gpui/src/platform/keystroke.rs zed-clean/crates/gpui/src/platform/keystroke.rs
+--- zed/crates/gpui/src/platform/keystroke.rs	2026-06-07 13:37:35.022554344 +0300
++++ zed-clean/crates/gpui/src/platform/keystroke.rs	2026-06-08 12:27:44.632055396 +0300
+@@ -699,7 +699,7 @@
+         #[cfg(target_os = "macos")]
+         f.write_char('⌘')?;
+ 
+-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+         f.write_char('❖')?;
+ 
+         #[cfg(target_os = "windows")]
+@@ -762,7 +762,7 @@
+         #[cfg(target_os = "macos")]
+         result.push_str("cmd-");
+ 
+-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+         result.push_str("super-");
+ 
+         #[cfg(target_os = "windows")]
+diff -Naur zed/crates/gpui/src/platform.rs zed-clean/crates/gpui/src/platform.rs
+--- zed/crates/gpui/src/platform.rs	2026-06-07 13:37:35.022017368 +0300
++++ zed-clean/crates/gpui/src/platform.rs	2026-06-08 12:28:50.803267272 +0300
+@@ -14,12 +14,12 @@
+ 
+ #[cfg(all(
+     feature = "screen-capture",
+-    any(target_os = "windows", target_os = "linux", target_os = "freebsd",)
++    any(target_os = "windows", target_os = "linux", target_os = "freebsd", target_os = "orange")
+ ))]
+ pub mod scap_screen_capture;
+ 
+ #[cfg(all(
+-    any(target_os = "windows", target_os = "linux"),
++    any(target_os = "windows", target_os = "linux", target_os = "orange"),
+     feature = "screen-capture"
+ ))]
+ pub(crate) type PlatformScreenCaptureFrame = scap::frame::Frame;
+@@ -37,7 +37,7 @@
+     SystemWindowTab, Task, Window, WindowControlArea, hash, point, px, size,
+ };
+ use anyhow::Result;
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ use anyhow::bail;
+ use async_task::Runnable;
+ use futures::channel::oneshot;
+@@ -83,7 +83,7 @@
+ // TODO(jk): return an enum instead of a string
+ /// Return which compositor we're guessing we'll use.
+ /// Does not attempt to connect to the given compositor.
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ #[inline]
+ pub fn guess_compositor() -> &'static str {
+     if std::env::var_os("ZED_HEADLESS").is_some() {
+@@ -225,9 +225,9 @@
+     fn read_from_clipboard(&self) -> Option<ClipboardItem>;
+     fn write_to_clipboard(&self, item: ClipboardItem);
+ 
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     fn read_from_primary(&self) -> Option<ClipboardItem>;
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     fn write_to_primary(&self, item: ClipboardItem);
+ 
+     #[cfg(target_os = "macos")]
+@@ -443,7 +443,7 @@
+         }
+     }
+ 
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     fn index(&self) -> usize {
+         match self {
+             WindowButton::Minimize => 0,
+@@ -468,7 +468,7 @@
+     pub right: [Option<WindowButton>; MAX_BUTTONS_PER_SIDE],
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ impl WindowButtonLayout {
+     /// Returns Zed's built-in fallback button layout for Linux titlebars.
+     pub fn linux_default() -> Self {
+@@ -999,7 +999,7 @@
+ impl AtlasKey {
+     #[cfg_attr(
+         all(
+-            any(target_os = "linux", target_os = "freebsd"),
++            any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+             not(any(feature = "x11", feature = "wayland"))
+         ),
+         allow(dead_code)
+@@ -1115,7 +1115,7 @@
+ #[repr(C)]
+ #[cfg_attr(
+     all(
+-        any(target_os = "linux", target_os = "freebsd"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+         not(any(feature = "x11", feature = "wayland"))
+     ),
+     allow(dead_code)
+@@ -1153,7 +1153,7 @@
+ #[expect(missing_docs)]
+ #[cfg_attr(
+     all(
+-        any(target_os = "linux", target_os = "freebsd"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+         not(any(feature = "x11", feature = "wayland"))
+     ),
+     allow(dead_code)
+@@ -1182,7 +1182,7 @@
+     }
+ 
+     #[cfg_attr(
+-        any(target_os = "linux", target_os = "freebsd", target_os = "windows"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange"),
+         allow(dead_code)
+     )]
+     pub fn text_for_range(
+@@ -1511,7 +1511,7 @@
+ #[derive(Debug)]
+ #[cfg_attr(
+     all(
+-        any(target_os = "linux", target_os = "freebsd"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+         not(any(feature = "x11", feature = "wayland"))
+     ),
+     allow(dead_code)
+@@ -1525,28 +1525,28 @@
+     pub titlebar: Option<TitlebarOptions>,
+ 
+     /// The kind of window to create
+-    #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
++    #[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "orange"), allow(dead_code))]
+     pub kind: WindowKind,
+ 
+     /// Whether the window should be movable by the user
+-    #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
++    #[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "orange"), allow(dead_code))]
+     pub is_movable: bool,
+ 
+     /// Whether the window should be resizable by the user
+-    #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
++    #[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "orange"), allow(dead_code))]
+     pub is_resizable: bool,
+ 
+     /// Whether the window should be minimized by the user
+-    #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
++    #[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "orange"), allow(dead_code))]
+     pub is_minimizable: bool,
+ 
+     #[cfg_attr(
+-        any(target_os = "linux", target_os = "freebsd", target_os = "windows"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange"),
+         allow(dead_code)
+     )]
+     pub focus: bool,
+ 
+-    #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
++    #[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "orange"), allow(dead_code))]
+     pub show: bool,
+ 
+     /// An image to set as the window icon (x11 only)
+@@ -2273,7 +2273,7 @@
+             .and_then(|m| serde_json::from_str(m).ok())
+     }
+ 
+-    #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
++    #[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "orange"), allow(dead_code))]
+     /// Compute a hash of the given text for clipboard change detection.
+     pub fn text_hash(text: &str) -> u64 {
+         let mut hasher = SeaHasher::new();
+@@ -2315,7 +2315,7 @@
+     }
+ }
+ 
+-#[cfg(all(test, any(target_os = "linux", target_os = "freebsd")))]
++#[cfg(all(test, any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+ mod tests {
+     use super::*;
+     use std::collections::HashSet;
+diff -Naur zed/crates/gpui/src/profiler/actions.rs zed-clean/crates/gpui/src/profiler/actions.rs
+--- zed/crates/gpui/src/profiler/actions.rs	2026-06-07 13:37:35.022880126 +0300
++++ zed-clean/crates/gpui/src/profiler/actions.rs	2026-06-08 10:27:55.344213655 +0300
+@@ -1,5 +1,4 @@
+ use std::{
+-    hint::cold_path,
+     time::{Duration, Instant},
+ };
+ 
+@@ -88,7 +87,6 @@
+ 
+         let runtime = now.duration_since(started);
+         if runtime >= self.runtime_to_beat {
+-            cold_path(); // most actions are not the worst, optimize for that
+ 
+             if self.longest_runtimes.is_full()
+                 && let Some(to_replace) = self
+diff -Naur zed/crates/gpui/src/profiler.rs zed-clean/crates/gpui/src/profiler.rs
+--- zed/crates/gpui/src/profiler.rs	2026-06-07 13:37:35.022880126 +0300
++++ zed-clean/crates/gpui/src/profiler.rs	2026-06-08 10:24:50.728195778 +0300
+@@ -4,7 +4,6 @@
+     cell::LazyCell,
+     collections::{HashMap, VecDeque},
+     hash::{DefaultHasher, Hash, Hasher},
+-    hint::cold_path,
+     sync::{
+         Arc,
+         atomic::{AtomicBool, Ordering},
+@@ -443,7 +442,6 @@
+     fn add_yield_timing(&mut self, task: TaskTiming) {
+         let yielded_after = task.poll_duration();
+         if yielded_after >= self.poll_time_to_beat {
+-            cold_path(); // most tasks are not the worst, optimize for that
+             let to_replace = self
+                 .longest_poll_times
+                 .iter()
+@@ -464,7 +462,6 @@
+     fn add_runtime(&mut self, task: TaskTiming) {
+         let runtime = task.since_spawn();
+         if runtime >= self.runtime_to_beat {
+-            cold_path(); // most tasks are not the worst, optimize for that
+             let to_replace = self
+                 .longest_runtimes
+                 .iter()
+@@ -563,7 +560,6 @@
+         self.stats.add_runtime(timing);
+ 
+         if trace_enabled() {
+-            cold_path(); // optimize for when the profiling is off
+             if self.timings.len() >= MAX_TASK_TIMINGS {
+                 self.timings.pop_front();
+             }
+diff -Naur zed/crates/gpui/src/scene.rs zed-clean/crates/gpui/src/scene.rs
+--- zed/crates/gpui/src/scene.rs	2026-06-07 13:37:35.023281476 +0300
++++ zed-clean/crates/gpui/src/scene.rs	2026-06-08 12:29:10.601688717 +0300
+@@ -150,7 +150,7 @@
+ 
+     #[cfg_attr(
+         all(
+-            any(target_os = "linux", target_os = "freebsd"),
++            any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+             not(any(feature = "x11", feature = "wayland"))
+         ),
+         allow(dead_code)
+@@ -180,7 +180,7 @@
+ #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Default)]
+ #[cfg_attr(
+     all(
+-        any(target_os = "linux", target_os = "freebsd"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+         not(any(feature = "x11", feature = "wayland"))
+     ),
+     allow(dead_code)
+@@ -247,7 +247,7 @@
+ 
+ #[cfg_attr(
+     all(
+-        any(target_os = "linux", target_os = "freebsd"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+         not(any(feature = "x11", feature = "wayland"))
+     ),
+     allow(dead_code)
+@@ -454,7 +454,7 @@
+ #[derive(Debug)]
+ #[cfg_attr(
+     all(
+-        any(target_os = "linux", target_os = "freebsd"),
++        any(target_os = "linux", target_os = "freebsd", target_os = "orange"),
+         not(any(feature = "x11", feature = "wayland"))
+     ),
+     allow(dead_code)
+diff -Naur zed/crates/gpui/src/svg_renderer.rs zed-clean/crates/gpui/src/svg_renderer.rs
+--- zed/crates/gpui/src/svg_renderer.rs	2026-06-07 13:37:35.023281476 +0300
++++ zed-clean/crates/gpui/src/svg_renderer.rs	2026-06-08 12:30:03.788396312 +0300
+@@ -16,7 +16,7 @@
+ #[cfg(target_os = "windows")]
+ const EMOJI_FONT_FAMILIES: &[&str] = &["Segoe UI Emoji", "Segoe UI Symbol"];
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ const EMOJI_FONT_FAMILIES: &[&str] = &[
+     "Noto Color Emoji",
+     "Emoji One",
+@@ -28,7 +28,7 @@
+     target_os = "macos",
+     target_os = "windows",
+     target_os = "linux",
+-    target_os = "freebsd",
++    target_os = "freebsd", target_os = "orange"
+ )))]
+ const EMOJI_FONT_FAMILIES: &[&str] = &[];
+ 
+diff -Naur zed/crates/gpui/src/window.rs zed-clean/crates/gpui/src/window.rs
+--- zed/crates/gpui/src/window.rs	2026-06-07 13:37:35.025619829 +0300
++++ zed-clean/crates/gpui/src/window.rs	2026-06-08 12:29:53.222720410 +0300
+@@ -1269,7 +1269,7 @@
+             window_min_size,
+             window_decorations,
+             #[cfg_attr(
+-                not(any(target_os = "linux", target_os = "freebsd")),
++                not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")),
+                 allow(unused_variables)
+             )]
+             icon,
+@@ -2259,7 +2259,7 @@
+         if cfg!(any(
+             target_os = "windows",
+             target_os = "linux",
+-            target_os = "freebsd"
++            target_os = "freebsd", target_os = "orange"
+         )) {
+             self.hovered.get()
+         } else {
+diff -Naur zed/crates/gpui_linux/Cargo.toml zed-clean/crates/gpui_linux/Cargo.toml
+--- zed/crates/gpui_linux/Cargo.toml	2026-06-07 13:37:35.025800885 +0300
++++ zed-clean/crates/gpui_linux/Cargo.toml	2026-06-10 16:47:19.250458761 +0300
+@@ -12,7 +12,7 @@
+ path = "src/gpui_linux.rs"
+ 
+ [features]
+-default = ["wayland", "x11"]
++default = ["x11"]
+ test-support = ["gpui/test-support"]
+ wayland = [
+     "bitflags",
+@@ -50,7 +50,7 @@
+ ]
+ 
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))'.dependencies]
+ accesskit.workspace = true
+ accesskit_unix.workspace = true
+ anyhow.workspace = true
+diff -Naur zed/crates/gpui_linux/src/gpui_linux.rs zed-clean/crates/gpui_linux/src/gpui_linux.rs
+--- zed/crates/gpui_linux/src/gpui_linux.rs	2026-06-07 13:37:35.025991028 +0300
++++ zed-clean/crates/gpui_linux/src/gpui_linux.rs	2026-06-10 13:26:03.441835113 +0300
+@@ -1,4 +1,4 @@
+-#![cfg(any(target_os = "linux", target_os = "freebsd"))]
++#![cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ mod linux;
+ 
+ pub use linux::current_platform;
+diff -Naur zed/crates/gpui_platform/Cargo.toml zed-clean/crates/gpui_platform/Cargo.toml
+--- zed/crates/gpui_platform/Cargo.toml	2026-06-07 13:37:35.030964699 +0300
++++ zed-clean/crates/gpui_platform/Cargo.toml	2026-06-10 15:30:33.186991732 +0300
+@@ -30,7 +30,7 @@
+ gpui_windows.workspace = true
+ gpui = { workspace = true, features = ["windows-manifest"] }
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))'.dependencies]
+ gpui_linux.workspace = true
+ 
+ [target.'cfg(target_family = "wasm")'.dependencies]
+diff -Naur zed/crates/gpui_platform/src/gpui_platform.rs zed-clean/crates/gpui_platform/src/gpui_platform.rs
+--- zed/crates/gpui_platform/src/gpui_platform.rs	2026-06-07 13:37:35.031057637 +0300
++++ zed-clean/crates/gpui_platform/src/gpui_platform.rs	2026-06-10 13:25:52.457403837 +0300
+@@ -47,7 +47,7 @@
+         )
+     }
+ 
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     {
+         gpui_linux::current_platform(headless)
+     }
+diff -Naur zed/crates/gpui_util/src/lib.rs zed-clean/crates/gpui_util/src/lib.rs
+--- zed/crates/gpui_util/src/lib.rs	2026-06-07 13:37:35.031579864 +0300
++++ zed-clean/crates/gpui_util/src/lib.rs	2026-06-07 15:16:20.659621542 +0300
+@@ -413,15 +413,14 @@
+     fn write(&mut self, bytes: &[u8]) {
+         // TypeId should only hash its first 8 bytes
+         if let Some(bytes) = bytes.get(..8) {
+-            bytes
+-                .as_array()
+-                .map(|&array| self.value = u64::from_ne_bytes(array))
+-                .unwrap_or_else(|| unreachable!("slice was sliced to 8 bytes"));
++            let array: &[u8; 8] = bytes.try_into().unwrap_or_else(|_| unreachable!("slice was sliced to 8 bytes"));
++            self.value = u64::from_ne_bytes(*array);
+         } else {
+             debug_panic!(
+                 "expected a 64-bit value, did you use this hasher with something other than a TypeId?"
+             );
+         }
++
+     }
+ 
+     #[inline]
+diff -Naur zed/crates/languages/src/python.rs zed-clean/crates/languages/src/python.rs
+--- zed/crates/languages/src/python.rs	2026-06-07 13:37:35.054282560 +0300
++++ zed-clean/crates/languages/src/python.rs	2026-06-13 20:07:21.204141383 +0300
+@@ -271,6 +271,12 @@
+     const ARCH_SERVER_NAME: &str = "unknown-linux-gnu";
+ }
+ 
++#[cfg(target_os = "orange")]
++impl TyLspAdapter {
++    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
++    const ARCH_SERVER_NAME: &str = "unknown-orange-mlibc";
++}
++
+ #[cfg(target_os = "freebsd")]
+ impl TyLspAdapter {
+     const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
+@@ -2455,6 +2461,12 @@
+     const ARCH_SERVER_NAME: &str = "unknown-freebsd";
+ }
+ 
++#[cfg(target_os = "orange")]
++impl RuffLspAdapter {
++    const GITHUB_ASSET_KIND: AssetKind = AssetKind::TarGz;
++    const ARCH_SERVER_NAME: &str = "unknown-orange-mlibc";
++}
++
+ #[cfg(target_os = "windows")]
+ impl RuffLspAdapter {
+     const GITHUB_ASSET_KIND: AssetKind = AssetKind::Zip;
+diff -Naur zed/crates/languages/src/rust.rs zed-clean/crates/languages/src/rust.rs
+--- zed/crates/languages/src/rust.rs	2026-06-07 13:37:35.054282560 +0300
++++ zed-clean/crates/languages/src/rust.rs	2026-06-13 20:09:21.230758079 +0300
+@@ -57,6 +57,12 @@
+     const ARCH_SERVER_NAME: &str = "unknown-linux";
+ }
+ 
++#[cfg(target_os = "orange")]
++impl RustLspAdapter {
++    const GITHUB_ASSET_KIND: AssetKind = AssetKind::Gz;
++    const ARCH_SERVER_NAME: &str = "unknown-orange-mlibc";
++}
++
+ #[cfg(target_os = "freebsd")]
+ impl RustLspAdapter {
+     const GITHUB_ASSET_KIND: AssetKind = AssetKind::Gz;
+diff -Naur zed/crates/livekit_client/Cargo.toml zed-clean/crates/livekit_client/Cargo.toml
+--- zed/crates/livekit_client/Cargo.toml	2026-06-07 13:37:35.055762457 +0300
++++ zed-clean/crates/livekit_client/Cargo.toml	2026-06-10 16:48:31.441329813 +0300
+@@ -26,7 +26,7 @@
+ collections.workspace = true
+ cpal.workspace = true
+ futures.workspace = true
+-gpui = { workspace = true, features = ["screen-capture", "x11", "wayland"] }
++gpui = { workspace = true, features = ["screen-capture", "x11"] }
+ gpui_tokio.workspace = true
+ http_client_tls.workspace = true
+ image.workspace = true
+@@ -43,7 +43,7 @@
+ ui.workspace = true
+ util.workspace = true
+ 
+-[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd")))'.dependencies]
++[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", target_os = "orange")))'.dependencies]
+ libwebrtc.workspace = true
+ livekit.workspace = true
+ 
+@@ -51,7 +51,7 @@
+ tokio = { workspace = true, features = ["time"] }
+ webrtc-sys.workspace = true
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange"))'.dependencies]
+ scap.workspace = true
+ 
+ [target.'cfg(target_os = "macos")'.dependencies]
+diff -Naur zed/crates/livekit_client/src/lib.rs zed-clean/crates/livekit_client/src/lib.rs
+--- zed/crates/livekit_client/src/lib.rs	2026-06-07 13:37:35.056318510 +0300
++++ zed-clean/crates/livekit_client/src/lib.rs	2026-06-10 09:30:42.015761946 +0300
+@@ -15,7 +15,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     ))
+ ))]
+ mod livekit_client;
+@@ -25,7 +26,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     ))
+ ))]
+ pub use livekit_client::*;
+@@ -36,7 +38,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     )
+ ))]
+ mod mock_client;
+@@ -46,7 +49,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     )
+ ))]
+ pub mod test;
+@@ -56,7 +60,8 @@
+         test,
+         feature = "test-support",
+         all(target_os = "windows", target_env = "gnu"),
+-        target_os = "freebsd"
++        target_os = "freebsd",
++        target_os = "orange"
+     )
+ ))]
+ pub use mock_client::*;
+diff -Naur zed/crates/paths/src/paths.rs zed-clean/crates/paths/src/paths.rs
+--- zed/crates/paths/src/paths.rs	2026-06-07 13:37:35.070091569 +0300
++++ zed-clean/crates/paths/src/paths.rs	2026-06-28 23:37:25.787542575 +0300
+@@ -127,7 +127,7 @@
+             dirs::config_dir()
+                 .expect("failed to determine RoamingAppData directory")
+                 .join(APP_NAME)
+-        } else if cfg!(any(target_os = "linux", target_os = "freebsd")) {
++        } else if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange")) {
+             if let Ok(flatpak_xdg_config) = std::env::var("FLATPAK_XDG_CONFIG_HOME") {
+                 flatpak_xdg_config.into()
+             } else {
+@@ -149,7 +149,7 @@
+             home_dir()
+                 .join("Library/Application Support")
+                 .join(APP_NAME)
+-        } else if cfg!(any(target_os = "linux", target_os = "freebsd")) {
++        } else if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange")) {
+             if let Ok(flatpak_xdg_data) = std::env::var("FLATPAK_XDG_DATA_HOME") {
+                 flatpak_xdg_data.into()
+             } else {
+@@ -173,7 +173,7 @@
+             return home_dir().join(".local").join("state").join(APP_NAME);
+         }
+ 
+-        if cfg!(any(target_os = "linux", target_os = "freebsd")) {
++        if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange")) {
+             return if let Ok(flatpak_xdg_state) = std::env::var("FLATPAK_XDG_STATE_HOME") {
+                 flatpak_xdg_state.into()
+             } else {
+@@ -205,7 +205,7 @@
+                 .join(APP_NAME);
+         }
+ 
+-        if cfg!(any(target_os = "linux", target_os = "freebsd")) {
++        if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange")) {
+             return if let Ok(flatpak_xdg_cache) = std::env::var("FLATPAK_XDG_CACHE_HOME") {
+                 flatpak_xdg_cache.into()
+             } else {
+diff -Naur zed/crates/remote_server/Cargo.toml zed-clean/crates/remote_server/Cargo.toml
+--- zed/crates/remote_server/Cargo.toml	2026-06-10 14:29:04.111298791 +0300
++++ zed-clean/crates/remote_server/Cargo.toml	2026-06-10 15:06:07.073109095 +0300
+@@ -78,7 +78,6 @@
+ crash-handler.workspace = true
+ fork.workspace = true
+ libc.workspace = true
+-minidumper.workspace = true
+ 
+ [target.'cfg(windows)'.dependencies]
+ windows.workspace = true
+diff -Naur zed/crates/remote_server/src/main.rs zed-clean/crates/remote_server/src/main.rs
+--- zed/crates/remote_server/src/main.rs	2026-06-10 14:25:14.887173335 +0300
++++ zed-clean/crates/remote_server/src/main.rs	2026-06-07 15:14:31.530866927 +0300
+@@ -29,7 +29,6 @@
+         return Ok(());
+     }
+ 
+-    #[cfg(not(target_os = "orange"))]
+     if let Some(socket) = &cli.crash_handler {
+         crashes::crash_server(socket.as_path(), paths::logs_dir().clone());
+         return Ok(());
+diff -Naur zed/crates/remote_server/src/server.rs zed-clean/crates/remote_server/src/server.rs
+--- zed/crates/remote_server/src/server.rs	2026-06-10 14:30:44.296560502 +0300
++++ zed-clean/crates/remote_server/src/server.rs	2026-06-07 15:14:31.530955667 +0300
+@@ -548,7 +548,6 @@
+         Ok("true" | "1")
+     ) || *RELEASE_CHANNEL != ReleaseChannel::Dev;
+ 
+-    #[cfg(not(target_os = "orange"))]
+     let crash_handler = if should_install_crash_handler {
+         Some(app.background_executor().spawn(crashes::init(
+             crashes::InitCrashHandler {
+@@ -612,7 +611,6 @@
+ 
+     let git_hosting_provider_registry = Arc::new(GitHostingProviderRegistry::new());
+     let run = move |cx: &mut App| {
+-        #[cfg(not(target_os = "orange"))]
+         if let Some(crash_handler) = crash_handler {
+             cx.spawn(async move |_cx| {
+                 let _crash_handler = crash_handler.await;
+@@ -830,7 +828,6 @@
+     ) || *RELEASE_CHANNEL != ReleaseChannel::Dev;
+ 
+     if should_install_crash_handler {
+-        #[cfg(not(target_os = "orange"))]
+         smol::spawn(crashes::init(
+             crashes::InitCrashHandler {
+                 session_id: id,
+diff -Naur zed/crates/settings/src/vscode_import.rs zed-clean/crates/settings/src/vscode_import.rs
+--- zed/crates/settings/src/vscode_import.rs	2026-06-07 13:37:35.106284379 +0300
++++ zed-clean/crates/settings/src/vscode_import.rs	2026-06-08 22:17:27.605084355 +0300
+@@ -931,7 +931,7 @@
+     fn project_terminal_settings_content(&self) -> ProjectTerminalSettingsContent {
+         #[cfg(target_os = "windows")]
+         let platform = "windows";
+-        #[cfg(target_os = "linux")]
++        #[cfg(any(target_os = "linux", target_os = "orange"))]
+         let platform = "linux";
+         #[cfg(target_os = "macos")]
+         let platform = "osx";
+diff -Naur zed/crates/sqlez/src/connection.rs zed-clean/crates/sqlez/src/connection.rs
+--- zed/crates/sqlez/src/connection.rs	2026-06-07 13:37:35.114710028 +0300
++++ zed-clean/crates/sqlez/src/connection.rs	2026-06-28 23:34:43.196504936 +0300
+@@ -140,10 +140,10 @@
+                     )
+                 };
+ 
+-                #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++                #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+                 let offset = unsafe { sqlite3_error_offset(temp_connection.sqlite3) };
+ 
+-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                 let offset = 0;
+ 
+                 unsafe {
+@@ -165,10 +165,10 @@
+                     )
+                 };
+ 
+-                #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++                #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+                 let offset = unsafe { sqlite3_error_offset(self.sqlite3) };
+ 
+-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                 let offset = 0;
+ 
+                 unsafe {
+@@ -496,7 +496,7 @@
+         );
+     }
+ 
+-    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++    #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+     #[test]
+     fn test_sql_has_syntax_errors() {
+         let connection = Connection::open_memory(Some("test_sql_has_syntax_errors"));
+diff -Naur zed/crates/sqlez_macros/src/sqlez_macros.rs zed-clean/crates/sqlez_macros/src/sqlez_macros.rs
+--- zed/crates/sqlez_macros/src/sqlez_macros.rs	2026-06-07 13:37:35.115239720 +0300
++++ zed-clean/crates/sqlez_macros/src/sqlez_macros.rs	2026-06-28 23:34:54.469853843 +0300
+@@ -1,7 +1,7 @@
+ use proc_macro::{Delimiter, Span, TokenStream, TokenTree};
+ use syn::Error;
+ 
+-#[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++#[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+ static SQLITE: std::sync::LazyLock<sqlez::thread_safe_connection::ThreadSafeConnection> =
+     std::sync::LazyLock::new(|| {
+         sqlez::thread_safe_connection::ThreadSafeConnection::new(
+@@ -16,10 +16,10 @@
+ pub fn sql(tokens: TokenStream) -> TokenStream {
+     let (spans, sql) = make_sql(tokens);
+ 
+-    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++    #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+     let error = SQLITE.sql_has_syntax_error(sql.trim());
+ 
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     let error: Option<(String, usize)> = None;
+ 
+     let formatted_sql = sqlformat::format(&sql, &sqlformat::QueryParams::None, Default::default());
+diff -Naur zed/crates/terminal/src/terminal.rs zed-clean/crates/terminal/src/terminal.rs
+--- zed/crates/terminal/src/terminal.rs	2026-06-07 13:37:35.119284833 +0300
++++ zed-clean/crates/terminal/src/terminal.rs	2026-06-10 09:36:13.239096631 +0300
+@@ -1498,7 +1498,7 @@
+                 if self.vi_mode_enabled {
+                     update_vi_cursor_for_scroll(term, *scroll);
+                     if let Some(selection_head) = update_selection_to_vi_cursor(term) {
+-                        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                         if let Some(selection_text) = selection_text(term) {
+                             cx.write_to_primary(ClipboardItem::new_string(selection_text));
+                         }
+@@ -1512,7 +1512,7 @@
+                 trace!("Setting selection: selection={selection:?}");
+                 set_term_selection(term, selection.as_ref());
+ 
+-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                 if let Some(selection_text) = selection_text(term) {
+                     cx.write_to_primary(ClipboardItem::new_string(selection_text));
+                 }
+@@ -1531,7 +1531,7 @@
+                 );
+ 
+                 if update_term_selection(term, point, side) {
+-                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                     if let Some(selection_text) = selection_text(term) {
+                         cx.write_to_primary(ClipboardItem::new_string(selection_text));
+                     }
+@@ -2263,7 +2263,7 @@
+                             .push_back(InternalEvent::SetSelection(Some(selection)));
+                     }
+                 }
+-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                 MouseButton::Middle => {
+                     if let Some(item) = _cx.read_from_primary() {
+                         let text = item.text().unwrap_or_default();
+diff -Naur zed/crates/ui_prompt/src/ui_prompt.rs zed-clean/crates/ui_prompt/src/ui_prompt.rs
+--- zed/crates/ui_prompt/src/ui_prompt.rs	2026-06-07 13:37:35.132919211 +0300
++++ zed-clean/crates/ui_prompt/src/ui_prompt.rs	2026-06-28 23:35:59.361863396 +0300
+@@ -18,7 +18,7 @@
+ 
+ fn process_settings(cx: &mut App) {
+     let settings = WorkspaceSettings::get_global(cx);
+-    if settings.use_system_prompts && cfg!(not(any(target_os = "linux", target_os = "freebsd"))) {
++    if settings.use_system_prompts && cfg!(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))) {
+         cx.reset_prompt_builder();
+     } else {
+         cx.set_prompt_builder(zed_prompt_renderer);
+diff -Naur zed/crates/util/src/paths.rs zed-clean/crates/util/src/paths.rs
+--- zed/crates/util/src/paths.rs	2026-06-07 13:37:35.133913921 +0300
++++ zed-clean/crates/util/src/paths.rs	2026-06-28 23:35:22.851309161 +0300
+@@ -103,7 +103,7 @@
+             self.as_ref().to_path_buf()
+         }
+         #[cfg(not(target_family = "wasm"))]
+-        if cfg!(any(target_os = "linux", target_os = "freebsd")) || cfg!(target_os = "macos") {
++        if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange")) || cfg!(target_os = "macos") {
+             match self.as_ref().strip_prefix(home_dir().as_path()) {
+                 Ok(relative_path) => {
+                     let mut shortened_path = PathBuf::new();
+@@ -2769,7 +2769,7 @@
+         ]
+         .iter()
+         .collect();
+-        if cfg!(any(target_os = "linux", target_os = "freebsd")) || cfg!(target_os = "macos") {
++        if cfg!(any(target_os = "linux", target_os = "freebsd", target_os = "orange")) || cfg!(target_os = "macos") {
+             assert_eq!(path.compact().to_str(), Some("~/some_file.txt"));
+         } else {
+             assert_eq!(path.compact().to_str(), path.to_str());
+diff -Naur zed/crates/util/src/util.rs zed-clean/crates/util/src/util.rs
+--- zed/crates/util/src/util.rs	2026-06-07 13:37:35.134572930 +0300
++++ zed-clean/crates/util/src/util.rs	2026-06-28 23:43:35.014014415 +0300
+@@ -324,7 +324,7 @@
+     } else if cfg!(target_os = "windows") {
+         // bin/zed.exe is for installed builds, ./cli.exe is for development builds.
+         &["bin/zed.exe", "./cli.exe"]
+-    } else if cfg!(target_os = "linux") || cfg!(target_os = "freebsd") {
++    } else if cfg!(target_os = "linux") || cfg!(any(target_os = "freebsd", target_os = "orange")) {
+         // bin is the standard, ./cli is for the target directory in development builds.
+         &["../bin/zed", "./cli"]
+     } else {
+diff -Naur zed/crates/vim/src/replace.rs zed-clean/crates/vim/src/replace.rs
+--- zed/crates/vim/src/replace.rs	2026-06-07 13:37:35.138285498 +0300
++++ zed-clean/crates/vim/src/replace.rs	2026-06-28 23:36:53.302535201 +0300
+@@ -316,7 +316,7 @@
+     }
+ 
+     #[gpui::test]
+-    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++    #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+     async fn test_replace_mode(cx: &mut gpui::TestAppContext) {
+         let mut cx: NeovimBackedTestContext = NeovimBackedTestContext::new(cx).await;
+ 
+diff -Naur zed/crates/vim/src/state.rs zed-clean/crates/vim/src/state.rs
+--- zed/crates/vim/src/state.rs	2026-06-07 13:37:35.138285498 +0300
++++ zed-clean/crates/vim/src/state.rs	2026-06-28 23:36:48.202947709 +0300
+@@ -856,9 +856,9 @@
+                     }
+                     '*' => {
+                         self.registers.insert('"', content.clone());
+-                        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                         cx.write_to_primary(content.into());
+-                        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++                        #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+                         cx.write_to_clipboard(content.into());
+                     }
+                     '"' => {
+@@ -926,11 +926,11 @@
+             '_' | ':' | '.' | '#' | '=' => None,
+             '+' => cx.read_from_clipboard().map(|item| item.into()),
+             '*' => {
+-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++                #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+                 {
+                     cx.read_from_primary().map(|item| item.into())
+                 }
+-                #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
++                #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "orange")))]
+                 {
+                     cx.read_from_clipboard().map(|item| item.into())
+                 }
+diff -Naur zed/crates/zed/build.rs zed-clean/crates/zed/build.rs
+--- zed/crates/zed/build.rs	2026-06-07 13:37:35.157534381 +0300
++++ zed-clean/crates/zed/build.rs	2026-06-10 09:46:43.213217030 +0300
+@@ -211,11 +211,11 @@
+         }
+     }
+ 
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     prepare_app_icon_x11();
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ fn icon_path() -> std::path::PathBuf {
+     use std::str::FromStr;
+ 
+@@ -236,7 +236,7 @@
+     std::path::PathBuf::from_str(&icon).unwrap()
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ fn prepare_app_icon_x11() {
+     use image::{ImageReader, imageops};
+     use std::env;
+diff -Naur zed/crates/zed/Cargo.toml zed-clean/crates/zed/Cargo.toml
+--- zed/crates/zed/Cargo.toml	2026-06-10 14:19:18.764468164 +0300
++++ zed-clean/crates/zed/Cargo.toml	2026-06-10 16:48:10.132785222 +0300
+@@ -92,7 +92,6 @@
+ copilot.workspace = true
+ copilot_chat.workspace = true
+ copilot_ui.workspace = true
+-
+ csv_preview.workspace = true
+ dap_adapters.workspace = true
+ db.workspace = true
+@@ -118,7 +117,7 @@
+ go_to_line.workspace = true
+ system_specs.workspace = true
+ gpui = { workspace = true, features = ["input-latency-histogram"] }
+-gpui_platform = {workspace = true, features=["screen-capture", "font-kit", "wayland", "x11"]}
++gpui_platform = {workspace = true, features=["screen-capture", "font-kit", "x11"]}
+ hdrhistogram.workspace = true
+ image = { workspace = true, optional = true }
+ itertools.workspace = true
+@@ -237,19 +236,17 @@
+ [build-dependencies]
+ windows_resources = { path = "../windows_resources" }
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))'.dependencies]
+ gpui = { workspace = true, features = [
+     "input-latency-histogram",
+-    "wayland",
+     "x11",
+ ] }
+ ashpd.workspace = true
+ image.workspace = true
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.build-dependencies]
++[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))'.build-dependencies]
+ image.workspace = true
+ 
+-
+ [target.'cfg(target_os = "linux")'.build-dependencies]
+ pkg-config = "0.3.22"
+ 
+diff -Naur zed/crates/zed/src/main.rs zed-clean/crates/zed/src/main.rs
+--- zed/crates/zed/src/main.rs	2026-06-10 14:28:26.207957145 +0300
++++ zed-clean/crates/zed/src/main.rs	2026-06-13 21:50:19.885846182 +0300
+@@ -23,8 +23,10 @@
+ use client::{Client, ProxySettings, RefreshLlmTokenListener, UserStore, parse_zed_link};
+ use collab_ui::channel_view::ChannelView;
+ use collections::HashMap;
++
+ #[cfg(not(target_os = "orange"))]
+ use crashes::InitCrashHandler;
++
+ use db::kvp::{GlobalKeyValueStore, KeyValueStore};
+ use editor::Editor;
+ use extension::ExtensionHostProxy;
+@@ -80,6 +82,9 @@
+     handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
+ };
+ 
++#[cfg(not(target_os = "orange"))]
++use crate::zed::{CrashHandler, OpenRequestKind, eager_load_active_theme_and_icon_theme};
++#[cfg(target_os = "orange")]
+ use crate::zed::{OpenRequestKind, eager_load_active_theme_and_icon_theme};
+ 
+ #[cfg(feature = "mimalloc")]
+@@ -359,7 +364,7 @@
+     {
+         false
+     } else {
+-        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+         {
+             crate::zed::listen_for_cli_connections(open_listener.clone()).is_err()
+         }
+@@ -662,6 +667,7 @@
+ 
+         #[cfg(not(target_os = "orange"))]
+         reliability::init(client.clone(), cx);
++
+         extension_host::init(
+             extension_host_proxy.clone(),
+             app_state.fs.clone(),
+diff -Naur zed/crates/zed/src/reliability.rs zed-clean/crates/zed/src/reliability.rs
+--- zed/crates/zed/src/reliability.rs	2026-06-07 13:37:35.175287092 +0300
++++ zed-clean/crates/zed/src/reliability.rs	2026-06-13 21:47:25.225323159 +0300
+@@ -18,6 +18,7 @@
+ 
+ mod hang_detection;
+ 
++#[cfg(not(target_os = "orange"))]
+ pub fn init(client: Arc<Client>, cx: &mut App) {
+     hang_detection::start(client.clone(), cx);
+ 
+@@ -82,6 +83,7 @@
+     .detach();
+ }
+ 
++#[cfg(not(target_os = "orange"))]
+ pub async fn upload_previous_minidumps(client: Arc<Client>) -> anyhow::Result<()> {
+     let Some(minidump_endpoint) = MINIDUMP_ENDPOINT.as_ref() else {
+         log::warn!("Minidump endpoint not set");
+@@ -123,6 +125,7 @@
+     Ok(())
+ }
+ 
++#[cfg(not(target_os = "orange"))]
+ async fn upload_minidump(
+     client: Arc<Client>,
+     endpoint: &str,
+diff -Naur zed/crates/zed/src/zed/open_listener.rs zed-clean/crates/zed/src/zed/open_listener.rs
+--- zed/crates/zed/src/zed/open_listener.rs	2026-06-07 13:37:35.176587426 +0300
++++ zed-clean/crates/zed/src/zed/open_listener.rs	2026-06-13 21:52:10.940507903 +0300
+@@ -420,7 +420,7 @@
+     }
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ pub fn listen_for_cli_connections(opener: OpenListener) -> Result<()> {
+     use release_channel::RELEASE_CHANNEL_NAME;
+     use std::os::unix::net::UnixDatagram;
+diff -Naur zed/crates/zed/src/zed.rs zed-clean/crates/zed/src/zed.rs
+--- zed/crates/zed/src/zed.rs	2026-06-10 14:24:31.027614880 +0300
++++ zed-clean/crates/zed/src/zed.rs	2026-06-13 21:47:27.353541009 +0300
+@@ -613,7 +613,7 @@
+     .detach();
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+ #[allow(unused)]
+ fn initialize_file_watcher(window: &mut Window, cx: &mut Context<Workspace>) {
+     if let Err(e) = fs::fs_watcher::global(|_| {}) {
+diff -Naur zed/crates/zlog/src/filter.rs zed-clean/crates/zlog/src/filter.rs
+--- zed/crates/zlog/src/filter.rs	2026-06-07 13:37:35.179880837 +0300
++++ zed-clean/crates/zlog/src/filter.rs	2026-06-28 23:35:35.164113823 +0300
+@@ -35,9 +35,9 @@
+ pub static LEVEL_ENABLED_MAX_CONFIG: AtomicU8 = AtomicU8::new(LEVEL_ENABLED_MAX_DEFAULT as u8);
+ 
+ const DEFAULT_FILTERS: &[(&str, log::LevelFilter)] = &[
+-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "orange"))]
+     ("zbus", log::LevelFilter::Warn),
+-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
++    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange"))]
+     ("naga::back::spv::writer", log::LevelFilter::Warn),
+     // usvg prints a lot of warnings on rendering an SVG with partial errors, which
+     // can happen a lot with the SVG preview
+diff -Naur zed/.git/config zed-clean/.git/config
+--- zed/.git/config	2026-06-07 13:37:34.853837954 +0300
++++ zed-clean/.git/config	2026-06-07 17:32:53.091443211 +0300
+@@ -9,3 +9,4 @@
+ [branch "main"]
+ 	remote = origin
+ 	merge = refs/heads/main
++	vscode-merge-base = origin/main

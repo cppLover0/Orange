@@ -46,7 +46,7 @@ syscall_item syscall_table[] = {
     {false, 24, (void*)sys_fcntl},
     {false, 25, (void*)sys_getpid},
     {false, 26, (void*)sys_gettid}, 
-    {true, 27, (void*)sys_clone3},
+    {true, 27, (void*)sys_clone3}, // used only for fork
     {false, 28, (void*)sys_clock_gettime},
     {false, 29, (void*)sys_getpgrp},
     {false, 30, (void*)sys_getppid},
@@ -57,7 +57,7 @@ syscall_item syscall_table[] = {
     {false, 35, (void*)sys_pipe2},
     {false, 36, (void*)sys_getrandom},
     {false, 37, (void*)sys_execve},
-    {false, 38, (void*)sys_wait4},
+    {false, 38, (void*)sys_wait4}, // unused
     {false, 39, (void*)sys_writev},
     {false, 40, (void*)sys_readlink},
     {false, 41, (void*)sys_readlinkat},
@@ -78,7 +78,7 @@ syscall_item syscall_table[] = {
     {false, 56, (void*)sys_prlimit64},
     {false, 57, (void*)sys_nanosleep},
     {false, 58, (void*)sys_yield},
-    {true, 59, (void*)sys_clone},
+    {true, 59, (void*)sys_clone},// unused
     {true, 60, (void*)sys_newthread},
     {false, 61, (void*)sys_getpgid},
     {false, 62, (void*)sys_getgid},
@@ -118,13 +118,21 @@ syscall_item syscall_table[] = {
     {false, 96, (void*)sys_shmctl},
     {false, 97, (void*)sys_shmget},
     {false, 98, (void*)sys_shmdt},
-    {false, 99, (void*)sys_getaffinity}
+    {false, 99, (void*)sys_getaffinity},
+    {false, 100, (void*)sys_pidstat},
+    {false, 101, (void*)sys_selfexe},
+    {false, 102, (void*)sys_epoll_create},
+    {false, 103, (void*)sys_epoll_ctl},
+    {false, 104, (void*)sys_epoll_wait},
+    {false, 105, (void*)sys_shutdown},
+    {false, 106, (void*)sys_ftruncate},
+    {false, 107, (void*)sys_fchownat}
 };
 
-long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);
-long long sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
-long long sys_shmget(int key, size_t size, int shmflg);
-long long sys_shmdt(std::uint64_t base);
+// long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);
+// long long sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
+// long long sys_shmget(int key, size_t size, int shmflg);
+// long long sys_shmdt(std::uint64_t base);
 
 syscall_item* find_syscall(long long num) {
     return &syscall_table[num];
@@ -138,7 +146,7 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
 
     thread* current = current_proc;
     current->signal_ctx = *ctx; // its used to return to userspace when there's signal 
-    current->last_syscall = ctx->rax;
+    
 
     long long ret = 0;
 
@@ -164,12 +172,20 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
     }
 #endif
 
-    if(current->is_debug && current_sys->num != 6)
+    if(current->is_debug && current_sys->num != 6 && current_sys->num != 5)
          klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);
 
     assert(ctx->cr3 != 0, "uh nuh ");
 
     ctx->rax = ret;
+
+    if(current->is_restore_sigset) {
+        klibc::memcpy(&current->sigset,&current->temp_sigset,sizeof(sigset_t));
+        current->is_restore_sigset = 0;
+    }
+
+    current->last_syscall = current_sys->num;
+
     return;
 }
 

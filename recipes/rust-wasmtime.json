@@ -1,0 +1,8 @@
+{
+    "name": "rust-wasmtime",
+    "version": "36.0.9",
+    "deps": ["base-libs"],
+    "url": "https://github.com/bytecodealliance/wasmtime/archive/refs/tags/v36.0.9.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

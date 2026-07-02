@@ -11,7 +11,7 @@ configure() {
         -Dgles1=enabled \
         -Dgles2=enabled \
         -Dgallium-drivers=llvmpipe \
-        -Dvulkan-drivers="" \
+        -Dvulkan-drivers=swrast \
         -Dvideo-codecs=all_free
 }
 

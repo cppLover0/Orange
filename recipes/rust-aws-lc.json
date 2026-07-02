@@ -1,0 +1,8 @@
+{
+    "name": "rust-aws-lc",
+    "version": "5.0.0",
+    "deps": ["base-libs"],
+    "url": "https://github.com/aws/aws-lc/archive/refs/tags/v5.0.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

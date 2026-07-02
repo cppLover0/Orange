@@ -1,0 +1,8 @@
+{
+    "name": "rust-open",
+    "version": "5.3.2",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/open/open-5.3.2.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

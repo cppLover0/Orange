@@ -1,0 +1,12 @@
+diff -Naur rust-wasmtime/crates/wasmtime/src/runtime/vm/sys/unix/signals.rs rust-wasmtime-clean/crates/wasmtime/src/runtime/vm/sys/unix/signals.rs
+--- rust-wasmtime/crates/wasmtime/src/runtime/vm/sys/unix/signals.rs	2026-05-05 19:09:21.000000000 +0300
++++ rust-wasmtime-clean/crates/wasmtime/src/runtime/vm/sys/unix/signals.rs	2026-06-08 17:51:25.070321529 +0300
+@@ -273,7 +273,7 @@
+ )]
+ unsafe fn get_trap_registers(cx: *mut libc::c_void, _signum: libc::c_int) -> TrapRegisters {
+     cfg_if::cfg_if! {
+-        if #[cfg(all(any(target_os = "linux", target_os = "android", target_os = "illumos"), target_arch = "x86_64"))] {
++        if #[cfg(all(any(target_os = "linux", target_os = "android", target_os = "illumos", target_os = "orange"), target_arch = "x86_64"))] {
+             let cx = unsafe { &*(cx as *const libc::ucontext_t) };
+             TrapRegisters {
+                 pc: cx.uc_mcontext.gregs[libc::REG_RIP as usize] as usize,

@@ -1,0 +1,8 @@
+{
+    "name": "rust-mio1.2.0",
+    "version": "1.2.0",
+    "deps": ["base-libs"],
+    "url": "https://github.com/tokio-rs/mio/archive/refs/tags/v1.2.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

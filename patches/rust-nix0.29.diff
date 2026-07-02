@@ -1,0 +1,519 @@
+diff -Naur rust-nix0.29/src/errno.rs rust-nix0.29-clean/src/errno.rs
+--- rust-nix0.29/src/errno.rs	2024-05-24 15:22:21.000000000 +0300
++++ rust-nix0.29-clean/src/errno.rs	2026-06-07 20:05:33.239285563 +0300
+@@ -32,7 +32,8 @@
+                         target_os = "redox",
+                         target_os = "dragonfly",
+                         target_os = "fuchsia",
+-                        target_os = "hurd"))] {
++                        target_os = "hurd",
++                        target_os = "orange"))] {
+         unsafe fn errno_location() -> *mut c_int {
+             unsafe { libc::__errno_location() }
+         }
+@@ -274,7 +275,7 @@
+         EHOSTUNREACH => "No route to host",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android, target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -282,7 +283,7 @@
+         ECHRNG => "Channel number out of range",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -290,7 +291,7 @@
+         EL2NSYNC => "Level 2 not synchronized",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -298,7 +299,7 @@
+         EL3HLT => "Level 3 halted",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -306,7 +307,7 @@
+         EL3RST => "Level 3 reset",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -314,7 +315,7 @@
+         ELNRNG => "Link number out of range",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -322,7 +323,7 @@
+         EUNATCH => "Protocol driver not attached",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+@@ -330,36 +331,36 @@
+         ENOCSI => "No CSI structure available",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+         ))]
+         EL2HLT => "Level 2 halted",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EBADE => "Invalid exchange",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EBADR => "Invalid request descriptor",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EXFULL => "Exchange full",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ENOANO => "No anode",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EBADRQC => "Invalid request code",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EBADSLT => "Invalid slot",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EBFONT => "Bad font file format",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "hurd"
+@@ -367,7 +368,7 @@
+         ENOSTR => "Device not a stream",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "hurd"
+@@ -375,7 +376,7 @@
+         ENODATA => "No data available",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "hurd"
+@@ -383,21 +384,21 @@
+         ETIME => "Timer expired",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "hurd"
+         ))]
+         ENOSR => "Out of streams resources",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ENONET => "Machine is not on the network",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         ENOPKG => "Package not installed",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "hurd"
+@@ -405,24 +406,24 @@
+         EREMOTE => "Object is remote",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+         ))]
+         ENOLINK => "Link has been severed",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         EADV => "Advertise error",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ESRMNT => "Srmount error",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ECOMM => "Communication error on send",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia",
+@@ -430,24 +431,24 @@
+         EPROTO => "Protocol error",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+         ))]
+         EMULTIHOP => "Multihop attempted",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",target_os = "fuchsia"))]
+         EDOTDOT => "RFS specific error",
+ 
+-        #[cfg(any(linux_android, target_os = "aix", target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",target_os = "aix", target_os = "fuchsia"))]
+         EBADMSG => "Not a data message",
+ 
+         #[cfg(solarish)]
+         EBADMSG => "Trying to read unreadable message",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             target_os = "aix",
+             target_os = "fuchsia",
+             target_os = "haiku",
+@@ -455,29 +456,29 @@
+         ))]
+         EOVERFLOW => "Value too large for defined data type",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ENOTUNIQ => "Name not unique on network",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         EBADFD => "File descriptor in bad state",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         EREMCHG => "Remote address changed",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ELIBACC => "Can not access a needed shared library",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", solarish, target_os = "fuchsia"))]
+         ELIBBAD => "Accessing a corrupted shared library",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         ELIBSCN => ".lib section in a.out corrupted",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         ELIBMAX => "Attempting to link in too many shared libraries",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "hurd"
+@@ -485,7 +486,7 @@
+         ELIBEXEC => "Cannot exec a shared library directly",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia",
+@@ -494,50 +495,50 @@
+         EILSEQ => "Illegal byte sequence",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "aix",
+             target_os = "fuchsia"
+         ))]
+         ERESTART => "Interrupted system call should be restarted",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         ESTRPIPE => "Streams pipe error",
+ 
+-        #[cfg(any(linux_android, solarish, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",solarish, target_os = "fuchsia"))]
+         EUSERS => "Too many users",
+ 
+         #[cfg(any(
+             linux_android,
+             target_os = "fuchsia",
+-            target_os = "netbsd",
++            target_os = "netbsd",target_os = "orange",
+             target_os = "redox"
+         ))]
+         EOPNOTSUPP => "Operation not supported on transport endpoint",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia", target_os = "hurd"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia", target_os = "hurd"))]
+         ESTALE => "Stale file handle",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         EUCLEAN => "Structure needs cleaning",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         ENOTNAM => "Not a XENIX named type file",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",target_os = "fuchsia"))]
+         ENAVAIL => "No XENIX semaphores available",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         EISNAM => "Is a named type file",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         EREMOTEIO => "Remote I/O error",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android, target_os = "orange",target_os = "fuchsia"))]
+         EDQUOT => "Quota exceeded",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             target_os = "fuchsia",
+             target_os = "openbsd",
+             target_os = "dragonfly"
+@@ -545,36 +546,36 @@
+         ENOMEDIUM => "No medium found",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             target_os = "fuchsia",
+             target_os = "openbsd"
+         ))]
+         EMEDIUMTYPE => "Wrong medium type",
+ 
+         #[cfg(any(
+-            linux_android,
++            linux_android,target_os = "orange",
+             solarish,
+             target_os = "fuchsia",
+             target_os = "haiku"
+         ))]
+         ECANCELED => "Operation canceled",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         ENOKEY => "Required key not available",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         EKEYEXPIRED => "Key has expired",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         EKEYREVOKED => "Key has been revoked",
+ 
+-        #[cfg(any(linux_android, target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "fuchsia"))]
+         EKEYREJECTED => "Key was rejected by service",
+ 
+         #[cfg(any(
+             linux_android,
+             target_os = "aix",
+-            target_os = "fuchsia",
++            target_os = "fuchsia",target_os = "orange",
+             target_os = "hurd"
+         ))]
+         EOWNERDEAD => "Owner died",
+@@ -582,20 +583,20 @@
+         #[cfg(solarish)]
+         EOWNERDEAD => "Process died with lock",
+ 
+-        #[cfg(any(linux_android, target_os = "aix", target_os = "fuchsia"))]
++        #[cfg(any(linux_android,target_os = "orange", target_os = "aix", target_os = "fuchsia"))]
+         ENOTRECOVERABLE => "State not recoverable",
+ 
+         #[cfg(solarish)]
+         ENOTRECOVERABLE => "Lock is not recoverable",
+ 
+         #[cfg(any(
+-            all(target_os = "linux", not(target_arch = "mips")),
++            all(target_os = "linux", not(target_arch = "mips")),target_os = "orange",
+             target_os = "fuchsia"
+         ))]
+         ERFKILL => "Operation not possible due to RF-kill",
+ 
+         #[cfg(any(
+-            all(target_os = "linux", not(target_arch = "mips")),
++            all(target_os = "linux", not(target_arch = "mips")),target_os = "orange",
+             target_os = "fuchsia"
+         ))]
+         EHWPOISON => "Memory page has hardware error",
+@@ -606,7 +607,7 @@
+         #[cfg(any(freebsdlike, target_os = "hurd", target_os = "redox"))]
+         EMULTIHOP => "Multihop attempted",
+ 
+-        #[cfg(any(freebsdlike, target_os = "hurd", target_os = "redox"))]
++        #[cfg(any(freebsdlike, target_os = "hurd",target_os = "redox"))]
+         ENOLINK => "Link has been severed",
+ 
+         #[cfg(target_os = "freebsd")]
+@@ -832,7 +833,7 @@
+     }
+ }
+ 
+-#[cfg(any(linux_android, target_os = "fuchsia"))]
++#[cfg(any(linux_android, target_os = "fuchsia", target_os = "orange"))]
+ mod consts {
+     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+     #[repr(i32)]
+diff -Naur rust-nix0.29/src/features.rs rust-nix0.29-clean/src/features.rs
+--- rust-nix0.29/src/features.rs	2024-05-24 15:22:21.000000000 +0300
++++ rust-nix0.29-clean/src/features.rs	2026-06-07 20:08:44.808729502 +0300
+@@ -1,7 +1,7 @@
+ //! Feature tests for OS functionality
+ pub use self::os::*;
+ 
+-#[cfg(linux_android)]
++#[cfg(any(linux_android, target_os = "orange"))]
+ mod os {
+     use crate::sys::utsname::uname;
+     use crate::Result;
+diff -Naur rust-nix0.29/src/unistd.rs rust-nix0.29-clean/src/unistd.rs
+--- rust-nix0.29/src/unistd.rs	2024-05-24 15:22:21.000000000 +0300
++++ rust-nix0.29-clean/src/unistd.rs	2026-06-07 20:11:59.045633404 +0300
+@@ -3188,8 +3188,8 @@
+         solarish,
+         target_os = "aix",
+         target_os = "fuchsia",
+-        target_os = "haiku",
+-        target_os = "hurd",
++        target_os = "haiku", 
++        target_os = "hurd", target_os = "orange",
+     )))]
+     pub class: CString,
+     /// Last password change
+@@ -3199,7 +3199,7 @@
+         target_os = "aix",
+         target_os = "fuchsia",
+         target_os = "haiku",
+-        target_os = "hurd",
++        target_os = "hurd",target_os = "orange",
+     )))]
+     pub change: libc::time_t,
+     /// Expiration time of account
+@@ -3209,7 +3209,7 @@
+         target_os = "aix",
+         target_os = "fuchsia",
+         target_os = "haiku",
+-        target_os = "hurd",
++        target_os = "hurd",target_os = "orange",
+     )))]
+     pub expire: libc::time_t,
+ }
+@@ -3262,7 +3262,7 @@
+                     target_os = "aix",
+                     target_os = "fuchsia",
+                     target_os = "haiku",
+-                    target_os = "hurd",
++                    target_os = "hurd", target_os = "orange",
+                 )))]
+                 class: CString::new(CStr::from_ptr(pw.pw_class).to_bytes())
+                     .unwrap(),
+@@ -3272,7 +3272,7 @@
+                     target_os = "aix",
+                     target_os = "fuchsia",
+                     target_os = "haiku",
+-                    target_os = "hurd",
++                    target_os = "hurd",target_os = "orange",
+                 )))]
+                 change: pw.pw_change,
+                 #[cfg(not(any(
+@@ -3281,7 +3281,7 @@
+                     target_os = "aix",
+                     target_os = "fuchsia",
+                     target_os = "haiku",
+-                    target_os = "hurd",
++                    target_os = "hurd",target_os = "orange",
+                 )))]
+                 expire: pw.pw_expire,
+             }
+@@ -3322,7 +3322,7 @@
+                 target_os = "aix",
+                 target_os = "fuchsia",
+                 target_os = "haiku",
+-                target_os = "hurd",
++                target_os = "hurd", target_os = "orange",
+             )))]
+             pw_class: u.class.into_raw(),
+             #[cfg(not(any(
+@@ -3331,7 +3331,7 @@
+                 target_os = "aix",
+                 target_os = "fuchsia",
+                 target_os = "haiku",
+-                target_os = "hurd",
++                target_os = "hurd", target_os = "orange",
+             )))]
+             pw_change: u.change,
+             #[cfg(not(any(
+@@ -3340,7 +3340,7 @@
+                 target_os = "aix",
+                 target_os = "fuchsia",
+                 target_os = "haiku",
+-                target_os = "hurd",
++                target_os = "hurd", target_os = "orange",
+             )))]
+             pw_expire: u.expire,
+             #[cfg(solarish)]

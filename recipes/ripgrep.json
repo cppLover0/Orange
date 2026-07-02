@@ -1,0 +1,8 @@
+{
+    "name": "ripgrep",
+    "version": "recent",
+    "deps": ["base-libs", "rust-host", "libpcre2"],
+    "url": "git:https://github.com/BurntSushi/ripgrep.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

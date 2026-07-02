@@ -1,0 +1,35 @@
+[build]
+rustc = "/home/cpplover0/orange/.orange-build/prefix/bin/rustc"
+
+[target.x86_64-unknown-orange-mlibc]
+linker = "x86_64-orange-mlibc-gcc"
+
+[patch.crates-io]
+backtrace = { path = "/home/cpplover0/orange/.orange-build/sources/rust-backtrace-workdir" }
+libc = { path = "/home/cpplover0/orange/.orange-build/sources/rust-libc-workdir" }
+getrandom-03 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-getrandom3-workdir", package = "getrandom" }
+getrandom-04 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-getrandom4-workdir", package = "getrandom" }
+rustix = { path = "/home/cpplover0/orange/.orange-build/sources/rust-rustix-workdir", package = "rustix" }
+rustix-038 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-rustix0.38-workdir", package = "rustix" }
+nix-030 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-nix-workdir", package = "nix" }
+nix-029 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-nix0.29-workdir", package = "nix" }
+nix-028 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-nix0.28-workdir", package = "nix" }
+nix-0271 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-nix0.27.1-workdir", package = "nix" }
+mio-120 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-mio1.2.0-workdir", package = "mio" }
+socket2 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-socket2-workdir", package = "socket2" }
+socket2-0510 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-socket2-0.5.10-workdir", package = "socket2" }
+tokio1521 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-tokio1.52.1-workdir/tokio", package = "tokio" }
+target-lexicon = { path = "/home/cpplover0/orange/.orange-build/sources/rust-targetlexicon-workdir", package = "target-lexicon" }
+scap = { path = "/home/cpplover0/orange/.orange-build/sources/rust-zed-scap-workdir", package = "zed-scap" }
+treesitter = { path = "/home/cpplover0/orange/.orange-build/sources/tree-sitter-workdir", package = "tree-sitter" }
+wasmtime = { path = "/home/cpplover0/orange/.orange-build/sources/rust-wasmtime-workdir/crates/wasmtime", package = "wasmtime" }
+awslcsys = { path = "/home/cpplover0/orange/.orange-build/sources/rust-aws-lc-sys-workdir/aws-lc-sys", package = "aws-lc-sys" }
+ring = { path = "/home/cpplover0/orange/.orange-build/sources/rust-ring-workdir", package = "ring" }
+libloading = { path = "/home/cpplover0/orange/.orange-build/sources/rust-libloading-workdir", package = "libloading" }
+sysinterface = { path = "/home/cpplover0/orange/.orange-build/sources/rust-sysinterface-workdir", package = "system-interface" }
+cap-primitives = { path = "/home/cpplover0/orange/.orange-build/sources/rust-cap-primitives-workdir", package = "cap-primitives" }
+ipchcannel = { path = "/home/cpplover0/orange/.orange-build/sources/rust-ipc-channel-workdir", package = "ipc-channel" }
+open = { path = "/home/cpplover0/orange/.orange-build/sources/rust-open-workdir", package = "open" }
+polling = { path = "/home/cpplover0/orange/.orange-build/sources/rust-polling-workdir", package = "polling" }
+errno = { path = "/home/cpplover0/orange/.orange-build/sources/rust-errno2.8-workdir", package = "errno" }
+errno2 = { path = "/home/cpplover0/orange/.orange-build/sources/rust-errno3.14-workdir", package = "errno" }

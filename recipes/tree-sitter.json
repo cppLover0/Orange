@@ -1,0 +1,8 @@
+{
+    "name": "tree-sitter",
+    "version": "0.26.9",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/tree-sitter/tree-sitter-0.26.9.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -12,6 +12,7 @@
 #include <generic/time.hpp>
 #include <utils/signal_ret.hpp>
 #include <utils/signal.hpp>
+#include <generic/flock.hpp>
 
 long long sys_access(const char* path, int mode) {
     (void)mode;
@@ -66,13 +67,15 @@ long long sys_openat(int dfd, const char* path, int flags, int mode) {
     int status = vfs::open(new_fd, buffer, true, flags & O_DIRECTORY);
 
     if(flags & O_CREAT && !(flags & O_DIRECTORY) && status == -ENOENT) {
-        int create_status = vfs::create(buffer, vfs_file_type::file, mode);
+        int create_status = vfs::create(buffer, vfs_file_type::file, mode, current->uid, current->gid);
         if(create_status != 0)
             goto fail;
         status = vfs::open(new_fd, buffer, true, flags & O_DIRECTORY);
         if(status != 0)
             goto fail;
         assert(new_fd->vnode.chmod, "v");
+        assert(new_fd->vnode.chown, "z");
+        new_fd->vnode.chown(new_fd, current->uid, current->gid);
         new_fd->vnode.chmod(new_fd, mode);
     } 
 
@@ -88,6 +91,7 @@ fail:
         int status2 = new_fd->vnode.stat(new_fd, &file_stat);
         assert(status2 == 0, "chieknefpksgf'shdgko'psdgo'hks'o %s (%d)", buffer, status2);
         if(flags & O_TRUNC) {
+            klibc::debug_printf("TRUNC\n");
             if(new_fd->vnode.zero) {
                 new_fd->vnode.zero(new_fd);
             }
@@ -181,7 +185,7 @@ long long sys_newfstatat(int dfd, const char* path, stat* out, int flags) {
     assert(target_fd.vnode.stat, "no lol");
 
     target_fd.vnode.stat(&target_fd, out);
-    if(current->is_debug) klibc::debug_printf("mode %o %s", out->st_mode, path == nullptr ? "" : path);
+    if(current->is_debug) klibc::debug_printf("mode %o %s size %lli", out->st_mode, path == nullptr ? "" : path, out->st_size);
 
     if(!is_empty) {
         if(target_fd.vnode.close)
@@ -269,7 +273,13 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
         return -EBADF;
 
     if(file->type == file_descriptor_type::file) {
-        return file->vnode.read(file, buffer, count);
+        std::int64_t cz = file->vnode.read(file, buffer, count);
+        if(cz == 0 && current->is_debug) {
+            stat x = {};
+            file->vnode.stat(file, &x);
+            klibc::debug_printf("eof ! %s, seek %d, file_size %d", file->path, file->offset, x.st_size);
+        }
+        return cz;
     } else if(file->type == file_descriptor_type::pipe) {
         return file->fs_specific.pipe->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
     } else if(file->type == file_descriptor_type::socket) {
@@ -339,7 +349,7 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
         return -EBADF;
 
     if(proc->is_debug) {
-        klibc::debug_printf("trying to write %s fd %d buffer 0x%p type %d count %lli %s\n", file->path , fd, buffer, file->type, count, buffer);
+        klibc::debug_printf("trying to write %s fd %d buffer 0x%p type %d count %lli %s\n", file->path , fd, buffer, file->type, count, count > 1000 ? "too big" : buffer);
     }
 
     if(file->type == file_descriptor_type::file) {
@@ -470,7 +480,7 @@ long long sys_close(int fd) {
     thread* current = current_proc;
 
     if(current->is_debug) {
-        klibc::debug_printf("trying to close fd %d\n", fd);
+        //klibc::debug_printf("trying to close fd %d\n", fd);
     }
 
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
@@ -496,14 +506,30 @@ long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
     if(!file)
         return -EBADF;
 
+    if(!is_safe_to_rw(current, arg, PAGE_SIZE))
+        return -EFAULT;
+
+    // FIONBIO
+    if(req == 0x5421) {
+        if((void*)arg == nullptr)
+            return -EINVAL;
+
+        int is_nonblock = *((int*)(arg));
+        
+        if(is_nonblock & 1) {
+            file->flags |= O_NONBLOCK;
+        } else {
+            file->flags &= ~(O_NONBLOCK);
+        }
+
+        return 0;
+    }
+
     if(file->type != file_descriptor_type::file)
         return -ENOTTY;
 
     if(!file->vnode.ioctl)
         return -ENOTTY;
-
-    if(!is_safe_to_rw(current, arg, PAGE_SIZE))
-        return -EFAULT;
 
     return file->vnode.ioctl(file, req, (void*)arg);
 }
@@ -610,7 +636,7 @@ long long sys_fcntl(int fd, int request, std::uint64_t arg) {
     if(!is_safe_to_rw(proc, arg, PAGE_SIZE))
         return -EFAULT;
 
-    if(proc->is_debug)
+    if(1)
         klibc::debug_printf("fcntl fd %d req %d arg 0x%p from proc %d",fd,request,arg);
     int is_cloexec = 0;
     switch(request) {
@@ -661,6 +687,101 @@ long long sys_fcntl(int fd, int request, std::uint64_t arg) {
             fd_s->flags &= ~(O_APPEND | O_ASYNC | O_NONBLOCK | O_RDONLY | O_RDWR | O_WRONLY);
             fd_s->flags |= (arg & (O_APPEND | O_ASYNC | O_NONBLOCK | O_RDONLY | O_RDWR | O_WRONLY));
 
+            return 0;
+        }
+
+        // my analog of F_GETPATH 
+        case 0x10209040: {
+            file_descriptor* fd_s = manager->search(fd);
+
+            if(!fd_s)
+                return -EBADF;
+
+            klibc::memcpy((void*)arg, fd_s->path, klibc::strlen(fd_s->path) + 1);
+            return 0;
+        }
+
+        // F_GETLK
+        case 5: {
+
+            file_descriptor* fd_s = manager->search(fd);
+
+            if(!fd_s)
+                return -EBADF;
+
+            if(fd_s->type != file_descriptor_type::file)
+                return -EINVAL;
+
+            stat file_stat = {};
+            fd_s->vnode.stat(fd_s, &file_stat);
+
+            flock::flock_struct* flock_user = (flock::flock_struct*)arg;
+            
+            fd_s->vnode.fs->flock_related.lock.lock();
+            flock::flock_struct* lock = flock::search(fd_s->vnode.fs, fd_s->inode, flock_user->l_start, flock_user->l_len, flock_user->l_whence, fd_s->offset, file_stat.st_size);
+
+            if(lock == nullptr) {
+                klibc::memset(flock_user, 0, sizeof(flock::flock_struct));
+                flock_user->l_type = F_UNLCK;
+                fd_s->vnode.fs->flock_related.lock.unlock();
+                return 0;
+            } 
+
+            *flock_user = *lock;
+
+            fd_s->vnode.fs->flock_related.lock.unlock();
+
+            return 0;
+        }
+        
+        // F_SETLK
+        case 6: {
+        
+            file_descriptor* fd_s = manager->search(fd);
+
+            if(!fd_s)
+                return -EBADF;
+
+            if(fd_s->type != file_descriptor_type::file)
+                return -EINVAL;
+
+            if(arg == (std::uintptr_t)nullptr)
+                return -EINVAL;
+
+            stat file_stat = {};
+            fd_s->vnode.stat(fd_s, &file_stat);
+
+            flock::flock_struct* flock_user = (flock::flock_struct*)arg;
+            
+            if(flock_user->l_type != F_UNLCK) {
+                flock::flock_struct* lock = flock::create(fd_s->vnode.fs, fd_s->inode, flock_user->l_start, flock_user->l_len, flock_user->l_type, flock_user->l_whence, fd_s->offset, file_stat.st_size, proc->pid);
+
+                if(lock == nullptr)
+                    return -EAGAIN;
+
+                lock->l_pid = proc->pid;
+                return 0;
+
+            } else {
+                fd_s->vnode.fs->flock_related.lock.lock();
+                flock::flock_struct* lock = flock::search(fd_s->vnode.fs, fd_s->inode, flock_user->l_start, flock_user->l_len, flock_user->l_whence, fd_s->offset, file_stat.st_size);
+                
+                if(lock == nullptr) {
+                    fd_s->vnode.fs->flock_related.lock.unlock();
+                    return 0;
+                }
+                
+                if((std::uint32_t)lock->l_pid != proc->pid) {
+                    fd_s->vnode.fs->flock_related.lock.unlock();
+                    return -EFAULT;
+                }
+
+                lock->l_type = F_UNLCK;
+                fd_s->vnode.fs->flock_related.lock.unlock();
+                return 0;
+
+            }
+            
             return 0;
         }
 
@@ -807,9 +928,11 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 } else if(fd->type == file_descriptor_type::socket && !fd->socket.is_listen) {
                     if(fd->socket.socket_type ==  PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
                         if(fd->socket.socket_side == 1) {
+                            klibc::debug_printf("meoww1 %lli %lli\n", fd->socket.write_socket->size.load(), fd->socket.write_socket->total_size);
                             if((std::uint64_t)fd->socket.write_socket->size.load() != fd->socket.write_socket->total_size)
                                 ret = true;
                         } else {
+                            klibc::debug_printf("meoww2 %lli %lli\n", fd->socket.read_socket->size.load(),  fd->socket.read_socket->total_size);
                             if((std::uint64_t)fd->socket.read_socket->size.load() != fd->socket.read_socket->total_size)
                                 ret = true;
                         }
@@ -938,6 +1061,15 @@ long long sys_pselect6(int num_fds, fd_set* read_set, fd_set* write_set, fd_set*
     if(!is_safe_to_rw(proc, (std::uint64_t)timeout, PAGE_SIZE))
         return -EFAULT;
 
+    if(!is_safe_to_rw(proc, (std::uint64_t)sigmask, PAGE_SIZE))
+        return -EFAULT;
+
+    if(sigmask != nullptr) {
+        proc->is_restore_sigset = true;
+        proc->temp_sigset = proc->sigset;
+        proc->sigset = *sigmask;
+    }
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla-cxx-extension"
     pollfd fds[num_fds];
@@ -1005,6 +1137,267 @@ long long sys_pselect6(int num_fds, fd_set* read_set, fd_set* write_set, fd_set*
 	return return_count;
 }
 
+#define EPOLL_CLOEXEC 02000000
+#define EPOLLIN 0x001
+#define EPOLLPRI 0x002
+#define EPOLLOUT 0x004
+#define EPOLLRDNORM 0x040
+#define EPOLLRDBAND 0x080
+#define EPOLLWRNORM 0x100
+#define EPOLLWRBAND 0x200
+#define EPOLLMSG 0x400
+#define EPOLLERR 0x008
+#define EPOLLHUP 0x010
+#define EPOLLRDHUP 0x2000
+#define EPOLLEXCLUSIVE (1U << 28)
+#define EPOLLWAKEUP (1U << 29)
+#define EPOLLONESHOT (1U << 30)
+#define EPOLLET (1U << 31)
+#define EPOLL_CTL_ADD 1
+#define EPOLL_CTL_DEL 2
+#define EPOLL_CTL_MOD 3
+
+long long sys_epoll_create(int flags) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+
+    file_descriptor* fd0 = manager->createlowest(2);
+    fd0->type = file_descriptor_type::epoll;
+    fd0->other.is_cloexec = (flags & EPOLL_CLOEXEC) ? true : false; 
+    fd0->epoll.epoll_usage_counter = new std::atomic<std::uint32_t>;
+    fd0->epoll.epoll_usage_counter->store(1);
+    fd0->epoll.info = new epoll_member*;
+    fd0->epoll.epoll_lock = new locks::spinlock;
+    fd0->epoll.epoll_ptr = new std::size_t;
+
+    fd0->epoll.epoll_lock->unlock();
+    *fd0->epoll.epoll_ptr = 0;
+
+    klibc::debug_printf("creating epoll %d\n", fd0->index);
+
+    return fd0->index;
+}
+
+long long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *ev) {
+    thread* current = current_proc;
+
+    if(ev == nullptr && op != EPOLL_CTL_DEL)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)ev, PAGE_SIZE))
+        return -EFAULT;
+
+    auto manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* file = manager->search(fd);
+    file_descriptor* epoll = manager->search(epfd);
+
+    if(epoll == nullptr)
+        return -EBADF;
+
+    if(file == nullptr)
+        return -EBADF;
+
+    if(epoll->type != file_descriptor_type::epoll)
+        return -EINVAL;
+
+    klibc::debug_printf("epollctl epfd %d op %d fd %d ev 0x%p 0x%p 0x%p\n", epfd, op, fd, ev, epoll->epoll.epoll_lock, epoll->epoll.info);
+
+    epoll->epoll.epoll_lock->lock();
+
+    epoll_member* info = *epoll->epoll.info;
+
+    switch(op) {
+        case EPOLL_CTL_ADD: {
+
+            if(info != nullptr) {
+                for(std::size_t i = 0; i < *epoll->epoll.epoll_ptr; i++) {
+                    if(info[i].is_used == true && info[i].target_fd == fd) {
+                        epoll->epoll.epoll_lock->unlock();
+                        return -EEXIST;
+                    }
+                }
+            }
+
+            epoll_member* free_epoll = nullptr;
+            if(info != nullptr) {
+                for(std::size_t i = 0; i < *epoll->epoll.epoll_ptr; i++) {
+                    if(info[i].is_used == false) {
+                        free_epoll = &info[i];
+                        goto end;
+                    }
+                }
+            }
+end:
+            // increase/create epoll array
+            if(free_epoll == nullptr) {
+                *epoll->epoll.epoll_ptr = *epoll->epoll.epoll_ptr + 1;
+                epoll_member* new_info = (epoll_member*)klibc::malloc(*epoll->epoll.epoll_ptr * sizeof(epoll_member));
+
+                klibc::memset(new_info, 0, *epoll->epoll.epoll_ptr * sizeof(epoll_member));
+
+                if(info != nullptr) {
+                    klibc::memcpy(new_info, info, (*epoll->epoll.epoll_ptr - 1) * sizeof(epoll_member));
+                    klibc::free((void*)info); 
+                }
+
+                *epoll->epoll.info = new_info;
+                info = new_info;
+
+                free_epoll = &info[*epoll->epoll.epoll_ptr - 1];
+            }
+
+            free_epoll->is_used = true;
+            free_epoll->target_fd = fd;
+            free_epoll->ev = *ev;
+
+            epoll->epoll.epoll_lock->unlock();
+            return 0;
+        }
+
+        case EPOLL_CTL_DEL: {
+            if(info != nullptr) {
+                for(std::size_t i = 0; i < *epoll->epoll.epoll_ptr; i++) {
+                    if(info[i].is_used == true && info[i].target_fd == fd) {
+                        info[i].is_used = false;
+                        epoll->epoll.epoll_lock->unlock();
+                        return 0;
+                    }
+                }
+            }
+
+            epoll->epoll.epoll_lock->unlock();
+            return -ENOENT;
+        }
+
+        case EPOLL_CTL_MOD: {
+            if(info != nullptr) {
+                for(std::size_t i = 0; i < *epoll->epoll.epoll_ptr; i++) {
+                    if(info[i].is_used == true && info[i].target_fd == fd) {
+                        info[i].ev = *ev;
+                        epoll->epoll.epoll_lock->unlock();
+                        return 0;
+                    }
+                }
+            }
+
+            epoll->epoll.epoll_lock->unlock();
+            return -ENOENT;
+        }
+
+        default:
+            epoll->epoll.epoll_lock->unlock();
+            return -EINVAL;
+    }
+
+    assert(0, "huh");
+    return -EFAULT;
+}
+
+inline static int epoll_to_poll_events(int events) {
+    int result = 0;
+
+    if(events & EPOLLIN)
+        result |= POLLIN;
+
+    if(events & EPOLLOUT)
+        result |= POLLOUT;
+
+    if(events & EPOLLHUP)
+        result |= POLLHUP;
+
+    if(events & EPOLLRDHUP)
+        result |= POLLHUP;
+
+    return result;
+}
+
+inline static int poll_to_epoll_events(int events) {
+    int result = 0;
+
+    if(events & POLLIN)
+        result |= EPOLLIN;
+
+    if(events & POLLOUT)
+        result |= EPOLLOUT;
+
+    if(events & POLLHUP)
+        result |= EPOLLHUP;
+
+    return result;
+}
+
+long long sys_epoll_wait(int epfd, struct epoll_event *ev, int n, int timeout, const sigset_t *sigmask) {
+    thread* current = current_proc;
+
+    if(n <= 0)
+        return 0;
+
+    if(ev == nullptr)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)ev, PAGE_SIZE + (n * sizeof(epoll_event))))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)sigmask, PAGE_SIZE))
+        return -EFAULT;
+
+    if(sigmask != nullptr) {
+        current->is_restore_sigset = true;
+        current->temp_sigset = current->sigset;
+        current->sigset = *sigmask;
+    }
+
+    auto manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* epoll = manager->search(epfd);
+
+    if(epoll == nullptr)
+        return -EBADF;
+
+    if(epoll->type != file_descriptor_type::epoll)
+        return -EINVAL;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla-cxx-extension"
+
+    std::size_t ptr = *epoll->epoll.epoll_ptr;
+    epoll_member* info = *epoll->epoll.info;
+
+    struct pollfd converted[ptr];
+    klibc::memset(converted, 0, ptr * sizeof(pollfd));
+
+    for(std::size_t i = 0; i < ptr; i++) {
+        if(info[i].is_used == true) {
+            converted[i].fd = info[i].target_fd;
+            converted[i].events = epoll_to_poll_events(info[i].ev.events);
+        } else {
+            converted[i].fd = -1;
+            converted[i].events = 0;
+        }
+    }
+
+    long long ret = poll_impl(converted, ptr, timeout);
+
+    std::size_t proc_events = 0;
+
+    for(std::size_t i = 0; i < ptr; i++) {
+        if(proc_events >= (std::size_t)n)
+            break;
+
+        if(converted[i].revents != 0 && info[i].is_used) {
+            ev[proc_events] = info[i].ev;
+            ev[proc_events].events = poll_to_epoll_events(converted[i].revents);
+            proc_events++;
+        }
+    }
+
+    if(ret < 0)
+        return ret;
+
+#pragma clang diagnostic pop
+    
+    return proc_events;
+}
+
 long long sys_seek(int fd, long offset, int whence) {
     thread* current = current_proc;
     auto manager = (vfs::fdmanager*)current->fd;
@@ -1055,8 +1448,10 @@ long long sys_writev(int fd, iovec* vecs, std::uint64_t vlen) {
         if(!is_safe_to_rw(current, (std::uint64_t)vecs[i].iov_base, vecs[i].iov_len + PAGE_SIZE))
             return -EFAULT;
         long long ret = sys_write(fd, (char*)vecs[i].iov_base, vecs[i].iov_len);
-        if(ret < 0)
+        if(ret < 0 && ret != -EAGAIN)
             return ret;
+        else if(ret == -EAGAIN)
+            return total;
         total += ret;
     }
     return total;
@@ -1248,7 +1643,7 @@ long long sys_mkdir(const char* path, int mode) {
 
     process_path(current->chroot, at, buffer1, buffer);
 
-    int status = vfs::create(buffer, vfs_file_type::directory, mode);
+    int status = vfs::create(buffer, vfs_file_type::directory, mode, current->uid, current->gid);
     if(status != 0)
         return status;
 
@@ -1274,7 +1669,7 @@ long long sys_mkdirat(int dfd, const char* path, int mode) {
 
     process_path(current->chroot, at, buffer1, buffer);
 
-    int status = vfs::create(buffer, vfs_file_type::directory, mode);
+    int status = vfs::create(buffer, vfs_file_type::directory, mode, current->uid, current->gid);
     if(status != 0)
         return status;
 
@@ -1583,6 +1978,92 @@ long long sys_ptsname(int fd, char *buffer, size_t length) {
         return -ERANGE;
 
     klibc::memcpy(buffer, built, klibc::strlen(built) + 1);
+
+    return 0;
+}
+
+long long sys_ftruncate(int fd, std::size_t new_size) {
+    thread* current = current_proc;
+
+    auto manager = (vfs::fdmanager*)current->fd;
+    auto file = manager->search(fd);
+
+    if(file == nullptr)
+        return -EBADF;
+
+    if(file->type != file_descriptor_type::file)
+        return -EINVAL;
+
+    if(file->vnode.truncate == nullptr)
+        return -ENOTSUP;
+
+    klibc::debug_printf("trunc file %s to size %lli\n", file->path, new_size);
+
+    file->vnode.truncate(file, new_size);
+
+    return 0;
+}
+
+long long sys_fchownat(int dfd, const char* path, uid_t owner, gid_t group, int flags) {
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)path, 4096) && path) {
+        return -EFAULT;
+    }
+
+    bool is_empty = false;
+    if(!path)
+        is_empty = true;
+
+    if(path) {
+        if(path[0] == '\0')
+            is_empty = true;
+    }
+
+    if(current->is_debug) {
+        klibc::debug_printf("trying to chown %d %s 0x%p 0x%p with uid %d gid %d\n", dfd, !is_empty ? path : "empty path", flags, path, owner, group);
+    }
+
+    vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
+    file_descriptor target_fd = {};
+    if(is_empty) {
+        file_descriptor* fd = manager->search(dfd);
+        if(!fd)
+            return -EBADF;
+        target_fd = *fd;
+    } else {
+        char buffer1[4096] = {};
+        char buffer[4096] = {};
+        klibc::memcpy(buffer1, path, safe_strlen((char*)path, 4096));
+
+        char* at = at_to_char(current, dfd);
+        if(at == nullptr)
+            return -EBADF;
+
+        process_path(current->chroot, at, buffer1, buffer);
+
+        sockaddr_un un = {};
+        klibc::memcpy(un.sun_path, buffer, klibc::strlen(buffer) + 1);
+
+        if(unix_sockets::is_exists(&un, false)) {
+            return 0;
+        }
+
+        target_fd.type = file_descriptor_type::file;
+        int status = vfs::open(&target_fd, buffer, (flags & AT_SYMLINK_NOFOLLOW) ? false : true, false);
+        if(status != 0)
+            return status;
+
+    }
+
+    assert(target_fd.vnode.chown, "no lol chown");
+
+    target_fd.vnode.chown(&target_fd, owner, group);
+
+    if(!is_empty) {
+        if(target_fd.vnode.close)
+            target_fd.vnode.close(&target_fd);
+    }
 
     return 0;
 }

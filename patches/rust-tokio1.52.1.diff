@@ -1,0 +1,33 @@
+diff -Naur rust-tokio1.52.1/tokio/src/net/unix/ucred.rs rust-tokio1.52.1-clean/tokio/src/net/unix/ucred.rs
+--- rust-tokio1.52.1/tokio/src/net/unix/ucred.rs	2026-04-17 00:28:05.000000000 +0300
++++ rust-tokio1.52.1-clean/tokio/src/net/unix/ucred.rs	2026-06-08 10:06:27.620660583 +0300
+@@ -37,7 +37,8 @@
+     target_os = "android",
+     target_os = "openbsd",
+     target_os = "haiku",
+-    target_os = "cygwin"
++    target_os = "cygwin",
++    target_os = "orange"
+ ))]
+ pub(crate) use self::impl_linux::get_peer_cred;
+ 
+@@ -71,7 +72,8 @@
+     target_os = "android",
+     target_os = "openbsd",
+     target_os = "haiku",
+-    target_os = "cygwin"
++    target_os = "cygwin",
++    target_os = "orange"
+ ))]
+ pub(crate) mod impl_linux {
+     use crate::net::unix::{self, UnixStream};
+@@ -86,7 +88,8 @@
+         target_os = "redox",
+         target_os = "android",
+         target_os = "haiku",
+-        target_os = "cygwin"
++        target_os = "cygwin",
++        target_os = "orange"
+     ))]
+     use libc::ucred;
+ 

@@ -7,7 +7,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+#if defined(__x86_64__)
     asm volatile("syscall" : : "a"(84) : "rcx","r11");
+#endif
 
     execvp(argv[1], &argv[1]);
     perror("execvp");

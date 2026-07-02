@@ -110,8 +110,8 @@ namespace arch {
         return __memory_paging_getphys((std::uint64_t*)(root + etc::hhdm()),virt,0);
     }
 
-    [[gnu::weak]] void destroy_root(std::uintptr_t root, int level) {
-                std::uint64_t* table = (std::uint64_t*) (root + etc::hhdm());
+    void destroy_root(std::uintptr_t root, int level) {
+        std::uint64_t* table = (std::uint64_t*) (root + etc::hhdm());
         if (bootloader::bootloader->is_5_level_paging()) {
             if (level != 4) {
                 if (level == 0) {

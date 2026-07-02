@@ -190,6 +190,8 @@ std::int32_t devfs_open(filesystem* fs, void* file_desc, char* path, bool is_dir
     fd->other.is_a_tty = node->is_a_tty;
     fd->fs_specific.tmpfs_pointer = (std::uint64_t)node;
 
+    fd->inode = node->id;
+
     if(node->open) 
         node->open(fd, node);
         
@@ -204,7 +206,9 @@ std::int32_t devfs_readlink(filesystem* fs, char* path, char* buffer) {
     return -EINVAL;
 }
 
-std::int32_t devfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode) {
+std::int32_t devfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid) {
+    (void)uid;
+    (void)gid;
     (void)fs;
     (void)path;
     (void)type;

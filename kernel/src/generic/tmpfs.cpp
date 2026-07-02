@@ -151,12 +151,17 @@ std::int32_t tmpfs_readlink(filesystem* fs, char* path, char* buffer) {
 
 signed long tmpfs_ls(file_descriptor* file, char* out, std::size_t count) {
     file->vnode.fs->lock.lock();
+
+    std::uint64_t stack_protect = 0x1122DDAAF09311BB;
+
     auto node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
 
     std::size_t current_offset = 0;
 
     if(node->type != vfs_file_type::directory)
         return -ENOTDIR;
+
+    std::uint64_t stack_protect2 = 0x1122DDAAF09311BB;
 
 again:
 
@@ -166,13 +171,19 @@ again:
         return current_offset; 
     }
 
+    // for(std::size_t i = 0;i < node->size / sizeof(tmpfs::directory_cont); i++) {
+    //     tmpfs::directory_cont* dre = &node->dirents[i];
+    //     assert(((std::uint64_t)dre->node > etc::hhdm()) || dre->node == nullptr, "not valid node %s 0x%p", dre->name, dre->node);
+    // }
+
     while(true) {
 
-        tmpfs::directory_cont* dre = &node->dirents[file->offset / sizeof(tmpfs::directory_cont)];
+        std::uint64_t stack_protect3 = 0x1122DDAAF09311BB;
 
-        auto current_node = dre->node;
-
-        file->offset += sizeof(tmpfs::directory_cont);
+        if(file->offset >= node->size) {
+            file->vnode.fs->lock.unlock();
+            return current_offset;
+        }
 
         if(file->offset + sizeof(tmpfs::directory_cont) >= node->size) {
             //klibc::debug_printf("%lli %lli\n", file->offset, node->size);
@@ -180,8 +191,21 @@ again:
             return current_offset; 
         }
 
-        if(current_node == nullptr)
+        std::uint64_t stack_protect34 = 0x1122DDAAF09311BB;
+
+        tmpfs::directory_cont dre1;
+        tmpfs::directory_cont* dre = &dre1;
+
+        std::uint64_t stack_protect35 = 0x1122DDAAF09311BB;
+
+        klibc::memcpy(&dre1, &node->dirents[file->offset / sizeof(tmpfs::directory_cont)], sizeof(tmpfs::directory_cont));
+
+        auto current_node = dre1.node;
+
+        if(current_node == nullptr) {
+            file->offset += sizeof(tmpfs::directory_cont);
             goto again;
+        }
 
         if(sizeof(dirent) + klibc::strlen(dre->name) + 1 > count - current_offset) {
             file->vnode.fs->lock.unlock();
@@ -196,6 +220,14 @@ again:
         current_offset += current_dir->d_reclen;
 
         klibc::memcpy(current_dir->d_name, dre->name, klibc::strlen(dre->name) + 1);
+
+        file->offset += sizeof(tmpfs::directory_cont);
+
+        assert(stack_protect == 0x1122DDAAF09311BB, "stack is fucked bro");
+        assert(stack_protect2 == 0x1122DDAAF09311BB, "stack is fucked bro");
+        assert(stack_protect3 == 0x1122DDAAF09311BB, "stack is fucked bro");
+        assert(stack_protect34 == 0x1122DDAAF09311BB, "stack is fucked bro");
+        assert(stack_protect35 == 0x1122DDAAF09311BB, "stack is fucked bro");
 
     }
 
@@ -239,7 +271,7 @@ std::int32_t tmpfs_link(filesystem* fs, char* old_path, char* new_path) {
     }
 
     if(is_pasted == false) {
-        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        alloc_t res = pmm::buddy::alloc(parent->size + sizeof(tmpfs::directory_cont));
         tmpfs_used_mem += parent->size * sizeof(tmpfs::directory_cont);
         tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
         if(parent->dirents) {
@@ -260,7 +292,7 @@ std::int32_t tmpfs_link(filesystem* fs, char* old_path, char* new_path) {
 
 std::uint8_t __tmpfs__create_parent_dirs_by_default = 1; /* Used for ustar */
 
-std::int32_t tmpfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode, tmpfs::tmpfs_node** out = nullptr) {
+std::int32_t tmpfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid, tmpfs::tmpfs_node** out = nullptr) {
 
     if(fs)
         fs->lock.lock();
@@ -275,7 +307,7 @@ std::int32_t tmpfs_create(filesystem* fs, char* path, vfs_file_type type, std::u
                 fs->lock.unlock();
             return -ENOENT;
         } else {
-            tmpfs_create(nullptr, copy, vfs_file_type::directory, mode, &parent);
+            tmpfs_create(nullptr, copy, vfs_file_type::directory, mode, uid, gid, &parent);
         }
     }
 
@@ -285,6 +317,10 @@ std::int32_t tmpfs_create(filesystem* fs, char* path, vfs_file_type type, std::u
         return -ENOENT; }
 
     bool is_pasted = false;
+
+    if(tmpfs_lookup(path) != nullptr) { fs->lock.unlock();
+        return -EEXIST;
+    }
 
     tmpfs::tmpfs_node* new_node = (tmpfs::tmpfs_node*)(pmm::freelist::alloc_4k() + etc::hhdm());
 
@@ -299,7 +335,7 @@ again_paste:
     }
 
     if(is_pasted == false) {
-        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        alloc_t res = pmm::buddy::alloc(parent->size + sizeof(tmpfs::directory_cont));
         tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
         if(parent->dirents) {
             klibc::memcpy(new_dir, parent->dirents, parent->size);
@@ -317,6 +353,8 @@ again_paste:
     new_node->mode = mode;
     new_node->create_time = time::current_unix_time;
     new_node->nlink = 1;
+    new_node->gid = gid;
+    new_node->uid = uid;
 
     if(!fs) {
         if(out)
@@ -326,6 +364,21 @@ again_paste:
     if(fs)
         fs->lock.unlock();
     return 0;
+}
+
+void tmpfs_truncate(file_descriptor* file, std::size_t size) {
+    file->vnode.fs->lock.lock();
+    tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)(file->fs_specific.tmpfs_pointer);
+    alloc_t new_content = pmm::buddy::alloc(size);
+    char* new_cont = (char*)(new_content.phys + etc::hhdm());
+    if(node->content) {
+        klibc::memcpy(new_cont, node->content, node->size > size ? size : node->size);
+        pmm::buddy::free((std::uint64_t)node->content - etc::hhdm());
+    }
+    node->content = new_cont;
+    node->physical_size = new_content.real_size;
+    node->size = size;
+    file->vnode.fs->lock.unlock();
 }
 
 std::int32_t tmpfs_opt_create(char* path, vfs_file_type type, std::uint32_t mode, char* content, std::uint64_t size, tmpfs::tmpfs_node** out = nullptr) {
@@ -338,7 +391,7 @@ std::int32_t tmpfs_opt_create(char* path, vfs_file_type type, std::uint32_t mode
         if(!__tmpfs__create_parent_dirs_by_default) {
             return -ENOENT;
         } else {
-            tmpfs_create(nullptr, copy, vfs_file_type::directory, mode, &parent);
+            tmpfs_create(nullptr, copy, vfs_file_type::directory, mode, 0, 0, &parent);
         }
     }
 
@@ -360,7 +413,7 @@ again_paste:
     }
 
     if(is_pasted == false) {
-        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        alloc_t res = pmm::buddy::alloc(parent->size + sizeof(tmpfs::directory_cont));
         tmpfs_used_mem += res.real_size;
         tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
         if(parent->dirents) {
@@ -468,6 +521,8 @@ bool tmpfs_test_for_busy(tmpfs::tmpfs_node* node) {
     return false;
 }
 
+#include <generic/flock.hpp>
+
 std::int32_t tmpfs_internal_remove(tmpfs::tmpfs_node* node) {
 
     klibc::debug_printf("rm 0x%p", node);
@@ -525,8 +580,8 @@ std::int32_t tmpfs_stat(file_descriptor* file, stat* out) {
     (void)type_to_mode;
     file->vnode.fs->lock.lock();
     tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
-    out->st_gid = 0;
-    out->st_uid = 0;
+    out->st_gid = node->gid;
+    out->st_uid = node->uid;
     out->st_rdev = 0;
     out->st_blksize = PAGE_SIZE;
     out->st_blocks = node->size / 512;
@@ -554,6 +609,7 @@ void tmpfs_close(file_descriptor* file) {
 
     if(node->busy_counter == 0 && node->nlink == 0) { 
         klibc::debug_printf("rm");
+        flock::remove(file->vnode.fs, node->ino);
         int res = tmpfs_internal_remove(node);
         if(res != 0) {
             klibc::debug_printf("rm unlink res %d path %s\n",res, file->path);
@@ -567,6 +623,15 @@ void tmpfs_ondup(file_descriptor* file) {
     file->vnode.fs->lock.lock();
     tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
     node->busy_counter++;
+    file->vnode.fs->lock.unlock();
+    return;
+}
+
+void tmpfs_chown(file_descriptor* file, int uid, int gid) {
+    file->vnode.fs->lock.lock();
+    tmpfs::tmpfs_node* node = (tmpfs::tmpfs_node*)file->fs_specific.tmpfs_pointer;
+    node->uid = uid;
+    node->gid = gid;
     file->vnode.fs->lock.unlock();
     return;
 }
@@ -595,7 +660,11 @@ std::int32_t tmpfs_open(filesystem* fs, void* file_desc, char* path, bool is_dir
     fd->vnode.chmod = tmpfs_chmod;
     fd->vnode.close = tmpfs_close;
     fd->vnode.ondup = tmpfs_ondup;
+    fd->vnode.chown = tmpfs_chown;
+    fd->vnode.truncate = tmpfs_truncate;
     fd->fs_specific.tmpfs_pointer = (std::uint64_t)node;
+
+    fd->inode = node->ino;
 
     node->busy_counter++;
 
@@ -636,6 +705,7 @@ std::int32_t tmpfs_unlink(filesystem* fs, char* path) {
     assert(node->busy_counter >= (std::int64_t)0, "v");
 
     if(node->busy_counter == 0 && node->nlink == 0) {
+        flock::remove(fs, node->ino);
         int res = tmpfs_internal_remove(node);
         if(res != 0) {
             klibc::debug_printf("rm unlink res %d path %s\n",res, path);
@@ -646,7 +716,7 @@ std::int32_t tmpfs_unlink(filesystem* fs, char* path) {
     return 0;
 }
 
-void fast_unlink(char* new_path, tmpfs::tmpfs_node* new_node) {
+void fast_unlink(filesystem* fs, char* new_path, tmpfs::tmpfs_node* new_node) {
 
     if(new_node == nullptr)
         return;
@@ -666,6 +736,7 @@ void fast_unlink(char* new_path, tmpfs::tmpfs_node* new_node) {
     new_node->nlink--;
 
     if(new_node->nlink == 0) {
+        flock::remove(fs, new_node->ino);
         tmpfs_internal_remove(new_node);
     }
 }
@@ -697,7 +768,7 @@ std::int32_t tmpfs_rename(filesystem* fs, char* old_path, char* new_path) {
         return -ENOENT;
     }
 
-    fast_unlink(new_path, new_node);
+    fast_unlink(fs, new_path, new_node);
 
     bool is_pasted = false;
 
@@ -712,7 +783,7 @@ std::int32_t tmpfs_rename(filesystem* fs, char* old_path, char* new_path) {
     }
 
     if(is_pasted == false) {
-        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::directory_cont));
+        alloc_t res = pmm::buddy::alloc(parent->size + sizeof(tmpfs::directory_cont));
         tmpfs::directory_cont* new_dir = (tmpfs::directory_cont*)(res.phys + etc::hhdm());
         if(parent->dirents) {
             klibc::memcpy(new_dir, parent->dirents, parent->size);
@@ -726,7 +797,7 @@ std::int32_t tmpfs_rename(filesystem* fs, char* old_path, char* new_path) {
     
     old_node->nlink++;
 
-    fast_unlink(old_path, old_node);
+    fast_unlink(fs, old_path, old_node);
 
     fs->lock.unlock();
     return 0;
@@ -736,7 +807,7 @@ void tmpfs::init_default(vfs::node* node) {
     filesystem* new_fs = new filesystem;
     node->fs = new_fs;
     node->fs->open = tmpfs_open;
-    node->fs->create = (int (*)(filesystem *, char *, vfs_file_type, unsigned int))((std::uint64_t)tmpfs_create);
+    node->fs->create = (int (*)(filesystem *, char *, vfs_file_type, unsigned int, int, int))((std::uint64_t)tmpfs_create);
     node->fs->readlink = tmpfs_readlink;
     node->fs->remove = tmpfs_remove;
     node->fs->link = tmpfs_link;

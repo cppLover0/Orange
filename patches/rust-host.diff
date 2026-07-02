@@ -1,0 +1,995 @@
+diff -Naur rust-host/Cargo.lock rust-host-clean/Cargo.lock
+--- rust-host/Cargo.lock	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/Cargo.lock	2026-06-07 10:23:53.553263982 +0300
+@@ -2091,9 +2091,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.174"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1171693293099992e19cddea4e8b849964e9846f4acee11b3948bcc337be8776"
++version = "0.2.186"
+ 
+ [[package]]
+ name = "libdbus-sys"
+diff -Naur rust-host/Cargo.toml rust-host-clean/Cargo.toml
+--- rust-host/Cargo.toml	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/Cargo.toml	2026-06-07 10:23:53.553828514 +0300
+@@ -93,3 +93,5 @@
+ # For git dependencies, also add your source to ALLOWED_SOURCES in src/tools/tidy/src/extdeps.rs.
+ #[patch.crates-io]
+ 
++[patch.crates-io]
++libc = { path = '../rust-libc-workdir' }
+diff -Naur rust-host/compiler/rustc_target/src/spec/base/mod.rs rust-host-clean/compiler/rustc_target/src/spec/base/mod.rs
+--- rust-host/compiler/rustc_target/src/spec/base/mod.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/compiler/rustc_target/src/spec/base/mod.rs	2026-06-07 10:23:53.554013669 +0300
+@@ -21,6 +21,7 @@
+ pub(crate) mod linux_wasm;
+ pub(crate) mod lynxos178;
+ pub(crate) mod managarm_mlibc;
++pub(crate) mod orange_mlibc;
+ pub(crate) mod motor;
+ pub(crate) mod msvc;
+ pub(crate) mod netbsd;
+diff -Naur rust-host/compiler/rustc_target/src/spec/base/orange_mlibc.rs rust-host-clean/compiler/rustc_target/src/spec/base/orange_mlibc.rs
+--- rust-host/compiler/rustc_target/src/spec/base/orange_mlibc.rs	1970-01-01 03:00:00.000000000 +0300
++++ rust-host-clean/compiler/rustc_target/src/spec/base/orange_mlibc.rs	2026-06-07 10:23:53.554170339 +0300
+@@ -0,0 +1,17 @@
++use crate::spec::{RelroLevel, TargetOptions, cvs};
++
++pub(crate) fn opts() -> TargetOptions {
++    TargetOptions {
++        os: "orange".into(),
++        env: "mlibc".into(),
++        dynamic_linking: true,
++        executables: true,
++        families: cvs!["unix"],
++        has_rpath: true,
++        position_independent_executables: true,
++        relro_level: RelroLevel::Full,
++        has_thread_local: true,
++        crt_static_respected: true,
++        ..Default::default()
++    }
++}
+diff -Naur rust-host/compiler/rustc_target/src/spec/mod.rs rust-host-clean/compiler/rustc_target/src/spec/mod.rs
+--- rust-host/compiler/rustc_target/src/spec/mod.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/compiler/rustc_target/src/spec/mod.rs	2026-06-07 10:23:53.554417603 +0300
+@@ -1555,6 +1555,8 @@
+     ("i586-unknown-redox", i586_unknown_redox),
+     ("x86_64-unknown-redox", x86_64_unknown_redox),
+ 
++    ("x86_64-unknown-orange-mlibc", x86_64_unknown_orange_mlibc),
++
+     ("x86_64-unknown-managarm-mlibc", x86_64_unknown_managarm_mlibc),
+     ("aarch64-unknown-managarm-mlibc", aarch64_unknown_managarm_mlibc),
+     ("riscv64gc-unknown-managarm-mlibc", riscv64gc_unknown_managarm_mlibc),
+diff -Naur rust-host/compiler/rustc_target/src/spec/targets/x86_64_unknown_orange_mlibc.rs rust-host-clean/compiler/rustc_target/src/spec/targets/x86_64_unknown_orange_mlibc.rs
+--- rust-host/compiler/rustc_target/src/spec/targets/x86_64_unknown_orange_mlibc.rs	1970-01-01 03:00:00.000000000 +0300
++++ rust-host-clean/compiler/rustc_target/src/spec/targets/x86_64_unknown_orange_mlibc.rs	2026-06-07 10:23:53.554885871 +0300
+@@ -0,0 +1,24 @@
++use crate::spec::{Cc, LinkerFlavor, Lld, StackProbeType, Target, base};
++
++pub(crate) fn target() -> Target {
++    let mut base = base::orange_mlibc::opts();
++    base.cpu = "x86-64".into();
++    base.max_atomic_width = Some(64);
++    base.add_pre_link_args(LinkerFlavor::Gnu(Cc::Yes, Lld::No), &["-m64"]);
++    base.stack_probes = StackProbeType::Inline;
++
++    Target {
++        llvm_target: "x86_64-unknown-orange-mlibc".into(),
++        metadata: crate::spec::TargetMetadata {
++            description: Some("orange/amd64".into()),
++            tier: Some(3),
++            host_tools: Some(false),
++            std: Some(false),
++        },
++        pointer_width: 64,
++        data_layout:
++            "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128".into(),
++        arch: "x86_64".into(),
++        options: base,
++    }
++}
+diff -Naur rust-host/library/Cargo.lock rust-host-clean/library/Cargo.lock
+--- rust-host/library/Cargo.lock	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/Cargo.lock	2026-06-07 10:23:53.555023625 +0300
+@@ -139,9 +139,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.177"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
++version = "0.2.180"
+ dependencies = [
+  "rustc-std-workspace-core",
+ ]
+diff -Naur rust-host/library/Cargo.toml rust-host-clean/library/Cargo.toml
+--- rust-host/library/Cargo.toml	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/Cargo.toml	2026-06-07 10:23:53.555175967 +0300
+@@ -59,3 +59,4 @@
+ rustc-std-workspace-core = { path = 'rustc-std-workspace-core' }
+ rustc-std-workspace-alloc = { path = 'rustc-std-workspace-alloc' }
+ rustc-std-workspace-std = { path = 'rustc-std-workspace-std' }
++libc = { path = '../../rust-libc-workdir' }
+diff -Naur rust-host/library/std/build.rs rust-host-clean/library/std/build.rs
+--- rust-host/library/std/build.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/build.rs	2026-06-07 10:23:53.555295055 +0300
+@@ -54,6 +54,7 @@
+         || target_os == "nuttx"
+         || target_os == "cygwin"
+         || target_os == "vexos"
++        || target_os == "orange"
+ 
+         // See src/bootstrap/src/core/build_steps/synthetic_targets.rs
+         || env::var("RUSTC_BOOTSTRAP_SYNTHETIC_TARGET").is_ok()
+diff -Naur rust-host/library/std/Cargo.toml rust-host-clean/library/std/Cargo.toml
+--- rust-host/library/std/Cargo.toml	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/Cargo.toml	2026-06-07 10:23:53.555419264 +0300
+@@ -33,7 +33,7 @@
+ addr2line = { version = "0.25.0", optional = true, default-features = false }
+ 
+ [target.'cfg(not(all(windows, target_env = "msvc")))'.dependencies]
+-libc = { version = "0.2.177", default-features = false, features = [
++libc = { path = "../../../rust-libc-workdir", default-features = false, features = [
+     'rustc-dep-of-std',
+ ], public = true }
+ 
+diff -Naur rust-host/library/std/src/env.rs rust-host-clean/library/std/src/env.rs
+--- rust-host/library/std/src/env.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/env.rs	2026-06-07 10:23:53.555583428 +0300
+@@ -1102,6 +1102,7 @@
+     /// * `"vita"`
+     /// * `"vxworks"`
+     /// * `"xous"`
++    /// * `"orange"`
+     ///
+     /// </details>
+     #[stable(feature = "env", since = "1.0.0")]
+diff -Naur rust-host/library/std/src/lib.rs rust-host-clean/library/std/src/lib.rs
+--- rust-host/library/std/src/lib.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/lib.rs	2026-06-07 10:23:53.555788712 +0300
+@@ -695,7 +695,7 @@
+ // Private support modules
+ mod panicking;
+ 
+-#[path = "../../backtrace/src/lib.rs"]
++#[path = "../../../../rust-backtrace-workdir/src/lib.rs"]
+ #[allow(dead_code, unused_attributes, fuzzy_provenance_casts, unsafe_op_in_unsafe_fn)]
+ mod backtrace_rs;
+ 
+diff -Naur rust-host/library/std/src/os/mod.rs rust-host-clean/library/std/src/os/mod.rs
+--- rust-host/library/std/src/os/mod.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/os/mod.rs	2026-06-07 10:23:53.555958317 +0300
+@@ -155,6 +155,8 @@
+ pub mod l4re;
+ #[cfg(target_os = "macos")]
+ pub mod macos;
++#[cfg(target_os = "orange")]
++pub mod orange;
+ #[cfg(target_os = "motor")]
+ pub mod motor;
+ #[cfg(target_os = "netbsd")]
+diff -Naur rust-host/library/std/src/os/orange/fs.rs rust-host-clean/library/std/src/os/orange/fs.rs
+--- rust-host/library/std/src/os/orange/fs.rs	1970-01-01 03:00:00.000000000 +0300
++++ rust-host-clean/library/std/src/os/orange/fs.rs	2026-06-07 10:23:53.556146798 +0300
+@@ -0,0 +1,148 @@
++#![stable(feature = "metadata_ext", since = "1.1.0")]
++
++use crate::fs::Metadata;
++use crate::sys_common::AsInner;
++
++#[allow(deprecated)]
++use crate::os::orange::raw;
++
++/// OS-specific extensions to [`fs::Metadata`].
++///
++/// [`fs::Metadata`]: crate::fs::Metadata
++#[stable(feature = "metadata_ext", since = "1.1.0")]
++pub trait MetadataExt {
++    /// Gain a reference to the underlying `stat` structure which contains
++    /// the raw information returned by the OS.
++    ///
++    /// The contents of the returned `stat` are **not** consistent across
++    /// Unix platforms. The `os::unix::fs::MetadataExt` trait contains the
++    /// cross-Unix abstractions contained within the raw stat.
++    #[stable(feature = "metadata_ext", since = "1.1.0")]
++    #[deprecated(
++        since = "1.8.0",
++        note = "deprecated in favor of the accessor \
++                  methods of this trait"
++    )]
++    #[allow(deprecated)]
++    fn as_raw_stat(&self) -> &raw::stat;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_dev(&self) -> u64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_ino(&self) -> u64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_mode(&self) -> u32;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_nlink(&self) -> u64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_uid(&self) -> u32;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_gid(&self) -> u32;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_rdev(&self) -> u64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_size(&self) -> u64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_atime(&self) -> i64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_atime_nsec(&self) -> i64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_mtime(&self) -> i64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_mtime_nsec(&self) -> i64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_ctime(&self) -> i64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_ctime_nsec(&self) -> i64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_blksize(&self) -> u64;
++
++    #[stable(feature = "metadata_ext2", since = "1.8.0")]
++    fn st_blocks(&self) -> u64;
++}
++
++#[stable(feature = "metadata_ext", since = "1.1.0")]
++impl MetadataExt for Metadata {
++    #[allow(deprecated)]
++    fn as_raw_stat(&self) -> &raw::stat {
++        unsafe { &*(self.as_inner().as_inner() as *const libc::stat as *const raw::stat) }
++    }
++
++    fn st_dev(&self) -> u64 {
++        self.as_inner().as_inner().st_dev as u64
++    }
++
++    fn st_ino(&self) -> u64 {
++        self.as_inner().as_inner().st_ino as u64
++    }
++
++    fn st_mode(&self) -> u32 {
++        self.as_inner().as_inner().st_mode as u32
++    }
++
++    fn st_nlink(&self) -> u64 {
++        self.as_inner().as_inner().st_nlink as u64
++    }
++
++    fn st_uid(&self) -> u32 {
++        self.as_inner().as_inner().st_uid as u32
++    }
++
++    fn st_gid(&self) -> u32 {
++        self.as_inner().as_inner().st_gid as u32
++    }
++
++    fn st_rdev(&self) -> u64 {
++        self.as_inner().as_inner().st_rdev as u64
++    }
++
++    fn st_size(&self) -> u64 {
++        self.as_inner().as_inner().st_size as u64
++    }
++
++    fn st_atime(&self) -> i64 {
++        self.as_inner().as_inner().st_atime as i64
++    }
++
++    fn st_atime_nsec(&self) -> i64 {
++        self.as_inner().as_inner().st_atime_nsec as i64
++    }
++
++    fn st_mtime(&self) -> i64 {
++        self.as_inner().as_inner().st_mtime as i64
++    }
++
++    fn st_mtime_nsec(&self) -> i64 {
++        self.as_inner().as_inner().st_mtime_nsec as i64
++    }
++
++    fn st_ctime(&self) -> i64 {
++        self.as_inner().as_inner().st_ctime as i64
++    }
++
++    fn st_ctime_nsec(&self) -> i64 {
++        self.as_inner().as_inner().st_ctime_nsec as i64
++    }
++
++    fn st_blksize(&self) -> u64 {
++        self.as_inner().as_inner().st_blksize as u64
++    }
++
++    fn st_blocks(&self) -> u64 {
++        self.as_inner().as_inner().st_blocks as u64
++    }
++}
+diff -Naur rust-host/library/std/src/os/orange/mod.rs rust-host-clean/library/std/src/os/orange/mod.rs
+--- rust-host/library/std/src/os/orange/mod.rs	1970-01-01 03:00:00.000000000 +0300
++++ rust-host-clean/library/std/src/os/orange/mod.rs	2026-06-07 10:23:53.556219337 +0300
+@@ -0,0 +1,6 @@
++//! Managarm-specific definitions
++
++#![stable(feature = "raw_ext", since = "1.1.0")]
++
++pub mod fs;
++pub mod raw;
+diff -Naur rust-host/library/std/src/os/orange/raw.rs rust-host-clean/library/std/src/os/orange/raw.rs
+--- rust-host/library/std/src/os/orange/raw.rs	1970-01-01 03:00:00.000000000 +0300
++++ rust-host-clean/library/std/src/os/orange/raw.rs	2026-06-07 10:23:53.556290664 +0300
+@@ -0,0 +1,74 @@
++#![stable(feature = "raw_ext", since = "1.1.0")]
++#![deprecated(
++    since = "1.8.0",
++    note = "these type aliases are no longer supported by \
++              the standard library, the `libc` crate on \
++              crates.io should be used instead for the correct \
++              definitions"
++)]
++#![allow(deprecated)]
++
++#[stable(feature = "pthread_t", since = "1.8.0")]
++pub type pthread_t = usize; // TODO: This is completely wrong tbh
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type dev_t = libc::dev_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type ino_t = libc::ino_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type mode_t = libc::mode_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type nlink_t = libc::nlink_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type off_t = libc::off_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type time_t = libc::time_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type blkcnt_t = libc::blkcnt_t;
++
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub type blksize_t = libc::blksize_t;
++
++#[repr(C)]
++#[derive(Clone)]
++#[stable(feature = "raw_ext", since = "1.1.0")]
++pub struct stat {
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_dev: libc::dev_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_ino: libc::ino_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_mode: libc::mode_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_nlink: libc::nlink_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_uid: libc::uid_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_gid: libc::gid_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_rdev: libc::dev_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_size: libc::off_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_atime: libc::time_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_atime_nsec: libc::c_long,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_mtime: libc::time_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_mtime_nsec: libc::c_long,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_ctime: libc::time_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_ctime_nsec: libc::c_long,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_blksize: libc::blksize_t,
++    #[stable(feature = "raw_ext", since = "1.1.0")]
++    pub st_blocks: libc::blkcnt_t,
++}
+diff -Naur rust-host/library/std/src/os/unix/mod.rs rust-host-clean/library/std/src/os/unix/mod.rs
+--- rust-host/library/std/src/os/unix/mod.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/os/unix/mod.rs	2026-06-07 10:23:53.556392099 +0300
+@@ -67,6 +67,8 @@
+     pub use crate::os::l4re::*;
+     #[cfg(target_os = "linux")]
+     pub use crate::os::linux::*;
++    #[cfg(target_os = "orange")]
++    pub use crate::os::orange::*;
+     #[cfg(target_os = "netbsd")]
+     pub use crate::os::netbsd::*;
+     #[cfg(target_os = "nto")]
+diff -Naur rust-host/library/std/src/sys/args/unix.rs rust-host-clean/library/std/src/sys/args/unix.rs
+--- rust-host/library/std/src/sys/args/unix.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/args/unix.rs	2026-06-07 10:23:53.556541675 +0300
+@@ -84,6 +84,7 @@
+     target_os = "hurd",
+     target_os = "rtems",
+     target_os = "nuttx",
++    target_os = "orange",
+ ))]
+ mod imp {
+     use crate::ffi::c_char;
+diff -Naur rust-host/library/std/src/sys/env_consts.rs rust-host-clean/library/std/src/sys/env_consts.rs
+--- rust-host/library/std/src/sys/env_consts.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/env_consts.rs	2026-06-07 10:23:53.556680812 +0300
+@@ -202,6 +202,17 @@
+     pub const EXE_EXTENSION: &str = "";
+ }
+ 
++#[cfg(target_os = "orange")]
++pub mod os {
++    pub const FAMILY: &str = "unix";
++    pub const OS: &str = "orange";
++    pub const DLL_PREFIX: &str = "lib";
++    pub const DLL_SUFFIX: &str = ".so";
++    pub const DLL_EXTENSION: &str = "so";
++    pub const EXE_SUFFIX: &str = "";
++    pub const EXE_EXTENSION: &str = "";
++}
++
+ #[cfg(target_os = "netbsd")]
+ pub mod os {
+     pub const FAMILY: &str = "unix";
+diff -Naur rust-host/library/std/src/sys/fd/unix.rs rust-host-clean/library/std/src/sys/fd/unix.rs
+--- rust-host/library/std/src/sys/fd/unix.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/fd/unix.rs	2026-06-07 10:23:53.556842131 +0300
+@@ -76,6 +76,7 @@
+     target_os = "android",
+     target_os = "emscripten",
+     target_os = "linux",
++    target_os = "orange",
+     target_os = "nto",
+ ))]
+ const fn max_iov() -> usize {
+@@ -89,6 +90,7 @@
+     target_os = "espidf",
+     target_os = "freebsd",
+     target_os = "linux",
++    target_os = "orange",
+     target_os = "netbsd",
+     target_os = "nuttx",
+     target_os = "nto",
+@@ -217,6 +219,7 @@
+         target_os = "hurd",
+         target_os = "illumos",
+         target_os = "linux",
++        target_os = "orange",
+         target_os = "netbsd",
+         target_os = "openbsd", // OpenBSD 2.7
+     ))]
+@@ -242,6 +245,7 @@
+         target_os = "hurd",
+         target_os = "illumos",
+         target_os = "linux",
++        target_os = "orange",
+         target_os = "netbsd",
+         target_os = "openbsd",
+         target_vendor = "apple",
+@@ -423,6 +427,7 @@
+         target_os = "hurd",
+         target_os = "illumos",
+         target_os = "linux",
++        target_os = "orange",
+         target_os = "netbsd",
+         target_os = "openbsd", // OpenBSD 2.7
+     ))]
+@@ -448,6 +453,7 @@
+         target_os = "hurd",
+         target_os = "illumos",
+         target_os = "linux",
++        target_os = "orange",
+         target_os = "netbsd",
+         target_os = "openbsd",
+         target_vendor = "apple",
+@@ -560,6 +566,7 @@
+         target_os = "redox",
+         target_os = "vxworks",
+         target_os = "nto",
++        target_os = "orange",
+     )))]
+     pub fn set_cloexec(&self) -> io::Result<()> {
+         unsafe {
+@@ -583,6 +590,7 @@
+         target_os = "redox",
+         target_os = "vxworks",
+         target_os = "nto",
++        target_os = "orange",
+     ))]
+     pub fn set_cloexec(&self) -> io::Result<()> {
+         unsafe {
+diff -Naur rust-host/library/std/src/sys/fs/unix.rs rust-host-clean/library/std/src/sys/fs/unix.rs
+--- rust-host/library/std/src/sys/fs/unix.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/fs/unix.rs	2026-06-07 10:23:53.557079166 +0300
+@@ -14,9 +14,10 @@
+     target_os = "fuchsia",
+     target_os = "hurd",
+     target_os = "illumos",
++    target_os = "orange"
+ ))]
+ use libc::dirfd;
+-#[cfg(any(target_os = "fuchsia", target_os = "illumos"))]
++#[cfg(any(target_os = "fuchsia", target_os = "illumos", target_os = "orange"))]
+ use libc::fstatat as fstatat64;
+ #[cfg(any(all(target_os = "linux", not(target_env = "musl")), target_os = "hurd"))]
+ use libc::fstatat64;
+@@ -30,6 +31,7 @@
+     target_os = "redox",
+     target_os = "solaris",
+     target_os = "vita",
++    target_os = "orange",
+     all(target_os = "linux", target_env = "musl"),
+ ))]
+ use libc::readdir as readdir64;
+@@ -284,6 +286,7 @@
+     target_os = "redox",
+     target_os = "solaris",
+     target_os = "vita",
++    target_os = "orange",
+ ))]
+ pub struct DirEntry {
+     dir: Arc<InnerReadDir>,
+@@ -309,6 +312,7 @@
+     target_os = "redox",
+     target_os = "solaris",
+     target_os = "vita",
++    target_os = "orange",
+ ))]
+ struct dirent64_min {
+     d_ino: u64,
+@@ -334,6 +338,7 @@
+     target_os = "redox",
+     target_os = "solaris",
+     target_os = "vita",
++    target_os = "orange",
+ )))]
+ pub struct DirEntry {
+     dir: Arc<InnerReadDir>,
+@@ -714,6 +719,7 @@
+         target_os = "redox",
+         target_os = "solaris",
+         target_os = "vita",
++        target_os = "orange",
+     ))]
+     fn next(&mut self) -> Option<io::Result<DirEntry>> {
+         use crate::sys::os::{errno, set_errno};
+@@ -811,6 +817,7 @@
+         target_os = "redox",
+         target_os = "solaris",
+         target_os = "vita",
++        target_os = "orange",
+     )))]
+     fn next(&mut self) -> Option<io::Result<DirEntry>> {
+         if self.end_of_stream {
+@@ -907,6 +914,7 @@
+             target_os = "fuchsia",
+             target_os = "hurd",
+             target_os = "illumos",
++            target_os = "orange",
+         ),
+         not(miri) // no dirfd on Miri
+     ))]
+@@ -937,6 +945,7 @@
+             target_os = "fuchsia",
+             target_os = "hurd",
+             target_os = "illumos",
++            target_os = "orange",
+         )),
+         miri
+     ))]
+@@ -999,6 +1008,7 @@
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "vxworks",
++        target_os = "orange",
+         target_vendor = "apple",
+     ))]
+     pub fn ino(&self) -> u64 {
+@@ -1054,6 +1064,7 @@
+         target_os = "nto",
+         target_os = "vita",
+         target_os = "hurd",
++        target_os = "orange",
+     )))]
+     fn name_cstr(&self) -> &CStr {
+         unsafe { CStr::from_ptr(self.entry.d_name.as_ptr()) }
+@@ -1070,6 +1081,7 @@
+         target_os = "nto",
+         target_os = "vita",
+         target_os = "hurd",
++        target_os = "orange",
+     ))]
+     fn name_cstr(&self) -> &CStr {
+         &self.name
+@@ -1264,6 +1276,7 @@
+             target_os = "openbsd",
+             target_os = "nto",
+             target_os = "hurd",
++            target_os = "orange",
+         ))]
+         unsafe fn os_datasync(fd: c_int) -> c_int {
+             libc::fdatasync(fd)
+@@ -1278,6 +1291,7 @@
+             target_os = "openbsd",
+             target_os = "nto",
+             target_os = "hurd",
++            target_os = "orange",
+             target_vendor = "apple",
+         )))]
+         unsafe fn os_datasync(fd: c_int) -> c_int {
+@@ -1822,7 +1836,7 @@
+ 
+ impl fmt::Debug for File {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+-        #[cfg(any(target_os = "linux", target_os = "illumos", target_os = "solaris"))]
++        #[cfg(any(target_os = "linux", target_os = "illumos", target_os = "solaris", target_os = "orange",))]
+         fn get_path(fd: c_int) -> Option<PathBuf> {
+             let mut p = PathBuf::from("/proc/self/fd");
+             p.push(&fd.to_string());
+@@ -1884,6 +1898,7 @@
+ 
+         #[cfg(not(any(
+             target_os = "linux",
++            target_os = "orange",
+             target_os = "vxworks",
+             target_os = "freebsd",
+             target_os = "netbsd",
+diff -Naur rust-host/library/std/src/sys/net/connection/socket/unix.rs rust-host-clean/library/std/src/sys/net/connection/socket/unix.rs
+--- rust-host/library/std/src/sys/net/connection/socket/unix.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/net/connection/socket/unix.rs	2026-06-07 10:23:53.557458824 +0300
+@@ -77,6 +77,7 @@
+                 target_os = "cygwin",
+                 target_os = "nto",
+                 target_os = "solaris",
++                target_os = "orange",
+             ) => {
+                 // On platforms that support it we pass the SOCK_CLOEXEC
+                 // flag to atomically create the socket and set it as
+@@ -120,6 +121,7 @@
+                     target_os = "illumos",
+                     target_os = "linux",
+                     target_os = "hurd",
++                    target_os = "orange",
+                     target_os = "netbsd",
+                     target_os = "openbsd",
+                     target_os = "cygwin",
+@@ -251,6 +253,7 @@
+                 target_os = "illumos",
+                 target_os = "linux",
+                 target_os = "hurd",
++                target_os = "orange",
+                 target_os = "netbsd",
+                 target_os = "openbsd",
+                 target_os = "cygwin",
+@@ -351,7 +354,7 @@
+         self.recv_from_with_flags(buf, 0)
+     }
+ 
+-    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin"))]
++    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin", target_os = "orange"))]
+     pub fn recv_msg(&self, msg: &mut libc::msghdr) -> io::Result<usize> {
+         let n = cvt(unsafe { libc::recvmsg(self.as_raw_fd(), msg, libc::MSG_CMSG_CLOEXEC) })?;
+         Ok(n as usize)
+@@ -374,7 +377,7 @@
+         self.0.is_write_vectored()
+     }
+ 
+-    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin"))]
++    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin", target_os = "orange"))]
+     pub fn send_msg(&self, msg: &mut libc::msghdr) -> io::Result<usize> {
+         let n = cvt(unsafe { libc::sendmsg(self.as_raw_fd(), msg, 0) })?;
+         Ok(n as usize)
+@@ -534,12 +537,12 @@
+         Ok(raw != 0)
+     }
+ 
+-    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin"))]
++    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin", target_os = "orange"))]
+     pub fn set_passcred(&self, passcred: bool) -> io::Result<()> {
+         unsafe { setsockopt(self, libc::SOL_SOCKET, libc::SO_PASSCRED, passcred as libc::c_int) }
+     }
+ 
+-    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin"))]
++    #[cfg(any(target_os = "android", target_os = "linux", target_os = "cygwin", target_os = "orange"))]
+     pub fn passcred(&self) -> io::Result<bool> {
+         let passcred: libc::c_int =
+             unsafe { getsockopt(self, libc::SOL_SOCKET, libc::SO_PASSCRED)? };
+diff -Naur rust-host/library/std/src/sys/pal/unix/os.rs rust-host-clean/library/std/src/sys/pal/unix/os.rs
+--- rust-host/library/std/src/sys/pal/unix/os.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/pal/unix/os.rs	2026-06-07 10:23:53.557681260 +0300
+@@ -27,6 +27,7 @@
+             target_os = "fuchsia",
+             target_os = "l4re",
+             target_os = "hurd",
++            target_os = "orange",
+         ),
+         link_name = "__errno_location"
+     )]
+@@ -387,6 +388,7 @@
+     target_os = "hurd",
+     target_os = "android",
+     target_os = "nuttx",
++    target_os = "orange",
+     target_os = "emscripten"
+ ))]
+ pub fn current_exe() -> io::Result<PathBuf> {
+diff -Naur rust-host/library/std/src/sys/process/unix/unix.rs rust-host-clean/library/std/src/sys/process/unix/unix.rs
+--- rust-host/library/std/src/sys/process/unix/unix.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/process/unix/unix.rs	2026-06-07 10:23:53.557890932 +0300
+@@ -1187,7 +1187,7 @@
+             )
+         ))]
+         libc::SIGSTKFLT => " (SIGSTKFLT)",
+-        #[cfg(any(target_os = "linux", target_os = "nto", target_os = "cygwin"))]
++        #[cfg(any(target_os = "linux", target_os = "nto", target_os = "cygwin", target_os = "orange"))]
+         libc::SIGPWR => " (SIGPWR)",
+         #[cfg(any(
+             target_os = "freebsd",
+diff -Naur rust-host/library/std/src/sys/random/mod.rs rust-host-clean/library/std/src/sys/random/mod.rs
+--- rust-host/library/std/src/sys/random/mod.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/random/mod.rs	2026-06-07 10:23:53.558132605 +0300
+@@ -54,6 +54,7 @@
+         target_os = "hurd",
+         target_os = "l4re",
+         target_os = "nto",
++        target_os = "orange",
+     ) => {
+         mod unix_legacy;
+         pub use unix_legacy::fill_bytes;
+diff -Naur rust-host/library/std/src/sys/thread/unix.rs rust-host-clean/library/std/src/sys/thread/unix.rs
+--- rust-host/library/std/src/sys/thread/unix.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/std/src/sys/thread/unix.rs	2026-06-07 10:23:53.558313332 +0300
+@@ -427,7 +427,8 @@
+     target_os = "freebsd",
+     target_os = "dragonfly",
+     target_os = "nuttx",
+-    target_os = "cygwin"
++    target_os = "cygwin",
++    target_os = "orange",
+ ))]
+ pub fn set_name(name: &CStr) {
+     unsafe {
+diff -Naur rust-host/library/unwind/src/lib.rs rust-host-clean/library/unwind/src/lib.rs
+--- rust-host/library/unwind/src/lib.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/library/unwind/src/lib.rs	2026-06-07 10:23:53.558567719 +0300
+@@ -197,3 +197,7 @@
+ #[link(name = "unwind", kind = "static", modifiers = "-bundle", cfg(target_feature = "crt-static"))]
+ #[link(name = "unwind", cfg(not(target_feature = "crt-static")))]
+ unsafe extern "C" {}
++
++#[cfg(target_os = "orange")]
++#[link(name = "gcc_s")]
++unsafe extern "C" {}
+diff -Naur rust-host/src/librustdoc/clean/cfg.rs rust-host-clean/src/librustdoc/clean/cfg.rs
+--- rust-host/src/librustdoc/clean/cfg.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/src/librustdoc/clean/cfg.rs	2026-06-07 10:23:53.558773574 +0300
+@@ -531,6 +531,7 @@
+                         "watchos" => "watchOS",
+                         "windows" => "Windows",
+                         "visionos" => "visionOS",
++                        "orange" => "orange",
+                         _ => "",
+                     },
+                     (sym::target_arch, Some(arch)) => match arch.as_str() {
+@@ -570,6 +571,7 @@
+                         "newlib" => "Newlib",
+                         "uclibc" => "uClibc",
+                         "sgx" => "SGX",
++                        "mlibc" => "mlibc",
+                         _ => "",
+                     },
+                     (sym::target_endian, Some(endian)) => return write!(fmt, "{endian}-endian"),
+diff -Naur rust-host/src/tools/generate-copyright/src/cargo_metadata.rs rust-host-clean/src/tools/generate-copyright/src/cargo_metadata.rs
+--- rust-host/src/tools/generate-copyright/src/cargo_metadata.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/src/tools/generate-copyright/src/cargo_metadata.rs	2026-06-07 10:23:53.559024495 +0300
+@@ -120,7 +120,11 @@
+ ) -> Result<(), Error> {
+     let name_version = format!("{}-{}", package.name, package.version);
+     println!("Scraping notices for {}...", name_version);
+-    let dep_vendor_path = vendor_root.join(name_version);
++    let dep_vendor_path = vendor_root.join(&name_version);
++        if !dep_vendor_path.exists() {
++        println!("No vendor path for {} found, skipping", name_version);
++        return Ok(());
++    }
+     for entry in std::fs::read_dir(dep_vendor_path)? {
+         let entry = entry?;
+         let metadata = entry.metadata()?;
+diff -Naur rust-host/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs rust-host-clean/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs
+--- rust-host/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs	2026-06-07 10:24:36.798402469 +0300
+@@ -103,9 +103,9 @@
+     "x86_64",
+ ];
+ 
+-const KNOWN_ENV: [&str; 7] = ["eabihf", "gnu", "gnueabihf", "msvc", "relibc", "sgx", "uclibc"];
++const KNOWN_ENV: [&str; 8] = ["eabihf", "gnu", "gnueabihf", "msvc", "relibc", "sgx", "uclibc", "mlibc"];
+ 
+-const KNOWN_OS: [&str; 20] = [
++const KNOWN_OS: [&str; 21] = [
+     "cuda",
+     "dragonfly",
+     "emscripten",
+@@ -126,6 +126,7 @@
+     "unknown",
+     "vxworks",
+     "windows",
++    "orange",
+ ];
+ 
+ const KNOWN_VENDOR: [&str; 8] =
+diff -Naur rust-host/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs.orig rust-host-clean/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs.orig
+--- rust-host/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs.orig	1970-01-01 03:00:00.000000000 +0300
++++ rust-host-clean/src/tools/rust-analyzer/crates/ide-completion/src/completions/attribute/cfg.rs.orig	2026-06-07 10:23:39.958877388 +0300
+@@ -0,0 +1,132 @@
++//! Completion for cfg
++
++use ide_db::SymbolKind;
++use itertools::Itertools;
++use syntax::{AstToken, Direction, NodeOrToken, SyntaxKind, algo, ast::Ident};
++
++use crate::{CompletionItem, completions::Completions, context::CompletionContext};
++
++pub(crate) fn complete_cfg(acc: &mut Completions, ctx: &CompletionContext<'_>) {
++    let add_completion = |item: &str| {
++        let mut completion =
++            CompletionItem::new(SymbolKind::BuiltinAttr, ctx.source_range(), item, ctx.edition);
++        completion.insert_text(format!(r#""{item}""#));
++        acc.add(completion.build(ctx.db));
++    };
++
++    // FIXME: Move this into context/analysis.rs
++    let previous = ctx
++        .original_token
++        .prev_token()
++        .and_then(|it| {
++            if matches!(it.kind(), SyntaxKind::EQ) {
++                Some(it.into())
++            } else {
++                algo::non_trivia_sibling(it.into(), Direction::Prev)
++            }
++        })
++        .filter(|t| matches!(t.kind(), SyntaxKind::EQ))
++        .and_then(|it| algo::non_trivia_sibling(it.prev_sibling_or_token()?, Direction::Prev))
++        .map(|it| match it {
++            NodeOrToken::Node(_) => None,
++            NodeOrToken::Token(t) => Ident::cast(t),
++        });
++    match previous {
++        Some(None) => (),
++        Some(Some(p)) => match p.text() {
++            "target_arch" => KNOWN_ARCH.iter().copied().for_each(add_completion),
++            "target_env" => KNOWN_ENV.iter().copied().for_each(add_completion),
++            "target_os" => KNOWN_OS.iter().copied().for_each(add_completion),
++            "target_vendor" => KNOWN_VENDOR.iter().copied().for_each(add_completion),
++            "target_endian" => ["little", "big"].into_iter().for_each(add_completion),
++            name => ctx.krate.potential_cfg(ctx.db).get_cfg_values(name).for_each(|s| {
++                let s = s.as_str();
++                let insert_text = format!(r#""{s}""#);
++                let mut item = CompletionItem::new(
++                    SymbolKind::BuiltinAttr,
++                    ctx.source_range(),
++                    s,
++                    ctx.edition,
++                );
++                item.insert_text(insert_text);
++
++                acc.add(item.build(ctx.db));
++            }),
++        },
++        None => ctx
++            .krate
++            .potential_cfg(ctx.db)
++            .get_cfg_keys()
++            .unique()
++            .map(|s| (s.as_str(), ""))
++            .chain(CFG_CONDITION.iter().copied())
++            .for_each(|(s, snippet)| {
++                let mut item = CompletionItem::new(
++                    SymbolKind::BuiltinAttr,
++                    ctx.source_range(),
++                    s,
++                    ctx.edition,
++                );
++                if let Some(cap) = ctx.config.snippet_cap
++                    && !snippet.is_empty()
++                {
++                    item.insert_snippet(cap, snippet);
++                }
++                acc.add(item.build(ctx.db));
++            }),
++    }
++}
++
++const CFG_CONDITION: &[(&str, &str)] =
++    &[("all", "all($0)"), ("any", "any($0)"), ("not", "not($0)")];
++
++const KNOWN_ARCH: [&str; 20] = [
++    "aarch64",
++    "arm",
++    "avr",
++    "csky",
++    "hexagon",
++    "mips",
++    "mips64",
++    "msp430",
++    "nvptx64",
++    "powerpc",
++    "powerpc64",
++    "riscv32",
++    "riscv64",
++    "s390x",
++    "sparc",
++    "sparc64",
++    "wasm32",
++    "wasm64",
++    "x86",
++    "x86_64",
++];
++
++const KNOWN_ENV: [&str; 7] = ["eabihf", "gnu", "gnueabihf", "msvc", "relibc", "sgx", "uclibc"];
++
++const KNOWN_OS: [&str; 20] = [
++    "cuda",
++    "dragonfly",
++    "emscripten",
++    "freebsd",
++    "fuchsia",
++    "haiku",
++    "hermit",
++    "illumos",
++    "l4re",
++    "linux",
++    "netbsd",
++    "none",
++    "openbsd",
++    "psp",
++    "redox",
++    "solaris",
++    "uefi",
++    "unknown",
++    "vxworks",
++    "windows",
++];
++
++const KNOWN_VENDOR: [&str; 8] =
++    ["apple", "fortanix", "nvidia", "pc", "sony", "unknown", "wrs", "uwp"];
+diff -Naur rust-host/tests/assembly-llvm/targets/targets-elf.rs rust-host-clean/tests/assembly-llvm/targets/targets-elf.rs
+--- rust-host/tests/assembly-llvm/targets/targets-elf.rs	2025-12-08 15:52:32.000000000 +0300
++++ rust-host-clean/tests/assembly-llvm/targets/targets-elf.rs	2026-06-07 10:23:53.559372783 +0300
+@@ -661,6 +661,9 @@
+ //@ revisions: x86_64_unknown_managarm_mlibc
+ //@ [x86_64_unknown_managarm_mlibc] compile-flags: --target x86_64-unknown-managarm-mlibc
+ //@ [x86_64_unknown_managarm_mlibc] needs-llvm-components: x86
++//@ revisions: x86_64_unknown_orange_mlibc
++//@ [x86_64_unknown_orange_mlibc] compile-flags: --target x86_64-unknown-orange-mlibc
++//@ [x86_64_unknown_orange_mlibc] needs-llvm-components: x86
+ //@ revisions: x86_64_unknown_motor
+ //@ [x86_64_unknown_motor] compile-flags: --target x86_64-unknown-motor
+ //@ [x86_64_unknown_motor] needs-llvm-components: x86

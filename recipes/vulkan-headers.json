@@ -1,0 +1,8 @@
+{
+    "name": "vulkan-headers",
+    "version": "1.3.300",
+    "deps": ["base-libs", "mesa"],
+    "url": "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.3.300.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

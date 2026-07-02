@@ -26,6 +26,10 @@ namespace tmpfs {
         std::uint64_t create_time;
         std::uint64_t modify_time;
         std::uint64_t access_time;
+
+        int uid;
+        int gid;
+    
         bool should_unlink;
     };
 

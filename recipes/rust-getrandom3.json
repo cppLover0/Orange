@@ -1,0 +1,8 @@
+{
+    "name": "rust-getrandom3",
+    "version": "0.3.4",
+    "deps": ["base-libs"],
+    "url": "https://github.com/rust-random/getrandom/archive/refs/tags/v0.3.4.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

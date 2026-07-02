@@ -8,6 +8,16 @@ struct sockaddr {
 	char		sa_data[14];	/* 14 bytes of protocol address	*/
 };
 
+struct in_addr {
+    uint32_t s_addr; 
+};
+
+struct sockaddr_in {
+    uint16_t        sin_family;  
+    uint16_t        sin_port;  
+    struct in_addr  sin_addr;   
+    unsigned char   sin_zero[8];  
+};
 
 struct msghdr {
 	void *msg_name;

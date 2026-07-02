@@ -68,7 +68,6 @@ void klibc::serial_printf(const char* fmt, ...) {
 }
 
 void klibc::debug_printf(const char* fmt, ...) {
-
     thread* cur = current_proc;
     if(cur) {
         if(!cur->is_debug)

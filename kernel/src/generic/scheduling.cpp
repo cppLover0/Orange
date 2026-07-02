@@ -68,6 +68,8 @@ thread* process::create_process(bool is_user) {
     new_thread->prof_next = -1;
     new_thread->virt_next = -1;
 
+    new_thread->exe = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
+
     proc_count++;
 
     bool state = scheduling_lock.lock();
@@ -147,6 +149,8 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
         new_proc->name = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
         klibc::memcpy(new_proc->name, proc->name, klibc::strlen(proc->name) + 1);
     }
+
+    klibc::memcpy(new_proc->exe, proc->exe, klibc::strlen(proc->exe) + 1);
 
 #if defined(__x86_64__)
     if(proc->sse_ctx) {
@@ -285,12 +289,14 @@ void process::kill(thread* t, int status, bool exit_group) {
         if(t->name) pmm::freelist::free((std::uint64_t)t->name - etc::hhdm());
         if(t->chroot) pmm::freelist::free((std::uint64_t)t->chroot - etc::hhdm());
         if(t->cwd) pmm::freelist::free((std::uint64_t)t->cwd - etc::hhdm());
+        if(t->exe) pmm::freelist::free((std::uint64_t)t->exe - etc::hhdm());
         if(t->sig) delete t->sig;
         t->syscall_stack = 0;
         t->name = 0;
         t->chroot = 0;
         t->cwd = 0;
         t->sig = 0;
+        t->exe = 0;
         t->vmem->free();
 
         t->did_exec = true;
@@ -367,8 +373,12 @@ void process::schedule(void* ctx) {
 
         current_thread->schedule_us_ts = 0;
         current_thread->should_not_save_ctx = false;
+
+        current_thread->sr_s = current_thread->scheduling_rate;
+
         current_thread->lock.unlock();
         current_thread = current_thread->next;
+
     } else {
         current_thread = (thread*)head_proc.load();
     }
@@ -377,7 +387,15 @@ void process::schedule(void* ctx) {
         while(current_thread) {
            // klibc::printf("current_proc %d cpu %d lock %d status %d\r\n",current_thread->id,current_thread->cpu.load(), current_thread->lock.test(), current_thread->status.load());
             
-           if(current_thread->cpu.load() == current_cpu && current_thread->status.load() == PROCESS_LIVE) {
+           if(current_thread->sr_s != 0 && current_thread->cpu.load() == current_cpu && current_thread->status.load() == PROCESS_LIVE) {
+                current_thread->sr_s -= (time::timer->current_nano() / 1000) - current_thread->sr_st;
+                if(current_thread->sr_s < 0)
+                    current_thread->sr_s = 0;
+
+                current_thread->sr_st = time::timer->current_nano() / 1000;
+           }
+
+           if(current_thread->cpu.load() == current_cpu && current_thread->status.load() == PROCESS_LIVE && current_thread->sr_s == 0) {
                 if(current_thread->lock.try_lock() == false) {
 
                     if(current_thread->exit_request != 0) {

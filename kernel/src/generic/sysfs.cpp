@@ -163,7 +163,9 @@ again:
     return current_offset;
 }
 
-std::int32_t sysfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode) {
+std::int32_t sysfs_create(filesystem* fs, char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid) {
+    (void)uid;
+    (void)gid;
     (void)fs;
     (void)path;
     (void)type;
@@ -181,7 +183,7 @@ std::int32_t sysfs_internal_create(filesystem* fs, char* path, vfs_file_type typ
     parent->size += sizeof(tmpfs::legacy_tmpfs_node*);
 
     if(parent->physical_size < parent->size) {
-        alloc_t res = pmm::buddy::alloc(parent->size * sizeof(tmpfs::legacy_tmpfs_node*));
+        alloc_t res = pmm::buddy::alloc(parent->size + sizeof(tmpfs::legacy_tmpfs_node*));
         tmpfs::legacy_tmpfs_node** new_dir = (tmpfs::legacy_tmpfs_node**)(res.phys + etc::hhdm());
         if(parent->directory_content) {
             klibc::memcpy(new_dir, parent->directory_content, parent->size);
@@ -304,6 +306,8 @@ std::int32_t sysfs_open(filesystem* fs, void* file_desc, char* path, bool is_dir
     fd->vnode.read = sysfs_read;
     fd->vnode.ls = sysfs_ls;
     fd->fs_specific.tmpfs_pointer = (std::uint64_t)node;
+
+    fd->inode = node->ino;
 
     fs->lock.unlock();
     return 0;

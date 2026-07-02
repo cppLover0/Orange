@@ -1,4 +1,7 @@
 #pragma once
+
+#define NO_SCHED_INCLUDE
+
 #include <cstdint>
 #if defined(__x86_64__)
 #include <arch/x86_64/cpu/idt.hpp>
@@ -55,6 +58,13 @@ struct thread {
     std::uint32_t exit_code;
     std::uint32_t exit_signal;
     std::uint32_t waitpid_state;
+
+    std::uint64_t scheduling_rate;
+
+    std::atomic<std::int64_t> sr_s;
+    std::atomic<std::int64_t> sr_st;
+
+    char* exe;
 
     bool should_block_signals_next;
     bool should_not_save_ctx;

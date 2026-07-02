@@ -77,10 +77,10 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         bool state = current_thread->vmem->lock.lock();
         vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
         if(obj != nullptr) {
-            bool status = current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
+            bool status = current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), cr2 + (PAGE_SIZE * 4) > obj->base + obj->len ? PAGE_SIZE : PAGE_SIZE * 4);
             (void)status;
             if(1) {
-                arch::tlb_flush(ALIGNPAGEDOWN(cr2), PAGE_SIZE);
+                arch::tlb_flush(ALIGNPAGEDOWN(cr2), cr2 + (PAGE_SIZE * 4) > obj->base + obj->len ? PAGE_SIZE : PAGE_SIZE * 4);
                 current_thread->vmem->lock.unlock(state);
 
                 if(frame->cs & 3)
@@ -111,6 +111,9 @@ meow:
     
     if(frame->cs == 0x08) {
         x86_64::panic::print_ascii_art();
+        if(current_thread != nullptr) {
+            klibc::printf("last sys %d\n", current_thread->last_syscall);
+        }
         print_regs(frame);
         extern int k_breakpoint;
         klibc::printf("k_breakpoint is %d, proc is %d, cpu is %d, target_cpu %d\r\n",k_breakpoint, current_thread == nullptr ? 0 : current_thread->id, CPU_LOCAL_READ(cpu),current_thread == nullptr ? 0 : current_thread->cpu.load());

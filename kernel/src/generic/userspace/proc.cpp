@@ -626,6 +626,8 @@ long long sys_execve(const char* path, char** argv, char** envp) {
     current_thread->ctx.cr3 = current_thread->original_root;
 #endif
 
+    klibc::memcpy(current_thread->exe, buffer, klibc::strlen(buffer) + 1);
+
     elf::exec(current_thread, buffer, stack_argv, stack_envp);
 
     for(std::uint64_t i = 0;i < argv_len; i++) {
@@ -708,5 +710,31 @@ long long sys_enabledebug() {
     current_proc->is_debug = true;
     auto manager = (vfs::fdmanager*)current_proc->fd;
     current_proc->debug_file_descriptor = (void*)manager->search(1);
+    return 0;
+}
+
+long long sys_pidstat(int pid) {
+    thread* proc = process::by_id(pid);
+    if(proc == nullptr)
+        return -ESRCH;
+
+#if defined(__x86_64__)
+    klibc::serial_printf("proc %d: rip 0x%p cpu %d\n", proc->id, proc->ctx.rip, proc->cpu.load());
+#endif
+    return 0;
+}
+
+long long sys_selfexe(char* buffer, std::uint32_t size) {
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)buffer, size + PAGE_SIZE))
+        return -EFAULT;
+
+    if(buffer == nullptr)
+        return -EINVAL;
+
+    klibc::memset(buffer, 0, size);
+    klibc::memcpy(buffer, current->exe, (std::uint32_t)klibc::strlen(current->exe) > size ? size : klibc::strlen(current->exe));
+
     return 0;
 }

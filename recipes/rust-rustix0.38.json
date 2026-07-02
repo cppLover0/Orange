@@ -1,0 +1,8 @@
+{
+    "name": "rust-rustix0.38",
+    "version": "0.38",
+    "deps": ["base-libs"],
+    "url": "https://github.com/bytecodealliance/rustix/archive/refs/tags/v0.38.44.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

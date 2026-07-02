@@ -1,0 +1,8 @@
+{
+    "name": "rust-backtrace",
+    "version": "0.3.75",
+    "deps": ["base-libs"],
+    "url": "https://github.com/rust-lang/backtrace-rs/archive/refs/tags/0.3.75.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

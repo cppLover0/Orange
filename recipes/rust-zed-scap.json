@@ -1,0 +1,9 @@
+{
+    "name": "rust-zed-scap",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://github.com/zed-industries/scap.git",
+    "git_flags": ["-b", "zed-patches"],
+    "should_patch": false,
+    "use_orange_prefix": true
+}

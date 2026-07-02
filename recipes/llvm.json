@@ -1,7 +1,7 @@
 {
     "name": "llvm",
     "version": "VERSION",
-    "deps": ["base-libs"],
+    "deps": ["base-libs", "llvm-host"],
     "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.7/llvm-project-21.1.7.src.tar.xz",
     "should_patch": false,
     "use_orange_prefix": true

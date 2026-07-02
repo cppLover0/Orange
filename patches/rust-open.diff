@@ -1,0 +1,44 @@
+diff -Naur rust-open/Cargo.toml rust-open-clean/Cargo.toml
+--- rust-open/Cargo.toml	1970-01-01 03:00:01.000000000 +0300
++++ rust-open-clean/Cargo.toml	2026-06-10 17:16:09.308557700 +0300
+@@ -54,7 +54,7 @@
+ [target."cfg(all(unix, not(macos)))".dependencies.pathdiff]
+ version = "0.2.0"
+ 
+-[target.'cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd", target_os = "illumos", target_os = "solaris", target_os = "aix", target_os = "hurd"))'.dependencies.is-wsl]
++[target.'cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd", target_os = "illumos", target_os = "solaris", target_os = "aix", target_os = "hurd", target_os = "orange"))'.dependencies.is-wsl]
+ version = "0.4.0"
+ 
+ [target."cfg(unix)".dependencies.libc]
+diff -Naur rust-open/src/lib.rs rust-open-clean/src/lib.rs
+--- rust-open/src/lib.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-open-clean/src/lib.rs	2026-06-10 17:15:50.712533162 +0300
+@@ -112,7 +112,8 @@
+     target_os = "illumos",
+     target_os = "solaris",
+     target_os = "aix",
+-    target_os = "hurd"
++    target_os = "hurd",
++    target_os = "orange"
+ ))]
+ use unix as os;
+ 
+@@ -132,7 +133,8 @@
+     target_os = "haiku",
+     target_os = "redox",
+     target_os = "aix",
+-    target_os = "hurd"
++    target_os = "hurd",
++    target_os = "orange"
+ )))]
+ compile_error!("open is not supported on this platform");
+ 
+@@ -397,6 +399,7 @@
+     target_os = "illumos",
+     target_os = "solaris",
+     target_os = "aix",
+-    target_os = "hurd"
++    target_os = "hurd",
++    target_os = "orange"
+ ))]
+ mod unix;

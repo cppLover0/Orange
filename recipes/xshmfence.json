@@ -1,0 +1,8 @@
+{
+    "name": "xshmfence",
+    "version": "1.3",
+    "deps": ["base-libs", "libx11", "xorg-macros-host"],
+    "url": "https://xorg.freedesktop.org/archive/individual/lib/libxshmfence-1.3.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

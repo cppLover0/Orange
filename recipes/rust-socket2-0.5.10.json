@@ -1,0 +1,8 @@
+{
+    "name": "rust-socket2",
+    "version": "0.5.1.0",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/socket2/socket2-0.5.10.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

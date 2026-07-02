@@ -274,7 +274,7 @@ std::int32_t vfs::open(file_descriptor* fd, char* path, bool follow_symlinks, bo
     return status;
 }
 
-std::int32_t vfs::create(char* path, vfs_file_type type, std::uint32_t mode) {
+std::int32_t vfs::create(char* path, vfs_file_type type, std::uint32_t mode, int uid, int gid) {
     char out[4096];
     klibc::memset(out,0,4096);
 
@@ -300,7 +300,7 @@ std::int32_t vfs::create(char* path, vfs_file_type type, std::uint32_t mode) {
         fs_love_name[1] = '\0';
     }
 
-    std::int32_t status = node->fs->create(node->fs, fs_love_name, type, mode);
+    std::int32_t status = node->fs->create(node->fs, fs_love_name, type, mode, uid, gid);
     return status;
 }
 
