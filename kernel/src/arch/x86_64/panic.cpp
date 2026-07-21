@@ -77,10 +77,15 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         bool state = current_thread->vmem->lock.lock();
         vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
         if(obj != nullptr) {
-            bool status = current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), cr2 + (PAGE_SIZE * 4) > obj->base + obj->len ? PAGE_SIZE : PAGE_SIZE * 4);
-            (void)status;
+
+            if(obj->mmap_info.copied_file_desc == nullptr) {
+                current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), cr2 + (PAGE_SIZE * 4) > obj->base + obj->len ? PAGE_SIZE : PAGE_SIZE * 4);
+            } else {
+                current_thread->vmem->inv_lazy_file_alloc_4kb(obj, ALIGNPAGEDOWN(cr2));
+            }
+
             if(1) {
-                arch::tlb_flush(ALIGNPAGEDOWN(cr2), cr2 + (PAGE_SIZE * 4) > obj->base + obj->len ? PAGE_SIZE : PAGE_SIZE * 4);
+                arch::tlb_flush(ALIGNPAGEDOWN(cr2), PAGE_SIZE * 4);
                 current_thread->vmem->lock.unlock(state);
 
                 if(frame->cs & 3)

@@ -77,7 +77,7 @@ void aarch64_map_page(std::uintptr_t root, std::uintptr_t phys, std::uintptr_t v
 
 
 namespace arch {
-    [[gnu::weak]] void enable_paging(std::uintptr_t root) {
+    void enable_paging(std::uintptr_t root) {
         if (root == gobject::kernel_root) {
             asm volatile("msr ttbr1_el1, %0" : : "r"(root) : "memory");
             asm volatile("dsb ish; tlbi vmalle1; dsb ish; isb" : : : "memory");
@@ -88,15 +88,15 @@ namespace arch {
     }
 
 
-    [[gnu::weak]] void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags) {
+    void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags) {
         aarch64_map_page(root,phys,virt,convert_flags(flags));
     }
 
-    [[gnu::weak]] std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
+    std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
         return __memory_paging_getphys((std::uint64_t*)(root + etc::hhdm()),virt,0);
     }
 
-    [[gnu::weak]] void destroy_root(std::uintptr_t root, int level) {
+    void destroy_root(std::uintptr_t root, int level) {
                 std::uint64_t* table = (std::uint64_t*) (root + etc::hhdm());
         if (bootloader::bootloader->is_5_level_paging()) {
             if (level != 4) {
@@ -139,7 +139,7 @@ namespace arch {
         }
     }
 
-    [[gnu::weak]] void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
+    void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         std::uint64_t* virt_srccr3 = (std::uint64_t*) (src_root + etc::hhdm());
         for (int i = 256; i < 512; i++) {

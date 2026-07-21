@@ -147,6 +147,7 @@ long long sys_pwrite64(int fd, char* buffer, std::uint64_t count, std::uint64_t 
 long long sys_prlimit64(int pid, int res, rlimit64* new_rlimit, rlimit64* old_rlimit);
 long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, std::uint64_t flags, int fd, std::uint64_t off);
 long long sys_socketpair(int* fds, int flags);
+long long sys_fsync(int fd);
 
 long long sys_setsid();
 long long sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags);

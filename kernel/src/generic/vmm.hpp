@@ -5,6 +5,8 @@
 #include <generic/paging.hpp>
 #include <utils/assert.hpp>
 #include <generic/time.hpp>
+#include <generic/ram_file.hpp>
+#include <generic/mmap_syncer.hpp>
 #include <atomic>
 
 #include <generic/shm.hpp>
@@ -28,6 +30,10 @@ struct vmm_obj {
     uint8_t is_mapped;
 
     struct {
+        ram_file::content* file;
+        std::uint64_t original_base;
+        std::uint64_t inode;
+        std::int64_t off;
         void* copied_file_desc;
         void (*close)(void* file);
         void (*dup)(void* file);
@@ -154,6 +160,16 @@ public:
             if(current == end)
                 break;
 
+            if(current->mmap_info.copied_file_desc) {
+                mmap_syncer::sync(this, current);
+                assert(current->mmap_info.file != nullptr, "meow :(");
+                ram_file::lock();
+                ram_file::dec(current->mmap_info.file->inode, current->mmap_info.file->ident, this);
+                ram_file::unlock();
+                current->mmap_info.close(current->mmap_info.copied_file_desc);
+                pmm::freelist::free((std::uint64_t)current->mmap_info.copied_file_desc - etc::hhdm());
+            }
+
             if(!current->is_mapped && current->base != 0) {
                 paging::free_range(this->root, current->base, current->len);
             } 
@@ -192,7 +208,11 @@ public:
                 } else if(current->shm && !current->mmap_info.copied_file_desc) {
                     dest->map_memory(current->base, current->phys, current->flags, current->len, true, current->shm);
                 } else if(current->mmap_info.copied_file_desc) {
-                    
+                    ram_file::lock();
+                    dest->map_memory(current->base, current->phys, current->flags, current->len, true, nullptr, current->mmap_info.copied_file_desc, (void*)current->mmap_info.dup, (void*)current->mmap_info.close, current->mmap_info.inode, current->mmap_info.off, current->mmap_info.file);
+                    current->mmap_info.dup(current->mmap_info.copied_file_desc);
+                    ram_file::inc(current->mmap_info.file->inode, current->mmap_info.file->ident);
+                    ram_file::unlock();
                 }
             }
 
@@ -257,7 +277,7 @@ public:
         }
     }
 
-    void unmap(std::uint64_t base, std::uint64_t len, bool should_lock = true, int shm_pid = 0) {
+    void unmap(std::uint64_t base, std::uint64_t len, bool should_lock = true, int shm_pid = 0, bool should_lock_file = true) {
         bool state = false;
         if(should_lock)
             state = this->lock.lock();
@@ -300,15 +320,18 @@ public:
 
         if(before == after && before != 0 && after != 0) {
 
-            if(before->is_mapped && !before->shm) {
+            if(before->is_mapped && !before->shm && !before->mmap_info.copied_file_desc) {
                 paging::zero_range(this->root, before->base,before->len);
                 dumb_unmap(before->base);
-            } else if(before->shm) {
+            } else if(before->shm && !before->mmap_info.copied_file_desc) {
                 free_shm(before);
                 dumb_unmap(before->base);
-                                
             } else {
                 before->len -= ((before->base + before->len) - base);
+            }
+
+            if(before->mmap_info.copied_file_desc) {
+                mmap_syncer::sync(this, before);
             }
 
             vmm_obj* split = new vmm_obj;
@@ -319,6 +342,25 @@ public:
             split->next = before->next;
             before->next = split;
             before->len = before->len - (len + split->len);
+
+            split->mmap_info.copied_file_desc = before->mmap_info.copied_file_desc;
+            split->mmap_info.close = before->mmap_info.close;
+            split->mmap_info.dup = before->mmap_info.dup;
+            split->mmap_info.original_base = before->mmap_info.original_base;
+            split->mmap_info.inode = before->mmap_info.inode;
+            split->mmap_info.off = before->mmap_info.off;
+
+            if(split->mmap_info.copied_file_desc) {
+                split->mmap_info.dup(split->mmap_info.copied_file_desc);
+
+                if(should_lock_file == true)
+                    ram_file::lock();
+                ram_file::inc(split->mmap_info.file->inode, split->mmap_info.file->ident);
+                if(should_lock_file == true)
+                    ram_file::unlock();
+                paging::free_range(this->root, base, len);
+            }
+
             current = split->next;
             goto end;
         } else {
@@ -326,36 +368,60 @@ public:
                 if(prev) {
                     if(current == before && before != 0) {
                         if(before->base + before->len > base) {
-                            if(before->is_mapped && !before->shm) {
+                            if(before->is_mapped && !before->shm && !before->mmap_info.copied_file_desc) {
                                 paging::zero_range(this->root, before->base,before->len);
                                 dumb_unmap(before->base);
-                            } else if(before->shm) {
+                            } else if(before->shm && !before->mmap_info.copied_file_desc) {
                                 free_shm(before);
                                 dumb_unmap(before->base);
-                                
                             } else {
+                                
+                                
+                                if(before->mmap_info.copied_file_desc) {
+                                    mmap_syncer::sync(this, before);
+                                    paging::zero_range(this->root, base, ((before->base + before->len) - base)); // its banned to free them
+                                }
+
                                 before->len -= ((before->base + before->len) - base);
+
                             }
                             
                         }
                     } else {
                         
                         if(current->base >= base && current->base < (base + len)) {
-                            if(before->is_mapped && !before->shm) {
-                                paging::zero_range(this->root, before->base,before->len);
-                                dumb_unmap(before->base);
-                            } else if(before->shm) {
-                                free_shm(before);
-                                dumb_unmap(before->base);
-                                
-                            } else {
-                                before->len -= ((before->base + before->len) - base);
+                            if(current->is_mapped && !current->shm && !current->mmap_info.copied_file_desc) {
+                                paging::zero_range(this->root, current->base,current->len);
+                                dumb_unmap(current->base);
+                            } else if(current->shm && !current->mmap_info.copied_file_desc) {
+                                free_shm(current);
+                                dumb_unmap(current->base);
+                            } 
+
+                            if(current->mmap_info.copied_file_desc) {
+                                mmap_syncer::sync(this, current);
                             }
+
                             std::uint64_t sz = ((base + len) -  current->base) > current->len ? current->len : current->len - ((current->base + current->len) - (base + len));
                             current->len -= sz;
                             current->base += sz;
-                            
+
+                            if(current->mmap_info.copied_file_desc) {
+                                paging::zero_range(this->root, current->base - sz, sz);
+                            }
+
                             if(current->len == 0) {
+
+                                if(current->mmap_info.copied_file_desc) {
+                                    current->mmap_info.close(current->mmap_info.copied_file_desc);
+                                    pmm::freelist::free((std::uint64_t)current->mmap_info.copied_file_desc - etc::hhdm());
+                                    if(should_lock_file == true)
+                                        ram_file::lock();
+                                    ram_file::dec(current->mmap_info.file->inode, current->mmap_info.file->ident, this);
+                                    if(should_lock_file == true)
+                                        ram_file::unlock();
+                                }
+
                                 prev->next = current->next;
                                 delete current;
                                 current = prev->next;
@@ -396,7 +462,7 @@ end:
         return current->base;
     }
 
-    std::uint64_t map_memory(std::uint64_t hint, std::uint64_t phys, std::uint64_t paging_flags, std::uint64_t len, bool is_fixed, shm_seg* shm = nullptr, void* file_desc = nullptr, void* dup = nullptr, void* close = nullptr) {
+    std::uint64_t map_memory(std::uint64_t hint, std::uint64_t phys, std::uint64_t paging_flags, std::uint64_t len, bool is_fixed, shm_seg* shm = nullptr, void* file_desc = nullptr, void* dup = nullptr, void* close = nullptr, std::uint64_t inode = 0, std::int64_t off = 0, ram_file::content* file = nullptr) {
         vmm_obj* current = nullptr;
         bool state = this->lock.lock();
 
@@ -407,24 +473,48 @@ end:
         }
 
         if(is_fixed) {
-            this->unmap(ALIGNDOWN(hint, PAGE_SIZE), ALIGNUP(len, PAGE_SIZE), false);
+            this->unmap(ALIGNDOWN(hint, PAGE_SIZE), ALIGNUP(len, PAGE_SIZE), false, 0, false);
             current = this->v_find(ALIGNDOWN(hint, PAGE_SIZE), ALIGNUP(len, PAGE_SIZE));
         } else {
             current = this->v_alloc(ALIGNUP(len, PAGE_SIZE));
         }
 
-        current.
+        if(file != nullptr) {
+            void* new_file = (void*)(pmm::freelist::alloc_4k() + etc::hhdm());
+            klibc::memcpy(new_file, file_desc, PAGE_SIZE);
+            current->mmap_info.copied_file_desc = new_file;
+        } else {
+            current->mmap_info.copied_file_desc = nullptr;
+        }
 
+        current->mmap_info.close = (void (*)(void*))close;
+        current->mmap_info.dup = (void (*)(void*))dup;
+        current->mmap_info.original_base = current->base; // used for offsets
+        current->mmap_info.inode = inode;
+        current->mmap_info.off = off;
+        current->mmap_info.file = file;
         current->is_mapped = true;
         current->shm = shm;
         current->phys = phys;
         current->flags = paging_flags;
 
         paging::zero_range(this->root, current->base, current->len);
-        paging::map_range(this->root, current->phys, current->base, current->len, current->flags);
+        
+        if(file == nullptr)
+            paging::map_range(this->root, current->phys, current->base, current->len, current->flags);
 
         this->lock.unlock(state);
         return current->base;
+    }
+
+    void inv_lazy_file_alloc_4kb(vmm_obj* obj, std::uint64_t virt) {
+        std::int64_t current_phys = arch::get_phys_from_page(this->root, virt);
+        if(current_phys == 0 || current_phys == -1) {
+            ram_file::lock();
+            ram_file::page* page = ram_file::access_page(obj->mmap_info.file->inode, obj->mmap_info.file->ident, ((virt - obj->base) / PAGE_SIZE) + (ALIGNPAGEDOWN(obj->mmap_info.off) / PAGE_SIZE), true, obj->mmap_info.copied_file_desc, 0);
+            ram_file::unlock();
+            paging::map_range(this->root, (std::uint64_t)page->p - etc::hhdm(), virt, PAGE_SIZE, PAGING_PRESENT | PAGING_RW | PAGING_USER);
+        }
     }
 
     bool inv_lazy_alloc(std::uint64_t virt, std::uint64_t len) {

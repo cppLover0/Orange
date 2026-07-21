@@ -117,21 +117,21 @@ void riscv64_map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t vi
 }
 
 namespace arch {
-    [[gnu::weak]] void enable_paging(std::uintptr_t root) {
+    void enable_paging(std::uintptr_t root) {
         std::uint64_t mode_root = (root >> 12) | ((std::uint64_t) riscv64::raw_level_paging << 60);
         asm volatile("csrw satp, %0" : : "r"(mode_root) : "memory");
         asm volatile("sfence.vma");
     }
 
-    [[gnu::weak]] void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags) {
+    void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags) {
         riscv64_map_page(root,phys,virt,convert_flags(flags));
     }
 
-    [[gnu::weak]] std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
+     std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
         return __memory_paging_getphys((std::uint64_t*)(root + etc::hhdm()),virt,0);
     }
 
-    [[gnu::weak]] void destroy_root(std::uintptr_t root, int level) {
+    void destroy_root(std::uintptr_t root, int level) {
         std::uint64_t* table = (std::uint64_t*) (root + etc::hhdm());
         if (level != riscv64::get_paging_level() - 1) {
             if (level == 0) {
@@ -153,7 +153,7 @@ namespace arch {
         }
     }
 
-    [[gnu::weak]] void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
+    void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         std::uint64_t* virt_srccr3 = (std::uint64_t*) (src_root + etc::hhdm());
         for (int i = 255; i < 512; i++) {

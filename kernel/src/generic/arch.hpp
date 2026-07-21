@@ -17,32 +17,39 @@
 
 namespace arch {
 
-    extern void init(int stage);
+    void init(int stage);
 
-    extern void disable_interrupts();
-    extern void enable_interrupts();
-    extern void wait_for_interrupt();
-    extern void hcf();
-    extern void pause();
-    extern void tlb_flush(std::uintptr_t hint, std::uintptr_t len);
-    extern const char* name();
+    void disable_interrupts();
+    void enable_interrupts();
+    void wait_for_interrupt();
+    void hcf();
+    void pause();
+    void tlb_flush(std::uintptr_t hint, std::uintptr_t len);
+    const char* name();
 
-    extern void enable_paging(std::uintptr_t root);
-    extern void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags);
-    extern std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt);
-    extern void destroy_root(std::uintptr_t root, int level);
-    extern void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root);
-    extern int level_paging();
+    void enable_paging(std::uintptr_t root);
+    void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags);
+    std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt);
+    void destroy_root(std::uintptr_t root, int level);
+    void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root);
+    bool is_dirty_address(std::uintptr_t root, std::uintptr_t virt);
+    void clear_dirty_bit(std::uintptr_t root, std::uintptr_t virt);
 
-    extern bool test_interrupts();
+    int level_paging();
 
-    extern std::uint64_t current_root();
+    bool test_interrupts();
 
-    extern void memory_barrier();
+    std::uint64_t current_root();
 
-    extern int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg);
+    void memory_barrier();
 
-    extern void panic(char* msg);
+    int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg);
+
+    void panic(char* msg);
+    
+
+
+
 
     [[gnu::weak]] void fill_root(std::uintptr_t root);
 };

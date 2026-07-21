@@ -4,5 +4,5 @@
 
 namespace mmap_syncer {
     void init();
-    void sync(vmm_obj* mem);
+    void sync(void* vmem, void* mem);
 }

@@ -126,7 +126,8 @@ syscall_item syscall_table[] = {
     {false, 104, (void*)sys_epoll_wait},
     {false, 105, (void*)sys_shutdown},
     {false, 106, (void*)sys_ftruncate},
-    {false, 107, (void*)sys_fchownat}
+    {false, 107, (void*)sys_fchownat},
+    {false, 108, (void*)sys_fsync}
 };
 
 // long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);
@@ -146,7 +147,8 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
 
     thread* current = current_proc;
     current->signal_ctx = *ctx; // its used to return to userspace when there's signal 
-    
+
+    current->last_syscall = current_sys->num;
 
     long long ret = 0;
 
@@ -183,8 +185,6 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
         klibc::memcpy(&current->sigset,&current->temp_sigset,sizeof(sigset_t));
         current->is_restore_sigset = 0;
     }
-
-    current->last_syscall = current_sys->num;
 
     return;
 }

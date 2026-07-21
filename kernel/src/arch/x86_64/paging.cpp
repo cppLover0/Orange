@@ -12,7 +12,8 @@
 #define PTE_RW (1 << 1)
 #define PTE_USER (1 << 2)
 #define PTE_WC ((1 << 7) | (1 << 3))
-#define PTE_MMIO (1ull << 4)
+#define PTE_DIRTY (1 << 6) 
+#define PTE_MMIO (1 << 4)
 #define LVL_PG_MASK (bootloader::bootloader->is_5_level_paging() ? PTE_MASK_VALUE_5 : PTE_MASK_VALUE)
 
 int level_to_index(std::uintptr_t virt, int level) {
@@ -41,6 +42,17 @@ int64_t* __paging_next_level_noalloc(std::uint64_t* table, std::uint16_t idx) {
     if (!(table[idx] & PTE_PRESENT))
         return (int64_t*) -1;
     return (int64_t*) ((table[idx] & LVL_PG_MASK) + etc::hhdm());
+}
+
+std::int64_t __memory_paging_getphysn(std::uint64_t* table, std::uint64_t virt, int level) {
+    if (!table || (std::int64_t) table == (std::int64_t)-1)
+        return -1;
+    int max_level = bootloader::bootloader->is_5_level_paging() ? 4 : 3;
+    if (max_level == level) {
+        return (table[level_to_index(virt, level)] & PTE_PRESENT) ? table[level_to_index(virt, level)] : -1;
+    } else
+        return __memory_paging_getphysn((std::uint64_t*) __paging_next_level_noalloc(table, level_to_index(virt, level)), virt, level + 1);
+    return -1;
 }
 
 std::int64_t __memory_paging_getphys(std::uint64_t* table, std::uint64_t virt, int level) {
@@ -98,15 +110,15 @@ void x86_64_map_page(std::uintptr_t root, std::uintptr_t phys, std::uintptr_t vi
 
 
 namespace arch {
-    [[gnu::weak]] void enable_paging(std::uintptr_t root) {
+    void enable_paging(std::uintptr_t root) {
         asm volatile("mov %0, %%cr3" : : "r"(root) : "memory");
     }
 
-    [[gnu::weak]] void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags) {
+    void map_page(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, int flags) {
         x86_64_map_page(root,phys,virt,convert_flags(flags));
     }
 
-    [[gnu::weak]] std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
+    std::int64_t get_phys_from_page(std::uintptr_t root, std::uintptr_t virt) {
         return __memory_paging_getphys((std::uint64_t*)(root + etc::hhdm()),virt,0);
     }
 
@@ -153,7 +165,7 @@ namespace arch {
         }
     }
 
-    [[gnu::weak]] void fill_root(std::uintptr_t root) {
+    void fill_root(std::uintptr_t root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         for (int i = 256; i < 512; i++) {
             if(virt_rootcr3[i] == 0) {
@@ -162,11 +174,24 @@ namespace arch {
         }
     }
     
-    [[gnu::weak]] void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
+    void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root) {
         std::uint64_t* virt_rootcr3 = (std::uint64_t*) (root + etc::hhdm());
         std::uint64_t* virt_srccr3 = (std::uint64_t*) (src_root + etc::hhdm());
         for (int i = 256; i < 512; i++) {
             virt_rootcr3[i] = virt_srccr3[i];
         }
+    }
+
+    bool is_dirty_address(std::uintptr_t root, std::uintptr_t virt) {
+        return (__memory_paging_getphysn((std::uint64_t*)(root + etc::hhdm()),virt,0) & PTE_DIRTY) ? true : false;
+    }
+
+    void clear_dirty_bit(std::uintptr_t root, std::uintptr_t virt) {
+        std::int64_t info = __memory_paging_getphysn((std::uint64_t*)(root + etc::hhdm()),virt,0);
+        if(info == -1 || (info & LVL_PG_MASK) == 0)
+            return;
+
+        info &= ~(PTE_DIRTY);
+        x86_64_map_page(root, info & LVL_PG_MASK, virt, info & ~(LVL_PG_MASK));
     }
 };

@@ -46,37 +46,72 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
         arch::tlb_flush(allocated, len);
     }
 
+    if((flags & MAP_ANONYMOUS) && (flags & MAP_SHARED)) {
+        // MAP_ANONYMOUS + MAP_SHARED is not implemented properly
+        goto shittt;
+    }
+
     if(!(flags & MAP_ANONYMOUS)) {
-        if(file->vnode.mmap != nullptr) {
-            std::uint64_t phys, size = 0;
-            int status = file->vnode.mmap(file, &phys, &size);
-            if(status == 0) {
-                if(flags & MAP_FIXED) {
-                    allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, true);
-                } else {
-                    allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, false);
+        if(!(flags & MAP_SHARED) || file->vnode.mmap) {
+shittt:
+            if(file->vnode.mmap != nullptr) {
+                std::uint64_t phys, size = 0;
+                int status = file->vnode.mmap(file, &phys, &size);
+                if(status == 0) {
+                    if(flags & MAP_FIXED) {
+                        allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, true);
+                    } else {
+                        allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, false);
+                    }
+
+                    arch::tlb_flush(allocated, size);
+
+                    goto end;
                 }
-
-                arch::tlb_flush(allocated, size);
-
-                goto end;
             }
-        }
 
-        if(flags & MAP_FIXED) {
-            allocated = current->vmem->alloc_memory(hint, len, true);
+            if(flags & MAP_FIXED) {
+                allocated = current->vmem->alloc_memory(hint, len, true);
+            } else {
+                allocated = current->vmem->alloc_memory(0, len, false);
+            }
+
+            arch::tlb_flush(allocated, len);
+
+            klibc::debug_printf("mmap file %s\n", file->path);
+
+            std::uint64_t old = file->offset;
+            file->offset = off;
+            file->vnode.read(file, (void*)allocated, len);
+            file->offset = old;
         } else {
-            allocated = current->vmem->alloc_memory(0, len, false);
+
+            klibc::debug_printf("mmap file1 %s\n", file->path);
+
+            stat s = {};
+            file->vnode.stat(file, &s);
+
+            if(file->type != file_descriptor_type::file)
+                return -EINVAL;
+
+            assert(file->vnode.read, "imposibel !!");
+
+            ram_file::lock();
+
+            ram_file::content* ram = ram_file::create(file->inode, file->vnode.fs);
+            ram_file::inc(file->inode, file->vnode.fs);
+
+            if(flags & MAP_FIXED) {
+                allocated = current->vmem->map_memory(hint, 0, PAGING_PRESENT | PAGING_RW | PAGING_USER, len, true, nullptr, file, (void*)file->vnode.ondup, (void*)file->vnode.close, file->inode, off, ram);
+            } else {
+                allocated = current->vmem->map_memory(0, 0, PAGING_PRESENT | PAGING_RW | PAGING_USER, len, false, nullptr, file, (void*)file->vnode.ondup, (void*)file->vnode.close, file->inode, off, ram);
+            }
+
+            ram_file::unlock();
+
+            arch::tlb_flush(allocated, len);
+
         }
-
-        arch::tlb_flush(allocated, len);
-
-        klibc::debug_printf("mmap file %s\n", file->path);
-
-        std::uint64_t old = file->offset;
-        file->offset = off;
-        file->vnode.read(file, (void*)allocated, len);
-        file->offset = old;
     }
 
 end:

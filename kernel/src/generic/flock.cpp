@@ -1,7 +1,10 @@
 #include <generic/flock.hpp>
+#include <generic/vfs.hpp>
 
-flock::flock_struct* flock::create(filesystem* fs, int inode, off_t start, off_t len, short lock, short whence, off_t seek, std::size_t file_size, int pid) {
+flock::flock_struct* flock::create(void* fs1, int inode, off_t start, off_t len, short lock, short whence, off_t seek, std::size_t file_size, int pid) {
     
+    filesystem* fs = (filesystem*)fs1;
+
     fs->flock_related.lock.lock();
 
     flock_high* list = (flock_high*)fs->flock_related.list;
@@ -71,19 +74,18 @@ flock::flock_struct* flock::create(filesystem* fs, int inode, off_t start, off_t
 
             bool intersects = false;
             if (inode_list->lock[i].l_len == 0) {
-                if (start + len > lock_start || len == 0) {
+                if (len == 0) { 
                     intersects = true;
-                }
-            } else {
-                if (len == 0) {
-                    if (start < lock_start + inode_list->lock[i].l_len) {
-                        intersects = true;
-                    }
                 } else {
-                    if ((start < lock_start + inode_list->lock[i].l_len) && (start + len > lock_start)) {
-                        intersects = true;
-                    }
+                    if (start + len > lock_start) intersects = true;
                 }
+            }
+            else if (len == 0) {
+                if (start < lock_start + inode_list->lock[i].l_len) intersects = true;
+            }
+            else {
+                if (start < lock_start + inode_list->lock[i].l_len && start + len > lock_start)
+                    intersects = true;
             }
 
             if (intersects) {
@@ -134,8 +136,10 @@ flock::flock_struct* flock::create(filesystem* fs, int inode, off_t start, off_t
     return found;
 }
 
-flock::flock_struct* flock::search(filesystem* fs, int inode, off_t start, off_t len, short whence, off_t seek, std::size_t file_size) {
+flock::flock_struct* flock::search(void* fs1, int inode, off_t start, off_t len, short whence, off_t seek, std::size_t file_size) {
     (void)whence;
+
+    filesystem* fs = (filesystem*)fs1;
 
     flock_high* list = (flock_high*)fs->flock_related.list;
 
@@ -198,7 +202,29 @@ flock::flock_struct* flock::search(filesystem* fs, int inode, off_t start, off_t
     return nullptr;
 }
 
-void flock::remove(filesystem* fs, int inode) {
+flock::flock_list* flock::access_source(void* fs1, int inode) {
+
+    filesystem* fs = (filesystem*)fs1;
+
+    flock_high* list = (flock_high*)fs->flock_related.list;
+
+    if(list != nullptr) {
+        if(list->flocks != nullptr) {
+            for(std::size_t i = 0;i < fs->flock_related.ptr; i++) {
+                if(list->flocks[i].is_used == true && list->flocks[i].inode == inode) {
+                    return &list->flocks[i];
+                }
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+void flock::remove(void* fs1, int inode) {
+
+    filesystem* fs = (filesystem*)fs1;
+
     flock_high* list = (flock_high*)fs->flock_related.list;
     fs->flock_related.lock.lock();
 
@@ -222,3 +248,4 @@ void flock::remove(filesystem* fs, int inode) {
     fs->flock_related.lock.unlock();
     return;
 }
+

@@ -94,6 +94,9 @@ fail:
             klibc::debug_printf("TRUNC\n");
             if(new_fd->vnode.zero) {
                 new_fd->vnode.zero(new_fd);
+                ram_file::lock();
+                ram_file::small(new_fd->inode, new_fd->vnode.fs, 0, nullptr);
+                ram_file::unlock();
             }
         }
         if(flags & O_APPEND)
@@ -250,6 +253,81 @@ long long sys_statfs(const char* path, statfs* out) {
     return 0;
 }
 
+#define CAST_TO_PAGE(x) (ALIGNPAGEDOWN(x) / PAGE_SIZE)
+
+long long read_page_cache(file_descriptor* file, char* buffer, std::size_t count, std::size_t file_size) {
+    long actual_count = count > file_size - file->offset ? file_size - file->offset : count;
+
+    if(file->offset > file_size)
+        return 0;
+
+    if(file_size - file->offset <= 0)
+        return 0;
+
+    assert(actual_count >= 0, "realy shit");
+
+    if(actual_count == 0)
+        return 0;
+
+    ram_file::lock();
+         
+    std::size_t start_page = CAST_TO_PAGE(file->offset);
+    std::size_t end_page = CAST_TO_PAGE(file->offset + actual_count - 1);
+
+    long counter = actual_count;
+    std::size_t ptr = file->offset;
+    std::size_t memory_offset = 0;
+
+    while(counter > 0) {
+
+        std::size_t start_offset = 0;
+        std::size_t memory_read = 0;
+        std::size_t current_page = CAST_TO_PAGE(ptr);
+        if(current_page == start_page && current_page != end_page) {
+            start_offset = file->offset % PAGE_SIZE;
+            memory_read = PAGE_SIZE - (file->offset % PAGE_SIZE);
+            memory_read = (long)memory_read > actual_count ? actual_count : memory_read;
+        } else if(current_page == end_page) {
+
+            if(current_page == start_page)
+                start_offset = file->offset % PAGE_SIZE;
+
+            memory_read = counter;
+        } else {
+            memory_read = PAGE_SIZE;
+            assert((long)memory_read < counter, "SHSIHHIHIIITTT");
+        }
+
+        ram_file::page* current = ram_file::access_page(file->inode, file->vnode.fs, current_page, false, nullptr, 0);
+
+        if(current != nullptr) {
+            klibc::memcpy(buffer + memory_offset, (void*)((std::uint64_t)current->p + start_offset), memory_read);
+            file->offset += memory_read;
+        } else {
+            ram_file::unlock();
+            std::size_t real_read = file->vnode.read(file, buffer + memory_offset, memory_read);
+            assert(real_read == memory_read, "shit");
+            ram_file::lock();
+        }
+
+        start_offset = 0;
+        counter -= memory_read;
+        ptr += memory_read;
+        memory_offset += memory_read;
+    }
+
+    ram_file::unlock();
+    return actual_count;
+}
+
+long long write_page_cache(file_descriptor* file, char* buffer, std::size_t count) {
+    (void)file;
+    (void)buffer;
+    (void)count;
+    assert(0, "SHGG");
+    return 0;
+}
+
 long long sys_read(int fd, char* buffer, std::uint64_t count) {
     if(count == 0)
         return 0;
@@ -273,12 +351,27 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
         return -EBADF;
 
     if(file->type == file_descriptor_type::file) {
-        std::int64_t cz = file->vnode.read(file, buffer, count);
+
+        ram_file::lock();
+        ram_file::content* file_ram = ram_file::get(file->inode, file->vnode.fs);
+        ram_file::unlock();
+
+        std::int64_t cz = 0;
+
+        if(file_ram == nullptr)
+            cz = file->vnode.read(file, buffer, count);
+        else {
+            stat stat_file = {};
+            file->vnode.stat(file, &stat_file);
+            cz = read_page_cache(file, buffer, count, stat_file.st_size);
+        }
+
         if(cz == 0 && current->is_debug) {
             stat x = {};
             file->vnode.stat(file, &x);
             klibc::debug_printf("eof ! %s, seek %d, file_size %d", file->path, file->offset, x.st_size);
         }
+
         return cz;
     } else if(file->type == file_descriptor_type::pipe) {
         return file->fs_specific.pipe->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
@@ -353,6 +446,7 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
     }
 
     if(file->type == file_descriptor_type::file) {
+        assert(ram_file::get(file->inode, file->vnode.fs) == nullptr, "shit");
         return file->vnode.write(file, buffer, count);
     } else if(file->type == file_descriptor_type::pipe) {
         return file->fs_specific.pipe->write(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
@@ -480,7 +574,7 @@ long long sys_close(int fd) {
     thread* current = current_proc;
 
     if(current->is_debug) {
-        //klibc::debug_printf("trying to close fd %d\n", fd);
+        klibc::debug_printf("trying to close fd %d\n", fd);
     }
 
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
@@ -489,7 +583,7 @@ long long sys_close(int fd) {
     if(!file)
         return -EBADF;
 
-    manager->close(file);
+    manager->close(file, current->pid);
     return 0;
 }
 
@@ -773,7 +867,7 @@ long long sys_fcntl(int fd, int request, std::uint64_t arg) {
                 
                 if((std::uint32_t)lock->l_pid != proc->pid) {
                     fd_s->vnode.fs->flock_related.lock.unlock();
-                    return -EFAULT;
+                    return -EAGAIN;
                 }
 
                 lock->l_type = F_UNLCK;
@@ -2001,6 +2095,25 @@ long long sys_ftruncate(int fd, std::size_t new_size) {
 
     file->vnode.truncate(file, new_size);
 
+    ram_file::lock();
+    ram_file::small(file->inode, file->vnode.fs, new_size == 0 ? 0 : ALIGNPAGEUP(new_size) / PAGE_SIZE, nullptr);
+
+    ram_file::content* file_ram = ram_file::get(file->inode, file->vnode.fs);
+
+    if(file_ram != nullptr) {
+        
+        std::size_t end_page = CAST_TO_PAGE(new_size);
+        ram_file::page* END = ram_file::access_page(file->inode, file->vnode.fs, end_page, false, nullptr, 0);
+
+        if(END != nullptr) {
+            void* dest = (void*)((std::uint64_t)END->p + (new_size % PAGE_SIZE));
+            klibc::memset(dest, 0, PAGE_SIZE - (new_size % PAGE_SIZE));
+        }
+
+    }
+
+    ram_file::unlock();
+
     return 0;
 }
 
@@ -2065,5 +2178,10 @@ long long sys_fchownat(int dfd, const char* path, uid_t owner, gid_t group, int 
             target_fd.vnode.close(&target_fd);
     }
 
+    return 0;
+}
+
+long long sys_fsync(int fd) {
+    klibc::debug_printf("fsync was called on fd %d\n", fd);
     return 0;
 }

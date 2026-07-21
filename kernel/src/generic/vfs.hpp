@@ -11,6 +11,7 @@
 #include <utils/ringbuffer.hpp>
 #include <generic/unix_sockets_extern.hpp>
 #include <generic/lock/spinlock.hpp>
+#include <generic/flock.hpp>
 
 struct statfs {
    long    f_type;  
@@ -924,10 +925,28 @@ namespace vfs {
             return lowest;
         }
 
-        void close(file_descriptor* file) {
+        void close(file_descriptor* file, int pid = 0) {
             if(file->type == file_descriptor_type::file) {
+
+                if(file->vnode.fs) {
+                    file->vnode.fs->flock_related.lock.lock();
+                    
+                    flock::flock_list* list = flock::access_source(file->vnode.fs, file->inode);
+                    if(list != nullptr) {
+                        for(std::size_t i = 0;i < list->ptr; i++) {
+                            if(list->is_used == true && list->lock[i].l_type != F_UNLCK && list->lock[i].l_pid == pid) {
+                                list->lock[i].l_type = F_UNLCK;
+                                log("removing lock", "FS");
+                            }
+                        }
+                    }
+
+                    file->vnode.fs->flock_related.lock.unlock();
+                }
+
                 if(file->vnode.close)
                     file->vnode.close(file);
+                
             } else if(file->type == file_descriptor_type::pipe) {
                 file->fs_specific.pipe->close(file->other.pipe_side);
             } else if(file->type == file_descriptor_type::socket) {

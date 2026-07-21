@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <generic/vfs.hpp>
 #include <generic/heap.hpp>
 
 #define F_RDLCK         0
@@ -14,8 +13,8 @@ namespace flock {
     struct flock_struct {
         short l_type;
         short l_whence;
-        off_t l_start;
-        off_t l_len;
+        std::int64_t l_start;
+        std::int64_t l_len;
         int l_pid;
     };
 
@@ -30,8 +29,10 @@ namespace flock {
         flock_list* flocks;
     };
 
-    flock_struct* create(filesystem* fs, int inode, off_t start, off_t len, short lock, short whence, off_t seek, std::size_t file_size, int pid);
-    flock_struct* search(filesystem* fs, int inode, off_t start, off_t len, short whence, off_t seek, std::size_t file_size);
-    void remove(filesystem* fs, int inode);
+    flock_list* access_source(void* fs1, int inode);
+
+    flock_struct* create(void* fs1, int inode, std::int64_t start, std::int64_t len, short lock, short whence, std::int64_t seek, std::size_t file_size, int pid);
+    flock_struct* search(void* fs1, int inode, std::int64_t start, std::int64_t len, short whence, std::int64_t seek, std::size_t file_size);
+    void remove(void* fs1, int inode);
     
 };

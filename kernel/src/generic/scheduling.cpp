@@ -282,6 +282,8 @@ void process::kill(thread* t, int status, bool exit_group) {
             arch::enable_paging(gobject::kernel_root);
         }
 
+        t->op_lock.lock();
+
         t->status = PROCESS_ZOMBIE;
         t->lock.try_lock();
         if(t->syscall_stack) pmm::buddy::free(t->original_syscall_stack - etc::hhdm());
@@ -297,7 +299,8 @@ void process::kill(thread* t, int status, bool exit_group) {
         t->cwd = 0;
         t->sig = 0;
         t->exe = 0;
-        t->vmem->free();
+
+        vmm* v = t->vmem;
 
         t->did_exec = true;
         vfs::fdmanager* manager = (vfs::fdmanager*)t->fd;
@@ -308,6 +311,10 @@ void process::kill(thread* t, int status, bool exit_group) {
         t->fd = 0;
         t->exit_code = status;
         t->exit_request = 0;
+
+        t->op_lock.unlock();
+
+        v->free();
 
     };
     

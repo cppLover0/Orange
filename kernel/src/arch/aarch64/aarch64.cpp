@@ -5,26 +5,26 @@
 #include <generic/arch.hpp>
 
 namespace arch {
-    [[gnu::weak]] void disable_interrupts() {
+    void disable_interrupts() {
         asm volatile("msr daifset, #2"); 
     }
 
-    [[gnu::weak]] void enable_interrupts() {
+    void enable_interrupts() {
         asm volatile("msr daifclr, #2"); 
     }
 
-    [[gnu::weak]] void wait_for_interrupt() {
+    void wait_for_interrupt() {
         asm volatile("wfi"); 
     }
 
-    [[gnu::weak]] void hcf() {
+    void hcf() {
         disable_interrupts();
         while(true) {
             wait_for_interrupt();
         }
     }
 
-    [[gnu::weak]] void tlb_flush(std::uintptr_t hint, std::uintptr_t len) {
+    void tlb_flush(std::uintptr_t hint, std::uintptr_t len) {
         if (len / PAGE_SIZE > 256 || len == 0) {
             __asm__ volatile("dsb ishst" : : : "memory");
             __asm__ volatile("tlbi vmalle1is" : : : "memory");
@@ -40,23 +40,23 @@ namespace arch {
         }
     }
 
-    [[gnu::weak]] void pause() {
+    void pause() {
         asm volatile("isb");
     }
 
-    [[gnu::weak]] const char* name() {
+    const char* name() {
         return "aarch64";
     }
 
-    [[gnu::weak]] int level_paging() {
+    int level_paging() {
         return 4;
     }
 
-    [[gnu::weak]] void memory_barrier() {
+    void memory_barrier() {
         asm volatile("" ::: "memory"); 
     }
 
-    [[gnu::weak]] bool test_interrupts() {
+    bool test_interrupts() {
         uint64_t daif;
         __asm__ __volatile__ (
             "mrs %0, daif"
@@ -65,7 +65,7 @@ namespace arch {
         return (daif & (1 << 7)) == 0;
     }
 
-    [[gnu::weak]] void init(int stage) {
+    void init(int stage) {
         switch(stage) {
         case ARCH_INIT_EARLY:
             aarch64::el::init();

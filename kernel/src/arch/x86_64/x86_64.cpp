@@ -21,36 +21,36 @@
 #include <utils/cmdline.hpp>
 
 namespace arch {
-    [[gnu::weak]] void disable_interrupts() {
+    void disable_interrupts() {
         asm volatile("cli");
     }
 
-    [[gnu::weak]] void enable_interrupts() {
+    void enable_interrupts() {
         asm volatile("sti");
     }
 
-    [[gnu::weak]] void wait_for_interrupt() {
+    void wait_for_interrupt() {
         asm volatile("hlt");
     }
 
-    [[gnu::weak]] void hcf() {
+    void hcf() {
         disable_interrupts();
         while(true) {
             wait_for_interrupt();
         }
     }
 
-    [[gnu::weak]] void pause() {
+    void pause() {
         asm volatile("pause");
     }
 
-    [[gnu::weak]] std::uint64_t current_root() {
+    std::uint64_t current_root() {
         std::uint64_t cr3;
         asm volatile("mov %%cr3, %0" : "=r"(cr3) : : "memory");
         return cr3;
     }
 
-    [[gnu::weak]] void tlb_flush(std::uintptr_t hint, std::uintptr_t len) {
+    void tlb_flush(std::uintptr_t hint, std::uintptr_t len) {
         if (len / PAGE_SIZE > 256 || len == 0) {
             std::uint64_t cr3 = 0;
             asm volatile("mov %%cr3, %0" : "=r"(cr3) : : "memory");
@@ -62,15 +62,15 @@ namespace arch {
         }
     }
 
-    [[gnu::weak]] const char* name() {
+    const char* name() {
         return "x86_64";
     }
 
-    [[gnu::weak]] int level_paging() {
+    int level_paging() {
         return bootloader::bootloader->is_5_level_paging() ? 5 : 4;
     }
 
-    [[gnu::weak]] void init(int stage) {
+    void init(int stage) {
         switch(stage) {
         case ARCH_INIT_EARLY:
             x86_64::init_cpu_data();
@@ -111,20 +111,20 @@ namespace arch {
         }
     }
 
-    [[gnu::weak]] void panic(char* msg) {
+    void panic(char* msg) {
         klibc::printf("Panic with message \"%s\"\r\n",msg);
         arch::hcf();
     }
 
-    [[gnu::weak]] void memory_barrier() {
+    void memory_barrier() {
         asm volatile("lfence" ::: "memory");
     }
 
-    [[gnu::weak]] int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg) {
+    int register_handler(int irq, int type, std::uint64_t flags, void (*func)(void* arg), void* arg) {
         return x86_64::irq::create(irq,type,func,arg,flags);
     }
 
-    [[gnu::weak]] bool test_interrupts() {
+    bool test_interrupts() {
         uint64_t rflags;
         __asm__ __volatile__ (
             "pushfq\n\t"

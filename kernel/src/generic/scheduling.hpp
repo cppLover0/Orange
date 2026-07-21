@@ -82,6 +82,7 @@ struct thread {
     signal_manager* sig;
     signal_member signals_handlers[34];
     sig_stack signal_stack;
+    locks::spinlock op_lock;
     locks::spinlock lock;
     std::atomic<std::uint32_t> futex;
     std::atomic<std::uint32_t> status;
