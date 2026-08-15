@@ -81,6 +81,15 @@ def download_and_extract(url, target_dir, gitflags = None):
         except:
             print("orangestrap: failed to copy source dir")
             sys.exit(1)
+    elif url.startswith("package:"):
+        package = url[8:]
+        print(f"orangestrap: using from already existing package {package}")
+        try:
+            os.system(f"cp -rf .orange-build/sources/{package}-workdir \"{target_dir}\"")
+            os.system(f"rm -rf \"{target_dir}\"/.orange-*")
+        except:
+            print("orangestrap: failed to copy source dir")
+            sys.exit(1)
     elif url.startswith("git:"):
         actual_url = url[4:]
         print(f"orangestrap: cloning git repo {url[4:]}")
@@ -117,10 +126,17 @@ def download_and_extract(url, target_dir, gitflags = None):
         try:
             with tarfile.open(archive_path, "r:*") as tar:
                 members = tar.getmembers()
-                first_member = members[0].name.split('/')[0]
+                
+                first_member = None
+                for m in members:
+                    clean_name = os.path.normpath(m.name)
+                    if clean_name and clean_name != ".":
+                        first_member = clean_name.split(os.sep)[0]
+                        break
+                        
                 tar.extractall(path=parent_dir)
-            
-            extracted_folder = os.path.join(parent_dir, first_member)
+
+            extracted_folder = os.path.join(parent_dir, first_member) if first_member else parent_dir
             
             if os.path.abspath(extracted_folder) != os.path.abspath(target_dir):
                 if os.path.exists(target_dir):
@@ -166,6 +182,7 @@ def install_pkg(pkg):
             return
     
     for dep in recipe_data["deps"]: 
+        print(f"orangestrap: cheching dep {pkg}-{dep}")
         install_pkg(dep)
 
     os.system(f"mkdir -p .orange-build/builds/{pkg}")
@@ -188,6 +205,8 @@ def install_pkg(pkg):
 
     if "git_flags" in recipe_data:
         gitflags1 = recipe_data["git_flags"]
+
+    print(f"{pkg} {f".orange-build/sources/{pkg}"} {os.path.dirname(".orange-build/sources/{pkg}")}")
 
     download_and_extract(recipe_data["url"], f".orange-build/sources/{pkg}", gitflags=gitflags1)
 

@@ -1,0 +1,8 @@
+{
+    "name": "curl",
+    "version": "8.21.0",
+    "deps": ["base-libs", "libnghttp2", "libsoup"],
+    "url": "https://curl.se/download/curl-8.21.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

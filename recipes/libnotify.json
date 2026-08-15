@@ -1,0 +1,8 @@
+{
+    "name": "libnotify",
+    "version": "0.8.8",
+    "deps": ["base-libs", "gtk3"],
+    "url": "https://gitlab.gnome.org/GNOME/libnotify/-/archive/0.8.8/libnotify-0.8.8.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

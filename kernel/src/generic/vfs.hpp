@@ -139,6 +139,10 @@ struct statfs {
 # define __O_TMPFILE   (020000000 | __O_DIRECTORY)
 #endif
 
+#define EFD_SEMAPHORE 1
+#define EFD_CLOEXEC __O_CLOEXEC
+#define EFD_NONBLOCK O_NONBLOCK
+
 inline static std::uint32_t s_to_dt_type(std::uint32_t s_type) {
     switch (s_type)
     {
@@ -170,7 +174,8 @@ enum class file_descriptor_type : std::uint8_t {
     socket = 3,
     epoll = 4,
     memfd = 5,
-    socketpair = 6
+    socketpair = 6,
+    eventfd = 7
 };
 
 struct dirent {
@@ -236,6 +241,8 @@ struct stat {
 #define st_mtime st_mtim.tv_sec
 #define st_ctime st_ctim.tv_sec
 };
+
+void __vfs_symlink_resolve(char* path, char* out, int level);
 
 enum class vfs_file_type : std::uint8_t {
     file = 1,
@@ -523,6 +530,7 @@ struct file_descriptor {
     union {
         std::uint64_t ino;
         std::uint64_t tmpfs_pointer;
+        void* drm_dev;
         vfs::pipe* pipe;
     } fs_specific;
 
@@ -576,6 +584,12 @@ struct file_descriptor {
     } socket;
 
     struct {
+        std::atomic<std::size_t>* ref_count;
+        std::atomic<std::uint64_t>* counter;
+        int flags;
+    } eventfd;
+
+    struct {
         disk* target_disk;
         filesystem* fs;
 
@@ -587,7 +601,8 @@ struct file_descriptor {
 
         void (*ondup)(file_descriptor* file);
 
-        std::int32_t (*mmap)(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size);
+        std::int32_t (*mmap)(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size, std::uint64_t* flags);
+        std::int32_t (*advanced_mmap)(file_descriptor* file, std::int64_t offset, std::uint64_t* out_phys, std::size_t* out_size, std::uint64_t* flags);
 
         signed long (*ls)(file_descriptor* file, char* out, std::size_t count);
         bool (*poll)(file_descriptor* file, vfs_poll_type type);
@@ -767,6 +782,8 @@ namespace vfs {
                     }
                 } else if(new_fd->type == file_descriptor_type::epoll) {
                     new_fd->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
+                } else if(new_fd->type == file_descriptor_type::eventfd) {
+                    *new_fd->eventfd.ref_count = *new_fd->eventfd.ref_count + 1;
                 }
 
                 current = current->next;
@@ -816,6 +833,8 @@ namespace vfs {
                 }
             } else if(new_fd->type == file_descriptor_type::epoll) {
                 new_fd->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
+            } else if(new_fd->type == file_descriptor_type::eventfd) {
+                *new_fd->eventfd.ref_count = *new_fd->eventfd.ref_count + 1;
             }
             new_fd->next = next;
             fd_lock.unlock(state);
@@ -919,6 +938,8 @@ namespace vfs {
                 }
             } else if(lowest->type == file_descriptor_type::epoll) {
                 lowest->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
+            } else if(lowest->type == file_descriptor_type::eventfd) {
+                *lowest->eventfd.ref_count = *lowest->eventfd.ref_count + 1;
             }
 
             this->fd_lock.unlock(state);
@@ -999,9 +1020,15 @@ namespace vfs {
                     }
                     delete file->epoll.info;
                 }
+            } else if(file->type == file_descriptor_type::eventfd) {
+                *file->eventfd.ref_count = *file->eventfd.ref_count - 1;
+                if(*file->eventfd.ref_count == 0) {
+                    delete file->eventfd.ref_count;
+                    delete file->eventfd.counter;
+                }
             } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);
-            }
+            } 
             file->type = file_descriptor_type::unallocated;
         }
 

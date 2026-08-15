@@ -65,6 +65,7 @@ long long sys_gettimeofday(timeval* tv, void* tz) {
 }
 
 long long sys_uname(old_utsname* utsname) {
+    
     thread* current = current_proc;
     if(!is_safe_to_rw(current, (std::uint64_t)utsname, PAGE_SIZE)) {
         return -EFAULT;

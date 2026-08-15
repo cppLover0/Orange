@@ -2,7 +2,7 @@
     "name": "libgmp",
     "version": "6.3.0",
     "deps": ["mlibc", "gcc-host"],
-    "url": "https://ftpmirror.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz",
+    "url": "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz",
     "should_patch": false,
     "use_orange_prefix": true
 }

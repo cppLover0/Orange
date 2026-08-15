@@ -1,3 +1,8 @@
+
+# fbdev is disabled for drm
+
+exit 0
+
 . "${pkg_lib}"
 
 prepare() {

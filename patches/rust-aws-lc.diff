@@ -5,8 +5,8 @@ diff -Naur rust-aws-lc/include/openssl/thread.h rust-aws-lc-clean/include/openss
    void *handle;
  } CRYPTO_MUTEX;
  #elif !defined(__GLIBC__)
--#if defined(OPENSSL_OPENBSD) || defined(__orange__)
-+#if defined(OPENSSL_OPENBSD)
+-#if defined(OPENSSL_OPENBSD)
++#if defined(OPENSSL_OPENBSD) || defined(__orange__)
  #include <pthread.h>
  #endif
  typedef pthread_rwlock_t CRYPTO_MUTEX;

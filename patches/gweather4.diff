@@ -1,0 +1,19 @@
+diff -Naur gweather4/data/meson.build gweather4-clean/data/meson.build
+--- gweather4/data/meson.build	2026-08-09 14:27:14.082715415 +0300
++++ gweather4-clean/data/meson.build	2026-08-09 14:27:55.259845532 +0300
+@@ -24,14 +24,7 @@
+   )
+ endif
+ 
+-# The generated file is architecture dependent (i.e. host endianness)
+-locations_bin = custom_target('locations-db',
+-  command: [gen_locations_variant, '@INPUT@', '@OUTPUT@' ],
+-  input: files('Locations.xml'),
+-  output: '@BASENAME@.bin',
+-  install: true,
+-  install_dir: pkglibdir,
+-)
++# locations_bin will be generated later
+ 
+ install_data('Locations.xml',
+   install_dir: pkgdatadir,

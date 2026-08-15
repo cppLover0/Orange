@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Denable-gtk-doc=false
+    meson_configure -Denable-gtk-doc=false -Dsoup2=false
 }
 
 build() {

@@ -26,7 +26,7 @@ syscall_item syscall_table[] = {
     {false, 4, (void*)sys_munmap},
     {false, 5, (void*)sys_close},
     {false, 6, (void*)sys_futex},
-    {false, 7, (void*)sys_exit_group},
+    {true, 7, (void*)sys_exit_group},
     {false, 8, (void*)sys_exit},
     {false, 9, (void*)sys_arch_prctl},
     {false, 10, (void*)sys_seek},
@@ -127,7 +127,10 @@ syscall_item syscall_table[] = {
     {false, 105, (void*)sys_shutdown},
     {false, 106, (void*)sys_ftruncate},
     {false, 107, (void*)sys_fchownat},
-    {false, 108, (void*)sys_fsync}
+    {false, 108, (void*)sys_fsync},
+    {false, 109, (void*)sys_stackinfo},
+    {false, 110, (void*)sys_fstatfs},
+    {false, 111, (void*)sys_eventfd_create}
 };
 
 // long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);

@@ -1,0 +1,55 @@
+From f038b4d0ca6aede5ee7c5878a2e92370ada5a344 Mon Sep 17 00:00:00 2001
+From: Dennis Bonke <admin@dennisbonke.com>
+Date: Mon, 7 Aug 2023 16:07:20 +0200
+Subject: [PATCH] Add orange support
+
+Signed-off-by: Dennis Bonke <admin@dennisbonke.com>
+---
+ Cargo.toml       | 4 ++++
+ src/backends.rs  | 1 +
+ src/util_libc.rs | 2 +-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/Cargo.toml b/Cargo.toml
+index 41b7a67..4ccbd8d 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -78,6 +78,10 @@ js-sys = { version = "0.3.77", default-features = false, optional = true }
+ [target.'cfg(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none")))'.dev-dependencies]
+ wasm-bindgen-test = "0.3"
+ 
++# orange
++[target.'cfg(target_os = "orange")'.dependencies]
++libc = { version = "0.2.171", default-features = false }
++
+ [lints.rust.unexpected_cfgs]
+ level = "warn"
+ check-cfg = [
+diff --git a/src/backends.rs b/src/backends.rs
+index a07cea2..f316648 100644
+--- a/src/backends.rs
++++ b/src/backends.rs
+@@ -49,6 +49,7 @@ cfg_if! {
+         target_os = "redox",
+         target_os = "nto",
+         target_os = "aix",
++        target_os = "orange",
+     ))] {
+         mod use_file;
+         pub use use_file::*;
+diff --git a/src/util_libc.rs b/src/util_libc.rs
+index 24c53c0..c450808 100644
+--- a/src/util_libc.rs
++++ b/src/util_libc.rs
+@@ -4,7 +4,7 @@ use core::mem::MaybeUninit;
+ cfg_if! {
+     if #[cfg(any(target_os = "netbsd", target_os = "openbsd", target_os = "android", target_os = "cygwin"))] {
+         use libc::__errno as errno_location;
+-    } else if #[cfg(any(target_os = "linux", target_os = "emscripten", target_os = "hurd", target_os = "redox", target_os = "dragonfly"))] {
++    } else if #[cfg(any(target_os = "linux", target_os = "emscripten", target_os = "hurd", target_os = "redox", target_os = "dragonfly", target_os = "orange"))] {
+         use libc::__errno_location as errno_location;
+     } else if #[cfg(any(target_os = "solaris", target_os = "illumos"))] {
+         use libc::___errno as errno_location;
+-- 
+2.48.1
+

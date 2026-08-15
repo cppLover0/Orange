@@ -1,7 +1,7 @@
 {
     "name": "xorg",
     "version": "21.1.22",
-    "deps": ["base-libs", "pixman", "libx11", "xorg-proto", "xtrans", "libxcb", "libxau", "pthread-stubs", "libxkbfile", "libxfont2", "libxcvt", "font-util-host", "libxdmcp"],
+    "deps": ["base-libs", "pixman", "libx11", "xorg-proto", "xtrans", "libxcb", "libxau", "pthread-stubs", "libxkbfile", "libxfont2", "libxcvt", "font-util-host", "libxdmcp", "xorg-libs", "libdrm", "mesa", "libpciaccess"],
     "url": "https://www.x.org/archive/individual/xserver/xorg-server-21.1.22.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

@@ -1,0 +1,22 @@
+diff -Naur libpulse/meson.build libpulse-workdir/meson.build
+--- libpulse/meson.build	2026-07-31 12:01:26.768310868 +0300
++++ libpulse-workdir/meson.build	2026-07-31 12:05:23.884773168 +0300
+@@ -12,14 +12,10 @@
+ # For tarballs, the first split will do nothing, but for builds in git, we
+ # split out suffixes when there are commits since the last tag
+ # (e.g.: v11.99.1-3-gad14bdb24 -> v11.99.1)
+-version_split = pa_version_str.split('-')[0].split('.')
+-pa_version_major = version_split[0].split('v')[0]
+-pa_version_minor = version_split[1]
+-if version_split.length() > 2
+-  pa_version_micro = version_split[2]
+-else
+-  pa_version_micro = '0'
+-endif
++pa_version_major = '16'
++pa_version_minor = '1'
++pa_version_macro = '0'
++
+ pa_version_major_minor = pa_version_major + '.' + pa_version_minor
+ 
+ pa_api_version = 12

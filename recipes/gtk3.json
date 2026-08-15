@@ -1,7 +1,7 @@
 {
     "name": "gtk3",
     "version": "3.24.52",
-    "deps": ["base-libs", "iso-codes", "xorg-libs", "glib-2.0", "cairo", "pango", "harfbuzz", "gdk-pixbuf", "libepoxy", "at-spi-core", "gobject-introspection", "gtk4"],
+    "deps": ["base-libs", "iso-codes", "xorg-libs", "glib-2.0", "cairo", "pango", "harfbuzz", "gdk-pixbuf", "libepoxy", "at-spi-core", "gobject-introspection", "gtk4", "host-valac"],
     "url": "https://github.com/GNOME/gtk/archive/refs/tags/3.24.52.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

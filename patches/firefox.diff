@@ -1,0 +1,1121 @@
+diff -Naur firefox/build/moz.configure/init.configure firefox-clean/build/moz.configure/init.configure
+--- firefox/build/moz.configure/init.configure	2026-07-15 23:30:28.000000000 +0300
++++ firefox-clean/build/moz.configure/init.configure	2026-08-09 10:37:53.637891670 +0300
+@@ -470,6 +470,9 @@
+     if "android" in os:
+         canonical_os = "Android"
+         canonical_kernel = "Linux"
++    elif "orange" in os:
++        canonical_os = "GNU"
++        canonical_kernel = "Linux"
+     elif os.startswith("linux"):
+         canonical_os = "GNU"
+         canonical_kernel = "Linux"
+diff -Naur firefox/build/RunCbindgen.py firefox-clean/build/RunCbindgen.py
+--- firefox/build/RunCbindgen.py	2026-07-15 23:30:28.000000000 +0300
++++ firefox-clean/build/RunCbindgen.py	2026-08-09 10:37:53.638258460 +0300
+@@ -55,7 +55,7 @@
+     # within a tree, the Rust dependencies have been vendored in so Cargo won't
+     # touch the lock file.
+     if not buildconfig.substs.get("JS_STANDALONE"):
+-        args.append("--frozen")
++        args.append("--offline")
+ 
+     stdout, returncode = _run_process(args)
+ 
+diff -Naur firefox/Cargo.lock firefox-clean/Cargo.lock
+--- firefox/Cargo.lock	2026-07-15 23:30:28.000000000 +0300
++++ firefox-clean/Cargo.lock	2026-08-09 10:37:53.638667540 +0300
+@@ -3695,7 +3695,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+@@ -3710,7 +3710,7 @@
+ 
+ [[package]]
+ name = "libloading"
+-version = "0.8.6"
++version = "0.8.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
+ dependencies = [
+@@ -5877,7 +5877,7 @@
+ 
+ [[package]]
+ name = "rustix"
+-version = "0.38.39"
++version = "0.38.44"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "375116bee2be9ed569afe2154ea6a99dfdffd257f533f187498c2a8f5feaf4ee"
+ dependencies = [
+diff -Naur firefox/config/makefiles/rust.mk firefox-clean/config/makefiles/rust.mk
+--- firefox/config/makefiles/rust.mk	2026-07-15 23:30:28.000000000 +0300
++++ firefox-clean/config/makefiles/rust.mk	2026-08-09 10:37:53.639368939 +0300
+@@ -24,7 +24,7 @@
+ # within a tree, the Rust dependencies have been vendored in so Cargo won't
+ # touch the lock file.
+ ifndef JS_STANDALONE
+-cargo_build_flags += --frozen
++cargo_build_flags += --offline
+ endif
+ 
+ cargo_build_flags += --manifest-path $(CARGO_FILE)
+diff -Naur firefox/dom/media/CubebUtils.cpp firefox-clean/dom/media/CubebUtils.cpp
+--- firefox/dom/media/CubebUtils.cpp	2026-07-15 23:30:29.000000000 +0300
++++ firefox-clean/dom/media/CubebUtils.cpp	2026-08-09 10:37:53.639627241 +0300
+@@ -753,7 +753,7 @@
+ #endif
+ #ifdef MOZ_CUBEB_REMOTING
+   if (sCubebSandbox && XRE_IsContentProcess()) {
+-#  if defined(XP_LINUX) && !defined(MOZ_WIDGET_ANDROID)
++#  if defined(XP_LINUX) && !defined(MOZ_WIDGET_ANDROID) && !defined(__orange__)
+     if (atp_set_real_time_limit(0, 48000)) {
+       NS_WARNING("could not set real-time limit in CubebUtils::InitLibrary");
+     }
+diff -Naur firefox/dom/media/moz.build firefox-clean/dom/media/moz.build
+--- firefox/dom/media/moz.build	2026-07-15 23:30:30.000000000 +0300
++++ firefox-clean/dom/media/moz.build	2026-08-09 10:37:53.639884202 +0300
+@@ -321,7 +321,7 @@
+     "XiphExtradata.cpp",
+ ]
+ 
+-if CONFIG["OS_TARGET"] == "Linux":
++if CONFIG["OS_TARGET"] == "Linux" and CONFIG["TARGET_RAW_OS"] != "orange-mlibc":
+     UNIFIED_SOURCES += ["UnderrunHandlerLinux.cpp"]
+ else:
+     UNIFIED_SOURCES += ["UnderrunHandlerNoop.cpp"]
+diff -Naur firefox/dom/webgpu/tests/cts/vendor/Cargo.lock firefox-clean/dom/webgpu/tests/cts/vendor/Cargo.lock
+--- firefox/dom/webgpu/tests/cts/vendor/Cargo.lock	2026-07-15 23:30:30.000000000 +0300
++++ firefox-clean/dom/webgpu/tests/cts/vendor/Cargo.lock	2026-08-09 10:37:53.639937625 +0300
+@@ -230,7 +230,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/gfx/angle/checkout/src/common/platform.h firefox-clean/gfx/angle/checkout/src/common/platform.h
+--- firefox/gfx/angle/checkout/src/common/platform.h	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/gfx/angle/checkout/src/common/platform.h	2026-08-09 10:37:53.640355521 +0300
+@@ -23,7 +23,7 @@
+ #elif defined(__ggp__)
+ #    define ANGLE_PLATFORM_GGP 1
+ #    define ANGLE_PLATFORM_POSIX 1
+-#elif defined(__linux__) || defined(EMSCRIPTEN)
++#elif defined(__linux__) || defined(EMSCRIPTEN) || defined(__orange__)
+ #    define ANGLE_PLATFORM_LINUX 1
+ #    define ANGLE_PLATFORM_POSIX 1
+ #elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) ||              \
+diff -Naur firefox/ipc/chromium/src/base/dir_reader_linux.h firefox-clean/ipc/chromium/src/base/dir_reader_linux.h
+--- firefox/ipc/chromium/src/base/dir_reader_linux.h	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/ipc/chromium/src/base/dir_reader_linux.h	2026-08-09 10:37:53.640554781 +0300
+@@ -11,7 +11,11 @@
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <stdint.h>
++
++#if !defined(__orange__)
+ #include <sys/syscall.h>
++#endif
++
+ #include <unistd.h>
+ 
+ #include "base/logging.h"
+diff -Naur firefox/ipc/chromium/src/base/dir_reader_posix.h firefox-clean/ipc/chromium/src/base/dir_reader_posix.h
+--- firefox/ipc/chromium/src/base/dir_reader_posix.h	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/ipc/chromium/src/base/dir_reader_posix.h	2026-08-09 10:37:53.640733242 +0300
+@@ -18,11 +18,11 @@
+ // seems worse than falling back to enumerating all file descriptors so we will
+ // probably never implement this on the Mac.
+ 
+-#if defined(XP_LINUX)
++#if defined(XP_LINUX) && !defined(__orange__)
+ #  include "base/dir_reader_linux.h"
+-#elif (defined(__DragonFly__) || defined(XP_FREEBSD) || defined(XP_NETBSD) || \
++#elif ((defined(__DragonFly__) || defined(XP_FREEBSD) || defined(XP_NETBSD) || \
+        defined(XP_OPENBSD)) &&                                                \
+-    !defined(__GLIBC__)
++    !defined(__GLIBC__)) && !defined(__orange__)
+ #  include "base/dir_reader_bsd.h"
+ #else
+ #  include "base/dir_reader_fallback.h"
+@@ -30,11 +30,11 @@
+ 
+ namespace base {
+ 
+-#if defined(XP_LINUX)
++#if defined(XP_LINUX) && !defined(__orange__)
+ typedef DirReaderLinux DirReaderPosix;
+ #elif (defined(__DragonFly__) || defined(XP_FREEBSD) || defined(XP_NETBSD) || \
+        defined(XP_OPENBSD)) &&                                                \
+-    !defined(__GLIBC__)
++    !defined(__GLIBC__) && !defined(__orange__)
+ typedef DirReaderBSD DirReaderPosix;
+ #else
+ typedef DirReaderFallback DirReaderPosix;
+diff -Naur firefox/ipc/chromium/src/base/platform_thread_posix.cc firefox-clean/ipc/chromium/src/base/platform_thread_posix.cc
+--- firefox/ipc/chromium/src/base/platform_thread_posix.cc	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/ipc/chromium/src/base/platform_thread_posix.cc	2026-08-09 10:37:53.640911292 +0300
+@@ -13,6 +13,8 @@
+ #  include <mach/mach.h>
+ #elif defined(XP_NETBSD)
+ #  include <lwp.h>
++#elif defined(__orange__)
++#include <unistd.h>
+ #elif defined(XP_LINUX)
+ #  include <sys/syscall.h>
+ #  include <sys/prctl.h>
+@@ -50,6 +52,8 @@
+   mach_port_t port = mach_thread_self();
+   mach_port_deallocate(mach_task_self(), port);
+   return port;
++#elif defined(__orange__)
++  return gettid();
+ #elif defined(XP_LINUX)
+   return syscall(__NR_gettid);
+ #elif defined(XP_OPENBSD) || defined(XP_SOLARIS) || defined(__GLIBC__)
+diff -Naur firefox/ipc/chromium/src/third_party/moz.build firefox-clean/ipc/chromium/src/third_party/moz.build
+--- firefox/ipc/chromium/src/third_party/moz.build	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/ipc/chromium/src/third_party/moz.build	2026-08-09 10:37:53.640937658 +0300
+@@ -57,7 +57,7 @@
+     UNIFIED_SOURCES += [
+         'libevent/epoll.c',
+     ]
+-    if CONFIG['OS_TARGET'] != 'Android':
++    if CONFIG['OS_TARGET'] != 'Android' and CONFIG["TARGET_RAW_OS"] != "orange-mlibc":
+         UNIFIED_SOURCES += [
+             'libevent/epoll_sub.c',
+         ]
+diff -Naur firefox/ipc/glue/SharedMemoryPlatform_posix.cpp firefox-clean/ipc/glue/SharedMemoryPlatform_posix.cpp
+--- firefox/ipc/glue/SharedMemoryPlatform_posix.cpp	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/ipc/glue/SharedMemoryPlatform_posix.cpp	2026-08-09 10:37:53.641289623 +0300
+@@ -15,7 +15,7 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
+-#ifdef XP_LINUX
++#if defined(XP_LINUX) && !defined(__orange__)
+ #  include "base/linux_memfd_defs.h"
+ #endif
+ #ifdef MOZ_WIDGET_GTK
+diff -Naur firefox/js/src/fuzz-tests/gluesmith/Cargo.toml firefox-clean/js/src/fuzz-tests/gluesmith/Cargo.toml
+--- firefox/js/src/fuzz-tests/gluesmith/Cargo.toml	2026-07-15 23:30:31.000000000 +0300
++++ firefox-clean/js/src/fuzz-tests/gluesmith/Cargo.toml	2026-08-09 10:37:53.641491509 +0300
+@@ -8,4 +8,4 @@
+ [dependencies]
+ wasm-smith = "0.219.1"
+ arbitrary = { version = "1.0.0", features = ["derive"] }
+-libc = "0.2"
++libc = "0.2.186"
+diff -Naur firefox/js/src/wasm/WasmSignalHandlers.cpp firefox-clean/js/src/wasm/WasmSignalHandlers.cpp
+--- firefox/js/src/wasm/WasmSignalHandlers.cpp	2026-07-15 23:30:34.000000000 +0300
++++ firefox-clean/js/src/wasm/WasmSignalHandlers.cpp	2026-08-09 10:37:53.641693484 +0300
+@@ -109,8 +109,8 @@
+ #      define R01_sig(p) ((p)->sc_frame.fixreg[1])
+ #      define R32_sig(p) ((p)->sc_frame.srr0)
+ #    endif
+-#  elif defined(__linux__) || defined(__sun)
+-#    if defined(__linux__)
++#  elif defined(__linux__) || defined(__sun) || defined(__orange__)
++#    if defined(__linux__) || defined(__orange__)
+ #      define EIP_sig(p) ((p)->uc_mcontext.gregs[REG_EIP])
+ #      define EBP_sig(p) ((p)->uc_mcontext.gregs[REG_EBP])
+ #      define ESP_sig(p) ((p)->uc_mcontext.gregs[REG_ESP])
+diff -Naur firefox/media/ffvpx/ffvpxcommon.mozbuild firefox-clean/media/ffvpx/ffvpxcommon.mozbuild
+--- firefox/media/ffvpx/ffvpxcommon.mozbuild	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/media/ffvpx/ffvpxcommon.mozbuild	2026-08-09 10:37:53.641945445 +0300
+@@ -37,6 +37,7 @@
+     '-Wno-unused-function',
+     # XXX This does not seem to have any effect on some versions of GCC.
+     '-Wno-deprecated-declarations',
++    '-Wno-incompatible-pointer-types',
+ ]
+ if CONFIG['CC_TYPE'] in ('clang', 'clang-cl'):
+     CFLAGS += [
+diff -Naur firefox/memory/build/mozjemalloc.cpp firefox-clean/memory/build/mozjemalloc.cpp
+--- firefox/memory/build/mozjemalloc.cpp	2026-07-15 23:30:35.000000000 +0300
++++ firefox-clean/memory/build/mozjemalloc.cpp	2026-08-09 10:37:53.642406675 +0300
+@@ -269,7 +269,7 @@
+ // On Alpha, glibc has a bug that prevents syscall() to work for system
+ // calls with 6 arguments.
+ #if (defined(XP_LINUX) && !defined(__alpha__)) || \
+-    (defined(__FreeBSD_kernel__) && defined(__GLIBC__))
++    (defined(__FreeBSD_kernel__) && defined(__GLIBC__)) && !defined(__orange__)
+ #  include <sys/syscall.h>
+ #  if defined(SYS_mmap) || defined(SYS_mmap2)
+ static inline void* _mmap(void* addr, size_t length, int prot, int flags,
+diff -Naur firefox/mfbt/TaggedAnonymousMemory.cpp firefox-clean/mfbt/TaggedAnonymousMemory.cpp
+--- firefox/mfbt/TaggedAnonymousMemory.cpp	2026-07-15 23:30:35.000000000 +0300
++++ firefox-clean/mfbt/TaggedAnonymousMemory.cpp	2026-08-09 10:37:53.643215097 +0300
+@@ -4,7 +4,7 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-#ifdef XP_LINUX
++#if defined(XP_LINUX) && !defined(__orange__)
+ 
+ #  include "mozilla/TaggedAnonymousMemory.h"
+ 
+diff -Naur firefox/mfbt/TaggedAnonymousMemory.h firefox-clean/mfbt/TaggedAnonymousMemory.h
+--- firefox/mfbt/TaggedAnonymousMemory.h	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mfbt/TaggedAnonymousMemory.h	2026-08-09 10:37:53.643390903 +0300
+@@ -42,7 +42,7 @@
+ 
+ #  include "mozilla/Types.h"
+ 
+-#  ifdef XP_LINUX
++#  if defined(XP_LINUX) && !defined(__orange__)
+ 
+ #    ifdef __cplusplus
+ extern "C" {
+diff -Naur firefox/mfbt/UniquePtrExtensions.h firefox-clean/mfbt/UniquePtrExtensions.h
+--- firefox/mfbt/UniquePtrExtensions.h	2026-07-15 23:30:35.000000000 +0300
++++ firefox-clean/mfbt/UniquePtrExtensions.h	2026-08-09 10:39:43.009617651 +0300
+@@ -98,7 +98,7 @@
+ // Can't include <windows.h> to get the actual definition of HANDLE
+ // because of namespace pollution.
+ typedef void* FileHandleType;
+-#  elif defined(XP_UNIX)
++#  elif defined(XP_UNIX) || defined(__orange__)
+ typedef int FileHandleType;
+ #  else
+ #    error "Unsupported OS?"
+diff -Naur firefox/mozglue/baseprofiler/core/platform.cpp firefox-clean/mozglue/baseprofiler/core/platform.cpp
+--- firefox/mozglue/baseprofiler/core/platform.cpp	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mozglue/baseprofiler/core/platform.cpp	2026-08-09 10:37:53.643690855 +0300
+@@ -2272,7 +2272,7 @@
+ #  include "platform-win32.cpp"
+ #elif defined(GP_OS_darwin)
+ #  include "platform-macos.cpp"
+-#elif defined(GP_OS_linux) || defined(GP_OS_android) || defined(GP_OS_freebsd)
++#elif defined(GP_OS_linux) || defined(GP_OS_android) || defined(GP_OS_freebsd) || defined(__orange__)
+ #  include "platform-linux-android.cpp"
+ #else
+ #  error "bad platform"
+diff -Naur firefox/mozglue/baseprofiler/core/platform-linux-android.cpp firefox-clean/mozglue/baseprofiler/core/platform-linux-android.cpp
+--- firefox/mozglue/baseprofiler/core/platform-linux-android.cpp	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mozglue/baseprofiler/core/platform-linux-android.cpp	2026-08-09 10:37:53.644163417 +0300
+@@ -41,10 +41,13 @@
+ #include <signal.h>
+ #include <sys/time.h>
+ #include <sys/resource.h>
++#if !defined(__orange__)
+ #include <sys/syscall.h>
++#endif
+ #include <sys/types.h>
+ #include <stdlib.h>
+ #include <sched.h>
++#define _GNU_SOURCE
+ #include <ucontext.h>
+ // Ubuntu Dapper requires memory pages to be marked as
+ // executable. Otherwise, OS raises an exception when executing code
+@@ -137,10 +140,15 @@
+ #  define SYS_tgkill __NR_tgkill
+ #endif
+ 
+-#if defined(GP_OS_linux) || defined(GP_OS_android)
++#if (defined(GP_OS_linux) || defined(GP_OS_android)) && !defined(__orange__)
+ int tgkill(pid_t tgid, pid_t tid, int signalno) {
+   return syscall(SYS_tgkill, tgid, tid, signalno);
+ }
++#elif defined(__orange__)
++
++#define _GNU_SOURCE
++#include <signal.h>
++
+ #endif
+ 
+ #if defined(GP_OS_freebsd)
+diff -Naur firefox/mozglue/baseprofiler/core/PlatformMacros.h firefox-clean/mozglue/baseprofiler/core/PlatformMacros.h
+--- firefox/mozglue/baseprofiler/core/PlatformMacros.h	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mozglue/baseprofiler/core/PlatformMacros.h	2026-08-09 10:37:53.644365322 +0300
+@@ -122,7 +122,10 @@
+ #  define GP_PLAT_arm64_windows 1
+ #  define GP_ARCH_arm64 1
+ #  define GP_OS_windows 1
+-
++#elif defined(__orange__) && defined(__x86_64__)
++#  define GP_PLAT_amd64_linux 1
++#  define GP_ARCH_amd64 1
++#  define GP_OS_linux 1
+ #else
+ #  error "Unsupported platform"
+ #endif
+diff -Naur firefox/mozglue/baseprofiler/core/ProfilerUtils.cpp firefox-clean/mozglue/baseprofiler/core/ProfilerUtils.cpp
+--- firefox/mozglue/baseprofiler/core/ProfilerUtils.cpp	2026-07-15 23:30:37.000000000 +0300
++++ firefox-clean/mozglue/baseprofiler/core/ProfilerUtils.cpp	2026-08-09 10:37:53.644530968 +0300
+@@ -9,6 +9,8 @@
+ // below, with each block being self-contained with all the #includes and
+ // definitions it needs, to keep platform code easier to maintain in isolation.
+ 
++#define _GNU_SOURCE
++
+ #include "mozilla/BaseProfilerUtils.h"
+ 
+ // --------------------------------------------- WASI process & thread ids
+@@ -54,6 +56,7 @@
+ #else
+ // All non-Windows platforms are assumed to be POSIX, which has getpid().
+ 
++#define _GNU_SOURCE
+ #  include <unistd.h>
+ 
+ namespace mozilla::baseprofiler {
+@@ -88,6 +91,19 @@
+ 
+ namespace mozilla::baseprofiler {
+ 
++BaseProfilerThreadId profiler_current_thread_id() {
++  return BaseProfilerThreadId::FromNativeId(gettid());
++}
++
++}  // namespace mozilla::baseprofiler
++
++#  elif defined(__orange__)
++
++#define _GNU_SOURCE
++#  include <unistd.h>
++
++namespace mozilla::baseprofiler {
++
+ BaseProfilerThreadId profiler_current_thread_id() {
+   return BaseProfilerThreadId::FromNativeId(gettid());
+ }
+diff -Naur firefox/mozglue/baseprofiler/core/shared-libraries-noop.cc firefox-clean/mozglue/baseprofiler/core/shared-libraries-noop.cc
+--- firefox/mozglue/baseprofiler/core/shared-libraries-noop.cc	1970-01-01 03:00:00.000000000 +0300
++++ firefox-clean/mozglue/baseprofiler/core/shared-libraries-noop.cc	2026-08-09 10:37:53.644674893 +0300
+@@ -0,0 +1,4 @@
++#include "SharedLibraries.h"
++
++SharedLibraryInfo SharedLibraryInfo::GetInfoForSelf() { return {}; }
++void SharedLibraryInfo::Initialize() { /* do nothing */ }
+\ В конце файла нет новой строки
+diff -Naur firefox/mozglue/baseprofiler/moz.build firefox-clean/mozglue/baseprofiler/moz.build
+--- firefox/mozglue/baseprofiler/moz.build	2026-07-15 23:30:37.000000000 +0300
++++ firefox-clean/mozglue/baseprofiler/moz.build	2026-08-09 10:37:53.644820611 +0300
+@@ -28,7 +28,11 @@
+         "core/RegisteredThread.cpp",
+     ]
+ 
+-    if CONFIG["OS_TARGET"] in ("Android", "Linux", "FreeBSD"):
++    if CONFIG["TARGET_RAW_OS"] == "orange-mlibc":
++        SOURCES += [
++            "core/shared-libraries-noop.cc",
++        ]
++    elif CONFIG["OS_TARGET"] in ("Android", "Linux", "FreeBSD"):
+         # These files cannot be built in unified mode because of name clashes with mozglue headers on Android.
+         SOURCES += [
+             "core/shared-libraries-linux.cc",
+diff -Naur firefox/mozglue/interposers/env_interposer.cpp firefox-clean/mozglue/interposers/env_interposer.cpp
+--- firefox/mozglue/interposers/env_interposer.cpp	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mozglue/interposers/env_interposer.cpp	2026-08-09 10:37:53.644986397 +0300
+@@ -8,6 +8,8 @@
+ 
+ #include "InterposerHelper.h"
+ 
++extern char **environ;
++
+ // The interposers in this file cover all the functions used to access the
+ // environment (getenv(), putenv(), setenv(), unsetenv() and clearenv()). They
+ // all use the mutex below for synchronization to prevent races that caused
+diff -Naur firefox/mozglue/misc/PlatformConditionVariable.h firefox-clean/mozglue/misc/PlatformConditionVariable.h
+--- firefox/mozglue/misc/PlatformConditionVariable.h	2026-07-15 23:30:37.000000000 +0300
++++ firefox-clean/mozglue/misc/PlatformConditionVariable.h	2026-08-09 10:37:53.645160008 +0300
+@@ -55,10 +55,14 @@
+   PlatformData* platformData();
+ 
+ #if !defined(XP_WIN) && !defined(__wasi__)
++#  ifdef __orange__
++  void* platformData_[(sizeof(pthread_cond_t) + sizeof(void*) - 1) / sizeof(void*)];
++#  else
+   void* platformData_[sizeof(pthread_cond_t) / sizeof(void*)];
+   static_assert(sizeof(pthread_cond_t) / sizeof(void*) != 0 &&
+                     sizeof(pthread_cond_t) % sizeof(void*) == 0,
+                 "pthread_cond_t must have pointer alignment");
++#endif
+ #else
+   void* platformData_[4];
+ #endif
+diff -Naur firefox/mozglue/misc/PlatformMutex.h firefox-clean/mozglue/misc/PlatformMutex.h
+--- firefox/mozglue/misc/PlatformMutex.h	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mozglue/misc/PlatformMutex.h	2026-08-09 10:37:53.645321637 +0300
+@@ -49,10 +49,14 @@
+   PlatformData* platformData();
+ 
+ #if !defined(XP_WIN) && !defined(__wasi__)
++#  ifdef __orange__
++  void* platformData_[(sizeof(pthread_mutex_t) + sizeof(void*) - 1) / sizeof(void*)];
++#  else
+   void* platformData_[sizeof(pthread_mutex_t) / sizeof(void*)];
+   static_assert(sizeof(pthread_mutex_t) / sizeof(void*) != 0 &&
+                     sizeof(pthread_mutex_t) % sizeof(void*) == 0,
+                 "pthread_mutex_t must have pointer alignment");
++#endif
+ #else
+   void* platformData_[6];
+ #endif
+diff -Naur firefox/mozglue/misc/TimeStamp_posix.cpp firefox-clean/mozglue/misc/TimeStamp_posix.cpp
+--- firefox/mozglue/misc/TimeStamp_posix.cpp	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/mozglue/misc/TimeStamp_posix.cpp	2026-08-09 10:37:53.645495108 +0300
+@@ -13,8 +13,13 @@
+ // obtained with this API; see TimeDuration::Resolution;
+ //
+ 
++#if !defined(__orange__)
+ #include <sys/syscall.h>
++#endif
+ #include <time.h>
++#if defined(__orange__)
++#define _GNU_SOURCE
++#endif
+ #include <unistd.h>
+ #include <string.h>
+ 
+@@ -272,10 +277,17 @@
+     return nullptr;
+   }
+ 
++#ifdef __orange__
++  char threadStat[40];
++  SprintfLiteral(threadStat, "/proc/self/task/%d/stat", (pid_t)gettid());
++#else
++
+   char threadStat[40];
+   SprintfLiteral(threadStat, "/proc/self/task/%d/stat",
+                  (pid_t)syscall(__NR_gettid));
+ 
++#endif
++
+   uint64_t threadJiffies = JiffiesSinceBoot(threadStat);
+   uint64_t selfJiffies = JiffiesSinceBoot("/proc/self/stat");
+ 
+diff -Naur firefox/netwerk/dns/PlatformDNSUnix.cpp firefox-clean/netwerk/dns/PlatformDNSUnix.cpp
+--- firefox/netwerk/dns/PlatformDNSUnix.cpp	2026-07-15 23:30:36.000000000 +0300
++++ firefox-clean/netwerk/dns/PlatformDNSUnix.cpp	2026-08-09 10:37:53.645675682 +0300
+@@ -19,6 +19,14 @@
+ #include <netinet/in.h>
+ #include <resolv.h>
+ 
++#if defined(__orange__)
++#  include <arpa/nameser.h>
++static inline int res_nquery(struct __res_state*, const char* dname, int klass,
++                             int type, unsigned char* answer, int anslen) {
++  return res_query(dname, klass, type, answer, anslen);
++}
++#endif
++
+ namespace mozilla::net {
+ 
+ #if defined(HAVE_RES_NINIT)
+diff -Naur firefox/python/mozbuild/mozbuild/configure/constants.py firefox-clean/python/mozbuild/mozbuild/configure/constants.py
+--- firefox/python/mozbuild/mozbuild/configure/constants.py	2026-07-15 23:30:37.000000000 +0300
++++ firefox-clean/python/mozbuild/mozbuild/configure/constants.py	2026-08-09 10:37:53.645832291 +0300
+@@ -143,7 +143,7 @@
+     "DragonFly": "__DragonFly__",
+     "FreeBSD": "__FreeBSD__",
+     "kFreeBSD": "__FreeBSD_kernel__",
+-    "Linux": "__linux__",
++    "Linux": "__linux__ || __orange__",
+     "NetBSD": "__NetBSD__",
+     "OpenBSD": "__OpenBSD__",
+     "SunOS": "__sun__",
+diff -Naur firefox/third_party/drm/drm/include/libdrm/drm.h firefox-clean/third_party/drm/drm/include/libdrm/drm.h
+--- firefox/third_party/drm/drm/include/libdrm/drm.h	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/drm/drm/include/libdrm/drm.h	2026-08-09 10:37:53.646034196 +0300
+@@ -35,7 +35,7 @@
+ #ifndef _DRM_H_
+ #define _DRM_H_
+ 
+-#if   defined(__linux__)
++#if   defined(__linux__) || defined(__orange__)
+ 
+ #include <linux/types.h>
+ #include <asm/ioctl.h>
+diff -Naur firefox/third_party/drm/drm/xf86drm.h firefox-clean/third_party/drm/drm/xf86drm.h
+--- firefox/third_party/drm/drm/xf86drm.h	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/drm/drm/xf86drm.h	2026-08-09 10:37:53.646331113 +0300
+@@ -47,7 +47,7 @@
+ #define DRM_MAX_MINOR   64 /* deprecated */
+ #endif
+ 
+-#if defined(__linux__)
++#if defined(__linux__) || defined(__orange__)
+ 
+ #define DRM_IOCTL_NR(n)		_IOC_NR(n)
+ #define DRM_IOC_VOID		_IOC_NONE
+diff -Naur firefox/third_party/rust/askama/.cargo-checksum.json firefox-clean/third_party/rust/askama/.cargo-checksum.json
+--- firefox/third_party/rust/askama/.cargo-checksum.json	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/rust/askama/.cargo-checksum.json	2026-08-09 10:37:53.646571602 +0300
+@@ -1 +1 @@
+-{"files":{"Cargo.lock":"cad3d8819bf20edbd9c47036cefa5310b2d22b195eb476336730da9719d58a26","Cargo.toml":"5ebc58027a0fd606bd36036295f375c358d0b21f8cad26d777e95840bfdfb24e","LICENSE-APACHE":"87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3","LICENSE-MIT":"df20e0180764bf5bd76f74d47bc9e8c0069a666401629c390003a1d5eba99c92","README.md":"eae12ef134f50f2b4439996b72074190e11d04f4cf9d19b6adb282801eaa0ae4","_typos.toml":"72588ef2385568368e7ec251c8451f75a16343d5a06b4c2b312beba2cdf5b308","benches/escape.rs":"bbf2e79702f8216cce9b2496cd028d8163ab261dfc4d4d6507a6dbfdca02ca5b","benches/strings.inc":"76b8ac1b79abeaced7831a03aaedf8dd85057eac78e0cecbe68f589d38f0592b","benches/to-json.rs":"ed7beddc73149e91e35408302b6314c615286bf5be360e63fe5e9364411a1f56","clippy.toml":"d141089a5edd91c83ae211257638df2ef1ca53f66b30faa98b22ea1447faeeff","deny.toml":"b7637b42164b1bbba883c422187292cf08ad624691145b5124eaf10edf38c164","src/ascii_str.rs":"272ed728e3e024cefbf16b9a004ad806781cff95f613d34c35a4e8479224d16f","src/error.rs":"0b5615a5b9d8bacedb473ca2c5f8f0d6b41faf58f5c5fc12bb72c1bea7b7efe2","src/filters/alloc.rs":"b3595393fe932043f1df0c579e4f7792f56d2ffd6ee351861d0087fbf3e49aec","src/filters/builtin.rs":"34d6dd5b6603c94b9a3f393f84adf4001e99addf50e60412c559e4748dc3eac6","src/filters/escape.rs":"e4dc1ab7a3b92c3ec402ad4e87989c08be4aa0d892eee65124735f41a0acdeec","src/filters/humansize.rs":"7d139ab50da3c90856b271fac68ed172d014d8a6ed43892e78a11e8cbdb7b0ac","src/filters/json.rs":"0e880bbc49787b83c880760038c8d900c2b1870d81d07211fa0873f77f171825","src/filters/mod.rs":"9a58841eb3173e73225bb40116d783d0b3a59d8f6b452bbe4efd5f0fd7dfd43a","src/filters/urlencode.rs":"5adbe8d4c0811146af02b061a4c648afdf45e29b0ee271d20d116b30479373cd","src/helpers.rs":"3e3e4a9a7698892f96c48a9be1305a88852b91ea278c22f2eacdfd833fde31a7","src/html.rs":"91ee580663d8ad08460373d9e5c8ed196ab0ce61eb113dc8d43ad19ca6671422","src/lib.rs":"dd806557cf5f54928f272a425d0630de850516b58dcb9f944d34b6bfef6b528a","src/values.rs":"7162ffa2dc5469d8f819ab61f9ed4fbe3b5f478cfb9eed74d141fb184c0c1161","tomlfmt.toml":"a33c21547346656aead5f46f2f07e1965f4cf0c6f2a16deb8ec06019619267aa"},"package":"5d4744ed2eef2645831b441d8f5459689ade2ab27c854488fbab1fbe94fce1a7"}
+\ В конце файла нет новой строки
++{"files":{"Cargo.lock":"c38d0485608980c30009a8cb93faef9bf5cd7a87a9a8c24840cf5d344781a941"},"package":"5d4744ed2eef2645831b441d8f5459689ade2ab27c854488fbab1fbe94fce1a7"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/askama/Cargo.lock firefox-clean/third_party/rust/askama/Cargo.lock
+--- firefox/third_party/rust/askama/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/askama/Cargo.lock	2026-08-09 10:37:53.646721638 +0300
+@@ -290,7 +290,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/askama_derive/.cargo-checksum.json firefox-clean/third_party/rust/askama_derive/.cargo-checksum.json
+--- firefox/third_party/rust/askama_derive/.cargo-checksum.json	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/rust/askama_derive/.cargo-checksum.json	2026-08-09 10:37:53.646907573 +0300
+@@ -1 +1 @@
+-{"files":{"Cargo.lock":"8008614e39c3bc17f343022acece92f83df083c063fadd7285b487edb6144cd0","Cargo.toml":"82346a11579069448d1e1d80d0ace534961ec3614a5b1cf08ef26e9120a3373d","LICENSE-APACHE":"87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3","LICENSE-MIT":"df20e0180764bf5bd76f74d47bc9e8c0069a666401629c390003a1d5eba99c92","README.md":"7ed9662073cd064bc6e5e57cd41658d318e9ae32285c5d6682a7c8ba83baef6c","_typos.toml":"72588ef2385568368e7ec251c8451f75a16343d5a06b4c2b312beba2cdf5b308","clippy.toml":"d141089a5edd91c83ae211257638df2ef1ca53f66b30faa98b22ea1447faeeff","deny.toml":"b7637b42164b1bbba883c422187292cf08ad624691145b5124eaf10edf38c164","empty_test_config.toml":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","src/config.rs":"56d724c4c21bd09c93ce8971226a5273eb86696eb1592e127149edcb43a2e4a1","src/generator.rs":"b3f3326072e436cc0ba7e4130e4298d8f3e5d8840121396b153aab4a13b1d403","src/generator/expr.rs":"1fcbbb2b7db536940d80d64863168f27f25b3b6c585c8f6522e5f38be3f800f9","src/generator/node.rs":"5c1dbee8e6ad4dacfa0a6a0c796489d2dd76f4625363beba866194fea65e3677","src/heritage.rs":"d726ea8a567be3503f7f6efa80f21fe009cc590dff63f0d4ad76cc8dd3c5bd43","src/html.rs":"91ee580663d8ad08460373d9e5c8ed196ab0ce61eb113dc8d43ad19ca6671422","src/input.rs":"0e2c0d4b574198511068069e7a11f6f2ab99a76281f45c7490f39cca631b9590","src/integration.rs":"bcdc1b7b1729487a8e4c756890e6d356622b725f1b9a41bff76eca87e71eaa0b","src/lib.rs":"0b9496bd40dc2bdca7ad825061e297ee9524ee18a30f7e065c4c6b583caca72a","src/tests.rs":"262039b9f6cbbf7a838ec55afbb6d6c0ffdf135090a58e157c66b63c8ead0c3b","templates/a.html":"b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c","templates/b.html":"7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730","templates/include1.html":"5a4304e5548d5cf618779383dcc27eba93d826feff1c41a348101c734c034ea2","templates/include2.html":"cd319fee61d9d0e8a00a40d55e91c338fd9e156e69773f03ba5c31db02892eb2","templates/include3.html":"1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2","templates/sub/b.html":"7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730","templates/sub/c.html":"bf07a7fbb825fc0aae7bf4a1177b2b31fcf8a3feeaf7092761e18c859ee52a9c","templates/sub/sub1/d.html":"86b0c5a1e2b73b08fd54c727f4458649ed9fe3ad1b6e8ac9460c070113509a1e","tomlfmt.toml":"a33c21547346656aead5f46f2f07e1965f4cf0c6f2a16deb8ec06019619267aa"},"package":"d661e0f57be36a5c14c48f78d09011e67e0cb618f269cca9f2fd8d15b68c46ac"}
+\ В конце файла нет новой строки
++{"files":{"Cargo.lock":"d1a84b746c4183ca5744cd02ddfd39d7240ba7010cd77e63304e5addd0b5ec72","Cargo.toml":"82346a11579069448d1e1d80d0ace534961ec3614a5b1cf08ef26e9120a3373d","LICENSE-APACHE":"87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3","LICENSE-MIT":"df20e0180764bf5bd76f74d47bc9e8c0069a666401629c390003a1d5eba99c92","README.md":"7ed9662073cd064bc6e5e57cd41658d318e9ae32285c5d6682a7c8ba83baef6c","_typos.toml":"72588ef2385568368e7ec251c8451f75a16343d5a06b4c2b312beba2cdf5b308","clippy.toml":"d141089a5edd91c83ae211257638df2ef1ca53f66b30faa98b22ea1447faeeff","deny.toml":"b7637b42164b1bbba883c422187292cf08ad624691145b5124eaf10edf38c164","empty_test_config.toml":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","src/config.rs":"56d724c4c21bd09c93ce8971226a5273eb86696eb1592e127149edcb43a2e4a1","src/generator.rs":"b3f3326072e436cc0ba7e4130e4298d8f3e5d8840121396b153aab4a13b1d403","src/generator/expr.rs":"1fcbbb2b7db536940d80d64863168f27f25b3b6c585c8f6522e5f38be3f800f9","src/generator/node.rs":"5c1dbee8e6ad4dacfa0a6a0c796489d2dd76f4625363beba866194fea65e3677","src/heritage.rs":"d726ea8a567be3503f7f6efa80f21fe009cc590dff63f0d4ad76cc8dd3c5bd43","src/html.rs":"91ee580663d8ad08460373d9e5c8ed196ab0ce61eb113dc8d43ad19ca6671422","src/input.rs":"0e2c0d4b574198511068069e7a11f6f2ab99a76281f45c7490f39cca631b9590","src/integration.rs":"bcdc1b7b1729487a8e4c756890e6d356622b725f1b9a41bff76eca87e71eaa0b","src/lib.rs":"0b9496bd40dc2bdca7ad825061e297ee9524ee18a30f7e065c4c6b583caca72a","src/tests.rs":"262039b9f6cbbf7a838ec55afbb6d6c0ffdf135090a58e157c66b63c8ead0c3b","templates/a.html":"b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c","templates/b.html":"7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730","templates/include1.html":"5a4304e5548d5cf618779383dcc27eba93d826feff1c41a348101c734c034ea2","templates/include2.html":"cd319fee61d9d0e8a00a40d55e91c338fd9e156e69773f03ba5c31db02892eb2","templates/include3.html":"1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2","templates/sub/b.html":"7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730","templates/sub/c.html":"bf07a7fbb825fc0aae7bf4a1177b2b31fcf8a3feeaf7092761e18c859ee52a9c","templates/sub/sub1/d.html":"86b0c5a1e2b73b08fd54c727f4458649ed9fe3ad1b6e8ac9460c070113509a1e","tomlfmt.toml":"a33c21547346656aead5f46f2f07e1965f4cf0c6f2a16deb8ec06019619267aa"},"package":"d661e0f57be36a5c14c48f78d09011e67e0cb618f269cca9f2fd8d15b68c46ac"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/askama_derive/Cargo.lock firefox-clean/third_party/rust/askama_derive/Cargo.lock
+--- firefox/third_party/rust/askama_derive/Cargo.lock	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/rust/askama_derive/Cargo.lock	2026-08-09 10:37:53.647043913 +0300
+@@ -69,7 +69,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/askama_parser/.cargo-checksum.json firefox-clean/third_party/rust/askama_parser/.cargo-checksum.json
+--- firefox/third_party/rust/askama_parser/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/askama_parser/.cargo-checksum.json	2026-08-09 10:37:53.647215610 +0300
+@@ -1 +1 @@
+-{"files":{"Cargo.lock":"fe55f129ae3e6619311c163585945ffe3aa1375e33661f0660a88b00aef32a0d","Cargo.toml":"c24d9b8953af7ad1763bfe09ae00274d02f1bd3ef9e0ed199583c2708712777d","LICENSE-APACHE":"87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3","LICENSE-MIT":"df20e0180764bf5bd76f74d47bc9e8c0069a666401629c390003a1d5eba99c92","README.md":"6db8144626e0048bfeed20163343b9f01130f297c9ec4b34e1087383cf0c7050","_typos.toml":"72588ef2385568368e7ec251c8451f75a16343d5a06b4c2b312beba2cdf5b308","benches/from_str.rs":"115edebf8d2812adf0f6d981063a977de9f447eccfc09578b321bec308f716e9","benches/librustdoc/LICENSE.md":"8e22b9dae01ceac57b59cf5794dd1a179fc411d14c5351ebf6a97be2678d00c2","benches/librustdoc/item_info.html":"50b88a3f7a56c9d4faf56b1c74dda1e8f02b28ede6581c71c5effa805961a8ea","benches/librustdoc/item_union.html":"aee76fa8260873caa1fb694b8972400e76474fbe7a0791da9298b68828f62364","benches/librustdoc/page.html":"1c656f63a52e1e526b9b0042e7819641db7530b94a71943257cd878f11dbd029","benches/librustdoc/print_item.html":"d3f020edd22e168a84b28b28c0d06084679c58f7c666dc6bf85ba3ba9ede1802","benches/librustdoc/short_item_info.html":"e477cc4083d6e090c00c81947450dba8d3116bdbae8ccd0d59e332c07d6d918b","benches/librustdoc/sidebar.html":"be30b18a25b6011784c11898bca43f06f99a69184812bef3ea92af27ae048849","benches/librustdoc/source.html":"4715ad7116104b800565ef332126c290addf23e989c7161ad184593bcfef50cc","benches/librustdoc/type_layout.html":"9d881f22ce88e40661dffd09d428f9cb2e33d878febc228126674a78b5e6c759","benches/librustdoc/type_layout_size.html":"23778308b293055acc84e29b87384e648675d41b9a18d3b76ad5a1cbeff9d502","clippy.toml":"d141089a5edd91c83ae211257638df2ef1ca53f66b30faa98b22ea1447faeeff","deny.toml":"b7637b42164b1bbba883c422187292cf08ad624691145b5124eaf10edf38c164","src/ascii_str.rs":"272ed728e3e024cefbf16b9a004ad806781cff95f613d34c35a4e8479224d16f","src/expr.rs":"c62b88d09aa311edab8025137b7fa79a33377180ccb0294a9a821e5c7074a94b","src/lib.rs":"b00d21a80702e441a48b11c712dbda09ed88e51e2f9f5fc3f1ae95c0d9bdca04","src/memchr_splitter.rs":"98b595e9aa2e8bbd5e387f708845a457bdc4a1e4430afd59fca5e8842c7f80c2","src/node.rs":"333a4fa93d421fbf08d9e6bf0d8ad8f939ca030f8f3a4105a3e2f4d5bc1c4b19","src/target.rs":"3147366b5be225d10bd3f0dc15294b5e8680268e435cd10690a6eb462ce37783","src/tests.rs":"8181c774f69f540eea59d551ed49d4359bde896d741f55ff39e83df569e00f25","tests/comment-depth.txt":"5d771b3a3b9e7ecea773f76426acb24fdb466df30b8554fb8fc48e9ecc70b32e","tests/excessive_filter_block.txt":"e062f409de016958e577e288f1ecb91d54eb50a319ea0a002eb008ad5e68125b","tests/filter-recursion.txt":"0aaf73f6664a5e1c8f38ac333692e1a2b391d0e23debdc2acf9c6d1b4303ce08","tests/fuzzed-deeply-tested-if-let.txt":"8ca5b1b580e1189feb59a1a12bbea220056b2cc655edd84068327b9bf04879b2","tests/fuzzed_excessive_filter_block.inc":"f50f1cc972c36daace6054ea43cf85b16c2065a7c60be881ceb730d9348793cf","tests/fuzzed_span_is_not_substring_of_source.bin":"27b97ec342a66dbb5a29e0e2ecf1f04ccf2a4e53c003f767143ad8a1729c4641","tests/target-recursion.txt":"501fa6855bbdf566f89b52ded1265c6f05896e749cfaf216d9dea07c76c772d2","tests/unary-recursion.txt":"1d1763a8f62e1a397cc274727562d6b2c5ac80d2558e8aa930a51906c604ea00","tomlfmt.toml":"a33c21547346656aead5f46f2f07e1965f4cf0c6f2a16deb8ec06019619267aa"},"package":"cf315ce6524c857bb129ff794935cf6d42c82a6cff60526fe2a63593de4d0d4f"}
+\ В конце файла нет новой строки
++{"files":{"Cargo.lock":"0c1b9d2372f1ec891ca5c3889952908720ee38693ab34076c3192c8757731680","Cargo.toml":"c24d9b8953af7ad1763bfe09ae00274d02f1bd3ef9e0ed199583c2708712777d","LICENSE-APACHE":"87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3","LICENSE-MIT":"df20e0180764bf5bd76f74d47bc9e8c0069a666401629c390003a1d5eba99c92","README.md":"6db8144626e0048bfeed20163343b9f01130f297c9ec4b34e1087383cf0c7050","_typos.toml":"72588ef2385568368e7ec251c8451f75a16343d5a06b4c2b312beba2cdf5b308","benches/from_str.rs":"115edebf8d2812adf0f6d981063a977de9f447eccfc09578b321bec308f716e9","benches/librustdoc/LICENSE.md":"8e22b9dae01ceac57b59cf5794dd1a179fc411d14c5351ebf6a97be2678d00c2","benches/librustdoc/item_info.html":"50b88a3f7a56c9d4faf56b1c74dda1e8f02b28ede6581c71c5effa805961a8ea","benches/librustdoc/item_union.html":"aee76fa8260873caa1fb694b8972400e76474fbe7a0791da9298b68828f62364","benches/librustdoc/page.html":"1c656f63a52e1e526b9b0042e7819641db7530b94a71943257cd878f11dbd029","benches/librustdoc/print_item.html":"d3f020edd22e168a84b28b28c0d06084679c58f7c666dc6bf85ba3ba9ede1802","benches/librustdoc/short_item_info.html":"e477cc4083d6e090c00c81947450dba8d3116bdbae8ccd0d59e332c07d6d918b","benches/librustdoc/sidebar.html":"be30b18a25b6011784c11898bca43f06f99a69184812bef3ea92af27ae048849","benches/librustdoc/source.html":"4715ad7116104b800565ef332126c290addf23e989c7161ad184593bcfef50cc","benches/librustdoc/type_layout.html":"9d881f22ce88e40661dffd09d428f9cb2e33d878febc228126674a78b5e6c759","benches/librustdoc/type_layout_size.html":"23778308b293055acc84e29b87384e648675d41b9a18d3b76ad5a1cbeff9d502","clippy.toml":"d141089a5edd91c83ae211257638df2ef1ca53f66b30faa98b22ea1447faeeff","deny.toml":"b7637b42164b1bbba883c422187292cf08ad624691145b5124eaf10edf38c164","src/ascii_str.rs":"272ed728e3e024cefbf16b9a004ad806781cff95f613d34c35a4e8479224d16f","src/expr.rs":"c62b88d09aa311edab8025137b7fa79a33377180ccb0294a9a821e5c7074a94b","src/lib.rs":"b00d21a80702e441a48b11c712dbda09ed88e51e2f9f5fc3f1ae95c0d9bdca04","src/memchr_splitter.rs":"98b595e9aa2e8bbd5e387f708845a457bdc4a1e4430afd59fca5e8842c7f80c2","src/node.rs":"333a4fa93d421fbf08d9e6bf0d8ad8f939ca030f8f3a4105a3e2f4d5bc1c4b19","src/target.rs":"3147366b5be225d10bd3f0dc15294b5e8680268e435cd10690a6eb462ce37783","src/tests.rs":"8181c774f69f540eea59d551ed49d4359bde896d741f55ff39e83df569e00f25","tests/comment-depth.txt":"5d771b3a3b9e7ecea773f76426acb24fdb466df30b8554fb8fc48e9ecc70b32e","tests/excessive_filter_block.txt":"e062f409de016958e577e288f1ecb91d54eb50a319ea0a002eb008ad5e68125b","tests/filter-recursion.txt":"0aaf73f6664a5e1c8f38ac333692e1a2b391d0e23debdc2acf9c6d1b4303ce08","tests/fuzzed-deeply-tested-if-let.txt":"8ca5b1b580e1189feb59a1a12bbea220056b2cc655edd84068327b9bf04879b2","tests/fuzzed_excessive_filter_block.inc":"f50f1cc972c36daace6054ea43cf85b16c2065a7c60be881ceb730d9348793cf","tests/fuzzed_span_is_not_substring_of_source.bin":"27b97ec342a66dbb5a29e0e2ecf1f04ccf2a4e53c003f767143ad8a1729c4641","tests/target-recursion.txt":"501fa6855bbdf566f89b52ded1265c6f05896e749cfaf216d9dea07c76c772d2","tests/unary-recursion.txt":"1d1763a8f62e1a397cc274727562d6b2c5ac80d2558e8aa930a51906c604ea00","tomlfmt.toml":"a33c21547346656aead5f46f2f07e1965f4cf0c6f2a16deb8ec06019619267aa"},"package":"cf315ce6524c857bb129ff794935cf6d42c82a6cff60526fe2a63593de4d0d4f"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/askama_parser/Cargo.lock firefox-clean/third_party/rust/askama_parser/Cargo.lock
+--- firefox/third_party/rust/askama_parser/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/askama_parser/Cargo.lock	2026-08-09 10:37:53.647335409 +0300
+@@ -237,7 +237,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/foldhash/.cargo-checksum.json firefox-clean/third_party/rust/foldhash/.cargo-checksum.json
+--- firefox/third_party/rust/foldhash/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/foldhash/.cargo-checksum.json	2026-08-09 10:37:53.647481939 +0300
+@@ -1 +1 @@
+-{"files":{"Cargo.lock":"bed725327fa6f840ba753d5adf9b3b6ee9deba237912c002a6db8678b22e182e","Cargo.toml":"73f8a9098a796d870371f47aaace67ba93a1786b7d54f93c1122223dced77ea3","LICENSE":"b1181a40b2a7b25cf66fd01481713bc1005df082c53ef73e851e55071b102744","README.md":"fe47dcae2123a581799544a577b3a464962f3b51323b5495c53903b3bd3cd4ed","src/convenience.rs":"60338e1ca7bfc781724819cd82ef4a9bd61f4f5c17772b3c0f776fb2257c60dc","src/fast.rs":"99eb2a8e23446afc160ae70464a15fc9bb2006fbe9d0714f08ff936a7e069e1d","src/lib.rs":"8a5551c3568c0e52b4150cfee5c44fe176af0a11b02f5846ff9c635779a41e7c","src/quality.rs":"77a7edda8f0314d0ab1ebf9d08ec1b039d0d630988bfd8460149350b2a4b6f36","src/seed.rs":"358937fa085dcc5ca5ca488ff1767a7f0c371ebbca81355f44cbb848cb6dd698"},"package":"d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"}
+\ В конце файла нет новой строки
++{"files":{"Cargo.lock":"82c2ed0d9d549655439b1f0970a995dac3f72152696168883cf4b5a7d44b9230","Cargo.toml":"73f8a9098a796d870371f47aaace67ba93a1786b7d54f93c1122223dced77ea3","LICENSE":"b1181a40b2a7b25cf66fd01481713bc1005df082c53ef73e851e55071b102744","README.md":"fe47dcae2123a581799544a577b3a464962f3b51323b5495c53903b3bd3cd4ed","src/convenience.rs":"60338e1ca7bfc781724819cd82ef4a9bd61f4f5c17772b3c0f776fb2257c60dc","src/fast.rs":"99eb2a8e23446afc160ae70464a15fc9bb2006fbe9d0714f08ff936a7e069e1d","src/lib.rs":"8a5551c3568c0e52b4150cfee5c44fe176af0a11b02f5846ff9c635779a41e7c","src/quality.rs":"77a7edda8f0314d0ab1ebf9d08ec1b039d0d630988bfd8460149350b2a4b6f36","src/seed.rs":"358937fa085dcc5ca5ca488ff1767a7f0c371ebbca81355f44cbb848cb6dd698"},"package":"d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/foldhash/Cargo.lock firefox-clean/third_party/rust/foldhash/Cargo.lock
+--- firefox/third_party/rust/foldhash/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/foldhash/Cargo.lock	2026-08-09 10:37:53.647604422 +0300
+@@ -361,7 +361,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/getrandom/.cargo-checksum.json firefox-clean/third_party/rust/getrandom/.cargo-checksum.json
+--- firefox/third_party/rust/getrandom/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/getrandom/.cargo-checksum.json	2026-08-09 10:37:53.647796348 +0300
+@@ -1 +1 @@
+-{"files":{"CHANGELOG.md":"fc99d55b89ff2dcca19d1d36f4e10b76e5adecc211afff67aac4d199f35e435c","Cargo.lock":"e55b09b283d1685505f5d15a2d79f0a7c1de35c79321eafd02074c815ef67597","Cargo.toml":"c11a6fef961eec45202c915ccde2aeec475c0950f31cb3c5a74e65fea2262bbc","LICENSE-APACHE":"aaff376532ea30a0cd5330b9502ad4a4c8bf769c539c87ffe78819d188a18ebf","LICENSE-MIT":"29e9fe5074bd27e0e5d5d110394fbbcd841baee2651a3c4b4560a632702cede4","README.md":"5afb17166a328f69726ae52321b3c6f698adefbfc64898e93e45cd3d4ce3e1e5","SECURITY.md":"816ea79f8c7937888ab5a972a1efb270c4bada028b448953a195359fe11d526e","benches/buffer.rs":"20fb7dd9edafe0c182f1fe037b28d7542f8e0ae742d51e97aeebf418edde49aa","build.rs":"9280e324b69c0c80c65de8074046104ac561cbfe0b7856e02a939e491936aaac","src/backends.rs":"1c43868fdb6b1bfd0f6b6ac1e4f8195ad0045fa472e366821be2249ef5aa6da6","src/backends/apple_other.rs":"f8fa784588f347cfd7c2b5f37a96b23d446f95c3157668069d7146e281fa783b","src/backends/custom.rs":"c8776ff0dda65cef1373b8624043f8a42ce4fd6183fbeb8918f9df5d4a13d457","src/backends/efi_rng.rs":"873b7343a003a5f222753fbd50cba3f2beeacec4386ad3272ec98d654a4466d4","src/backends/esp_idf.rs":"b50d6c582b49488204151c2036a100aac7902b8215fb791f271e1b5fc772db9a","src/backends/fuchsia.rs":"d7c660a62f1da2c41c537ccea085bba6d3f83b82c34e6e63175130feca9dece8","src/backends/getentropy.rs":"a0fdf57546e20be8e76d21ec5f815f07a3a4dfb590d4d693cc2e78b494676304","src/backends/getrandom.rs":"1d165160ab4526534f0981d0cddee4075d6ddfc07d7a3086b0b30544ad755b17","src/backends/hermit.rs":"92e0cf4103b5ddc15ed48cad8d7165ba8e344fde0f07960385b36590466ee67c","src/backends/linux_android_with_fallback.rs":"ba4b820542aceee7b3b0b8b8be6460140cd0f601132b4e79f1abe0051a997af8","src/backends/linux_raw.rs":"eea0428ac3a803ae1c8463cdbaf385b73008ec67a02c7c634eb4ce01589a97f8","src/backends/netbsd.rs":"ca6a6c4c17c04ec987002296debdd7a03b10f5efd5bcb79f159b9a13c4b6821f","src/backends/rdrand.rs":"2a06eb62ad7e97c2486ab1b0159e4b9fe3a1c0a39d479a836d23051f89cb9aed","src/backends/rndr.rs":"bc06a88e3314a06494b6fe70bdae684fe45f9a6a63d28c61dbd90f66595424d0","src/backends/solaris.rs":"b263a3e8bc3c490a0c589d2a1a67d8fdb36119993df1f8d05f43975ff88f9c3e","src/backends/solid.rs":"1c92fc4c5a8ac67b64af560bb7843d6e447efe9785e557f064348fb84b83ceb8","src/backends/use_file.rs":"a2582912793ed985f7c092243405c8ee15fc2d6cb23ef4233a842325cec69492","src/backends/vxworks.rs":"64ee8619c5b5aa267761aabc99552ba8df71d14cda7cc66d6c1e4f4fb1ed8d00","src/backends/wasi_p1.rs":"77755c8fefb9f36509b2e6764edb9f8293dc1efa3d5a9bc85d28723ceeb7aec0","src/backends/wasi_p2.rs":"5821dff8eb2a145a49adcb751f9ec794e0fb8989ff625c70a98afcba48de0731","src/backends/wasm_js.rs":"5913b33ec9cb4076cef65d461ce82af98e9233f621eac8fab44b68fd37080927","src/backends/windows.rs":"60a5c9a87c8b35d3816c8909d051ce76741121806de6ea4f17a847c89b9cd4a2","src/backends/windows7.rs":"a5fac48672fa109eff2dc67f424fe99fabe4ec8af4802ce4ecc2f07706b2201c","src/error.rs":"6497fc88435c341e5547c35f259f9bebf1272b83b782794d8c6251a4c3159d28","src/error_std_impls.rs":"4c068e81d876237a7e0a0e91519896bd670c2f999ca729f7fb970caf888cab46","src/lazy.rs":"9c7e3efcc7b4cc2252751d29e42465bae8cbe49461a4a81a006d8d2c45003fd1","src/lib.rs":"54279c7e2ac54bf990c89c37f12754da7183cde6fb51d9e6900aaaed4e1f995f","src/util.rs":"207e21353f4e402daf84ff137c8d4aa4ffafa48141194ae7148252e06dcadd9f","src/util_libc.rs":"1d3f16d8996295822e6cbfc848e90912795f378913627c6b765f47b2185d9480","tests/mod.rs":"b8e88300a1ec0b2f6cbc03d40cc66eacae625d1fdc1163f4cf50fae7712d2bdc"},"package":"26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"}
+\ В конце файла нет новой строки
++{"files":{"CHANGELOG.md":"fc99d55b89ff2dcca19d1d36f4e10b76e5adecc211afff67aac4d199f35e435c","Cargo.lock":"e7b7c6738ad5aad59d04ed13dbedebdcb3323087eda0c217789c2b73b65818c1","Cargo.toml":"c11a6fef961eec45202c915ccde2aeec475c0950f31cb3c5a74e65fea2262bbc","LICENSE-APACHE":"aaff376532ea30a0cd5330b9502ad4a4c8bf769c539c87ffe78819d188a18ebf","LICENSE-MIT":"29e9fe5074bd27e0e5d5d110394fbbcd841baee2651a3c4b4560a632702cede4","README.md":"5afb17166a328f69726ae52321b3c6f698adefbfc64898e93e45cd3d4ce3e1e5","SECURITY.md":"816ea79f8c7937888ab5a972a1efb270c4bada028b448953a195359fe11d526e","benches/buffer.rs":"20fb7dd9edafe0c182f1fe037b28d7542f8e0ae742d51e97aeebf418edde49aa","build.rs":"9280e324b69c0c80c65de8074046104ac561cbfe0b7856e02a939e491936aaac","src/backends.rs":"1c43868fdb6b1bfd0f6b6ac1e4f8195ad0045fa472e366821be2249ef5aa6da6","src/backends/apple_other.rs":"f8fa784588f347cfd7c2b5f37a96b23d446f95c3157668069d7146e281fa783b","src/backends/custom.rs":"c8776ff0dda65cef1373b8624043f8a42ce4fd6183fbeb8918f9df5d4a13d457","src/backends/efi_rng.rs":"873b7343a003a5f222753fbd50cba3f2beeacec4386ad3272ec98d654a4466d4","src/backends/esp_idf.rs":"b50d6c582b49488204151c2036a100aac7902b8215fb791f271e1b5fc772db9a","src/backends/fuchsia.rs":"d7c660a62f1da2c41c537ccea085bba6d3f83b82c34e6e63175130feca9dece8","src/backends/getentropy.rs":"a0fdf57546e20be8e76d21ec5f815f07a3a4dfb590d4d693cc2e78b494676304","src/backends/getrandom.rs":"1d165160ab4526534f0981d0cddee4075d6ddfc07d7a3086b0b30544ad755b17","src/backends/hermit.rs":"92e0cf4103b5ddc15ed48cad8d7165ba8e344fde0f07960385b36590466ee67c","src/backends/linux_android_with_fallback.rs":"ba4b820542aceee7b3b0b8b8be6460140cd0f601132b4e79f1abe0051a997af8","src/backends/linux_raw.rs":"eea0428ac3a803ae1c8463cdbaf385b73008ec67a02c7c634eb4ce01589a97f8","src/backends/netbsd.rs":"ca6a6c4c17c04ec987002296debdd7a03b10f5efd5bcb79f159b9a13c4b6821f","src/backends/rdrand.rs":"2a06eb62ad7e97c2486ab1b0159e4b9fe3a1c0a39d479a836d23051f89cb9aed","src/backends/rndr.rs":"bc06a88e3314a06494b6fe70bdae684fe45f9a6a63d28c61dbd90f66595424d0","src/backends/solaris.rs":"b263a3e8bc3c490a0c589d2a1a67d8fdb36119993df1f8d05f43975ff88f9c3e","src/backends/solid.rs":"1c92fc4c5a8ac67b64af560bb7843d6e447efe9785e557f064348fb84b83ceb8","src/backends/use_file.rs":"a2582912793ed985f7c092243405c8ee15fc2d6cb23ef4233a842325cec69492","src/backends/vxworks.rs":"64ee8619c5b5aa267761aabc99552ba8df71d14cda7cc66d6c1e4f4fb1ed8d00","src/backends/wasi_p1.rs":"77755c8fefb9f36509b2e6764edb9f8293dc1efa3d5a9bc85d28723ceeb7aec0","src/backends/wasi_p2.rs":"5821dff8eb2a145a49adcb751f9ec794e0fb8989ff625c70a98afcba48de0731","src/backends/wasm_js.rs":"5913b33ec9cb4076cef65d461ce82af98e9233f621eac8fab44b68fd37080927","src/backends/windows.rs":"60a5c9a87c8b35d3816c8909d051ce76741121806de6ea4f17a847c89b9cd4a2","src/backends/windows7.rs":"a5fac48672fa109eff2dc67f424fe99fabe4ec8af4802ce4ecc2f07706b2201c","src/error.rs":"6497fc88435c341e5547c35f259f9bebf1272b83b782794d8c6251a4c3159d28","src/error_std_impls.rs":"4c068e81d876237a7e0a0e91519896bd670c2f999ca729f7fb970caf888cab46","src/lazy.rs":"9c7e3efcc7b4cc2252751d29e42465bae8cbe49461a4a81a006d8d2c45003fd1","src/lib.rs":"54279c7e2ac54bf990c89c37f12754da7183cde6fb51d9e6900aaaed4e1f995f","src/util.rs":"207e21353f4e402daf84ff137c8d4aa4ffafa48141194ae7148252e06dcadd9f","src/util_libc.rs":"1d3f16d8996295822e6cbfc848e90912795f378913627c6b765f47b2185d9480","tests/mod.rs":"b8e88300a1ec0b2f6cbc03d40cc66eacae625d1fdc1163f4cf50fae7712d2bdc"},"package":"26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/getrandom/Cargo.lock firefox-clean/third_party/rust/getrandom/Cargo.lock
+--- firefox/third_party/rust/getrandom/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/getrandom/Cargo.lock	2026-08-09 10:37:53.647922169 +0300
+@@ -62,7 +62,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/half/.cargo-checksum.json firefox-clean/third_party/rust/half/.cargo-checksum.json
+--- firefox/third_party/rust/half/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/half/.cargo-checksum.json	2026-08-09 10:37:53.648086853 +0300
+@@ -1 +1 @@
+-{"files":{"CHANGELOG.md":"a9e09221c973d56eb8d0227dd3bb639c2e4811d47b503d004edcd3dc9da3c9a4","Cargo.lock":"f8c96ecf2253658f6ac840a3a5530b9767eec35d7609908b2cf5ee77046cedf9","Cargo.toml":"6d8b91386fb3b31cb11672fb04a75d1a8dfa66a0b27d2a9f76a9f7358aad2d2f","LICENSE-APACHE":"a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9","LICENSE-MIT":"508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1","Makefile.toml":"9a7c73f926e9a03e24331852fe31c5c0b034215ea18c23de91b5d98e097b9ed9","README.md":"f48dacc314fbd367551ec9e00edab552449117668bc34e83b1941cb3babbd08b","benches/convert.rs":"95c905467f132ea37e79b704a8fc3a0843f5f9dc6d61750c4abc57408321b8f6","src/bfloat.rs":"dcd9591c198862565c9f551a7b2f12266391c1163bb49a9d49aacb3adbeb6d70","src/bfloat/convert.rs":"daab845ea86e45449550f7039f6b5a550da763ca65839b8b3ced1fcc9fa439cc","src/binary16.rs":"33ec3664f3ef02b9ff4bd1e09c7758ffb6b945112a194a1028730cc56407987b","src/binary16/arch.rs":"f34369c39545e53a8ee9ef3a29f6c837272e5cbf70d86cb815234c42f5bf721c","src/binary16/arch/aarch64.rs":"a912917e13c01f175576edcdad720d19ce6e53f32e37e5b39027b1188fc99fb0","src/binary16/arch/x86.rs":"c2f4ae517f3216c0716dca52837f8aff89186856e6e7eac894e8b644b2124a75","src/leading_zeros.rs":"37fe7595856f9d0b1ed0a806314ab7a8860bdebf4223fb3747768a077935bea0","src/lib.rs":"19d2d2caa628a59c22a4c494eb284c035b08bb3a7ce92a88669e6b38a1cf4894","src/num_traits.rs":"79e6c08a5aa5cc47543e0ab65797adfb50bbc8092dd1f7f292d8640f3806b2b2","src/rand_distr.rs":"0a738b423beae579017291180b1e89ef9e2edc2a484392838b388b3a200bab1e","src/slice.rs":"b42be83032cd4beaa43c2ca6e66bd86db6908a1add00feabf1b9c8c8bd48b1fc","src/vec.rs":"1858a6485b26027ad7160a834977c424b05983ab42de2e618aa3f9d11221b04d"},"package":"7db2ff139bba50379da6aa0766b52fdcb62cb5b263009b09ed58ba604e14bbd1"}
+\ В конце файла нет новой строки
++{"files":{"CHANGELOG.md":"a9e09221c973d56eb8d0227dd3bb639c2e4811d47b503d004edcd3dc9da3c9a4","Cargo.lock":"65c99e102a2b71a0000efa02b73986c2f9f83ca836fc848c6111003cd5bb3636","Cargo.toml":"6d8b91386fb3b31cb11672fb04a75d1a8dfa66a0b27d2a9f76a9f7358aad2d2f","LICENSE-APACHE":"a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9","LICENSE-MIT":"508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1","Makefile.toml":"9a7c73f926e9a03e24331852fe31c5c0b034215ea18c23de91b5d98e097b9ed9","README.md":"f48dacc314fbd367551ec9e00edab552449117668bc34e83b1941cb3babbd08b","benches/convert.rs":"95c905467f132ea37e79b704a8fc3a0843f5f9dc6d61750c4abc57408321b8f6","src/bfloat.rs":"dcd9591c198862565c9f551a7b2f12266391c1163bb49a9d49aacb3adbeb6d70","src/bfloat/convert.rs":"daab845ea86e45449550f7039f6b5a550da763ca65839b8b3ced1fcc9fa439cc","src/binary16.rs":"33ec3664f3ef02b9ff4bd1e09c7758ffb6b945112a194a1028730cc56407987b","src/binary16/arch.rs":"f34369c39545e53a8ee9ef3a29f6c837272e5cbf70d86cb815234c42f5bf721c","src/binary16/arch/aarch64.rs":"a912917e13c01f175576edcdad720d19ce6e53f32e37e5b39027b1188fc99fb0","src/binary16/arch/x86.rs":"c2f4ae517f3216c0716dca52837f8aff89186856e6e7eac894e8b644b2124a75","src/leading_zeros.rs":"37fe7595856f9d0b1ed0a806314ab7a8860bdebf4223fb3747768a077935bea0","src/lib.rs":"19d2d2caa628a59c22a4c494eb284c035b08bb3a7ce92a88669e6b38a1cf4894","src/num_traits.rs":"79e6c08a5aa5cc47543e0ab65797adfb50bbc8092dd1f7f292d8640f3806b2b2","src/rand_distr.rs":"0a738b423beae579017291180b1e89ef9e2edc2a484392838b388b3a200bab1e","src/slice.rs":"b42be83032cd4beaa43c2ca6e66bd86db6908a1add00feabf1b9c8c8bd48b1fc","src/vec.rs":"1858a6485b26027ad7160a834977c424b05983ab42de2e618aa3f9d11221b04d"},"package":"7db2ff139bba50379da6aa0766b52fdcb62cb5b263009b09ed58ba604e14bbd1"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/half/Cargo.lock firefox-clean/third_party/rust/half/Cargo.lock
+--- firefox/third_party/rust/half/Cargo.lock	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/rust/half/Cargo.lock	2026-08-09 10:37:53.648222752 +0300
+@@ -375,7 +375,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/iana-time-zone/.cargo-checksum.json firefox-clean/third_party/rust/iana-time-zone/.cargo-checksum.json
+--- firefox/third_party/rust/iana-time-zone/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/iana-time-zone/.cargo-checksum.json	2026-08-09 10:37:53.648406152 +0300
+@@ -1 +1 @@
+-{"files":{"CHANGELOG.md":"467a75b20956c8201acdad52b44b1cd146913a4df9f5282e47bf144dea2878da","Cargo.lock":"0cd9cc06007ba8411bb0c1202ac7a587b261aa355287f54737ca0d5c0554f160","Cargo.toml":"b5fcc4b21e07e9f085a5ed540134e01f107e0af2e9358e3cb49aaebb2d70bfae","LICENSE-APACHE":"696759d65dfe558ff7d9f031c76db19ec5c0767470fb67c4e8d990820d1e99c9","LICENSE-MIT":"da28ccc6b158fc2d8cccc74e99794b1cff1d29bd7bbeb019442fcf0c04c6cad9","README.md":"22f9a823adec27aca10eb6dfb5e4e1e9d485e1d5f78348f788bfc81dbee2787f","bindings.txt":"6e9b2e58051bf22fb39b38dc04e54bf75b6204fbd97df06bc58617b1b5d14461","deny.toml":"bde861b1ca6304017f8a57268058aa99ad33d89b1498bba68086e65cca7fe7a2","examples/get_timezone.rs":"c4db7b1cc71c7b3728ddd70e76c0dbd40239c6b1b8c705cb63476757d3177dec","examples/get_timezone_loop.rs":"5e9da42eabd529f5f8d04acc5c1eb84575b9ed38a9226e76e91a1717089b016e","examples/stress-test.rs":"3ad469de5a650389699c9ffe5fd78af2bdd46e7140cc05391c60d793fc6f8e98","src/ffi_utils.rs":"4a49637f60e4d2ab1afecb168e884cee8137a32037d440f9f032196c9fd6f159","src/lib.rs":"0982d7d2e2228b3b4d6a62a4dd5e28ea22086074edce0f0b07ce72fefccacdbf","src/platform.rs":"7847381ca6976d9f39ce84759a3b0d7aabe31eae7a88bc20d7fb99bc376782b0","src/tz_aix.rs":"86fd048ff14062c53d1aa770ee715961f7b1099337453ca2eb297a74fc59f673","src/tz_android.rs":"3da37f1b87f87a0ed215734f2b373b2d187bcf49386adfe8bfff207f9a5e8fe2","src/tz_darwin.rs":"8938e34f1f7c4cf813deb8d008ea6ee130dcb30ada6db3d068c3f0990f81165b","src/tz_freebsd.rs":"4247af5c6dd0712705186ed54d789193c64139f707af316d4fde86aa1e2a1b13","src/tz_haiku.rs":"761afd80301683a44bf937bbf6b13c5c792af42ed7037623bbeccbab6d0aa8fc","src/tz_illumos.rs":"375ae951d1417f63e6d77c9add7f7f646f24c0054cb8407bd4b9f06907494888","src/tz_linux.rs":"fc62ae0275e745c4fc6552c25f70812e37e91d78a16d9a40e5688331a7af04ed","src/tz_netbsd.rs":"ec278bbe1cb5f648c063ec23bff6081146454b9f6aa3918b9ca50b8804d5838f","src/tz_ohos.rs":"f1db259b38f6890ec3c7b357e15d10f2aa166dc84394bac58fa62cb31d4559dc","src/tz_wasm32_unknown.rs":"10aa33caa86645a16e2126fe1a86dda2b57f63caa9addcd726245fbc9657dc1b","src/tz_windows.rs":"804c11a3c638c93626459612cd444df64e9962668d1e8cd6f0774301c00c9529","src/windows_bindings.rs":"d58d11d01f5f5335febb91e83f32956801824553e2b26216bfd16e6a0c87803c"},"package":"b0c919e5debc312ad217002b8048a17b7d83f80703865bbfcfebb0458b0b27d8"}
+\ В конце файла нет новой строки
++{"files":{"CHANGELOG.md":"467a75b20956c8201acdad52b44b1cd146913a4df9f5282e47bf144dea2878da","Cargo.lock":"504c2124fff6c7dd516fbdd2345322d7adc0817bb95d88a7deba30e1cfaa8f23","Cargo.toml":"b5fcc4b21e07e9f085a5ed540134e01f107e0af2e9358e3cb49aaebb2d70bfae","LICENSE-APACHE":"696759d65dfe558ff7d9f031c76db19ec5c0767470fb67c4e8d990820d1e99c9","LICENSE-MIT":"da28ccc6b158fc2d8cccc74e99794b1cff1d29bd7bbeb019442fcf0c04c6cad9","README.md":"22f9a823adec27aca10eb6dfb5e4e1e9d485e1d5f78348f788bfc81dbee2787f","bindings.txt":"6e9b2e58051bf22fb39b38dc04e54bf75b6204fbd97df06bc58617b1b5d14461","deny.toml":"bde861b1ca6304017f8a57268058aa99ad33d89b1498bba68086e65cca7fe7a2","examples/get_timezone.rs":"c4db7b1cc71c7b3728ddd70e76c0dbd40239c6b1b8c705cb63476757d3177dec","examples/get_timezone_loop.rs":"5e9da42eabd529f5f8d04acc5c1eb84575b9ed38a9226e76e91a1717089b016e","examples/stress-test.rs":"3ad469de5a650389699c9ffe5fd78af2bdd46e7140cc05391c60d793fc6f8e98","src/ffi_utils.rs":"4a49637f60e4d2ab1afecb168e884cee8137a32037d440f9f032196c9fd6f159","src/lib.rs":"0982d7d2e2228b3b4d6a62a4dd5e28ea22086074edce0f0b07ce72fefccacdbf","src/platform.rs":"7847381ca6976d9f39ce84759a3b0d7aabe31eae7a88bc20d7fb99bc376782b0","src/tz_aix.rs":"86fd048ff14062c53d1aa770ee715961f7b1099337453ca2eb297a74fc59f673","src/tz_android.rs":"3da37f1b87f87a0ed215734f2b373b2d187bcf49386adfe8bfff207f9a5e8fe2","src/tz_darwin.rs":"8938e34f1f7c4cf813deb8d008ea6ee130dcb30ada6db3d068c3f0990f81165b","src/tz_freebsd.rs":"4247af5c6dd0712705186ed54d789193c64139f707af316d4fde86aa1e2a1b13","src/tz_haiku.rs":"761afd80301683a44bf937bbf6b13c5c792af42ed7037623bbeccbab6d0aa8fc","src/tz_illumos.rs":"375ae951d1417f63e6d77c9add7f7f646f24c0054cb8407bd4b9f06907494888","src/tz_linux.rs":"fc62ae0275e745c4fc6552c25f70812e37e91d78a16d9a40e5688331a7af04ed","src/tz_netbsd.rs":"ec278bbe1cb5f648c063ec23bff6081146454b9f6aa3918b9ca50b8804d5838f","src/tz_ohos.rs":"f1db259b38f6890ec3c7b357e15d10f2aa166dc84394bac58fa62cb31d4559dc","src/tz_wasm32_unknown.rs":"10aa33caa86645a16e2126fe1a86dda2b57f63caa9addcd726245fbc9657dc1b","src/tz_windows.rs":"804c11a3c638c93626459612cd444df64e9962668d1e8cd6f0774301c00c9529","src/windows_bindings.rs":"d58d11d01f5f5335febb91e83f32956801824553e2b26216bfd16e6a0c87803c"},"package":"b0c919e5debc312ad217002b8048a17b7d83f80703865bbfcfebb0458b0b27d8"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/iana-time-zone/Cargo.lock firefox-clean/third_party/rust/iana-time-zone/Cargo.lock
+--- firefox/third_party/rust/iana-time-zone/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/iana-time-zone/Cargo.lock	2026-08-09 10:37:53.648531221 +0300
+@@ -133,7 +133,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/jobserver/.cargo-checksum.json firefox-clean/third_party/rust/jobserver/.cargo-checksum.json
+--- firefox/third_party/rust/jobserver/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/jobserver/.cargo-checksum.json	2026-08-09 10:37:53.648695364 +0300
+@@ -1 +1 @@
+-{"files":{"Cargo.lock":"c4b876198c51462999d8485d55c13b9adbb8ec8d3139ee22a0b3b779ae848d1d","Cargo.toml":"d6392932a8989572704e9f1214fde950b436987afee156bb3c1710ecc37be518","LICENSE-APACHE":"a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2","LICENSE-MIT":"378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397","README.md":"de412b60535de63bd312ab0df197f72b89d6aaeab166ed090f58a26dcda72bcf","src/error.rs":"f947d858ba95a9a08d16325d163b61fdf0ce40ec95b7fb08cc47c9876de9c8dc","src/lib.rs":"9b82f32a87deae5bd5a0ed36cdab3a195f9419c6befa9f77a682f262b9158722","src/unix.rs":"e76e4073040f7576d54f1eaa9beb4a10e1c0ca4602f794de7204491b161676cc","src/wasm.rs":"74db7bd1441b7b4d1b53cd83e23097a2b976faf4d18d3f42f583048d27611d4d","src/windows.rs":"d939574ff187be4fa6bfba4cb9f2cb95541dc8752d0e2915c8b9de90bd833755","tests/client-of-myself.rs":"ca09bf398f69df4bac1730999e954dbbc3faf3c6512678c136e0938e7e9cd0ab","tests/client.rs":"5d9b3606356c0fed0c9f5bf372f0fa09f922f93ffe910a1a9a474898d5ec9fa2","tests/helper.rs":"7b8d9eb8484ccf1e656ed235a23f62c2756045e3a6604121aee5493d8a5b1ede","tests/make-as-a-client.rs":"8be1f3fef1e9e65c7904dbaa04364bf0f44e9deab84a2a247a5a94b5cf0df9bc","tests/server.rs":"da15bf12e1df1883f660892b996c9e0d92485aace3f7b50ee70c4a8e6deae8da"},"package":"38f262f097c174adebe41eb73d66ae9c06b2844fb0da69969647bbddd9b0538a"}
+\ В конце файла нет новой строки
++{"files":{"Cargo.lock":"f0cb452d05302033f200e70c0657ce40da8cdf95503bcac180a6a1ac3c10d9a5","Cargo.toml":"e3f966c578705ef4d547e4d283829c83fe230ff934d830cf64d1e359d2be97a6","LICENSE-APACHE":"a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2","LICENSE-MIT":"378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397","README.md":"de412b60535de63bd312ab0df197f72b89d6aaeab166ed090f58a26dcda72bcf","src/error.rs":"f947d858ba95a9a08d16325d163b61fdf0ce40ec95b7fb08cc47c9876de9c8dc","src/lib.rs":"9b82f32a87deae5bd5a0ed36cdab3a195f9419c6befa9f77a682f262b9158722","src/unix.rs":"e76e4073040f7576d54f1eaa9beb4a10e1c0ca4602f794de7204491b161676cc","src/wasm.rs":"74db7bd1441b7b4d1b53cd83e23097a2b976faf4d18d3f42f583048d27611d4d","src/windows.rs":"d939574ff187be4fa6bfba4cb9f2cb95541dc8752d0e2915c8b9de90bd833755","tests/client-of-myself.rs":"ca09bf398f69df4bac1730999e954dbbc3faf3c6512678c136e0938e7e9cd0ab","tests/client.rs":"5d9b3606356c0fed0c9f5bf372f0fa09f922f93ffe910a1a9a474898d5ec9fa2","tests/helper.rs":"7b8d9eb8484ccf1e656ed235a23f62c2756045e3a6604121aee5493d8a5b1ede","tests/make-as-a-client.rs":"8be1f3fef1e9e65c7904dbaa04364bf0f44e9deab84a2a247a5a94b5cf0df9bc","tests/server.rs":"da15bf12e1df1883f660892b996c9e0d92485aace3f7b50ee70c4a8e6deae8da"},"package":"38f262f097c174adebe41eb73d66ae9c06b2844fb0da69969647bbddd9b0538a"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/jobserver/Cargo.lock firefox-clean/third_party/rust/jobserver/Cargo.lock
+--- firefox/third_party/rust/jobserver/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/jobserver/Cargo.lock	2026-08-09 10:37:53.648822516 +0300
+@@ -60,7 +60,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/jobserver/Cargo.toml firefox-clean/third_party/rust/jobserver/Cargo.toml
+--- firefox/third_party/rust/jobserver/Cargo.toml	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/rust/jobserver/Cargo.toml	2026-08-09 10:37:53.648973154 +0300
+@@ -61,7 +61,7 @@
+ version = "3.10.1"
+ 
+ [target."cfg(unix)".dependencies.libc]
+-version = "0.2.171"
++version = "0.2.186"
+ 
+ [target."cfg(unix)".dev-dependencies.nix]
+ version = "0.28.0"
+diff -Naur firefox/third_party/rust/libc/.cargo-checksum.json firefox-clean/third_party/rust/libc/.cargo-checksum.json
+--- firefox/third_party/rust/libc/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/libc/.cargo-checksum.json	2026-08-09 10:37:53.649313253 +0300
+@@ -1 +1 @@
+-{"files":{"CHANGELOG.md":"747b437db48b8ded620a8738f9c1dbc2fde3d26db03d0782796537a9e505a263","CONTRIBUTING.md":"155e7f4e96fafe9ee5c8adb5068be27a22de89a95ca9bfc7baf517b9850d20d6","Cargo.lock":"8f6d0b13c977c8016b568c0a35b5ae709318e0766af3cff4a84d351219013841","Cargo.toml":"7f31f2e612b4c14b57ecdcec4912ac1514e26e3c061d5b06b54e1e34e83191b1","LICENSE-APACHE":"62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a","LICENSE-MIT":"a8d47ff51ca256f56a8932dba07660672dbfe3004257ca8de708aac1415937a1","README.md":"a198be444453fe0b24d4fb6a8b732eb9e6dc77ebcfd119fca95b97b45c77c77a","build.rs":"199eb63f03c4e90cad31c1f03a15bac3d81ca97f31bcb81c45bbd0d909e57d61","rustfmt.toml":"e9321ff995242e8cb0a4984254f0748ef11a89ca4618cab8f047ee59a88768e7","src/fuchsia/aarch64.rs":"9cd032304a54321a8926cf3157194c5d79a2491b1b974a05fe71729fa43b5738","src/fuchsia/mod.rs":"e27680db23fa506e379a86033b42813ea1f6c8f6b01d97a9a880d9d7be6d9f7f","src/fuchsia/riscv64.rs":"f2aba92cb88480bd72a9eb7a41aafc63c5db293b93113fa973fe5ab1fd819e29","src/fuchsia/x86_64.rs":"66c6ae7d3f81b1d7c962671aa074d709c39069e3b5830621a26d94c15caf588f","src/hermit.rs":"e414a3ecd5b5bc6c0bf7ce7c31639805943b789fbbf6006ceeb85ab44f3e4564","src/lib.rs":"d65975abfeac27f8dbef348fa7afa0b2b761a0a7073f4621c1bbff41334983cd","src/macros.rs":"076f328df1d51017bac70456e7b8290bee1b07390328fff48102e05048ada56a","src/primitives.rs":"0096ec3f32454a630fd1e78fa5aaaa033f107c1394a0d7b8dfe92594339a547b","src/psp.rs":"b88f5659011db6a189bd06de3a365c35a34cec6b7ab547719b8ae2b371f9cb21","src/sgx.rs":"964d6af358f5c85f948275090e5a7854e0169c43b5c338070b6a4cd156ebc9e6","src/solid/aarch64.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/solid/arm.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/solid/mod.rs":"a2045b6089af91bd533a666773d3b99fcfaf03da7a06869382969eed059b0e4c","src/switch.rs":"bfdcaf0268d79652ee52c1a2837959b8253e6a4124fd94dda82727ecc442a758","src/teeos/mod.rs":"2cca695904dacb13c063fb6463a6e0b2bb47ed86be0fdc9476938297441d7795","src/trusty.rs":"c5012aeefc4307c11374f062ad1d530e2ec556e7069e375de326a49c77f65e22","src/unix/aix/mod.rs":"fa3fa1f33e381f9492321e47f683300460d02fa230f14965ee808eeab2884408","src/unix/aix/powerpc64.rs":"c2315d638bad020e75ef15f85989f8feffb4f38bac4b7e70642031c6ae1fb65d","src/unix/bsd/apple/b32/mod.rs":"39a7f5cf92cf2d26ca50f54182fe57028cf24147ec12cb89d251301d65862138","src/unix/bsd/apple/b64/aarch64/mod.rs":"3ce904e72d78e6465ca52fd3905208fbb8cbc49a1695a708b12dff2ee01f4d36","src/unix/bsd/apple/b64/mod.rs":"a77ef659cd2edadb39db562e655ea5efdb102ed0dfb872d8d004b38d1a0e9e49","src/unix/bsd/apple/b64/x86_64/mod.rs":"71bad5c051368805146168c4063534b010afcb358477c1f164712bb015bf3fb6","src/unix/bsd/apple/mod.rs":"39216bfe363384709f0b38df6b333206ad85361e6b1389f699b2b88d46aa3e1f","src/unix/bsd/freebsdlike/dragonfly/errno.rs":"07b19390b9ae8f541ac35fd4e14685d639b95152d6d7a33814bb749b8b927298","src/unix/bsd/freebsdlike/dragonfly/mod.rs":"9681882d03a9cc7e00db0d9f0be797426ce4e9f7584d3fe4ab43bc7967dd0e4e","src/unix/bsd/freebsdlike/freebsd/aarch64.rs":"9e8e5a9f1de648b248f257aab6e1bc8ccfe9e481554a52bdef06aefd262a15a2","src/unix/bsd/freebsdlike/freebsd/arm.rs":"36158ac5a31d86a919d8e477a9ba64467d38b57bc3910e19b082130811c2f289","src/unix/bsd/freebsdlike/freebsd/freebsd11/b32.rs":"8d9bef35f3e490d04755a59a99ad054ef20498beff979ae8b14acbec1097318a","src/unix/bsd/freebsdlike/freebsd/freebsd11/b64.rs":"45f718f556a8368f282944d9a14afae7261827ec4838d26719290466efc4f023","src/unix/bsd/freebsdlike/freebsd/freebsd11/mod.rs":"77bef57a5697d837331cff8947c50d070b28bb7aaa51b23f4d604cedaba76806","src/unix/bsd/freebsdlike/freebsd/freebsd12/mod.rs":"2dfe0dd90c956e3bcc8bbbd6926c5b370829f411f22b80fa749fe87ebf0ea47b","src/unix/bsd/freebsdlike/freebsd/freebsd12/x86_64.rs":"64c4bd82eaf30a2681417f982fce28de7d1b0743bfaa14004692a56cee44be21","src/unix/bsd/freebsdlike/freebsd/freebsd13/mod.rs":"f0d4d0fcd6c4e3bd77f84474a404be8a3a326731e9fe52008a09bcfb123a98a0","src/unix/bsd/freebsdlike/freebsd/freebsd13/x86_64.rs":"64c4bd82eaf30a2681417f982fce28de7d1b0743bfaa14004692a56cee44be21","src/unix/bsd/freebsdlike/freebsd/freebsd14/mod.rs":"c6efc4de30803d89d7c73ef59e5e18dfb3c4a0c0688855b9193b228573651106","src/unix/bsd/freebsdlike/freebsd/freebsd14/x86_64.rs":"d6e66809e109dc779efe5584b79d34fcd6fdba91973a415d64ae66f481f45940","src/unix/bsd/freebsdlike/freebsd/freebsd15/mod.rs":"48730e73367432bce709d5bcf316197c48f7501833a4798df5fc5f7043f04030","src/unix/bsd/freebsdlike/freebsd/freebsd15/x86_64.rs":"d6e66809e109dc779efe5584b79d34fcd6fdba91973a415d64ae66f481f45940","src/unix/bsd/freebsdlike/freebsd/mod.rs":"59ba589299a415936aad6f99f253a5b31e9b1e83ab6f0db3ceba077b7ba198b7","src/unix/bsd/freebsdlike/freebsd/powerpc.rs":"36a03b20551864c92852e967ebf91c6a8105fd520e41a35273e2dc6487590267","src/unix/bsd/freebsdlike/freebsd/powerpc64.rs":"3de9344db84572975b5965ac4292cf475e3c96854c58b7a478b9972407ffd1fd","src/unix/bsd/freebsdlike/freebsd/riscv64.rs":"3dfdc394922c2cb66790309c76913576a7235513ad3bf9d8bd86b8671e284ff0","src/unix/bsd/freebsdlike/freebsd/x86.rs":"2521db73acc14867b2e16aa05dd55cc48a7650d2773a009b269bbceafd819fac","src/unix/bsd/freebsdlike/freebsd/x86_64/mod.rs":"85b4b6118ef4e08a74b8cc17d364b22949b2e05e642e3240e14f2651a2126d18","src/unix/bsd/freebsdlike/mod.rs":"eda51316ba108b78c3f6c383cb047855dbd04f5b4bb59d04e0f2978722c68101","src/unix/bsd/mod.rs":"c69855551561c4beeaed5ada823404c9b9d27e9e21c0e4bafb6f1b52ad09ad2b","src/unix/bsd/netbsdlike/mod.rs":"ef9b617c42084db1bd3aa4f5d5d1a75ce1963b23945c117b6076400905ff75ec","src/unix/bsd/netbsdlike/netbsd/aarch64.rs":"bd36c92099db501350fb8617414d1fea89a6bb12867498e1821167813ab70a02","src/unix/bsd/netbsdlike/netbsd/arm.rs":"237beaefcb12e7be9ccd4fef6e3be7db79ee63d4fc714e5eaf6084d4826d6fa2","src/unix/bsd/netbsdlike/netbsd/mips.rs":"d1ff114b268358e5d35e7b83d85f414d16b81ef39eeb1802682ff4424b102bc7","src/unix/bsd/netbsdlike/netbsd/mod.rs":"df73622ea883b9e44980e14eb7cee3b53bcdddd62190fe3d672ac5843b2e2e95","src/unix/bsd/netbsdlike/netbsd/powerpc.rs":"94494f348f011c6135d301944696c5b5a09979f5892abee4c8fdee1056388b94","src/unix/bsd/netbsdlike/netbsd/riscv64.rs":"f3778a9bd2ba923220537d167cfb10b91580ffbf583100789a46d2807f7a1e3e","src/unix/bsd/netbsdlike/netbsd/sparc64.rs":"d50816e830225779ac9e9a55a7e3e097882153d72987061d76a96ee736c8af9c","src/unix/bsd/netbsdlike/netbsd/x86.rs":"307a9aba68071b0589e459269ef10845c302599b0fd2b0ee7b5c480177904e89","src/unix/bsd/netbsdlike/netbsd/x86_64.rs":"4ced76b3640d465f6dead8beb5e947b3ce8297884260fb943d5f417d985dbafc","src/unix/bsd/netbsdlike/openbsd/aarch64.rs":"8be46bc5151ec1081feaf7685c18507f766f2501a2b5d35107db3babb896395a","src/unix/bsd/netbsdlike/openbsd/arm.rs":"f81c71e1cfe436b8f32cfe064991019cce0c83627f0d9c3a30d68691d71c7449","src/unix/bsd/netbsdlike/openbsd/mips64.rs":"bee7664d88f8451ae22552fc0721b6b6a6dee2493cc42bcb9829c1e47e4b05f5","src/unix/bsd/netbsdlike/openbsd/mod.rs":"dd9e56c95e324e90e3a7c8905c593025f65c36e98c9f95eb0e033ea04e6d949f","src/unix/bsd/netbsdlike/openbsd/powerpc.rs":"f81c71e1cfe436b8f32cfe064991019cce0c83627f0d9c3a30d68691d71c7449","src/unix/bsd/netbsdlike/openbsd/powerpc64.rs":"9bd3813fe2fd7ca66ee8d70d13887b4595fb8c9e819691a657ddf108ed9cafbf","src/unix/bsd/netbsdlike/openbsd/riscv64.rs":"7fb322e9f5425456dd53eb07de9fc84097ef35295802e8f50a7fb3c7e1f89ac6","src/unix/bsd/netbsdlike/openbsd/sparc64.rs":"8d4c5a4cae63e09e1c156164ddc82e0fc77926841d4d4e419dd2e7a7b7145f58","src/unix/bsd/netbsdlike/openbsd/x86.rs":"26c1b7e7f7799c5e434126c6c0ddd45f40939cae4151f8ce0a7a1836f83ac56a","src/unix/bsd/netbsdlike/openbsd/x86_64.rs":"312b77a50ee47f107e9cfd8e7e7e0d4945675a859d7286fedbf192840f8a4c34","src/unix/cygwin/mod.rs":"13c9af853fa35f3318f629b336fd8727e62ab106ac3a2cfa0a2ac13e77536900","src/unix/haiku/b32.rs":"c3f8678ceee65a3094d8133b0d1a94470860e0b1867977f0569c52c5a20e039f","src/unix/haiku/b64.rs":"f97ce9225f4710893dab03ab3e13bc62152cc84f90c597ec88f6dc1f4c27d242","src/unix/haiku/mod.rs":"991e5ab02e8607ece273e66ab8303dc7604488bf7e0b7533fdb69ea9adef83df","src/unix/haiku/native.rs":"fafc7daab134d37ed260373f9c3a8177cc0fd88ba147c1001b9867eb9bd0799b","src/unix/haiku/x86_64.rs":"4480c0423eac3f288202df587b54025292633869a868bd0ac2767cd40afb5173","src/unix/hurd/b32.rs":"501f426f7aeb60acf4119064100dd94bbdfebff2cec785428708059d853dc123","src/unix/hurd/b64.rs":"b9b2082e721a5ec89ba55fd5a16bbffcc8a05ca7cef6dbfbd78aff0806cb931f","src/unix/hurd/mod.rs":"4bc76f612d215300d01bd36bb5e6541cddbe62858571328a03c6b7bb8a208262","src/unix/linux_like/android/b32/arm.rs":"06dfde862400151e3a667650d73c8ac8ea9c3c44c5401ef2b2406b2cca4a8672","src/unix/linux_like/android/b32/mod.rs":"2df9e7337f299a12890bccca59d65619aa5a53991aa2c0c33b4fc49b64c3c93d","src/unix/linux_like/android/b32/x86/mod.rs":"ad5942e15c6603469e82144076c4837e9daebb40d0195865e7d574e6433136d0","src/unix/linux_like/android/b64/aarch64/mod.rs":"5ae558c8af8187155fa0ae8b8776459a60c08ce152f25d137f845d8371673b7e","src/unix/linux_like/android/b64/mod.rs":"6a87e7e673677882c31eb4b69375427b71f7f9f61f883322bb1fba8ecb9ff39c","src/unix/linux_like/android/b64/riscv64/mod.rs":"d826b0e4f078b8ea228f2244659fc700b95aa8a7ba87caef0bc34f54c9defd2c","src/unix/linux_like/android/b64/x86_64/mod.rs":"cab0e8cc6895e7af9e631196b2484e7ccb3bdf5b0a134ab14abb626eef8b2a3e","src/unix/linux_like/android/mod.rs":"980694e20136b3f83176af5b6a2fcc7c70aa8e7a76baef324cefb7c9ac3b1af8","src/unix/linux_like/emscripten/lfs64.rs":"3a1d1779bcf16525a578a68237f9854090eae4c9819e18ffb5a288f39be4afbe","src/unix/linux_like/emscripten/mod.rs":"356db0bbc7ee5c23cc79fc15add48febaf2976b0780a3c430b2f098715e4153a","src/unix/linux_like/linux/arch/generic/mod.rs":"affb1e1abc4d58d8f37ba834981cf86858242c2a01c1c4bfd905c9e3bbbeacab","src/unix/linux_like/linux/arch/mips/mod.rs":"abda6685083597ed88c1f5d4121b387288d29a7bfb5f9b47a1580a45d3f523d8","src/unix/linux_like/linux/arch/mod.rs":"8bc5898b03760a95dd4f124ac76ad92e5ae36b2d0644203d752ef2b37e487c3a","src/unix/linux_like/linux/arch/powerpc/mod.rs":"ca5e83ce5f0e6c7ef7f575dcc27a5669b64b759ae0871c13b91fce43ad152351","src/unix/linux_like/linux/arch/sparc/mod.rs":"9735216185ae78271e8333f8e8199480244d1a269b27b430f480a7b75c219c50","src/unix/linux_like/linux/gnu/b32/arm/mod.rs":"aa5958011a063d025f11cf0cfc999dbc987ca5cbe0aad5385ab5e7ff7fc55abe","src/unix/linux_like/linux/gnu/b32/csky/mod.rs":"e1c53b84e1c13d91d94a44da0c3f120788c135d4253834782db57cccf0a39db4","src/unix/linux_like/linux/gnu/b32/m68k/mod.rs":"4e8eaf62fefaaa57842259b47b21f02e21f299975a6d82a64729506781259e43","src/unix/linux_like/linux/gnu/b32/mips/mod.rs":"333c338367275ec420fc4c83779e3f0e52f86cace91d7940718a5b02c2e60297","src/unix/linux_like/linux/gnu/b32/mod.rs":"7a4767d2409a4764ec0735f7f47d7d082247b324d28bdd2baee03802f95fa3e3","src/unix/linux_like/linux/gnu/b32/powerpc.rs":"336f24e10b2dbd2faf0fb003cf43220c08f325695a02f4f7fd63fa06c23ce381","src/unix/linux_like/linux/gnu/b32/riscv32/mod.rs":"e5882e019997612fac4fe839915dbef9b2bcc1bea5484efa4a2664a339fa5e14","src/unix/linux_like/linux/gnu/b32/sparc/mod.rs":"756ea27c90bee66496aac32fba1a2e38b4ecb1e9c104a3160010eaa505807efb","src/unix/linux_like/linux/gnu/b32/x86/mod.rs":"9d28eac7d1bf98aa38832b8e55757ddef3ee8bde4cb00ba5e4145d07038bf827","src/unix/linux_like/linux/gnu/b64/aarch64/ilp32.rs":"638b2d717dcf5b59a0058c3dabab43edd84de9d1d7da6e16ad0c58e863000417","src/unix/linux_like/linux/gnu/b64/aarch64/lp64.rs":"28c11e70467b2f00735d3a04c369e96e04fd44d0587ee33359f38328b0677ee6","src/unix/linux_like/linux/gnu/b64/aarch64/mod.rs":"335b220e43cd07c3f6a262fe161fb057dea6324ab8ad41cd419bc596e16cd640","src/unix/linux_like/linux/gnu/b64/loongarch64/mod.rs":"425047046086c6be01d35b6c630f70c560a58be772704329e0aae23102f7db51","src/unix/linux_like/linux/gnu/b64/mips64/mod.rs":"05c9fa18fb781f775d7fba8916b756752612590168ddc127315a0fcbbd5d8ad3","src/unix/linux_like/linux/gnu/b64/mod.rs":"d1d38f4a25d885be350bc6fdfa4a633a180717d60392010c40ec2c3899fc4d42","src/unix/linux_like/linux/gnu/b64/powerpc64/mod.rs":"8ea4a284cfb48c23ffa1a5dba69ac2e6433109ec00260dc3ffb241aec5219473","src/unix/linux_like/linux/gnu/b64/riscv64/mod.rs":"c20634c01c22d0d618d0f6d555f35eb339f4e75fd6491cb4a77392b48e1b2265","src/unix/linux_like/linux/gnu/b64/s390x.rs":"67cad067e292b4d8cc0743adb4506f02c53bdf3c2e935fbfc1467a88451c645b","src/unix/linux_like/linux/gnu/b64/sparc64/mod.rs":"8cbfa0d9c67893b18e836a7e9b70076dcbcb06386575fc261f2b8a9fefd2caa7","src/unix/linux_like/linux/gnu/b64/x86_64/mod.rs":"10fcc444c2550be09ccf7a4231024b8af4acd6024de81da110ad932b62707698","src/unix/linux_like/linux/gnu/b64/x86_64/not_x32.rs":"07240332eaf44996d86e37b12d71b519b499c9c9b57898441c58ac2e8c0cb6f7","src/unix/linux_like/linux/gnu/b64/x86_64/x32.rs":"914898b781dfe6b2f755730d6000223d1beea177731e180ccbfdd84a0b8b3bd9","src/unix/linux_like/linux/gnu/mod.rs":"52e1300f6c25cefd4c3d491ec7e1385f423a1fbbeb97b774c9a400b1c1b2b822","src/unix/linux_like/linux/mod.rs":"07f336f3e08712d51a96380250784c5a3364361d6c75f1e135931779b8d752af","src/unix/linux_like/linux/musl/b32/arm/mod.rs":"8aefb482620db0e6853abc2313877f6bf87b3b4d63c0891d99189cdb12ce7733","src/unix/linux_like/linux/musl/b32/hexagon.rs":"400457049bad619da3accbca2c841206d1cd2673d670baf7210bf17427510271","src/unix/linux_like/linux/musl/b32/mips/mod.rs":"fa47a3a9614ec2a964e99d30cde2d2dd4f04015e6c4dcf3b3e3061a7538bd7c7","src/unix/linux_like/linux/musl/b32/mod.rs":"e0f53df7ca1dbe9b0b25ccecf1adf664227995e58d67a222a8d046d2a879dfc8","src/unix/linux_like/linux/musl/b32/powerpc.rs":"e97baedfe7f1a0cb48f0ba9e5389f86c19c4a08e22de1d82f18f411dba4c95e2","src/unix/linux_like/linux/musl/b32/riscv32/mod.rs":"435ba055ec51d48bea1f835aeea91d01a24a12db9363aa34d1587dc7f0ac99e4","src/unix/linux_like/linux/musl/b32/x86/mod.rs":"b27cf5ff9f1f734957af06f50881360dffb20538f7703daea01bbebf0e232bf0","src/unix/linux_like/linux/musl/b64/aarch64/mod.rs":"ef117d729a168607bc7ddbf6fa1289e62233b50cf154237151ba1ee842208178","src/unix/linux_like/linux/musl/b64/loongarch64/mod.rs":"3075639f37378774f3991f05971a9b725766105e5884b1e97b3889b079f95514","src/unix/linux_like/linux/musl/b64/mips64.rs":"abf1eb14fff4dd1bdf081672ab92858e99c09666583d8f9952112da13036e50e","src/unix/linux_like/linux/musl/b64/mod.rs":"07081d3471292a46d5ed69a5a376fceac9c6a01533c76db277eb6f9923092d5f","src/unix/linux_like/linux/musl/b64/powerpc64.rs":"606be7895a1578916b2b1f1d01518307d46b79a9c64d239a37dc8693af697466","src/unix/linux_like/linux/musl/b64/riscv64/mod.rs":"a76a7a24d52f2fc3811d72f69e9a369d0547bdee166a5a943b94396e320b077c","src/unix/linux_like/linux/musl/b64/s390x.rs":"ffbfdefb58d27d6463757a256b1480b83e53b19fc0f9c7fc1af461be33fae359","src/unix/linux_like/linux/musl/b64/wasm32/mod.rs":"f44f7b2ade822aa468f4abd6ba3f1ce86d6ffd307c4b4eb50684156458abd137","src/unix/linux_like/linux/musl/b64/wasm32/wali.rs":"69e0d06289f1c86898ef3ab505e397af2acce146accb62efff654fe458b6af02","src/unix/linux_like/linux/musl/b64/x86_64/mod.rs":"a317282fb504c35a83e0de335caa01c09f8f9b2649d1250dbcedb1ebf0f75e7f","src/unix/linux_like/linux/musl/lfs64.rs":"308c5b5c9b2f4b1ad17e5c2d02946f84ae83e8f5cb0e789d8d3e76c1923a5d31","src/unix/linux_like/linux/musl/mod.rs":"7fc0d475f397b64eb40c57bf5835a4612267d2a42c955e12f486032a8b54b8d9","src/unix/linux_like/linux/uclibc/arm/mod.rs":"32d3701fa086b2a98589b4ae4842ce62b295bc0bd9eaf1b5f9792e442b681090","src/unix/linux_like/linux/uclibc/mips/mips32/mod.rs":"59493f1ab84ddbcf9dc5881c9cfc26e28d4fb5322d63f60eb7de5f9e8e329580","src/unix/linux_like/linux/uclibc/mips/mips64/mod.rs":"a35532d5ae376f403873aa566f37bff99c6c323d334f3201667e5f7200b04643","src/unix/linux_like/linux/uclibc/mips/mod.rs":"ead3f9c05e3bdd5d5b52f25dd4a2d154471555a6bae2d4cbd5c07e976513dcea","src/unix/linux_like/linux/uclibc/mod.rs":"ed8bd29fc30319dfc149ccc5d150ca41e2d28ea5210fc26d9af91ad5903d0093","src/unix/linux_like/linux/uclibc/x86_64/l4re.rs":"059d1f15bf84e2226be6b842dc9466fc5f5bf55cdeed7a8742658ff25f05361c","src/unix/linux_like/linux/uclibc/x86_64/mod.rs":"c37752975c173aeb1641bae0e743ff2e7600976620bcb6e9ee8e74a40355d186","src/unix/linux_like/linux/uclibc/x86_64/other.rs":"12f8d4049862fc0c4d94b770f2d0341c1c7bf3da0619436169c12cadc4093def","src/unix/linux_like/mod.rs":"e04413e0d1c5207b58ab6c49f7995b9000be1f2fb1d4595c357a32df38951410","src/unix/mod.rs":"72b609e49e61591b3082cf674bb8df806f2ca5b755b9a052d94c6c8cb0f5e597","src/unix/newlib/aarch64/mod.rs":"ec594c54dc0e7784668d02ef737fd194dcc3f1e6ee23328d810fd2453bcb6f20","src/unix/newlib/arm/mod.rs":"a1fb6caa077c2ed69adf12da07c814ffab4c1311579f23bae2b26a40cf180665","src/unix/newlib/espidf/mod.rs":"77e8ad5b7db027b8b0b5aa5126f15bc0e35b6f3deb2339acf403c961f13df26f","src/unix/newlib/generic.rs":"182e584f14e0984934130425dd2be0781ca2c131449b3ae1734a07c72c3d43cd","src/unix/newlib/horizon/mod.rs":"ae4e76ef8c04fa8580578e33037bcf1888a8e4d688aa6f115713f644b8a11313","src/unix/newlib/mod.rs":"2f3e9c6217994ec34b0e3b49bf5ebe1335f3b12146f7f55a797ea7041cb1f44c","src/unix/newlib/powerpc/mod.rs":"4e5f804a13e907e17ebb66dcbf3b0fe6e1a611f91876aad8d8a0a69c7df0a7e8","src/unix/newlib/rtems/mod.rs":"239c90d1daf783ff95168a3fcbc5a0c3d1f9c4b5a0ef32a0e4a22b861f82713a","src/unix/newlib/vita/mod.rs":"66765c20482f03c3fcb57d57dd3f31eeeab9729e1bb188191ad53a8fc124fc5f","src/unix/nto/aarch64.rs":"73ad54ebca13454a75c7b0815e853175070a8ac2eefa338012a03e8b59f01e0c","src/unix/nto/mod.rs":"ded4a28f5b322446b0885290b917171d771b7897f39bf5616122283318b7a8e2","src/unix/nto/neutrino.rs":"039ab7b1ed702d515f3e06d7f3536709704715a49905024b6c520696a65086f9","src/unix/nto/x86_64.rs":"8da99138e210516a95d49c8c0265eada4c5f7b93d59be86224844410f5e7929b","src/unix/nuttx/mod.rs":"69beba3516f66d36c5b5e38130ff1fde8a8403d6d8ec79bebe437ac5d385176f","src/unix/redox/mod.rs":"a9a0005c8572ad5404cc9680a83a610d8aa82278fcb5d24a4b99ab32fcc6eb60","src/unix/solarish/compat.rs":"c02a88918852b7a9c60e45a34f7b003901000380f5c1b2832b8bd79f84936c8b","src/unix/solarish/illumos.rs":"7c5da4d4ea69ebfb83a59764eeafc74e234b2b9b021eed32572b8a28d991a398","src/unix/solarish/mod.rs":"ae04bf0fd7a30c0d0e22df180617c545428874c50a6ff815048a82124c2c6d75","src/unix/solarish/solaris.rs":"54bae4c960b65d849beea8f0beb79dc37afebc1e9d7664424df13e6082ccc2e8","src/unix/solarish/x86.rs":"44261c1f1b300dac9fa0dab93ec85d0c3b3c48b15bc4515b9820c9421cff7427","src/unix/solarish/x86_64.rs":"1601309baae50ccfd51b5d188668e6ac5dabc4e8d2ffde103592922ec15295ef","src/unix/solarish/x86_common.rs":"4ae02d88622f7f080f5e8cd328f13187edbc5e124fb3e05e4cf212597f6cce48","src/vxworks/aarch64.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/arm.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/mod.rs":"b2857bf7695b4571ad7fba8f44ebcbdecbdd9ac26b38430b33b04f0c50addcc7","src/vxworks/powerpc.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/powerpc64.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/riscv32.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/vxworks/riscv64.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/vxworks/x86.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/vxworks/x86_64.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/wasi/mod.rs":"cac5127894b50bd1880e87b54ae0cbc9afe98f99ee739f74aec04172c14bcc1a","src/wasi/p2.rs":"feecc0485eabd2c32bc5d800df6ad1b9b4d282741342fb08792f2635204e1e08","src/windows/gnu/mod.rs":"320ddf761f731c24a27e061438ddbacb0630e3ad6f3bb39f6514c28dffd8ac9f","src/windows/mod.rs":"6be16eea8c7319c35e7efc6a70da8a04f9ab25d68173c51d561f37a0935de47c","src/windows/msvc/mod.rs":"7bc0f1e7e73815296cd6b63b2700e12624e9f47b5c4113a1a87fae8e64549c00","src/xous.rs":"1a83621c40248ad4d0c08e1fd4c1107d5efcbc2f4f0169538b7b4a885abedbfa","tests/const_fn.rs":"8ac3171d7bced3576a4e93f48570b3e00c553d7510ab85a7473ae3b716a812dc"},"package":"c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"}
+\ В конце файла нет новой строки
++{"files":{"CHANGELOG.md":"747b437db48b8ded620a8738f9c1dbc2fde3d26db03d0782796537a9e505a263","CONTRIBUTING.md":"155e7f4e96fafe9ee5c8adb5068be27a22de89a95ca9bfc7baf517b9850d20d6","Cargo.lock":"f73065fee2180d2c25908eb5dadd8a152a7906095b1f2bca0f1da26087d67775","Cargo.toml":"1a802d9289b72da000d4948c2e1f9f96ea96f85ed6b13b520d11af6b76810aff","LICENSE-APACHE":"62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a","LICENSE-MIT":"a8d47ff51ca256f56a8932dba07660672dbfe3004257ca8de708aac1415937a1","README.md":"a198be444453fe0b24d4fb6a8b732eb9e6dc77ebcfd119fca95b97b45c77c77a","build.rs":"199eb63f03c4e90cad31c1f03a15bac3d81ca97f31bcb81c45bbd0d909e57d61","rustfmt.toml":"e9321ff995242e8cb0a4984254f0748ef11a89ca4618cab8f047ee59a88768e7","src/fuchsia/aarch64.rs":"9cd032304a54321a8926cf3157194c5d79a2491b1b974a05fe71729fa43b5738","src/fuchsia/mod.rs":"e27680db23fa506e379a86033b42813ea1f6c8f6b01d97a9a880d9d7be6d9f7f","src/fuchsia/riscv64.rs":"f2aba92cb88480bd72a9eb7a41aafc63c5db293b93113fa973fe5ab1fd819e29","src/fuchsia/x86_64.rs":"66c6ae7d3f81b1d7c962671aa074d709c39069e3b5830621a26d94c15caf588f","src/hermit.rs":"e414a3ecd5b5bc6c0bf7ce7c31639805943b789fbbf6006ceeb85ab44f3e4564","src/lib.rs":"d65975abfeac27f8dbef348fa7afa0b2b761a0a7073f4621c1bbff41334983cd","src/macros.rs":"076f328df1d51017bac70456e7b8290bee1b07390328fff48102e05048ada56a","src/primitives.rs":"0096ec3f32454a630fd1e78fa5aaaa033f107c1394a0d7b8dfe92594339a547b","src/psp.rs":"b88f5659011db6a189bd06de3a365c35a34cec6b7ab547719b8ae2b371f9cb21","src/sgx.rs":"964d6af358f5c85f948275090e5a7854e0169c43b5c338070b6a4cd156ebc9e6","src/solid/aarch64.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/solid/arm.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/solid/mod.rs":"a2045b6089af91bd533a666773d3b99fcfaf03da7a06869382969eed059b0e4c","src/switch.rs":"bfdcaf0268d79652ee52c1a2837959b8253e6a4124fd94dda82727ecc442a758","src/teeos/mod.rs":"2cca695904dacb13c063fb6463a6e0b2bb47ed86be0fdc9476938297441d7795","src/trusty.rs":"c5012aeefc4307c11374f062ad1d530e2ec556e7069e375de326a49c77f65e22","src/unix/aix/mod.rs":"fa3fa1f33e381f9492321e47f683300460d02fa230f14965ee808eeab2884408","src/unix/aix/powerpc64.rs":"c2315d638bad020e75ef15f85989f8feffb4f38bac4b7e70642031c6ae1fb65d","src/unix/bsd/apple/b32/mod.rs":"39a7f5cf92cf2d26ca50f54182fe57028cf24147ec12cb89d251301d65862138","src/unix/bsd/apple/b64/aarch64/mod.rs":"3ce904e72d78e6465ca52fd3905208fbb8cbc49a1695a708b12dff2ee01f4d36","src/unix/bsd/apple/b64/mod.rs":"a77ef659cd2edadb39db562e655ea5efdb102ed0dfb872d8d004b38d1a0e9e49","src/unix/bsd/apple/b64/x86_64/mod.rs":"71bad5c051368805146168c4063534b010afcb358477c1f164712bb015bf3fb6","src/unix/bsd/apple/mod.rs":"39216bfe363384709f0b38df6b333206ad85361e6b1389f699b2b88d46aa3e1f","src/unix/bsd/freebsdlike/dragonfly/errno.rs":"07b19390b9ae8f541ac35fd4e14685d639b95152d6d7a33814bb749b8b927298","src/unix/bsd/freebsdlike/dragonfly/mod.rs":"9681882d03a9cc7e00db0d9f0be797426ce4e9f7584d3fe4ab43bc7967dd0e4e","src/unix/bsd/freebsdlike/freebsd/aarch64.rs":"9e8e5a9f1de648b248f257aab6e1bc8ccfe9e481554a52bdef06aefd262a15a2","src/unix/bsd/freebsdlike/freebsd/arm.rs":"36158ac5a31d86a919d8e477a9ba64467d38b57bc3910e19b082130811c2f289","src/unix/bsd/freebsdlike/freebsd/freebsd11/b32.rs":"8d9bef35f3e490d04755a59a99ad054ef20498beff979ae8b14acbec1097318a","src/unix/bsd/freebsdlike/freebsd/freebsd11/b64.rs":"45f718f556a8368f282944d9a14afae7261827ec4838d26719290466efc4f023","src/unix/bsd/freebsdlike/freebsd/freebsd11/mod.rs":"77bef57a5697d837331cff8947c50d070b28bb7aaa51b23f4d604cedaba76806","src/unix/bsd/freebsdlike/freebsd/freebsd12/mod.rs":"2dfe0dd90c956e3bcc8bbbd6926c5b370829f411f22b80fa749fe87ebf0ea47b","src/unix/bsd/freebsdlike/freebsd/freebsd12/x86_64.rs":"64c4bd82eaf30a2681417f982fce28de7d1b0743bfaa14004692a56cee44be21","src/unix/bsd/freebsdlike/freebsd/freebsd13/mod.rs":"f0d4d0fcd6c4e3bd77f84474a404be8a3a326731e9fe52008a09bcfb123a98a0","src/unix/bsd/freebsdlike/freebsd/freebsd13/x86_64.rs":"64c4bd82eaf30a2681417f982fce28de7d1b0743bfaa14004692a56cee44be21","src/unix/bsd/freebsdlike/freebsd/freebsd14/mod.rs":"c6efc4de30803d89d7c73ef59e5e18dfb3c4a0c0688855b9193b228573651106","src/unix/bsd/freebsdlike/freebsd/freebsd14/x86_64.rs":"d6e66809e109dc779efe5584b79d34fcd6fdba91973a415d64ae66f481f45940","src/unix/bsd/freebsdlike/freebsd/freebsd15/mod.rs":"48730e73367432bce709d5bcf316197c48f7501833a4798df5fc5f7043f04030","src/unix/bsd/freebsdlike/freebsd/freebsd15/x86_64.rs":"d6e66809e109dc779efe5584b79d34fcd6fdba91973a415d64ae66f481f45940","src/unix/bsd/freebsdlike/freebsd/mod.rs":"59ba589299a415936aad6f99f253a5b31e9b1e83ab6f0db3ceba077b7ba198b7","src/unix/bsd/freebsdlike/freebsd/powerpc.rs":"36a03b20551864c92852e967ebf91c6a8105fd520e41a35273e2dc6487590267","src/unix/bsd/freebsdlike/freebsd/powerpc64.rs":"3de9344db84572975b5965ac4292cf475e3c96854c58b7a478b9972407ffd1fd","src/unix/bsd/freebsdlike/freebsd/riscv64.rs":"3dfdc394922c2cb66790309c76913576a7235513ad3bf9d8bd86b8671e284ff0","src/unix/bsd/freebsdlike/freebsd/x86.rs":"2521db73acc14867b2e16aa05dd55cc48a7650d2773a009b269bbceafd819fac","src/unix/bsd/freebsdlike/freebsd/x86_64/mod.rs":"85b4b6118ef4e08a74b8cc17d364b22949b2e05e642e3240e14f2651a2126d18","src/unix/bsd/freebsdlike/mod.rs":"eda51316ba108b78c3f6c383cb047855dbd04f5b4bb59d04e0f2978722c68101","src/unix/bsd/mod.rs":"c69855551561c4beeaed5ada823404c9b9d27e9e21c0e4bafb6f1b52ad09ad2b","src/unix/bsd/netbsdlike/mod.rs":"ef9b617c42084db1bd3aa4f5d5d1a75ce1963b23945c117b6076400905ff75ec","src/unix/bsd/netbsdlike/netbsd/aarch64.rs":"bd36c92099db501350fb8617414d1fea89a6bb12867498e1821167813ab70a02","src/unix/bsd/netbsdlike/netbsd/arm.rs":"237beaefcb12e7be9ccd4fef6e3be7db79ee63d4fc714e5eaf6084d4826d6fa2","src/unix/bsd/netbsdlike/netbsd/mips.rs":"d1ff114b268358e5d35e7b83d85f414d16b81ef39eeb1802682ff4424b102bc7","src/unix/bsd/netbsdlike/netbsd/mod.rs":"df73622ea883b9e44980e14eb7cee3b53bcdddd62190fe3d672ac5843b2e2e95","src/unix/bsd/netbsdlike/netbsd/powerpc.rs":"94494f348f011c6135d301944696c5b5a09979f5892abee4c8fdee1056388b94","src/unix/bsd/netbsdlike/netbsd/riscv64.rs":"f3778a9bd2ba923220537d167cfb10b91580ffbf583100789a46d2807f7a1e3e","src/unix/bsd/netbsdlike/netbsd/sparc64.rs":"d50816e830225779ac9e9a55a7e3e097882153d72987061d76a96ee736c8af9c","src/unix/bsd/netbsdlike/netbsd/x86.rs":"307a9aba68071b0589e459269ef10845c302599b0fd2b0ee7b5c480177904e89","src/unix/bsd/netbsdlike/netbsd/x86_64.rs":"4ced76b3640d465f6dead8beb5e947b3ce8297884260fb943d5f417d985dbafc","src/unix/bsd/netbsdlike/openbsd/aarch64.rs":"8be46bc5151ec1081feaf7685c18507f766f2501a2b5d35107db3babb896395a","src/unix/bsd/netbsdlike/openbsd/arm.rs":"f81c71e1cfe436b8f32cfe064991019cce0c83627f0d9c3a30d68691d71c7449","src/unix/bsd/netbsdlike/openbsd/mips64.rs":"bee7664d88f8451ae22552fc0721b6b6a6dee2493cc42bcb9829c1e47e4b05f5","src/unix/bsd/netbsdlike/openbsd/mod.rs":"dd9e56c95e324e90e3a7c8905c593025f65c36e98c9f95eb0e033ea04e6d949f","src/unix/bsd/netbsdlike/openbsd/powerpc.rs":"f81c71e1cfe436b8f32cfe064991019cce0c83627f0d9c3a30d68691d71c7449","src/unix/bsd/netbsdlike/openbsd/powerpc64.rs":"9bd3813fe2fd7ca66ee8d70d13887b4595fb8c9e819691a657ddf108ed9cafbf","src/unix/bsd/netbsdlike/openbsd/riscv64.rs":"7fb322e9f5425456dd53eb07de9fc84097ef35295802e8f50a7fb3c7e1f89ac6","src/unix/bsd/netbsdlike/openbsd/sparc64.rs":"8d4c5a4cae63e09e1c156164ddc82e0fc77926841d4d4e419dd2e7a7b7145f58","src/unix/bsd/netbsdlike/openbsd/x86.rs":"26c1b7e7f7799c5e434126c6c0ddd45f40939cae4151f8ce0a7a1836f83ac56a","src/unix/bsd/netbsdlike/openbsd/x86_64.rs":"312b77a50ee47f107e9cfd8e7e7e0d4945675a859d7286fedbf192840f8a4c34","src/unix/cygwin/mod.rs":"13c9af853fa35f3318f629b336fd8727e62ab106ac3a2cfa0a2ac13e77536900","src/unix/haiku/b32.rs":"c3f8678ceee65a3094d8133b0d1a94470860e0b1867977f0569c52c5a20e039f","src/unix/haiku/b64.rs":"f97ce9225f4710893dab03ab3e13bc62152cc84f90c597ec88f6dc1f4c27d242","src/unix/haiku/mod.rs":"991e5ab02e8607ece273e66ab8303dc7604488bf7e0b7533fdb69ea9adef83df","src/unix/haiku/native.rs":"fafc7daab134d37ed260373f9c3a8177cc0fd88ba147c1001b9867eb9bd0799b","src/unix/haiku/x86_64.rs":"4480c0423eac3f288202df587b54025292633869a868bd0ac2767cd40afb5173","src/unix/hurd/b32.rs":"501f426f7aeb60acf4119064100dd94bbdfebff2cec785428708059d853dc123","src/unix/hurd/b64.rs":"b9b2082e721a5ec89ba55fd5a16bbffcc8a05ca7cef6dbfbd78aff0806cb931f","src/unix/hurd/mod.rs":"4bc76f612d215300d01bd36bb5e6541cddbe62858571328a03c6b7bb8a208262","src/unix/linux_like/android/b32/arm.rs":"06dfde862400151e3a667650d73c8ac8ea9c3c44c5401ef2b2406b2cca4a8672","src/unix/linux_like/android/b32/mod.rs":"2df9e7337f299a12890bccca59d65619aa5a53991aa2c0c33b4fc49b64c3c93d","src/unix/linux_like/android/b32/x86/mod.rs":"ad5942e15c6603469e82144076c4837e9daebb40d0195865e7d574e6433136d0","src/unix/linux_like/android/b64/aarch64/mod.rs":"5ae558c8af8187155fa0ae8b8776459a60c08ce152f25d137f845d8371673b7e","src/unix/linux_like/android/b64/mod.rs":"6a87e7e673677882c31eb4b69375427b71f7f9f61f883322bb1fba8ecb9ff39c","src/unix/linux_like/android/b64/riscv64/mod.rs":"d826b0e4f078b8ea228f2244659fc700b95aa8a7ba87caef0bc34f54c9defd2c","src/unix/linux_like/android/b64/x86_64/mod.rs":"cab0e8cc6895e7af9e631196b2484e7ccb3bdf5b0a134ab14abb626eef8b2a3e","src/unix/linux_like/android/mod.rs":"980694e20136b3f83176af5b6a2fcc7c70aa8e7a76baef324cefb7c9ac3b1af8","src/unix/linux_like/emscripten/lfs64.rs":"3a1d1779bcf16525a578a68237f9854090eae4c9819e18ffb5a288f39be4afbe","src/unix/linux_like/emscripten/mod.rs":"356db0bbc7ee5c23cc79fc15add48febaf2976b0780a3c430b2f098715e4153a","src/unix/linux_like/linux/arch/generic/mod.rs":"affb1e1abc4d58d8f37ba834981cf86858242c2a01c1c4bfd905c9e3bbbeacab","src/unix/linux_like/linux/arch/mips/mod.rs":"abda6685083597ed88c1f5d4121b387288d29a7bfb5f9b47a1580a45d3f523d8","src/unix/linux_like/linux/arch/mod.rs":"8bc5898b03760a95dd4f124ac76ad92e5ae36b2d0644203d752ef2b37e487c3a","src/unix/linux_like/linux/arch/powerpc/mod.rs":"ca5e83ce5f0e6c7ef7f575dcc27a5669b64b759ae0871c13b91fce43ad152351","src/unix/linux_like/linux/arch/sparc/mod.rs":"9735216185ae78271e8333f8e8199480244d1a269b27b430f480a7b75c219c50","src/unix/linux_like/linux/gnu/b32/arm/mod.rs":"aa5958011a063d025f11cf0cfc999dbc987ca5cbe0aad5385ab5e7ff7fc55abe","src/unix/linux_like/linux/gnu/b32/csky/mod.rs":"e1c53b84e1c13d91d94a44da0c3f120788c135d4253834782db57cccf0a39db4","src/unix/linux_like/linux/gnu/b32/m68k/mod.rs":"4e8eaf62fefaaa57842259b47b21f02e21f299975a6d82a64729506781259e43","src/unix/linux_like/linux/gnu/b32/mips/mod.rs":"333c338367275ec420fc4c83779e3f0e52f86cace91d7940718a5b02c2e60297","src/unix/linux_like/linux/gnu/b32/mod.rs":"7a4767d2409a4764ec0735f7f47d7d082247b324d28bdd2baee03802f95fa3e3","src/unix/linux_like/linux/gnu/b32/powerpc.rs":"336f24e10b2dbd2faf0fb003cf43220c08f325695a02f4f7fd63fa06c23ce381","src/unix/linux_like/linux/gnu/b32/riscv32/mod.rs":"e5882e019997612fac4fe839915dbef9b2bcc1bea5484efa4a2664a339fa5e14","src/unix/linux_like/linux/gnu/b32/sparc/mod.rs":"756ea27c90bee66496aac32fba1a2e38b4ecb1e9c104a3160010eaa505807efb","src/unix/linux_like/linux/gnu/b32/x86/mod.rs":"9d28eac7d1bf98aa38832b8e55757ddef3ee8bde4cb00ba5e4145d07038bf827","src/unix/linux_like/linux/gnu/b64/aarch64/ilp32.rs":"638b2d717dcf5b59a0058c3dabab43edd84de9d1d7da6e16ad0c58e863000417","src/unix/linux_like/linux/gnu/b64/aarch64/lp64.rs":"28c11e70467b2f00735d3a04c369e96e04fd44d0587ee33359f38328b0677ee6","src/unix/linux_like/linux/gnu/b64/aarch64/mod.rs":"335b220e43cd07c3f6a262fe161fb057dea6324ab8ad41cd419bc596e16cd640","src/unix/linux_like/linux/gnu/b64/loongarch64/mod.rs":"425047046086c6be01d35b6c630f70c560a58be772704329e0aae23102f7db51","src/unix/linux_like/linux/gnu/b64/mips64/mod.rs":"05c9fa18fb781f775d7fba8916b756752612590168ddc127315a0fcbbd5d8ad3","src/unix/linux_like/linux/gnu/b64/mod.rs":"d1d38f4a25d885be350bc6fdfa4a633a180717d60392010c40ec2c3899fc4d42","src/unix/linux_like/linux/gnu/b64/powerpc64/mod.rs":"8ea4a284cfb48c23ffa1a5dba69ac2e6433109ec00260dc3ffb241aec5219473","src/unix/linux_like/linux/gnu/b64/riscv64/mod.rs":"c20634c01c22d0d618d0f6d555f35eb339f4e75fd6491cb4a77392b48e1b2265","src/unix/linux_like/linux/gnu/b64/s390x.rs":"67cad067e292b4d8cc0743adb4506f02c53bdf3c2e935fbfc1467a88451c645b","src/unix/linux_like/linux/gnu/b64/sparc64/mod.rs":"8cbfa0d9c67893b18e836a7e9b70076dcbcb06386575fc261f2b8a9fefd2caa7","src/unix/linux_like/linux/gnu/b64/x86_64/mod.rs":"10fcc444c2550be09ccf7a4231024b8af4acd6024de81da110ad932b62707698","src/unix/linux_like/linux/gnu/b64/x86_64/not_x32.rs":"07240332eaf44996d86e37b12d71b519b499c9c9b57898441c58ac2e8c0cb6f7","src/unix/linux_like/linux/gnu/b64/x86_64/x32.rs":"914898b781dfe6b2f755730d6000223d1beea177731e180ccbfdd84a0b8b3bd9","src/unix/linux_like/linux/gnu/mod.rs":"52e1300f6c25cefd4c3d491ec7e1385f423a1fbbeb97b774c9a400b1c1b2b822","src/unix/linux_like/linux/mod.rs":"07f336f3e08712d51a96380250784c5a3364361d6c75f1e135931779b8d752af","src/unix/linux_like/linux/musl/b32/arm/mod.rs":"8aefb482620db0e6853abc2313877f6bf87b3b4d63c0891d99189cdb12ce7733","src/unix/linux_like/linux/musl/b32/hexagon.rs":"400457049bad619da3accbca2c841206d1cd2673d670baf7210bf17427510271","src/unix/linux_like/linux/musl/b32/mips/mod.rs":"fa47a3a9614ec2a964e99d30cde2d2dd4f04015e6c4dcf3b3e3061a7538bd7c7","src/unix/linux_like/linux/musl/b32/mod.rs":"e0f53df7ca1dbe9b0b25ccecf1adf664227995e58d67a222a8d046d2a879dfc8","src/unix/linux_like/linux/musl/b32/powerpc.rs":"e97baedfe7f1a0cb48f0ba9e5389f86c19c4a08e22de1d82f18f411dba4c95e2","src/unix/linux_like/linux/musl/b32/riscv32/mod.rs":"435ba055ec51d48bea1f835aeea91d01a24a12db9363aa34d1587dc7f0ac99e4","src/unix/linux_like/linux/musl/b32/x86/mod.rs":"b27cf5ff9f1f734957af06f50881360dffb20538f7703daea01bbebf0e232bf0","src/unix/linux_like/linux/musl/b64/aarch64/mod.rs":"ef117d729a168607bc7ddbf6fa1289e62233b50cf154237151ba1ee842208178","src/unix/linux_like/linux/musl/b64/loongarch64/mod.rs":"3075639f37378774f3991f05971a9b725766105e5884b1e97b3889b079f95514","src/unix/linux_like/linux/musl/b64/mips64.rs":"abf1eb14fff4dd1bdf081672ab92858e99c09666583d8f9952112da13036e50e","src/unix/linux_like/linux/musl/b64/mod.rs":"07081d3471292a46d5ed69a5a376fceac9c6a01533c76db277eb6f9923092d5f","src/unix/linux_like/linux/musl/b64/powerpc64.rs":"606be7895a1578916b2b1f1d01518307d46b79a9c64d239a37dc8693af697466","src/unix/linux_like/linux/musl/b64/riscv64/mod.rs":"a76a7a24d52f2fc3811d72f69e9a369d0547bdee166a5a943b94396e320b077c","src/unix/linux_like/linux/musl/b64/s390x.rs":"ffbfdefb58d27d6463757a256b1480b83e53b19fc0f9c7fc1af461be33fae359","src/unix/linux_like/linux/musl/b64/wasm32/mod.rs":"f44f7b2ade822aa468f4abd6ba3f1ce86d6ffd307c4b4eb50684156458abd137","src/unix/linux_like/linux/musl/b64/wasm32/wali.rs":"69e0d06289f1c86898ef3ab505e397af2acce146accb62efff654fe458b6af02","src/unix/linux_like/linux/musl/b64/x86_64/mod.rs":"a317282fb504c35a83e0de335caa01c09f8f9b2649d1250dbcedb1ebf0f75e7f","src/unix/linux_like/linux/musl/lfs64.rs":"308c5b5c9b2f4b1ad17e5c2d02946f84ae83e8f5cb0e789d8d3e76c1923a5d31","src/unix/linux_like/linux/musl/mod.rs":"7fc0d475f397b64eb40c57bf5835a4612267d2a42c955e12f486032a8b54b8d9","src/unix/linux_like/linux/uclibc/arm/mod.rs":"32d3701fa086b2a98589b4ae4842ce62b295bc0bd9eaf1b5f9792e442b681090","src/unix/linux_like/linux/uclibc/mips/mips32/mod.rs":"59493f1ab84ddbcf9dc5881c9cfc26e28d4fb5322d63f60eb7de5f9e8e329580","src/unix/linux_like/linux/uclibc/mips/mips64/mod.rs":"a35532d5ae376f403873aa566f37bff99c6c323d334f3201667e5f7200b04643","src/unix/linux_like/linux/uclibc/mips/mod.rs":"ead3f9c05e3bdd5d5b52f25dd4a2d154471555a6bae2d4cbd5c07e976513dcea","src/unix/linux_like/linux/uclibc/mod.rs":"ed8bd29fc30319dfc149ccc5d150ca41e2d28ea5210fc26d9af91ad5903d0093","src/unix/linux_like/linux/uclibc/x86_64/l4re.rs":"059d1f15bf84e2226be6b842dc9466fc5f5bf55cdeed7a8742658ff25f05361c","src/unix/linux_like/linux/uclibc/x86_64/mod.rs":"c37752975c173aeb1641bae0e743ff2e7600976620bcb6e9ee8e74a40355d186","src/unix/linux_like/linux/uclibc/x86_64/other.rs":"12f8d4049862fc0c4d94b770f2d0341c1c7bf3da0619436169c12cadc4093def","src/unix/linux_like/mod.rs":"e04413e0d1c5207b58ab6c49f7995b9000be1f2fb1d4595c357a32df38951410","src/unix/mod.rs":"72b609e49e61591b3082cf674bb8df806f2ca5b755b9a052d94c6c8cb0f5e597","src/unix/newlib/aarch64/mod.rs":"ec594c54dc0e7784668d02ef737fd194dcc3f1e6ee23328d810fd2453bcb6f20","src/unix/newlib/arm/mod.rs":"a1fb6caa077c2ed69adf12da07c814ffab4c1311579f23bae2b26a40cf180665","src/unix/newlib/espidf/mod.rs":"77e8ad5b7db027b8b0b5aa5126f15bc0e35b6f3deb2339acf403c961f13df26f","src/unix/newlib/generic.rs":"182e584f14e0984934130425dd2be0781ca2c131449b3ae1734a07c72c3d43cd","src/unix/newlib/horizon/mod.rs":"ae4e76ef8c04fa8580578e33037bcf1888a8e4d688aa6f115713f644b8a11313","src/unix/newlib/mod.rs":"2f3e9c6217994ec34b0e3b49bf5ebe1335f3b12146f7f55a797ea7041cb1f44c","src/unix/newlib/powerpc/mod.rs":"4e5f804a13e907e17ebb66dcbf3b0fe6e1a611f91876aad8d8a0a69c7df0a7e8","src/unix/newlib/rtems/mod.rs":"239c90d1daf783ff95168a3fcbc5a0c3d1f9c4b5a0ef32a0e4a22b861f82713a","src/unix/newlib/vita/mod.rs":"66765c20482f03c3fcb57d57dd3f31eeeab9729e1bb188191ad53a8fc124fc5f","src/unix/nto/aarch64.rs":"73ad54ebca13454a75c7b0815e853175070a8ac2eefa338012a03e8b59f01e0c","src/unix/nto/mod.rs":"ded4a28f5b322446b0885290b917171d771b7897f39bf5616122283318b7a8e2","src/unix/nto/neutrino.rs":"039ab7b1ed702d515f3e06d7f3536709704715a49905024b6c520696a65086f9","src/unix/nto/x86_64.rs":"8da99138e210516a95d49c8c0265eada4c5f7b93d59be86224844410f5e7929b","src/unix/nuttx/mod.rs":"69beba3516f66d36c5b5e38130ff1fde8a8403d6d8ec79bebe437ac5d385176f","src/unix/redox/mod.rs":"a9a0005c8572ad5404cc9680a83a610d8aa82278fcb5d24a4b99ab32fcc6eb60","src/unix/solarish/compat.rs":"c02a88918852b7a9c60e45a34f7b003901000380f5c1b2832b8bd79f84936c8b","src/unix/solarish/illumos.rs":"7c5da4d4ea69ebfb83a59764eeafc74e234b2b9b021eed32572b8a28d991a398","src/unix/solarish/mod.rs":"ae04bf0fd7a30c0d0e22df180617c545428874c50a6ff815048a82124c2c6d75","src/unix/solarish/solaris.rs":"54bae4c960b65d849beea8f0beb79dc37afebc1e9d7664424df13e6082ccc2e8","src/unix/solarish/x86.rs":"44261c1f1b300dac9fa0dab93ec85d0c3b3c48b15bc4515b9820c9421cff7427","src/unix/solarish/x86_64.rs":"1601309baae50ccfd51b5d188668e6ac5dabc4e8d2ffde103592922ec15295ef","src/unix/solarish/x86_common.rs":"4ae02d88622f7f080f5e8cd328f13187edbc5e124fb3e05e4cf212597f6cce48","src/vxworks/aarch64.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/arm.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/mod.rs":"b2857bf7695b4571ad7fba8f44ebcbdecbdd9ac26b38430b33b04f0c50addcc7","src/vxworks/powerpc.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/powerpc64.rs":"4d4236500f98858fc249f3b6858af5009851c8c582031926b8195b2646f7da5e","src/vxworks/riscv32.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/vxworks/riscv64.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/vxworks/x86.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/vxworks/x86_64.rs":"b1f933205800f0da00f975d53b18fe0035e075cc4613acf110a09a277dc3302a","src/wasi/mod.rs":"cac5127894b50bd1880e87b54ae0cbc9afe98f99ee739f74aec04172c14bcc1a","src/wasi/p2.rs":"feecc0485eabd2c32bc5d800df6ad1b9b4d282741342fb08792f2635204e1e08","src/windows/gnu/mod.rs":"320ddf761f731c24a27e061438ddbacb0630e3ad6f3bb39f6514c28dffd8ac9f","src/windows/mod.rs":"6be16eea8c7319c35e7efc6a70da8a04f9ab25d68173c51d561f37a0935de47c","src/windows/msvc/mod.rs":"7bc0f1e7e73815296cd6b63b2700e12624e9f47b5c4113a1a87fae8e64549c00","src/xous.rs":"1a83621c40248ad4d0c08e1fd4c1107d5efcbc2f4f0169538b7b4a885abedbfa","tests/const_fn.rs":"8ac3171d7bced3576a4e93f48570b3e00c553d7510ab85a7473ae3b716a812dc"},"package":"c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/libc/Cargo.lock firefox-clean/third_party/rust/libc/Cargo.lock
+--- firefox/third_party/rust/libc/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/libc/Cargo.lock	2026-08-09 10:37:53.649467317 +0300
+@@ -4,7 +4,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ dependencies = [
+  "rustc-std-workspace-core",
+ ]
+diff -Naur firefox/third_party/rust/libc/Cargo.toml firefox-clean/third_party/rust/libc/Cargo.toml
+--- firefox/third_party/rust/libc/Cargo.toml	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/libc/Cargo.toml	2026-08-09 10:37:53.649593057 +0300
+@@ -13,7 +13,7 @@
+ edition = "2021"
+ rust-version = "1.63"
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ authors = ["The Rust Project Developers"]
+ build = "build.rs"
+ exclude = [
+diff -Naur firefox/third_party/rust/libsqlite3-sys/Cargo.lock firefox-clean/third_party/rust/libsqlite3-sys/Cargo.lock
+--- firefox/third_party/rust/libsqlite3-sys/Cargo.lock	2026-07-15 23:30:44.000000000 +0300
++++ firefox-clean/third_party/rust/libsqlite3-sys/Cargo.lock	2026-08-09 10:37:53.649737713 +0300
+@@ -99,7 +99,7 @@
+ 
+ [[package]]
+ name = "libloading"
+-version = "0.8.6"
++version = "0.8.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
+ dependencies = [
+diff -Naur firefox/third_party/rust/metal/Cargo.lock firefox-clean/third_party/rust/metal/Cargo.lock
+--- firefox/third_party/rust/metal/Cargo.lock	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/third_party/rust/metal/Cargo.lock	2026-08-09 10:37:53.649911003 +0300
+@@ -545,7 +545,7 @@
+ 
+ [[package]]
+ name = "libloading"
+-version = "0.8.6"
++version = "0.8.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
+ dependencies = [
+diff -Naur firefox/third_party/rust/mtu/src/lib.rs firefox-clean/third_party/rust/mtu/src/lib.rs
+--- firefox/third_party/rust/mtu/src/lib.rs	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/mtu/src/lib.rs	2026-08-09 10:37:53.650142675 +0300
+@@ -48,7 +48,7 @@
+     net::IpAddr,
+ };
+ 
+-#[cfg(not(target_os = "windows"))]
++#[cfg(not(any(target_os = "windows", target_os = "orange")))]
+ macro_rules! asserted_const_with_type {
+     ($name:ident, $t1:ty, $e:expr, $t2:ty) => {
+         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)] // Guarded by the following `const_assert_eq!`.
+@@ -66,7 +66,7 @@
+ #[cfg(target_os = "windows")]
+ mod windows;
+ 
+-#[cfg(not(target_os = "windows"))]
++#[cfg(not(any(target_os = "windows", target_os = "orange")))]
+ mod routesocket;
+ 
+ #[cfg(any(target_os = "macos", bsd))]
+@@ -82,14 +82,14 @@
+ }
+ 
+ /// Prepare an error for cases that "should never happen".
+-#[cfg(not(target_os = "windows"))]
++#[cfg(not(any(target_os = "windows", target_os = "orange")))]
+ fn unlikely_err(msg: String) -> Error {
+     debug_assert!(false, "{msg}");
+     Error::new(ErrorKind::Other, msg)
+ }
+ 
+ /// Align `size` to the next multiple of `align` (which needs to be a power of two).
+-#[cfg(not(target_os = "windows"))]
++#[cfg(not(any(target_os = "windows", target_os = "orange")))]
+ const fn aligned_by(size: usize, align: usize) -> usize {
+     if size == 0 {
+         align
+@@ -101,7 +101,7 @@
+ // Platforms currently not supported.
+ //
+ // See <https://github.com/mozilla/mtu/issues/82>.
+-#[cfg(any(target_os = "ios", target_os = "tvos", target_os = "visionos"))]
++#[cfg(any(target_os = "ios", target_os = "tvos", target_os = "visionos", target_os = "orange"))]
+ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
+     return Err(default_err());
+ }
+diff -Naur firefox/third_party/rust/nix/.cargo-checksum.json firefox-clean/third_party/rust/nix/.cargo-checksum.json
+--- firefox/third_party/rust/nix/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/nix/.cargo-checksum.json	2026-08-09 10:37:53.650325755 +0300
+@@ -1 +1 @@
+-{"files":{"CHANGELOG.md":"890c53890067bbd8a41ff3a7d063bbee24b489ac3cfa16d18fd7049ff9ea4935","Cargo.lock":"4daa24505b4599f9b059180347a013138bf07a07b2d63baf48b5715116909659","Cargo.toml":"f70a6f4e89f0347208d6d430e99454e295c41ee7dd93808f21fe041817301dbf","LICENSE":"66e3ee1fa7f909ad3c612d556f2a0cdabcd809ad6e66f3b0605015ac64841b70","README.md":"8852e4634aa931e6a65535cc20859d8bbbc07a6e8f82ffdb0d01e30372eec605","build.rs":"b41a7d4331f46c610c5f2bcb151894b5cf49527677d39174223c634c0d7162ed","src/dir.rs":"904437827c640dd01fab1a1c69812bb4f675c062527f5b627afb42b5c003e432","src/env.rs":"9d1e7d52c6c5f46d790a8cbc6d5d2ff9097fb7728594c518d51824ebfb70c9b3","src/errno.rs":"4aec12c7ac75f5ee9cd9f238b0777425d5ce1385c61b6907b6f34037cc52ac03","src/fcntl.rs":"90566967444f69ca37fedaaed247fd9af13fc6e99f0ee2e421a0e544449364dc","src/features.rs":"2077db641b72f976d0805b7018cb3e2fa22e161400e822312d7b5f12eaf544cc","src/ifaddrs.rs":"afd4cf9a0aa2809b6f56b07534a6ff8690be2856e8adc0cbbc8b6bc550c4d8a0","src/kmod.rs":"1e77141714fc7da27fcc59caaae0e31b5801f6e164a57f8d6d399a1b4051d5b1","src/lib.rs":"adfdb4a45cf92d13bbd56e48e5d1173da1253a9768948b10eea20aee692bd632","src/macros.rs":"ea6b3a5c117f82ab97d0a410501e7ec250ee11baf3c44b1f207ec404ea682d85","src/mount/apple.rs":"bb98335449b95e5135708d33da649472498d305d225564c81cb7f1279ba3b5b9","src/mount/bsd_without_apple.rs":"b60913e556e999deaeba464071e63b024866c648e75fc75994ddf6ec7ba6cdf7","src/mount/linux.rs":"83b4716728c54ed1d6db3fd6e2c4499f8bbe77af7e513d29c4e75525ce0d759d","src/mount/mod.rs":"1bfbdf0b8781ac6f8d320a43aedbbdfd72ac7e5d8f2a87e03f4f87cb5857ece3","src/mqueue.rs":"acc0401efa1f80487a9ac895c7dbec05ec2f1adc8811dd9ec87c54077dc52186","src/net/if_.rs":"e0d0e46718c3fc4a7f4d7c3404f2d3657707d96fb617bbdd926a9f4c75aa3b59","src/net/mod.rs":"577f70170e53d4a6de1abb70bf8f1031ec3e65c0e63ef5fcf05c907125e7ac17","src/poll.rs":"920880a9023a356ff0bb10c51ef0eb5768310bf98d70cde4b387623d2eb693fc","src/poll_timeout.rs":"c32412689fcafa561514df9d974206c11bb1276ef79fc10964f11b5416f51a00","src/pty.rs":"85b1af94ff0028f49f405098c6a18b11c838c5cd6816a94cf973feccd4163c19","src/sched.rs":"99e31eec5c47cf30d66148ef43ef47a7079da1ec05e1f68cce421208bfbf108b","src/spawn.rs":"4a3d2918ec210199fab392757cd4577c46b484a6c923a70474ae049b8bcfc1c9","src/sys/aio.rs":"c3d5ea712d19fce560647586aec3b0a31b54ceeb4aa22e982968899c2174df5b","src/sys/epoll.rs":"af7c3b564c11f3819468a5ac7be29a53d0ab10f0e92436835f195135108e662d","src/sys/event.rs":"e9e239db2e0c54379fc37343990281977cff327180f83976647d631669227f7e","src/sys/eventfd.rs":"f2d8d0577a47319171949ac26aaf5ba5fc1c8fb63b19d36359ed03f32c6c7b93","src/sys/fanotify.rs":"c92fd424099022b0d272b1022eca8406c3007fa3af56b94512cab79f9a534bd9","src/sys/inotify.rs":"d639d4194abecc1297d4e46c054cdbdcde65734ad550a14a04b3a31b09b2eff8","src/sys/ioctl/bsd.rs":"e6affc2babd4fa4539574426e416b330b7e32ba4fd2821899a67417261e7089e","src/sys/ioctl/linux.rs":"7df1a668a5fe83664a2f779c69fa4a4c1ef038f031e3e112581c54b1e871b42f","src/sys/ioctl/mod.rs":"b51770a4d8d5435b4e0305fa1d5239b762c63e9186d26ac57b2a5aef9f9d8d03","src/sys/memfd.rs":"949ca5f097a5ffce5ba7857a51e4fbc5c6e8508b8c5806167e6e3ee3bb9a652a","src/sys/mman.rs":"59da620df8ba3b8a00970fbb6499765c42ceb3f4605a9790a25d36023fd63cdd","src/sys/mod.rs":"2bef45693dbba8344c969116f2af4da1bc2ed0836366e9983c7cb126c6c4747f","src/sys/personality.rs":"4a0a28e3238024543f37b9106463d5fd1a5396b1e2a31d660a187ac27409dd0f","src/sys/prctl.rs":"58162ca18f11269bcda2bd24c5c479bf3b21c28c9b7497785ca4abbb2e0f9bdc","src/sys/pthread.rs":"258cdf7ff0b61a4afa6d228109e4cb4fb88d859bb8dfe6c959d95130fb010906","src/sys/ptrace/bsd.rs":"54b92e1ffe6455a545f807ed7de9011be05251adfdc71a5823b1965579650939","src/sys/ptrace/linux.rs":"b25c091366c57c89ece59cb55abeddffbde65ed72f0b37f4390093e0559c8248","src/sys/ptrace/mod.rs":"a9aefa2b10cc63c8b40adcd3e7dd612a8f4677bf6f37420cdd09e7129ba02c95","src/sys/quota.rs":"1638e34bddd955c7f98f1814d239eb76647101295c8a1ae40c78dd7dd7638f20","src/sys/reboot.rs":"b748217e4877c94c1870885407b9ab1ab9e059c9fb7d04818a1b29477eac81c6","src/sys/resource.rs":"a17ece2523d2f842eeb94ce4e475c5b01c1eb48eaef112aa8fc1fb05aa83696c","src/sys/select.rs":"2419abf9fa0d0e97c5262c1eb74c847497198ae73f5be5b9379e3946ecf41601","src/sys/sendfile.rs":"fc7ac628424eb1132674c73bbe19f0d82a28d6752b0beffbf111965ea3885760","src/sys/signal.rs":"7ec92d546b7767461b3a15a05d63ce8d97e7ce80370bf99b3c5caa548691159c","src/sys/signalfd.rs":"7a3f759be9026c7654d5ae9b03309ce79476c00206e585454bf142742ed0b09f","src/sys/socket/addr.rs":"23f5ead54f86149b5ea05bfdb181a573d18cf6fb35b61cdb6394bc4235be3ee7","src/sys/socket/mod.rs":"b4112a9943f73dfd4a1cd940a1fce6f7de6e4c2508505a69e2fb6f93275f3bb7","src/sys/socket/sockopt.rs":"c756c9bb97763492e96192e397cf2ccdfd9c5fe2eecdf9df0f6287cdbf222618","src/sys/stat.rs":"71ab2e0587725483df9ecff9cfe6e9288c7d11bd9de031d6a130720ee6cb3652","src/sys/statfs.rs":"f50517ca31ad2795c566dee9e84d91905fba89b7bbc896d6ec0a55043cb647a9","src/sys/statvfs.rs":"526c2e69b640f49331e8ca7a2e59cdb803887c91a53fa41f866364fec93bce24","src/sys/sysinfo.rs":"93ccfc746128dfcf8fbc2775ceefac6ddcefe154b6e5f7db96de8f29ad869b85","src/sys/termios.rs":"e9b057aced878d9bcf8ae5fb15a655e56dd2202e4c7932b870f3fab7222270f1","src/sys/time.rs":"859d29eb9879372385131934b4fe7404f12bed8a09ae2a1c3d29fc5b75218c70","src/sys/timer.rs":"b347e177d480d11f2cf7484ad19e6660dd3ca6ab2aebddc6267992f089fbd012","src/sys/timerfd.rs":"fdfe47cb1ded2eb7de51d855b769f7fb7599fee1c3b81c02ae6c605d9ea7f33d","src/sys/uio.rs":"62b8ee82f55c09a7eb90130b5a7eb9f6497e6e68b0bcd12208f5408a2c41cc98","src/sys/utsname.rs":"e1f81d363621445633101800ba34debdb222eaf3a25553f8b486f74d49e4be41","src/sys/wait.rs":"338235d42a2ec29633cf64dada7b9b1d434ed0005776bffdecfd5c69922eed89","src/syslog.rs":"567660eb9e5302fe6b584ec247fd1fc855564a833943f044c07652df83364a63","src/time.rs":"1200e48658a03aaea44ec49d439cb5d589d2db9be3c743a62e7b2cd79ed38ceb","src/ucontext.rs":"f07646e9a5908b92d790cd0b46d937ef4700d0313d600fbe4af9c64e134bc1dc","src/unistd.rs":"26b45c0e0861ca82a9300eb952bc81bf626bbde6d3606fd780ad27fc86360ba7","test/common/mod.rs":"cb322163f65319b350882fccea8d540216c4ac43f0912f1e35efa7ea0305d23d","test/mount/mod.rs":"4aac842da29f063b6f653fc5ccb02e742283fc683d6281cbcc582f55004b9c0f","test/mount/test_mount.rs":"90820c9378690190bd576e22361d0cb9b932cd7002a099c5034772feefc4f8e6","test/mount/test_mount_apple.rs":"77055902167e85368291284c00ae67b83ec932eca425a17d69ceb867ea5a142d","test/mount/test_nmount.rs":"d6c112547bb80968170b5497cda4b6cbf69dabec6f51d494bd52298995ceff18","test/sys/mod.rs":"349ccdb4b4ded7bb6c3ac4db47a37d42ee6c985b6051215964c4f7b3e22d6f91","test/sys/test_aio.rs":"a0c1315c2924a4eb4d419e08cdb00702061941170c4e3b4e53b383bf3475642d","test/sys/test_aio_drop.rs":"34464033e2872d44d578b642736ae17b2c611e6cd52970ba0e60b9588efda500","test/sys/test_epoll.rs":"c30b08d665a1fe7d7a04fe51d50ec78fc74c2ac707ae0f95f82104d5c76ceaf2","test/sys/test_event.rs":"43ed4ed940e20b6dd4aac9835eb13de099a7e60a4e6b03b89bfb8dc014208f73","test/sys/test_fanotify.rs":"d759eb6d20cfab11b491fb2972cb2c93f643919e73be29032facd8c752313483","test/sys/test_inotify.rs":"a141b9a995892547b51ceeb6761a70a6b86d37e8f38d13ea2c497b81b4b0f49f","test/sys/test_ioctl.rs":"07d08a46c4ac84161974b655a0d040e03efc9338e7a7505e0d16826b7653b5c2","test/sys/test_memfd.rs":"732a4e03b099fd80975e4993ed05b0d1eaac5fefd54b17b6e641cf119822df42","test/sys/test_mman.rs":"f7338ede651141e238596ec1d379ab83380ea4903426504af93c78a8b26f0334","test/sys/test_prctl.rs":"a2d5f1b8911b305345fadecbf39318cf201e74225b251633bd95b390c274244f","test/sys/test_pthread.rs":"8bdf06fe013fff44e0b7c558b21e2b4d3f5bf352e8b621af1d17cba70120b814","test/sys/test_ptrace.rs":"eaabeae8dd4de28cb65771983ab7504df56a6ecc39a4b936446b70ee947a17b3","test/sys/test_resource.rs":"b148e17e6c07138ca93b2c6c289fbf7d97fc4571066dc78e317a245b4464a577","test/sys/test_select.rs":"09fe9d020e4f1cdb0951ebd27a6c3f408b23471ce2c51d2f1e4708500fc15261","test/sys/test_signal.rs":"a1e4943e459e4bc79ac1e8929bbd4dab3c012935ed8084631fef4e973902a1c0","test/sys/test_signalfd.rs":"348aa82e161d99ffac0b70247441cc5b806ed7e0f23f32ecdfaa87ab2eb6c25c","test/sys/test_socket.rs":"d89baf32ffa2279cb6a44fffeda6d595f6ef9327a2fb8bf58f96e69729c8bf72","test/sys/test_sockopt.rs":"585b9160f7568de5fd5ddc8b23f5c341a142871e6149a8d5c03fb020021db0bd","test/sys/test_stat.rs":"a61b1801934ea4da6ace8ba3b983ac1251d8174b65652afc3c773b4b5f11f0d8","test/sys/test_statfs.rs":"90da08a3828b091482ee9be17c7f1aba32ffa598158b25ce3001d468fbc328c5","test/sys/test_statvfs.rs":"05cf8f1bcab0f0cd8fbefe8a2a72f9ac6d95aa760c355ac6d4b6f9c61649bc38","test/sys/test_sysinfo.rs":"ffd49bc96375914a2c4a4a59730cae8072f85771e2c4a80d3403df38d967e272","test/sys/test_termios.rs":"a5bbbb65600aa788ac1edd2af276837d065df6761a65c010e899f30850b8a3ca","test/sys/test_time.rs":"aff97dd1bfc4aa9b616cc71e9cc11f25fb3ad983f1406c856648736847778c19","test/sys/test_timer.rs":"3ae20d364f075d2811f3ff94eda9886682cc21d8807656007d2464fe36d1e361","test/sys/test_timerfd.rs":"cfed3abf58118611d08f6985251a7739cff67108e11214222a1d2394a3a026ce","test/sys/test_uio.rs":"05bab155a5e9f29e90f2996e17d77072eee576cf2ee89208524a84651d7bc3ea","test/sys/test_utsname.rs":"b8371dca02c9cdfc0c8e93df9b5cf5b5cb8a92b114977966854918abeb01ad73","test/sys/test_wait.rs":"c958e51b10a7d0396d0013e9d637a2848ad9d061d526408b40dfefb850c22beb","test/test.rs":"6518d60fd48f5a4084c9d665e7409b5691c5e6de077f05501ca5930ed67a8b2f","test/test_clearenv.rs":"45ca548035b3c20ec87314715feaba2be973709a635d85b8cde46fd1d9f1ecd4","test/test_dir.rs":"a450dec9499609a15156027b39479c1011f034efd1d1e92fd7ebef3a647a7578","test/test_errno.rs":"e7a1320e97350c2883368ffe9fc47fd041f4f9ecdee360d21d36254a63a305a3","test/test_fcntl.rs":"5e7fc105d67200ecc218334bb028e736ba688dbb228006a71249ed31f7599b64","test/test_kmod/hello_mod/Makefile":"0219f7bce0603f97d997fb377ca071966c90333ecc665e78a54dfeb97a9c811b","test/test_kmod/hello_mod/hello.c":"bcac6b19c5bd807e1f3878c15e426acc85785a8ade9840c3bb4d068635c9188c","test/test_kmod/mod.rs":"b4ae25841c2f06f32de9f1acd8230eeccd7095721302ebe78ad454e4e4f9c783","test/test_mq.rs":"d8ec2a3f3acad4369851663b3f7fef03177d9f8395b585dee8e2c53f6a2a9b4a","test/test_net.rs":"d01e3f1f955b0d58b1a22f6dfe3926fbde21f8a7183c8533f278504179c3c9d0","test/test_nix_path.rs":"01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b","test/test_poll.rs":"25b4fa094bbcda5a5317a25d2f292465965dbe3e066374b04a9b27a8d55897ac","test/test_pty.rs":"bea466c6c8c7f2e4879ef4c870482b5b58a60524fa57c88339f0e117469b0dd5","test/test_sched.rs":"c4579bd376fab8816e63b07fa9ace31dc08e63ebb7c855a2c450698090d1d1e8","test/test_sendfile.rs":"08b6a60e062fe2fb4acaa1518f9cecc5e502aeba198c84a33497d13a542a023a","test/test_spawn.rs":"6a2cf164a34deab73ae22b463ca3fc601908a6ff8815ac57270d283c6bc85db4","test/test_syslog.rs":"3430fcc54776ed931da371bff23a7d83312818430f361774cdeed10fe56a143b","test/test_time.rs":"6eb3536936c67bcfbc80a73a902b4a485943aab5375fc7e3880da6695a4eafce","test/test_unistd.rs":"a8159177d144a778ae1d26e0682f750e8df200ff6be4d08ce2ece37b6689dec9"},"package":"74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"}
+\ В конце файла нет новой строки
++{"files":{"CHANGELOG.md":"890c53890067bbd8a41ff3a7d063bbee24b489ac3cfa16d18fd7049ff9ea4935","Cargo.lock":"4daa24505b4599f9b059180347a013138bf07a07b2d63baf48b5715116909659","Cargo.toml":"bbb6da0977492980a42e1d63b0aea7fdaaf12a49eed66a8121008a6ce6287f9f","LICENSE":"66e3ee1fa7f909ad3c612d556f2a0cdabcd809ad6e66f3b0605015ac64841b70","README.md":"8852e4634aa931e6a65535cc20859d8bbbc07a6e8f82ffdb0d01e30372eec605","build.rs":"b41a7d4331f46c610c5f2bcb151894b5cf49527677d39174223c634c0d7162ed","src/dir.rs":"904437827c640dd01fab1a1c69812bb4f675c062527f5b627afb42b5c003e432","src/env.rs":"9d1e7d52c6c5f46d790a8cbc6d5d2ff9097fb7728594c518d51824ebfb70c9b3","src/errno.rs":"4aec12c7ac75f5ee9cd9f238b0777425d5ce1385c61b6907b6f34037cc52ac03","src/fcntl.rs":"90566967444f69ca37fedaaed247fd9af13fc6e99f0ee2e421a0e544449364dc","src/features.rs":"2077db641b72f976d0805b7018cb3e2fa22e161400e822312d7b5f12eaf544cc","src/ifaddrs.rs":"afd4cf9a0aa2809b6f56b07534a6ff8690be2856e8adc0cbbc8b6bc550c4d8a0","src/kmod.rs":"1e77141714fc7da27fcc59caaae0e31b5801f6e164a57f8d6d399a1b4051d5b1","src/lib.rs":"adfdb4a45cf92d13bbd56e48e5d1173da1253a9768948b10eea20aee692bd632","src/macros.rs":"ea6b3a5c117f82ab97d0a410501e7ec250ee11baf3c44b1f207ec404ea682d85","src/mount/apple.rs":"bb98335449b95e5135708d33da649472498d305d225564c81cb7f1279ba3b5b9","src/mount/bsd_without_apple.rs":"b60913e556e999deaeba464071e63b024866c648e75fc75994ddf6ec7ba6cdf7","src/mount/linux.rs":"83b4716728c54ed1d6db3fd6e2c4499f8bbe77af7e513d29c4e75525ce0d759d","src/mount/mod.rs":"1bfbdf0b8781ac6f8d320a43aedbbdfd72ac7e5d8f2a87e03f4f87cb5857ece3","src/mqueue.rs":"acc0401efa1f80487a9ac895c7dbec05ec2f1adc8811dd9ec87c54077dc52186","src/net/if_.rs":"e0d0e46718c3fc4a7f4d7c3404f2d3657707d96fb617bbdd926a9f4c75aa3b59","src/net/mod.rs":"577f70170e53d4a6de1abb70bf8f1031ec3e65c0e63ef5fcf05c907125e7ac17","src/poll.rs":"920880a9023a356ff0bb10c51ef0eb5768310bf98d70cde4b387623d2eb693fc","src/poll_timeout.rs":"c32412689fcafa561514df9d974206c11bb1276ef79fc10964f11b5416f51a00","src/pty.rs":"85b1af94ff0028f49f405098c6a18b11c838c5cd6816a94cf973feccd4163c19","src/sched.rs":"99e31eec5c47cf30d66148ef43ef47a7079da1ec05e1f68cce421208bfbf108b","src/spawn.rs":"4a3d2918ec210199fab392757cd4577c46b484a6c923a70474ae049b8bcfc1c9","src/sys/aio.rs":"c3d5ea712d19fce560647586aec3b0a31b54ceeb4aa22e982968899c2174df5b","src/sys/epoll.rs":"af7c3b564c11f3819468a5ac7be29a53d0ab10f0e92436835f195135108e662d","src/sys/event.rs":"e9e239db2e0c54379fc37343990281977cff327180f83976647d631669227f7e","src/sys/eventfd.rs":"f2d8d0577a47319171949ac26aaf5ba5fc1c8fb63b19d36359ed03f32c6c7b93","src/sys/fanotify.rs":"c92fd424099022b0d272b1022eca8406c3007fa3af56b94512cab79f9a534bd9","src/sys/inotify.rs":"d639d4194abecc1297d4e46c054cdbdcde65734ad550a14a04b3a31b09b2eff8","src/sys/ioctl/bsd.rs":"e6affc2babd4fa4539574426e416b330b7e32ba4fd2821899a67417261e7089e","src/sys/ioctl/linux.rs":"7df1a668a5fe83664a2f779c69fa4a4c1ef038f031e3e112581c54b1e871b42f","src/sys/ioctl/mod.rs":"b51770a4d8d5435b4e0305fa1d5239b762c63e9186d26ac57b2a5aef9f9d8d03","src/sys/memfd.rs":"949ca5f097a5ffce5ba7857a51e4fbc5c6e8508b8c5806167e6e3ee3bb9a652a","src/sys/mman.rs":"59da620df8ba3b8a00970fbb6499765c42ceb3f4605a9790a25d36023fd63cdd","src/sys/mod.rs":"2bef45693dbba8344c969116f2af4da1bc2ed0836366e9983c7cb126c6c4747f","src/sys/personality.rs":"4a0a28e3238024543f37b9106463d5fd1a5396b1e2a31d660a187ac27409dd0f","src/sys/prctl.rs":"58162ca18f11269bcda2bd24c5c479bf3b21c28c9b7497785ca4abbb2e0f9bdc","src/sys/pthread.rs":"258cdf7ff0b61a4afa6d228109e4cb4fb88d859bb8dfe6c959d95130fb010906","src/sys/ptrace/bsd.rs":"54b92e1ffe6455a545f807ed7de9011be05251adfdc71a5823b1965579650939","src/sys/ptrace/linux.rs":"b25c091366c57c89ece59cb55abeddffbde65ed72f0b37f4390093e0559c8248","src/sys/ptrace/mod.rs":"a9aefa2b10cc63c8b40adcd3e7dd612a8f4677bf6f37420cdd09e7129ba02c95","src/sys/quota.rs":"1638e34bddd955c7f98f1814d239eb76647101295c8a1ae40c78dd7dd7638f20","src/sys/reboot.rs":"b748217e4877c94c1870885407b9ab1ab9e059c9fb7d04818a1b29477eac81c6","src/sys/resource.rs":"a17ece2523d2f842eeb94ce4e475c5b01c1eb48eaef112aa8fc1fb05aa83696c","src/sys/select.rs":"2419abf9fa0d0e97c5262c1eb74c847497198ae73f5be5b9379e3946ecf41601","src/sys/sendfile.rs":"fc7ac628424eb1132674c73bbe19f0d82a28d6752b0beffbf111965ea3885760","src/sys/signal.rs":"7ec92d546b7767461b3a15a05d63ce8d97e7ce80370bf99b3c5caa548691159c","src/sys/signalfd.rs":"7a3f759be9026c7654d5ae9b03309ce79476c00206e585454bf142742ed0b09f","src/sys/socket/addr.rs":"23f5ead54f86149b5ea05bfdb181a573d18cf6fb35b61cdb6394bc4235be3ee7","src/sys/socket/mod.rs":"b4112a9943f73dfd4a1cd940a1fce6f7de6e4c2508505a69e2fb6f93275f3bb7","src/sys/socket/sockopt.rs":"c756c9bb97763492e96192e397cf2ccdfd9c5fe2eecdf9df0f6287cdbf222618","src/sys/stat.rs":"71ab2e0587725483df9ecff9cfe6e9288c7d11bd9de031d6a130720ee6cb3652","src/sys/statfs.rs":"f50517ca31ad2795c566dee9e84d91905fba89b7bbc896d6ec0a55043cb647a9","src/sys/statvfs.rs":"526c2e69b640f49331e8ca7a2e59cdb803887c91a53fa41f866364fec93bce24","src/sys/sysinfo.rs":"93ccfc746128dfcf8fbc2775ceefac6ddcefe154b6e5f7db96de8f29ad869b85","src/sys/termios.rs":"e9b057aced878d9bcf8ae5fb15a655e56dd2202e4c7932b870f3fab7222270f1","src/sys/time.rs":"859d29eb9879372385131934b4fe7404f12bed8a09ae2a1c3d29fc5b75218c70","src/sys/timer.rs":"b347e177d480d11f2cf7484ad19e6660dd3ca6ab2aebddc6267992f089fbd012","src/sys/timerfd.rs":"fdfe47cb1ded2eb7de51d855b769f7fb7599fee1c3b81c02ae6c605d9ea7f33d","src/sys/uio.rs":"62b8ee82f55c09a7eb90130b5a7eb9f6497e6e68b0bcd12208f5408a2c41cc98","src/sys/utsname.rs":"e1f81d363621445633101800ba34debdb222eaf3a25553f8b486f74d49e4be41","src/sys/wait.rs":"338235d42a2ec29633cf64dada7b9b1d434ed0005776bffdecfd5c69922eed89","src/syslog.rs":"567660eb9e5302fe6b584ec247fd1fc855564a833943f044c07652df83364a63","src/time.rs":"1200e48658a03aaea44ec49d439cb5d589d2db9be3c743a62e7b2cd79ed38ceb","src/ucontext.rs":"f07646e9a5908b92d790cd0b46d937ef4700d0313d600fbe4af9c64e134bc1dc","src/unistd.rs":"26b45c0e0861ca82a9300eb952bc81bf626bbde6d3606fd780ad27fc86360ba7","test/common/mod.rs":"cb322163f65319b350882fccea8d540216c4ac43f0912f1e35efa7ea0305d23d","test/mount/mod.rs":"4aac842da29f063b6f653fc5ccb02e742283fc683d6281cbcc582f55004b9c0f","test/mount/test_mount.rs":"90820c9378690190bd576e22361d0cb9b932cd7002a099c5034772feefc4f8e6","test/mount/test_mount_apple.rs":"77055902167e85368291284c00ae67b83ec932eca425a17d69ceb867ea5a142d","test/mount/test_nmount.rs":"d6c112547bb80968170b5497cda4b6cbf69dabec6f51d494bd52298995ceff18","test/sys/mod.rs":"349ccdb4b4ded7bb6c3ac4db47a37d42ee6c985b6051215964c4f7b3e22d6f91","test/sys/test_aio.rs":"a0c1315c2924a4eb4d419e08cdb00702061941170c4e3b4e53b383bf3475642d","test/sys/test_aio_drop.rs":"34464033e2872d44d578b642736ae17b2c611e6cd52970ba0e60b9588efda500","test/sys/test_epoll.rs":"c30b08d665a1fe7d7a04fe51d50ec78fc74c2ac707ae0f95f82104d5c76ceaf2","test/sys/test_event.rs":"43ed4ed940e20b6dd4aac9835eb13de099a7e60a4e6b03b89bfb8dc014208f73","test/sys/test_fanotify.rs":"d759eb6d20cfab11b491fb2972cb2c93f643919e73be29032facd8c752313483","test/sys/test_inotify.rs":"a141b9a995892547b51ceeb6761a70a6b86d37e8f38d13ea2c497b81b4b0f49f","test/sys/test_ioctl.rs":"07d08a46c4ac84161974b655a0d040e03efc9338e7a7505e0d16826b7653b5c2","test/sys/test_memfd.rs":"732a4e03b099fd80975e4993ed05b0d1eaac5fefd54b17b6e641cf119822df42","test/sys/test_mman.rs":"f7338ede651141e238596ec1d379ab83380ea4903426504af93c78a8b26f0334","test/sys/test_prctl.rs":"a2d5f1b8911b305345fadecbf39318cf201e74225b251633bd95b390c274244f","test/sys/test_pthread.rs":"8bdf06fe013fff44e0b7c558b21e2b4d3f5bf352e8b621af1d17cba70120b814","test/sys/test_ptrace.rs":"eaabeae8dd4de28cb65771983ab7504df56a6ecc39a4b936446b70ee947a17b3","test/sys/test_resource.rs":"b148e17e6c07138ca93b2c6c289fbf7d97fc4571066dc78e317a245b4464a577","test/sys/test_select.rs":"09fe9d020e4f1cdb0951ebd27a6c3f408b23471ce2c51d2f1e4708500fc15261","test/sys/test_signal.rs":"a1e4943e459e4bc79ac1e8929bbd4dab3c012935ed8084631fef4e973902a1c0","test/sys/test_signalfd.rs":"348aa82e161d99ffac0b70247441cc5b806ed7e0f23f32ecdfaa87ab2eb6c25c","test/sys/test_socket.rs":"d89baf32ffa2279cb6a44fffeda6d595f6ef9327a2fb8bf58f96e69729c8bf72","test/sys/test_sockopt.rs":"585b9160f7568de5fd5ddc8b23f5c341a142871e6149a8d5c03fb020021db0bd","test/sys/test_stat.rs":"a61b1801934ea4da6ace8ba3b983ac1251d8174b65652afc3c773b4b5f11f0d8","test/sys/test_statfs.rs":"90da08a3828b091482ee9be17c7f1aba32ffa598158b25ce3001d468fbc328c5","test/sys/test_statvfs.rs":"05cf8f1bcab0f0cd8fbefe8a2a72f9ac6d95aa760c355ac6d4b6f9c61649bc38","test/sys/test_sysinfo.rs":"ffd49bc96375914a2c4a4a59730cae8072f85771e2c4a80d3403df38d967e272","test/sys/test_termios.rs":"a5bbbb65600aa788ac1edd2af276837d065df6761a65c010e899f30850b8a3ca","test/sys/test_time.rs":"aff97dd1bfc4aa9b616cc71e9cc11f25fb3ad983f1406c856648736847778c19","test/sys/test_timer.rs":"3ae20d364f075d2811f3ff94eda9886682cc21d8807656007d2464fe36d1e361","test/sys/test_timerfd.rs":"cfed3abf58118611d08f6985251a7739cff67108e11214222a1d2394a3a026ce","test/sys/test_uio.rs":"05bab155a5e9f29e90f2996e17d77072eee576cf2ee89208524a84651d7bc3ea","test/sys/test_utsname.rs":"b8371dca02c9cdfc0c8e93df9b5cf5b5cb8a92b114977966854918abeb01ad73","test/sys/test_wait.rs":"c958e51b10a7d0396d0013e9d637a2848ad9d061d526408b40dfefb850c22beb","test/test.rs":"6518d60fd48f5a4084c9d665e7409b5691c5e6de077f05501ca5930ed67a8b2f","test/test_clearenv.rs":"45ca548035b3c20ec87314715feaba2be973709a635d85b8cde46fd1d9f1ecd4","test/test_dir.rs":"a450dec9499609a15156027b39479c1011f034efd1d1e92fd7ebef3a647a7578","test/test_errno.rs":"e7a1320e97350c2883368ffe9fc47fd041f4f9ecdee360d21d36254a63a305a3","test/test_fcntl.rs":"5e7fc105d67200ecc218334bb028e736ba688dbb228006a71249ed31f7599b64","test/test_kmod/hello_mod/Makefile":"0219f7bce0603f97d997fb377ca071966c90333ecc665e78a54dfeb97a9c811b","test/test_kmod/hello_mod/hello.c":"bcac6b19c5bd807e1f3878c15e426acc85785a8ade9840c3bb4d068635c9188c","test/test_kmod/mod.rs":"b4ae25841c2f06f32de9f1acd8230eeccd7095721302ebe78ad454e4e4f9c783","test/test_mq.rs":"d8ec2a3f3acad4369851663b3f7fef03177d9f8395b585dee8e2c53f6a2a9b4a","test/test_net.rs":"d01e3f1f955b0d58b1a22f6dfe3926fbde21f8a7183c8533f278504179c3c9d0","test/test_nix_path.rs":"01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b","test/test_poll.rs":"25b4fa094bbcda5a5317a25d2f292465965dbe3e066374b04a9b27a8d55897ac","test/test_pty.rs":"bea466c6c8c7f2e4879ef4c870482b5b58a60524fa57c88339f0e117469b0dd5","test/test_sched.rs":"c4579bd376fab8816e63b07fa9ace31dc08e63ebb7c855a2c450698090d1d1e8","test/test_sendfile.rs":"08b6a60e062fe2fb4acaa1518f9cecc5e502aeba198c84a33497d13a542a023a","test/test_spawn.rs":"6a2cf164a34deab73ae22b463ca3fc601908a6ff8815ac57270d283c6bc85db4","test/test_syslog.rs":"3430fcc54776ed931da371bff23a7d83312818430f361774cdeed10fe56a143b","test/test_time.rs":"6eb3536936c67bcfbc80a73a902b4a485943aab5375fc7e3880da6695a4eafce","test/test_unistd.rs":"a8159177d144a778ae1d26e0682f750e8df200ff6be4d08ce2ece37b6689dec9"},"package":"74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/nix/Cargo.toml firefox-clean/third_party/rust/nix/Cargo.toml
+--- firefox/third_party/rust/nix/Cargo.toml	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/nix/Cargo.toml	2026-08-09 10:37:53.650447748 +0300
+@@ -122,7 +122,7 @@
+ version = "1.0"
+ 
+ [dependencies.libc]
+-version = "0.2.171"
++version = "0.2.186"
+ features = ["extra_traits"]
+ 
+ [dependencies.memoffset]
+diff -Naur firefox/third_party/rust/quinn-udp/.cargo-checksum.json firefox-clean/third_party/rust/quinn-udp/.cargo-checksum.json
+--- firefox/third_party/rust/quinn-udp/.cargo-checksum.json	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/quinn-udp/.cargo-checksum.json	2026-08-09 10:37:53.650558829 +0300
+@@ -1 +1 @@
+-{"files":{"Cargo.lock":"b6db9f61ff4fdb22fb4a928df627f66d2a12b699476b244ea5260e010d8c2ae1","Cargo.toml":"397318dc0e80f559c5f570a71e5497fd2a5ab1b4daab1f365d094f1612198968","LICENSE-APACHE":"c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4","LICENSE-MIT":"4b2d0aca6789fa39e03d6738e869ea0988cceba210ca34ebb59c15c463e93a04","benches/throughput.rs":"86cb85d2ae07169da8c279861c53b7a055168aaaa91155576c633b8724748db6","build.rs":"1d7ecadda4a26fb0eba598789eef9b99a1b4febba9bcb61a34f0c92b1d1bbaeb","src/cmsg/mod.rs":"ccf970026c8578b1c4661fbe106093dfb62b084a231ecbb4c62eaa10df5822fe","src/cmsg/unix.rs":"7917bce2f3c8e844eca2e4cfea82669b2a31cf311321dc42532626db4ee42de8","src/cmsg/windows.rs":"6fb936ec4a283efc5796872e777441e3039c40589073865644a8ef7936af4f4b","src/fallback.rs":"1e59ea16c6e1487bbb6aa759e349000431474aa245960512cb3b5117a1ed9e21","src/lib.rs":"77d48436bbfcccaea8dc3f061acc874ef5089148bf1700fc7a61b1b3d1b575e1","src/unix.rs":"ae3cc0de15c0ec03b4aaa108a69406ee62d3b57abf5226ccd8f8e66b85c95d2d","src/windows.rs":"43da25457cb17c61369c3ba2c1d98f0ff758c5ea3207ae22969cca1f620b54af","tests/tests.rs":"bd4ee24b0e1ccab9beb444541b472bc1e815e2aba19d75572a379b6e1533449c"},"package":"ee4e529991f949c5e25755532370b8af5d114acae52326361d68d47af64aa842"}
+\ В конце файла нет новой строки
++{"files":{"Cargo.lock":"0a7021098e5b172fe6c6e4c5491d0207128caf87c8916e0297446b9606c40b54","Cargo.toml":"397318dc0e80f559c5f570a71e5497fd2a5ab1b4daab1f365d094f1612198968","LICENSE-APACHE":"c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4","LICENSE-MIT":"4b2d0aca6789fa39e03d6738e869ea0988cceba210ca34ebb59c15c463e93a04","benches/throughput.rs":"86cb85d2ae07169da8c279861c53b7a055168aaaa91155576c633b8724748db6","build.rs":"1d7ecadda4a26fb0eba598789eef9b99a1b4febba9bcb61a34f0c92b1d1bbaeb","src/cmsg/mod.rs":"ccf970026c8578b1c4661fbe106093dfb62b084a231ecbb4c62eaa10df5822fe","src/cmsg/unix.rs":"7917bce2f3c8e844eca2e4cfea82669b2a31cf311321dc42532626db4ee42de8","src/cmsg/windows.rs":"6fb936ec4a283efc5796872e777441e3039c40589073865644a8ef7936af4f4b","src/fallback.rs":"1e59ea16c6e1487bbb6aa759e349000431474aa245960512cb3b5117a1ed9e21","src/lib.rs":"77d48436bbfcccaea8dc3f061acc874ef5089148bf1700fc7a61b1b3d1b575e1","src/unix.rs":"ae3cc0de15c0ec03b4aaa108a69406ee62d3b57abf5226ccd8f8e66b85c95d2d","src/windows.rs":"43da25457cb17c61369c3ba2c1d98f0ff758c5ea3207ae22969cca1f620b54af","tests/tests.rs":"bd4ee24b0e1ccab9beb444541b472bc1e815e2aba19d75572a379b6e1533449c"},"package":"ee4e529991f949c5e25755532370b8af5d114acae52326361d68d47af64aa842"}
+\ В конце файла нет новой строки
+diff -Naur firefox/third_party/rust/quinn-udp/Cargo.lock firefox-clean/third_party/rust/quinn-udp/Cargo.lock
+--- firefox/third_party/rust/quinn-udp/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/quinn-udp/Cargo.lock	2026-08-09 10:37:53.650670613 +0300
+@@ -288,7 +288,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.171"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+ 
+diff -Naur firefox/third_party/rust/quinn-udp/src/unix.rs firefox-clean/third_party/rust/quinn-udp/src/unix.rs
+--- firefox/third_party/rust/quinn-udp/src/unix.rs	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/third_party/rust/quinn-udp/src/unix.rs	2026-08-09 10:37:53.650830688 +0300
+@@ -461,7 +461,7 @@
+     }
+ }
+ 
+-#[cfg(not(any(apple, target_os = "openbsd", target_os = "netbsd", solarish)))]
++#[cfg(not(any(apple, target_os = "openbsd", target_os = "netbsd", target_os = "orange", solarish)))]
+ fn recv(io: SockRef<'_>, bufs: &mut [IoSliceMut<'_>], meta: &mut [RecvMeta]) -> io::Result<usize> {
+     let mut names = [MaybeUninit::<libc::sockaddr_storage>::uninit(); BATCH_SIZE];
+     let mut ctrls = [cmsg::Aligned(MaybeUninit::<[u8; CMSG_LEN]>::uninit()); BATCH_SIZE];
+@@ -538,7 +538,7 @@
+     Ok(msg_count as usize)
+ }
+ 
+-#[cfg(any(target_os = "openbsd", target_os = "netbsd", solarish, apple_slow))]
++#[cfg(any(target_os = "openbsd", target_os = "netbsd", solarish, apple_slow, target_os = "orange"))]
+ fn recv(io: SockRef<'_>, bufs: &mut [IoSliceMut<'_>], meta: &mut [RecvMeta]) -> io::Result<usize> {
+     let mut name = MaybeUninit::<libc::sockaddr_storage>::uninit();
+     let mut ctrl = cmsg::Aligned(MaybeUninit::<[u8; CMSG_LEN]>::uninit());
+diff -Naur firefox/third_party/rust/rusqlite/Cargo.lock firefox-clean/third_party/rust/rusqlite/Cargo.lock
+--- firefox/third_party/rust/rusqlite/Cargo.lock	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/rusqlite/Cargo.lock	2026-08-09 10:37:53.651016773 +0300
+@@ -487,7 +487,7 @@
+ 
+ [[package]]
+ name = "libloading"
+-version = "0.8.6"
++version = "0.8.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
+ dependencies = [
+diff -Naur firefox/third_party/rust/socket2/src/sys/unix.rs firefox-clean/third_party/rust/socket2/src/sys/unix.rs
+--- firefox/third_party/rust/socket2/src/sys/unix.rs	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/socket2/src/sys/unix.rs	2026-08-09 10:37:53.651305414 +0300
+@@ -348,6 +348,7 @@
+     target_os = "watchos",
+     target_os = "espidf",
+     target_os = "vita",
++    target_os = "orange"
+ ))]
+ type IovLen = c_int;
+ 
+diff -Naur firefox/third_party/rust/tempfile/Cargo.toml firefox-clean/third_party/rust/tempfile/Cargo.toml
+--- firefox/third_party/rust/tempfile/Cargo.toml	2026-07-15 23:30:45.000000000 +0300
++++ firefox-clean/third_party/rust/tempfile/Cargo.toml	2026-08-09 10:37:53.651625475 +0300
+@@ -81,7 +81,7 @@
+ nightly = []
+ 
+ [target.'cfg(any(unix, target_os = "wasi"))'.dependencies.rustix]
+-version = "0.38.39"
++version = "0.38.44"
+ features = ["fs"]
+ 
+ [target.'cfg(any(unix, windows, target_os = "wasi"))'.dependencies.getrandom]
+diff -Naur firefox/toolkit/components/backgroundhangmonitor/ThreadStackHelper.cpp firefox-clean/toolkit/components/backgroundhangmonitor/ThreadStackHelper.cpp
+--- firefox/toolkit/components/backgroundhangmonitor/ThreadStackHelper.cpp	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/toolkit/components/backgroundhangmonitor/ThreadStackHelper.cpp	2026-08-09 10:37:53.651749712 +0300
+@@ -42,7 +42,9 @@
+ #ifdef XP_LINUX
+ #  include <ucontext.h>
+ #  include <unistd.h>
++#  ifndef __orange__
+ #  include <sys/syscall.h>
++#  endif
+ #endif
+ 
+ #ifdef __GNUC__
+diff -Naur firefox/toolkit/components/backgroundhangmonitor/ThreadStackHelper.h firefox-clean/toolkit/components/backgroundhangmonitor/ThreadStackHelper.h
+--- firefox/toolkit/components/backgroundhangmonitor/ThreadStackHelper.h	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/toolkit/components/backgroundhangmonitor/ThreadStackHelper.h	2026-08-09 10:37:53.651886463 +0300
+@@ -28,11 +28,15 @@
+ #  endif
+ 
+ // Support profiling stack and native stack on these platforms.
+-#  if defined(XP_LINUX) || defined(XP_WIN) || defined(XP_MACOSX)
++#  if (defined(XP_LINUX) || defined(XP_WIN) || defined(XP_MACOSX))
+ #    define MOZ_THREADSTACKHELPER_PROFILING_STACK
+ #    define MOZ_THREADSTACKHELPER_NATIVE_STACK
+ #  endif
+ 
++#if defined(__orange__)
++#  undef MOZ_THREADSTACKHELPER_NATIVE_STACK
++#endif
++
+ namespace mozilla {
+ 
+ /**
+diff -Naur firefox/toolkit/moz.configure firefox-clean/toolkit/moz.configure
+--- firefox/toolkit/moz.configure	2026-07-15 23:30:47.000000000 +0300
++++ firefox-clean/toolkit/moz.configure	2026-08-09 10:37:53.651938019 +0300
+@@ -217,6 +217,10 @@
+     # MozDescribeCodeAddress to call into some Rust crates that parse ELF and
+     # DWARF data, but build system issues currently prevent Rust from being
+     # used in mozglue.)
++
++    if "orange" in target.raw_os:
++        return False
++
+     if value and (target.kernel == "Linux" or target.kernel == "FreeBSD"):
+         return True
+ 
+@@ -268,7 +272,7 @@
+ @depends(target)
+ def midir_linux_support(target):
+     return (
+-        target.kernel == "Linux" and target.os != "Android" and target.cpu != "riscv64"
++        target.kernel == "Linux" and target.os != "Android" and target.cpu != "riscv64" and "orange" not in target.raw_os
+     )
+ 
+ 
+diff -Naur firefox/tools/power/moz.build firefox-clean/tools/power/moz.build
+--- firefox/tools/power/moz.build	2026-07-15 23:30:47.000000000 +0300
++++ firefox-clean/tools/power/moz.build	2026-08-09 10:37:53.652522727 +0300
+@@ -12,7 +12,8 @@
+ if (
+     CONFIG["OS_ARCH"] == "Linux"
+     and CONFIG["OS_TARGET"] != "Android"
+-    and CONFIG["TARGET_CPU"] in ("x86", "x86_64")
++    and CONFIG["TARGET_CPU"] in ("x86", "x86_64") 
++    and CONFIG["TARGET_RAW_OS"] != "orange-mlibc"
+ ):
+     do_rapl = True
+ 
+diff -Naur firefox/tools/profiler/core/platform.cpp firefox-clean/tools/profiler/core/platform.cpp
+--- firefox/tools/profiler/core/platform.cpp	2026-07-15 23:30:47.000000000 +0300
++++ firefox-clean/tools/profiler/core/platform.cpp	2026-08-09 10:37:53.653000458 +0300
+@@ -213,11 +213,11 @@
+ #endif
+ 
+ // Linux/BSD builds use LUL, which uses DWARF info to unwind stacks.
+-#if defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux) ||       \
++#if (defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux) ||       \
+     defined(GP_PLAT_amd64_android) || defined(GP_PLAT_x86_android) ||   \
+     defined(GP_PLAT_mips64_linux) || defined(GP_PLAT_arm64_linux) ||    \
+     defined(GP_PLAT_arm64_android) || defined(GP_PLAT_amd64_freebsd) || \
+-    defined(GP_PLAT_arm64_freebsd)
++    defined(GP_PLAT_arm64_freebsd)) && !defined(__orange__)
+ #  define HAVE_NATIVE_UNWIND
+ #  define USE_LUL_STACKWALK
+ #  include "lul/LulMain.h"
+diff -Naur firefox/tools/profiler/core/platform-linux-android.cpp firefox-clean/tools/profiler/core/platform-linux-android.cpp
+--- firefox/tools/profiler/core/platform-linux-android.cpp	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/tools/profiler/core/platform-linux-android.cpp	2026-08-09 10:37:53.653765438 +0300
+@@ -41,7 +41,9 @@
+ #include <signal.h>
+ #include <sys/time.h>
+ #include <sys/resource.h>
++#if !defined(__orange__)
+ #include <sys/syscall.h>
++#endif
+ #include <sys/types.h>
+ #include <stdlib.h>
+ #include <sched.h>
+@@ -129,10 +131,13 @@
+ #  define SYS_tgkill __NR_tgkill
+ #endif
+ 
+-#if defined(GP_OS_linux) || defined(GP_OS_android)
++#if (defined(GP_OS_linux) || defined(GP_OS_android)) && !defined(__orange__)
+ int tgkill(pid_t tgid, pid_t tid, int signalno) {
+   return syscall(SYS_tgkill, tgid, tid, signalno);
+ }
++#else
++// mlibc have tgkill
++#include <unistd.h>
+ #endif
+ 
+ #if defined(GP_OS_freebsd)
+diff -Naur firefox/tools/profiler/core/PlatformMacros.h firefox-clean/tools/profiler/core/PlatformMacros.h
+--- firefox/tools/profiler/core/PlatformMacros.h	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/tools/profiler/core/PlatformMacros.h	2026-08-09 10:37:53.653951262 +0300
+@@ -123,6 +123,10 @@
+ #  define GP_ARCH_arm64 1
+ #  define GP_OS_windows 1
+ 
++#elif defined(__orange__) && defined(__x86_64__)
++#  define GP_PLAT_amd64_linux 1
++#  define GP_ARCH_amd64 1
++#  define GP_OS_linux 1
+ #else
+ #  error "Unsupported platform"
+ #endif
+diff -Naur firefox/tools/profiler/core/ProfilerUtils.cpp firefox-clean/tools/profiler/core/ProfilerUtils.cpp
+--- firefox/tools/profiler/core/ProfilerUtils.cpp	2026-07-15 23:30:47.000000000 +0300
++++ firefox-clean/tools/profiler/core/ProfilerUtils.cpp	2026-08-09 10:37:53.654122750 +0300
+@@ -61,8 +61,15 @@
+   return ProfilerThreadId::FromNativeId(gettid());
+ }
+ 
++#  elif defined(__orange__)
++
++ProfilerThreadId profiler_current_thread_id() {
++  return ProfilerThreadId::FromNativeId(gettid());
++}
++
++
+ // ------------------------------------------------------- Linux
+-#  elif defined(XP_LINUX)
++#  elif defined(XP_LINUX) && !defined(__orange__)
+ 
+ #    include <sys/syscall.h>
+ 
+diff -Naur firefox/tools/profiler/moz.build firefox-clean/tools/profiler/moz.build
+--- firefox/tools/profiler/moz.build	2026-07-15 23:30:46.000000000 +0300
++++ firefox-clean/tools/profiler/moz.build	2026-08-09 10:37:53.654278347 +0300
+@@ -55,11 +55,11 @@
+             "gecko/nsProfiler.cpp",
+         ]
+ 
+-    if CONFIG["OS_TARGET"] in ("Android", "Linux"):
++    if CONFIG["OS_TARGET"] in ("Android", "Linux") and CONFIG["TARGET_RAW_OS"] != "orange-mlibc":
+         UNIFIED_SOURCES += [
+             "core/ProfilerCPUFreq-linux-android.cpp",
+         ]
+-    if CONFIG["OS_TARGET"] in ("Android", "Linux", "FreeBSD"):
++    if CONFIG["OS_TARGET"] in ("Android", "Linux", "FreeBSD") and CONFIG["TARGET_RAW_OS"] != "orange-mlibc":
+         if CONFIG["TARGET_CPU"] in ("arm", "aarch64", "x86", "x86_64", "mips64"):
+             UNIFIED_SOURCES += [
+                 "lul/AutoObjectMapper.cpp",
+diff -Naur firefox/tools/profiler/public/ProfilerThreadPlatformData.h firefox-clean/tools/profiler/public/ProfilerThreadPlatformData.h
+--- firefox/tools/profiler/public/ProfilerThreadPlatformData.h	2026-07-15 23:30:47.000000000 +0300
++++ firefox-clean/tools/profiler/public/ProfilerThreadPlatformData.h	2026-08-09 10:37:53.654451838 +0300
+@@ -11,7 +11,7 @@
+ 
+ #if defined(__APPLE__)
+ #  include <mach/mach_types.h>
+-#elif defined(__linux__) || defined(__ANDROID__) || defined(__FreeBSD__)
++#elif defined(__linux__) || defined(__ANDROID__) || defined(__FreeBSD__) || defined(__orange__)
+ #  include "mozilla/Maybe.h"
+ #  include <time.h>
+ #endif
+@@ -43,7 +43,7 @@
+   // because the latter doesn't provide thread manipulation primitives
+   // required. For details, consult "Mac OS X Internals" book, Section 7.3.
+   thread_act_t mProfiledThread;
+-#elif (defined(__linux__) || defined(__ANDROID__) || defined(__FreeBSD__)) && \
++#elif (defined(__linux__) || defined(__ANDROID__) || defined(__FreeBSD__) || defined(__orange__)) && \
+     defined(MOZ_GECKO_PROFILER)
+  public:
+   explicit PlatformData(ProfilerThreadId aThreadId);
+diff -Naur firefox/xpcom/io/nsLocalFileUnix.h firefox-clean/xpcom/io/nsLocalFileUnix.h
+--- firefox/xpcom/io/nsLocalFileUnix.h	2026-07-15 23:30:47.000000000 +0300
++++ firefox-clean/xpcom/io/nsLocalFileUnix.h	2026-08-09 10:37:53.654618425 +0300
+@@ -30,7 +30,7 @@
+ #  define LSTAT lstat
+ #endif
+ 
+-#if defined(HAVE_SYS_QUOTA_H) && defined(HAVE_LINUX_QUOTA_H)
++#if defined(HAVE_SYS_QUOTA_H) && defined(HAVE_LINUX_QUOTA_H) && !defined(__orange__)
+ #  define USE_LINUX_QUOTACTL
+ #endif
+ 

@@ -1,0 +1,8 @@
+{
+    "name": "upower",
+    "version": "1.91.3",
+    "deps": ["base-libs"],
+    "url": "https://gitlab.freedesktop.org/upower/upower/-/archive/v1.91.3/upower-v1.91.3.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

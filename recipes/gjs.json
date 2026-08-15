@@ -1,7 +1,7 @@
 {
     "name": "gjs",
     "version": "recent",
-    "deps": ["base-libs", "gtk3", "gobject-introspection"],
+    "deps": ["base-libs", "gtk3", "gobject-introspection", "js-140"],
     "url": "git:https://gitlab.gnome.org/GNOME/gjs.git",
     "should_patch": false,
     "use_orange_prefix": true

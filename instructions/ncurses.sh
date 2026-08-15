@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    CFLAGS="-std=gnu17 -Wno-implicit-function-declaration" "${source_dir}"/configure --host=x86_64-orange-mlibc --prefix=/usr --enable-widec --enable-pc-files --with-shared --with-cxx-shared --with-cxx-binding --without-normal --without-debug --with-manpage-format=normal --with-pkg-config-libdir=/usr/lib/pkgconfig --with-termlib 
+    CFLAGS="-std=gnu17 -Wno-implicit-function-declaration -Wno-int-conversion" "${source_dir}"/configure --host=x86_64-orange-mlibc --prefix=/usr --enable-widec --enable-pc-files --with-shared --with-cxx-shared --with-cxx-binding --without-normal --without-debug --with-manpage-format=normal --with-pkg-config-libdir=/usr/lib/pkgconfig --with-termlib 
 }
 
 build() {

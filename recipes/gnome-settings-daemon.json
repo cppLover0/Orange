@@ -1,7 +1,7 @@
 {
     "name": "gnome-settings-daemon",
     "version": "43.0",
-    "deps": ["base-libs", "gtk3", "geocode-glib-2.0", "gnome-desktop-3.0", "gweather4"],
+    "deps": ["base-libs", "gtk3", "geocode-glib-2.0", "gnome-desktop-3.0", "gweather4", "libcanberra", "polkit", "upower", "alsa-lib"],
     "url": "https://gitlab.gnome.org/GNOME/gnome-settings-daemon/-/archive/43.0/gnome-settings-daemon-43.0.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true

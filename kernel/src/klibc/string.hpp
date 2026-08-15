@@ -17,4 +17,5 @@ namespace klibc {
     char* utoa(unsigned int value, char* buffer, int base);
     char* itoa64(int64_t value, char* buffer, int base);
     char* utoa64(uint64_t value, char* buffer, int base);
+    long strtol(const char *nptr, char **endptr, int base);
 };

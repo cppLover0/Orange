@@ -1,7 +1,7 @@
 {
     "name": "libxkbcommon",
     "version": "1.13.1",
-    "deps": ["base-libs", "libxcb", "libx11", "xkeyboard-config"],
+    "deps": ["base-libs", "libxcb", "libx11", "xkeyboard-config", "libxml2"],
     "url": "https://codeload.github.com/xkbcommon/libxkbcommon/tar.gz/refs/tags/xkbcommon-1.13.1",
     "should_patch": false,
     "use_orange_prefix": true

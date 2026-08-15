@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dnative_backend=false -Dtests=false
+    meson_configure -Dnative_backend=false -Dtests=false -Degl=false -Dgles2=false -Dwayland=false -Dudev=false -Dnative_backend=false -Dwayland_eglstream=false -Dsm=false -Dlibwacom=false -Dpango_ft2=false -Dremote_desktop=false -Dtests=false -Dprofiler=false 
 }
 
 build() {

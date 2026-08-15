@@ -1,0 +1,36 @@
+diff -Naur libpciaccess/src/common_init.c libpciaccess-clean/src/common_init.c
+--- libpciaccess/src/common_init.c	2026-08-11 08:39:21.862203050 +0300
++++ libpciaccess-clean/src/common_init.c	2026-08-11 08:43:01.575965270 +0300
+@@ -61,7 +61,7 @@
+           return 0;
+     }
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__orange__)
+     err = pci_system_linux_sysfs_create();
+ #elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__)
+     err = pci_system_freebsd_create();
+diff -Naur libpciaccess/src/common_interface.c libpciaccess-clean/src/common_interface.c
+--- libpciaccess/src/common_interface.c	2026-08-11 08:39:21.862203050 +0300
++++ libpciaccess-clean/src/common_interface.c	2026-08-11 08:40:41.241813247 +0300
+@@ -39,7 +39,7 @@
+ #include "pciaccess.h"
+ #include "pciaccess_private.h"
+ 
+-#if defined(__linux__) || defined(__GLIBC__) || defined(__CYGWIN__)
++#if defined(__linux__) || defined(__GLIBC__) || defined(__CYGWIN__) || defined(__orange__)
+ #include <byteswap.h>
+ 
+ #if __BYTE_ORDER == __BIG_ENDIAN
+diff -Naur libpciaccess/src/meson.build libpciaccess-clean/src/meson.build
+--- libpciaccess/src/meson.build	2026-08-11 08:39:21.862203050 +0300
++++ libpciaccess-clean/src/meson.build	2026-08-11 08:44:29.666144463 +0300
+@@ -20,7 +20,7 @@
+ 
+ host = host_machine.system()
+ _pci_access_host_files = []
+-if host == 'linux'
++if ['linux', 'orange'].contains(host)
+   _pci_access_host_files += ['linux_sysfs.c', 'linux_devmem.c', 'common_vgaarb.c']
+ elif ['freebsd', 'dragonfly'].contains(host)
+   _pci_access_host_files += ['freebsd_pci.c', 'common_vgaarb_stub.c']

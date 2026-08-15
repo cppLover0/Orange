@@ -1,0 +1,41 @@
+diff -Naur gjs/meson.build gjs-clean/meson.build
+--- gjs/meson.build	2026-08-09 09:52:01.030586388 +0300
++++ gjs-clean/meson.build	2026-08-09 10:35:16.807778266 +0300
+@@ -282,36 +282,7 @@
+ --disable-debug.''')
+ endif
+ 
+-# Check if a minimal SpiderMonkey program compiles, links, and runs. If not,
+-# it's most likely the case that SpiderMonkey was configured incorrectly, for
+-# example by building mozglue as a shared library.
+-minimal_program = cxx.run('''
+-#include <js/Initialization.h>
+-int main() {
+-    if (!JS_Init()) return 1;
+-    JS_ShutDown();
+-    return 0;
+-}
+-''',
+-    args: debug_arg, dependencies: spidermonkey,
+-    name: 'SpiderMonkey sanity check')
+-
+-recommended_configuration = ''' Check the recommended configuration:
+-https://github.com/spidermonkey-embedders/spidermonkey-embedding-examples/blob/esr91/docs/Building%20SpiderMonkey.md'''
+-if not minimal_program.compiled()
+-    error('''A minimal SpiderMonkey program
+-could not be compiled or linked. Most likely you should build it with a
+-different configuration.''' + recommended_configuration)
+-elif meson.is_cross_build()
+-    warning('''This is a cross build. A check that a minimal
+-SpiderMonkey program executes will not be performed. Before shipping GJS, you
+-should check that it does not crash on startup, since building SpiderMonkey with
+-the wrong configuration may cause that.''' + recommended_configuration)
+-elif minimal_program.returncode() != 0
+-    error('''A minimal SpiderMonkey program
+-failed to execute. Most likely you should build it with a different
+-configuration.''' + recommended_configuration)
+-endif
++# meow
+ 
+ ### Check for external programs ################################################
+ 

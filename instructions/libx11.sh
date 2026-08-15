@@ -1,5 +1,9 @@
 . "${pkg_lib}"
 
+CFLAGS=""
+CXXFLAGS=""
+LDFLAGS=""
+
 prepare() {
     autotools_recursive_regen
     touch aclocal.m4 Makefile.in configure

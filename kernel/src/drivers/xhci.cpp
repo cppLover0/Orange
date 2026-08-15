@@ -602,8 +602,10 @@ void __xhci_unicode_to_ascii(uint16_t* src,char* dest) {
 
         if(ptr[src_ptr] < 128)
             dest[dest_ptr++] = ptr[src_ptr++];
-        else
+        else {
             dest[dest_ptr++] = '?';
+            src_ptr++;
+        }
     }
     dest[dest_ptr] = '\0';
 }

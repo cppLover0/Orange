@@ -1,0 +1,8 @@
+{
+    "name": "libtool",
+    "version": "2.5.4",
+    "deps": ["mlibc"],
+    "url": "https://ftpmirror.gnu.org/gnu/libtool/libtool-2.5.4.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

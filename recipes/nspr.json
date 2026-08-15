@@ -1,0 +1,8 @@
+{
+    "name": "nspr",
+    "version": "4.35",
+    "deps": ["base-libs"],
+    "url": "http://deb.debian.org/debian/pool/main/n/nspr/nspr_4.35.orig.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

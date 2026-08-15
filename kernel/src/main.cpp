@@ -13,6 +13,7 @@
 #include <generic/mp.hpp>
 #include <generic/vfs.hpp>
 #include <drivers/xhci.hpp>
+#include <generic/drm.hpp>
 #include <generic/lock/spinlock.hpp>
 #include <generic/tty.hpp>
 #include <generic/keyboard.hpp>
@@ -105,6 +106,7 @@ extern "C" void main() {
     x86_64::pci::initworkspace();
     log("pci", "launched all drivers");
 #endif
+
     tty::init();
     fbdev::init();
     //sysfs::dump();

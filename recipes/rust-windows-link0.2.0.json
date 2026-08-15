@@ -1,0 +1,8 @@
+{
+    "name": "rust-windows-link",
+    "version": "0.2.0",
+    "deps": ["base-libs"],
+    "url": "https://static.crates.io/crates/windows-link/windows-link-0.2.0.crate",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

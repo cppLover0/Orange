@@ -1,0 +1,8 @@
+{
+    "name": "polkit",
+    "version": "127",
+    "deps": ["base-libs", "gtk3"],
+    "url": "https://github.com/polkit-org/polkit/archive/refs/tags/127.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

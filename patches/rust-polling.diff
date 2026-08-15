@@ -1,15 +1,15 @@
 diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
 --- rust-polling/src/epoll.rs	2006-07-24 05:21:28.000000000 +0400
-+++ rust-polling-clean/src/epoll.rs	2026-06-13 19:45:14.738940364 +0300
++++ rust-polling-clean/src/epoll.rs	2026-07-23 12:53:53.311342022 +0300
 @@ -4,9 +4,9 @@
  use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, RawFd};
  use std::time::{Duration, Instant};
  
 -#[cfg(not(target_os = "redox"))]
-+#[cfg(not(any(target_os = "redox", target_os = "orange")))]
++#[cfg(not(target_os = "orange"))]
  use rustix::event::{eventfd, EventfdFlags};
 -#[cfg(not(target_os = "redox"))]
-+#[cfg(not(any(target_os = "redox", target_os = "orange")))]
++#[cfg(not(target_os = "orange"))]
  use rustix::time::{
      timerfd_create, timerfd_settime, Itimerspec, TimerfdClockId, TimerfdFlags, TimerfdTimerFlags,
  };
@@ -18,7 +18,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
      ///
      /// Redox does not support timerfd.
 -    #[cfg(not(target_os = "redox"))]
-+    #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++    #[cfg(not(target_os = "orange"))]
      timer_fd: Option<OwnedFd>,
  }
  
@@ -27,7 +27,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
          // Set up notifier and timerfd.
          let notifier = Notifier::new()?;
 -        #[cfg(not(target_os = "redox"))]
-+        #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++        #[cfg(not(target_os = "orange"))]
          let timer_fd = timerfd_create(
              TimerfdClockId::Monotonic,
              TimerfdFlags::CLOEXEC | TimerfdFlags::NONBLOCK,
@@ -36,13 +36,13 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
              epoll_fd,
              notifier,
 -            #[cfg(not(target_os = "redox"))]
-+            #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++            #[cfg(not(target_os = "orange"))]
              timer_fd,
          };
  
          unsafe {
 -            #[cfg(not(target_os = "redox"))]
-+            #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++            #[cfg(not(target_os = "orange"))]
              if let Some(ref timer_fd) = poller.timer_fd {
                  poller.add(
                      timer_fd.as_raw_fd(),
@@ -51,7 +51,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
          let timeout = deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()));
  
 -        #[cfg(not(target_os = "redox"))]
-+        #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++        #[cfg(not(target_os = "orange"))]
          if let Some(ref timer_fd) = self.timer_fd {
              // Configure the timeout using timerfd.
              let new_val = Itimerspec {
@@ -60,10 +60,10 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
          }
  
 -        #[cfg(not(target_os = "redox"))]
-+        #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++        #[cfg(not(target_os = "orange"))]
          let timer_fd = &self.timer_fd;
 -        #[cfg(target_os = "redox")]
-+        #[cfg(any(target_os = "redox", target_os = "orange"))]
++        #[cfg(target_os = "orange")]
          let timer_fd: Option<core::convert::Infallible> = None;
  
          // Timeout for epoll. In case of overflow, use no timeout.
@@ -72,7 +72,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
          let _enter = span.enter();
  
 -        #[cfg(not(target_os = "redox"))]
-+        #[cfg(not(any(any(target_os = "redox", target_os = "orange"))))]
++        #[cfg(not(target_os = "orange"))]
          if let Some(timer_fd) = self.timer_fd.take() {
              let _ = self.delete(timer_fd.as_fd());
          }
@@ -81,7 +81,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
  
  /// `timespec` value that equals zero.
 -#[cfg(not(target_os = "redox"))]
-+#[cfg(not(any(any(target_os = "redox", target_os = "orange"))))]
++#[cfg(not(target_os = "orange"))]
  const TS_ZERO: Timespec = unsafe { std::mem::transmute([0u8; std::mem::size_of::<Timespec>()]) };
  
  /// Get the EPOLL flags for the interest.
@@ -90,7 +90,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
  enum Notifier {
      /// The primary notifier, using eventfd.
 -    #[cfg(not(target_os = "redox"))]
-+    #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++    #[cfg(not(target_os = "orange"))]
      EventFd(OwnedFd),
  
      /// The fallback notifier, using a pipe.
@@ -99,7 +99,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
      fn new() -> io::Result<Self> {
          // Skip eventfd for testing if necessary.
 -        #[cfg(not(target_os = "redox"))]
-+        #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++        #[cfg(not(target_os = "orange"))]
          {
              if !cfg!(polling_test_epoll_pipe) {
                  // Try to create an eventfd.
@@ -108,7 +108,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
      fn as_fd(&self) -> BorrowedFd<'_> {
          match self {
 -            #[cfg(not(target_os = "redox"))]
-+            #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++            #[cfg(not(target_os = "orange"))]
              Notifier::EventFd(fd) => fd.as_fd(),
              Notifier::Pipe {
                  read_pipe: read, ..
@@ -117,7 +117,7 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
      fn notify(&self) {
          match self {
 -            #[cfg(not(target_os = "redox"))]
-+            #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++            #[cfg(not(target_os = "orange"))]
              Self::EventFd(fd) => {
                  let buf: [u8; 8] = 1u64.to_ne_bytes();
                  let _ = write(fd, &buf);
@@ -126,13 +126,13 @@ diff -Naur rust-polling/src/epoll.rs rust-polling-clean/src/epoll.rs
      fn clear(&self) {
          match self {
 -            #[cfg(not(target_os = "redox"))]
-+            #[cfg(not(any(target_os = "redox", target_os = "orange")))]
++            #[cfg(not(target_os = "orange"))]
              Self::EventFd(fd) => {
                  let mut buf = [0u8; 8];
                  let _ = read(fd, &mut buf);
 diff -Naur rust-polling/src/lib.rs rust-polling-clean/src/lib.rs
 --- rust-polling/src/lib.rs	2006-07-24 05:21:28.000000000 +0400
-+++ rust-polling-clean/src/lib.rs	2026-06-13 19:29:16.660688571 +0300
++++ rust-polling-clean/src/lib.rs	2026-07-23 12:43:31.387544322 +0300
 @@ -83,7 +83,8 @@
      } else if #[cfg(any(
          target_os = "linux",
@@ -143,23 +143,61 @@ diff -Naur rust-polling/src/lib.rs rust-polling-clean/src/lib.rs
      ))] {
          mod epoll;
          use epoll as sys;
-@@ -983,7 +984,8 @@
-         target_os = "freebsd",
+@@ -984,6 +985,7 @@
          target_os = "netbsd",
          target_os = "openbsd",
--        target_os = "dragonfly",
-+        target_os = "orange",
-+        target_os = "dragonfly"
+         target_os = "dragonfly",
++        target_os = "orange"
      ),
      not(polling_test_poll_backend),
  ))]
-@@ -999,7 +1001,8 @@
-         target_os = "freebsd",
+@@ -1000,6 +1002,7 @@
          target_os = "netbsd",
          target_os = "openbsd",
--        target_os = "dragonfly",
-+        target_os = "orange",
-+        target_os = "dragonfly"
+         target_os = "dragonfly",
++        target_os = "orange"
      )))
  )]
  mod raw_fd_impl {
+diff -Naur rust-polling/tests/other_modes.rs rust-polling-clean/tests/other_modes.rs
+--- rust-polling/tests/other_modes.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-polling-clean/tests/other_modes.rs	2026-07-23 12:43:47.419063125 +0300
+@@ -117,7 +117,8 @@
+                     target_os = "freebsd",
+                     target_os = "netbsd",
+                     target_os = "openbsd",
+-                    target_os = "dragonfly"
++                    target_os = "dragonfly",
++                    target_os = "orange"
+                 ),
+                 not(polling_test_poll_backend)
+             ))] {
+@@ -210,7 +211,8 @@
+                     target_os = "freebsd",
+                     target_os = "netbsd",
+                     target_os = "openbsd",
+-                    target_os = "dragonfly"
++                    target_os = "dragonfly",
++                    target_os = "orange"
+                 ),
+                 not(polling_test_poll_backend)
+             ))] {
+diff -Naur rust-polling/tests/precision.rs rust-polling-clean/tests/precision.rs
+--- rust-polling/tests/precision.rs	2006-07-24 05:21:28.000000000 +0400
++++ rust-polling-clean/tests/precision.rs	2026-07-23 12:44:03.301577322 +0300
+@@ -28,6 +28,7 @@
+             target_os = "android",
+             target_vendor = "apple",
+             target_os = "freebsd",
++            target_os = "orange"
+         ),
+         not(polling_test_poll_backend)
+     )) {
+@@ -63,6 +64,7 @@
+             target_os = "solaris",
+             target_vendor = "apple",
+             target_os = "freebsd",
++            target_os = "orange"
+         ),
+         not(polling_test_poll_backend)
+     )) {

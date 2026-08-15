@@ -1,0 +1,8 @@
+{
+    "name": "libxcrypt",
+    "version": "4.5.2",
+    "deps": ["mlibc"],
+    "url": "https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

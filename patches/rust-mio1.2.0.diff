@@ -1,60 +1,47 @@
-diff -Naur rust-mio1.2.0/src/poll.rs rust-mio1.2.0-clean/src/poll.rs
---- rust-mio1.2.0/src/poll.rs	2026-03-27 14:32:07.000000000 +0300
-+++ rust-mio1.2.0-clean/src/poll.rs	2026-06-08 09:58:46.279182499 +0300
-@@ -12,6 +12,7 @@
-         target_os = "solaris",
-         target_os = "vita",
-         target_os = "cygwin",
-+        target_os = "orange"
-     )),
- ))]
- use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
-@@ -455,6 +456,7 @@
-         target_os = "solaris",
-         target_os = "vita",
-         target_os = "cygwin",
-+        target_os = "orange"
-     )),
- ))]
- impl AsRawFd for Poll {
-@@ -757,6 +759,7 @@
-         target_os = "solaris",
-         target_os = "vita",
-         target_os = "cygwin",
-+        target_os = "orange"
-     )),
- ))]
- impl AsFd for Registry {
-@@ -779,6 +782,7 @@
-         target_os = "solaris",
-         target_os = "vita",
-         target_os = "cygwin",
-+        target_os = "orange"
-     )),
- ))]
- impl AsRawFd for Registry {
 diff -Naur rust-mio1.2.0/src/sys/unix/mod.rs rust-mio1.2.0-clean/src/sys/unix/mod.rs
 --- rust-mio1.2.0/src/sys/unix/mod.rs	2026-03-27 14:32:07.000000000 +0300
-+++ rust-mio1.2.0-clean/src/sys/unix/mod.rs	2026-06-08 09:58:40.641017611 +0300
-@@ -40,6 +40,7 @@
-     ), path = "selector/kqueue.rs")]
-     #[cfg_attr(any(
-         mio_unsupported_force_poll_poll,
-+        target_os = "orange",
-         target_os = "aix",
-         target_os = "espidf",
-         target_os = "fuchsia",
-@@ -103,6 +104,7 @@
-         target_os = "redox",
++++ rust-mio1.2.0-clean/src/sys/unix/mod.rs	2026-07-24 10:22:37.549013114 +0300
+@@ -22,6 +22,7 @@
+             target_os = "illumos",
+             target_os = "linux",
+             target_os = "redox",
++            target_os = "orange"
+         )
+     ), path = "selector/epoll.rs")]
+     #[cfg_attr(all(
+@@ -104,6 +105,7 @@
          target_os = "solaris",
          target_os = "vita",
-+        target_os = "orange",
          target_os = "cygwin",
++        target_os = "orange",
          all(target_os = "wasi", target_env = "p1")
      ), path = "waker/pipe.rs")]
+     #[cfg_attr(all(target_os = "wasi", not(target_env = "p1")), path = "waker/single_threaded.rs")]
+diff -Naur rust-mio1.2.0/src/sys/unix/net.rs rust-mio1.2.0-clean/src/sys/unix/net.rs
+--- rust-mio1.2.0/src/sys/unix/net.rs	2026-03-27 14:32:07.000000000 +0300
++++ rust-mio1.2.0-clean/src/sys/unix/net.rs	2026-07-24 10:23:06.625944574 +0300
+@@ -25,6 +25,7 @@
+         target_os = "solaris",
+         target_os = "hermit",
+         target_os = "cygwin",
++        target_os = "orange"
+     ))]
+     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+     // WASI doesn't have the concept of `fork`ing or `exec`ing processes, so
+diff -Naur rust-mio1.2.0/src/sys/unix/pipe.rs rust-mio1.2.0-clean/src/sys/unix/pipe.rs
+--- rust-mio1.2.0/src/sys/unix/pipe.rs	2026-03-27 14:32:07.000000000 +0300
++++ rust-mio1.2.0-clean/src/sys/unix/pipe.rs	2026-07-24 10:18:37.187669053 +0300
+@@ -22,6 +22,7 @@
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "cygwin",
++        target_os = "orange"
+     ))]
+     unsafe {
+         if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
 diff -Naur rust-mio1.2.0/src/sys/unix/tcp.rs rust-mio1.2.0-clean/src/sys/unix/tcp.rs
 --- rust-mio1.2.0/src/sys/unix/tcp.rs	2026-03-27 14:32:07.000000000 +0300
-+++ rust-mio1.2.0-clean/src/sys/unix/tcp.rs	2026-06-08 10:02:57.563526612 +0300
++++ rust-mio1.2.0-clean/src/sys/unix/tcp.rs	2026-07-24 10:20:26.234612328 +0300
 @@ -102,6 +102,7 @@
          target_os = "hermit",
          target_os = "nto",

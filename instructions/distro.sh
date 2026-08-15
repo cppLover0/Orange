@@ -13,15 +13,12 @@ build() {
 }
 
 install() {
-    rm -rf "${dest_dir}/bin" "${dest_dir}/lib" "${dest_dir}/lib64"
-    ln -s usr/lib "${dest_dir}"/lib
-    ln -s usr/lib "${dest_dir}"/lib64
-    ln -s usr/bin "${dest_dir}"/bin
-    
+
     set +e
 
     echo stripping $(find "${dest_dir}"/usr/lib/ -name "*.so") $(find "${dest_dir}"/usr/lib/ -name "*.a")
-    x86_64-orange-mlibc-strip --strip-debug $(find "${dest_dir}"/usr/lib/ -name "*.so") $(find "${dest_dir}"/usr/lib/ -name "*.a")
+    x86_64-orange-mlibc-strip --strip-debug $(find "${dest_dir}"/usr/lib/ -name "*.so") $(find "${dest_dir}"/usr/lib/ -name "*.a") 
+    rm -rf "${dest_dir}"/usr/lib/*.ajs
 
     echo stripping "${dest_dir}"/usr/bin/*
     x86_64-orange-mlibc-strip --strip-unneeded "${dest_dir}"/usr/bin/*
@@ -50,7 +47,6 @@ install() {
     localedef --prefix="${dest_dir}" -i C -f UTF-8 C.UTF-8 --no-archive
 
     glib-compile-schemas "${dest_dir}/usr"/share/glib-2.0/schemas
-    rm "${dest_dir}/usr"/share/glib-2.0/schemas/gschemas.compiled
 
     update-mime-database "${dest_dir}"/usr/share/mime
 

@@ -1,0 +1,8 @@
+{
+    "name": "geoclue",
+    "version": "2.8.2",
+    "deps": ["base-libs", "gtk3", "libsoup", "json-glib", "libsoup", "libsoup2", "modem-manager", "libnotify"],
+    "url": "https://gitlab.freedesktop.org/geoclue/geoclue/-/archive/2.8.2/geoclue-2.8.2.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

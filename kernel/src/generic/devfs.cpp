@@ -108,7 +108,7 @@ bool devfs_poll(file_descriptor* file, vfs_poll_type type) {
     return node->poll(file, node, type);
 }
 
-std::int32_t devfs_mmap(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size) {
+std::int32_t devfs_mmap(file_descriptor* file, std::uint64_t* out_phys, std::size_t* out_size, std::uint64_t* flags) {
     auto node = (devfs_node*)file->fs_specific.tmpfs_pointer;
     if(node->is_directory)
         return -EISDIR;
@@ -116,6 +116,7 @@ std::int32_t devfs_mmap(file_descriptor* file, std::uint64_t* out_phys, std::siz
         return -EINVAL;
     *out_phys = node->mmap;
     *out_size = node->mmap_size;
+    *flags = node->mmap_flags;
     return 0;
 }
 
@@ -236,6 +237,7 @@ void devfs::init(vfs::node* new_node) {
     klibc::memcpy(new_node->internal_path, "/dev", sizeof("/dev\0") + 1);
 
     create(false, (char*)"/input", nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, true);
+    create(false, (char*)"/dri", nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, true);
 
     log("devfs", "devfs filesystem is 0x%p",new_fs);
 }

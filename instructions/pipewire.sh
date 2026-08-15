@@ -23,7 +23,8 @@ configure() {
   -Dv4l2=disabled \
   -Dlibusb=disabled \
   -Dsdl2=disabled \
-  -Dsndfile=disabled
+  -Dsndfile=disabled \
+  -Dlibpulse=enabled
 }
 
 build() {

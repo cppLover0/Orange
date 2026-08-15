@@ -1,0 +1,28 @@
+diff -Naur glib-2.0-introspection/gio/gcredentialsprivate.h glib-2.0-introspection-clean/gio/gcredentialsprivate.h
+--- glib-2.0-introspection/gio/gcredentialsprivate.h	2026-04-02 21:26:19.000000000 +0300
++++ glib-2.0-introspection-clean/gio/gcredentialsprivate.h	2026-08-09 13:48:11.032154085 +0300
+@@ -104,7 +104,7 @@
+  */
+ #undef G_CREDENTIALS_HAS_PID
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__orange__)
+ #define G_CREDENTIALS_SUPPORTED 1
+ #define G_CREDENTIALS_USE_LINUX_UCRED 1
+ #define G_CREDENTIALS_NATIVE_TYPE G_CREDENTIALS_TYPE_LINUX_UCRED
+diff -Naur glib-2.0-introspection/meson.build glib-2.0-introspection-clean/meson.build
+--- glib-2.0-introspection/meson.build	2026-04-02 21:26:19.000000000 +0300
++++ glib-2.0-introspection-clean/meson.build	2026-08-09 13:50:54.736705813 +0300
+@@ -2701,11 +2701,7 @@
+ gobject_introspection_required_version = '>= 1.80.0'
+ gir_scanner = find_program('g-ir-scanner', required: get_option('introspection'), version: gobject_introspection_required_version)
+ gobject_introspection = dependency('gobject-introspection-1.0', required: get_option('introspection'), version: gobject_introspection_required_version)
+-enable_gir = get_option('introspection').allowed() and gir_scanner.found() and gobject_introspection.found() and meson.can_run_host_binaries()
+-
+-if get_option('introspection').enabled() and not meson.can_run_host_binaries()
+-  error('Running binaries on the build host needs to be supported to build with -Dintrospection=enabled')
+-endif
++enable_gir = get_option('introspection').allowed() and gir_scanner.found() and gobject_introspection.found() 
+ 
+ gir_args = [
+   '--quiet',

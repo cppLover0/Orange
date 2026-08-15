@@ -339,3 +339,70 @@ char* klibc::utoa64(uint64_t value, char* buffer, int base) {
     
     return buffer;
 }
+
+#define LONG_MAX  __LONG_MAX__
+#define LONG_MIN  (-__LONG_MAX__ -1L)
+
+//i stole it somewehere
+// moeowemweomwoewmeomwmeweowmeowmo
+long klibc::strtol(const char *nptr, char **endptr, int base) {
+    const char *s = nptr;
+    unsigned long acc;
+    int c;
+    unsigned long cutoff;
+    int cutlim;
+    int any, any_neg;
+
+    if (base != 10 && base != 0) {
+        if (endptr) *endptr = (char *)nptr;
+        return 0;
+    }
+
+    do {
+        c = *s++;
+    } while (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f');
+
+    if (c == '-') {
+        any_neg = 1;
+        c = *s++;
+    } else {
+        any_neg = 0;
+        if (c == '+') {
+            c = *s++;
+        }
+    }
+
+    cutoff = any_neg ? -(unsigned long)LONG_MIN : LONG_MAX;
+    cutlim = cutoff % 10;
+    cutoff /= 10;
+
+    any = 0;
+    acc = 0;
+
+    for (;; c = *s++) {
+        if (c >= '0' && c <= '9') {
+            c -= '0';
+        } else {
+            break; 
+        }
+
+        if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim)) {
+            any = -1;
+        } else {
+            any = 1;
+            acc = acc * 10 + c;
+        }
+    }
+
+    if (endptr != nullptr) {
+        *endptr = (char *)(any ? s - 1 : nptr);
+    }
+
+    if (any < 0) {
+        return any_neg ? LONG_MIN : LONG_MAX;
+    } else if (any_neg) {
+        return -(long)acc;
+    } else {
+        return (long)acc;
+    }
+}

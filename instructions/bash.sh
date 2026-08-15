@@ -15,7 +15,8 @@ build() {
 install() {
     set +e
     make install DESTDIR="${dest_dir}"
-    echo if you got some error on j0 just ignore it 
+    echo if you got some error on j0 just ignore it
+    rm -rf "${dest_dir}/usr/bin/sh" 
     ln -s bash "${dest_dir}"/usr/bin/sh
 }
 

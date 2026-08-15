@@ -1,6 +1,6 @@
 diff -Naur rust-ipc-channel/Cargo.toml rust-ipc-channel-clean/Cargo.toml
 --- rust-ipc-channel/Cargo.toml	1970-01-01 03:00:01.000000000 +0300
-+++ rust-ipc-channel-clean/Cargo.toml	2026-06-10 13:18:52.159919253 +0300
++++ rust-ipc-channel-clean/Cargo.toml	2026-07-23 12:48:13.329695721 +0300
 @@ -97,15 +97,15 @@
  memfd = ["sc"]
  win32-trace = []
@@ -22,7 +22,7 @@ diff -Naur rust-ipc-channel/Cargo.toml rust-ipc-channel-clean/Cargo.toml
  [target.'cfg(target_os = "windows")'.dependencies.windows]
 diff -Naur rust-ipc-channel/src/platform/mod.rs rust-ipc-channel-clean/src/platform/mod.rs
 --- rust-ipc-channel/src/platform/mod.rs	2006-07-24 05:21:28.000000000 +0400
-+++ rust-ipc-channel-clean/src/platform/mod.rs	2026-06-10 13:18:36.636659761 +0300
++++ rust-ipc-channel-clean/src/platform/mod.rs	2026-07-23 12:48:49.598876428 +0300
 @@ -9,12 +9,12 @@
  
  #[cfg(all(
@@ -38,27 +38,15 @@ diff -Naur rust-ipc-channel/src/platform/mod.rs rust-ipc-channel-clean/src/platf
  ))]
  mod os {
      pub use super::unix::*;
-diff -Naur rust-ipc-channel/src/platform/test.rs rust-ipc-channel-clean/src/platform/test.rs
---- rust-ipc-channel/src/platform/test.rs	2006-07-24 05:21:28.000000000 +0400
-+++ rust-ipc-channel-clean/src/platform/test.rs	2026-06-10 13:21:17.346743469 +0300
-@@ -224,7 +224,7 @@
- // These tests only apply to platforms that need fragmentation.
- #[cfg(all(
-     not(feature = "force-inprocess"),
--    any(target_os = "linux", target_os = "freebsd", target_os = "windows")
-+    any(target_os = "linux", target_os = "freebsd", target_os = "windows", target_os = "orange")
- ))]
- mod fragment_tests {
-     use super::with_n_fds;
 diff -Naur rust-ipc-channel/src/platform/unix/mod.rs rust-ipc-channel-clean/src/platform/unix/mod.rs
 --- rust-ipc-channel/src/platform/unix/mod.rs	2006-07-24 05:21:28.000000000 +0400
-+++ rust-ipc-channel-clean/src/platform/unix/mod.rs	2026-06-10 15:27:53.961847462 +0300
-@@ -1149,6 +1149,8 @@
-                 #[cfg(target_os = "freebsd")]
-                 const POLLRDHUP: libc::c_short = 0x4000;
++++ rust-ipc-channel-clean/src/platform/unix/mod.rs	2026-07-23 13:21:10.341027267 +0300
+@@ -1139,7 +1139,7 @@
+                 }
+             },
+             BlockingMode::Timeout(duration) => {
+-                #[cfg(target_os = "linux")]
++                #[cfg(target_os = "orange")]
+                 const POLLRDHUP: libc::c_short = libc::POLLRDHUP;
  
-+                const POLLRDHUP: libc::c_short = 0x10;
-+
-                 let events = libc::POLLIN | libc::POLLPRI | POLLRDHUP;
- 
-                 let mut fd = [libc::pollfd {
+                 // It's rather unfortunate that Rust's libc doesn't know that

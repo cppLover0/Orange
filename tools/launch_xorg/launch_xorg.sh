@@ -19,9 +19,6 @@ export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 export DISPLAY=:0
 
-gsettings set org.gnome.Terminal.Legacy.Settings theme-variant 'dark'
-gsettings set org.gnome.desktop.interface gtk-theme 'Orchis-Dark-Compact'
-
 echo Launching dbus
 (dbus-daemon --session --address=unix:path=/run/user/1000/bus) > /dev/null 2> /dev/null &
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus

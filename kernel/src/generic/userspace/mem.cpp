@@ -46,17 +46,30 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
         arch::tlb_flush(allocated, len);
     }
 
-    if((flags & MAP_ANONYMOUS) && (flags & MAP_SHARED)) {
-        // MAP_ANONYMOUS + MAP_SHARED is not implemented properly
-        goto shittt;
-    }
+    if(fd != -1) {
 
-    if(!(flags & MAP_ANONYMOUS)) {
-        if(!(flags & MAP_SHARED) || file->vnode.mmap) {
-shittt:
+        if(file->vnode.advanced_mmap != nullptr) {
+                std::uint64_t phys, size, flags = 0;
+                int status = file->vnode.advanced_mmap(file, off, &phys, &size, &flags);
+                if(status == 0) {
+                    if(flags & MAP_FIXED) {
+                        allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size > len ? len : size, true);
+                    } else {
+                        allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size > len ? len : size, false);
+                    }
+
+                    arch::tlb_flush(allocated, len);
+
+                    goto end;
+                } else {
+                    return status;
+                }
+        }
+
+        if((flags & MAP_PRIVATE) || file->vnode.mmap || current->is_debug) {
             if(file->vnode.mmap != nullptr) {
-                std::uint64_t phys, size = 0;
-                int status = file->vnode.mmap(file, &phys, &size);
+                std::uint64_t phys, size, flags = 0;
+                int status = file->vnode.mmap(file, &phys, &size, &flags);
                 if(status == 0) {
                     if(flags & MAP_FIXED) {
                         allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, true);
@@ -84,7 +97,7 @@ shittt:
             file->offset = off;
             file->vnode.read(file, (void*)allocated, len);
             file->offset = old;
-        } else {
+        } else if(flags & MAP_SHARED) {
 
             klibc::debug_printf("mmap file1 %s\n", file->path);
 

@@ -406,6 +406,9 @@ long long clone3_impl(void* ctx, clone_args* clarg, std::uint64_t size) {
     process::wakeup(new_proc);
     new_proc->is_debug = proc->is_debug;
     new_proc->debug_file_descriptor = proc->debug_file_descriptor;
+    
+    new_proc->userspace_stack = proc->userspace_stack;
+    new_proc->userspace_stack_size = proc->userspace_stack_size;
 
     if(clarg->flags & CLONE_VFORK) {
         while(1) {
@@ -446,7 +449,7 @@ long long sys_clone(void* frame, unsigned long flags, unsigned long newsp, int* 
     return clone3_impl(frame, &arg, sizeof(clone_args));
 }
 
-long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_stack) {
+long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_stack, std::size_t stack_size) {
 
     thread* current_thread = current_proc;
 
@@ -458,6 +461,9 @@ long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_sta
     thread* new_proc = process::clone3(current_thread, clarg, frame);
     new_proc->is_debug = current_thread->is_debug;
     new_proc->debug_file_descriptor = current_thread->debug_file_descriptor;
+
+    new_proc->userspace_stack = new_stack;
+    new_proc->userspace_stack_size = stack_size;
 
 #if defined(__x86_64__)
     new_proc->ctx.rax = 0;
@@ -471,8 +477,43 @@ long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_sta
     return new_proc->id;
 }
 
-long long sys_exit_group(int status) {
+long long sys_exit_group(void* ctx, int status) {
     thread* proc = current_proc;
+
+#if defined(__x86_64__)
+    if (proc->is_debug && ctx != nullptr) {
+        x86_64::idt::int_frame_t* regs = (x86_64::idt::int_frame_t*)ctx;
+
+        klibc::debug_printf("Backtrace:\n");
+        klibc::debug_printf("  [0] 0x%016llx\n", regs->rip); 
+
+        uint64_t* current_rbp = reinterpret_cast<uint64_t*>(regs->rbp);
+        int frame_depth = 1;
+
+        while (current_rbp != nullptr && frame_depth < 16) {
+            if (reinterpret_cast<uint64_t>(current_rbp) % 8 != 0) {
+                klibc::debug_printf("  [?] 0x%016llx (invalid rbp alignment)\n", current_rbp);
+                break;
+            }
+
+            uint64_t next_rbp = current_rbp[0];
+            uint64_t return_address = current_rbp[1];
+
+            if (return_address == 0) {
+                break; 
+            }
+
+            klibc::debug_printf("  [%d] 0x%016llx\n", frame_depth++, return_address);
+            
+            if (next_rbp <= reinterpret_cast<uint64_t>(current_rbp)) {
+                break;
+            }
+
+            current_rbp = reinterpret_cast<uint64_t*>(next_rbp);
+        }
+    }
+#endif
+
     proc->exit_request = 2;
     proc->exit_code = (status & 0xFF) << 8;
     klibc::debug_printf("exit group status %d\n", status);
@@ -626,7 +667,11 @@ long long sys_execve(const char* path, char** argv, char** envp) {
     current_thread->ctx.cr3 = current_thread->original_root;
 #endif
 
-    klibc::memcpy(current_thread->exe, buffer, klibc::strlen(buffer) + 1);
+    char out[4096] = {};
+
+    __vfs_symlink_resolve(buffer, out, 0);
+
+    klibc::memcpy(current_thread->exe, out, klibc::strlen(out) + 1);
 
     elf::exec(current_thread, buffer, stack_argv, stack_envp);
 
@@ -737,4 +782,16 @@ long long sys_selfexe(char* buffer, std::uint32_t size) {
     klibc::memcpy(buffer, current->exe, (std::uint32_t)klibc::strlen(current->exe) > size ? size : klibc::strlen(current->exe));
 
     return 0;
+}
+
+long long sys_stackinfo(void** stack) {
+    thread* current = current_proc;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)stack, PAGE_SIZE))
+        return -EFAULT;
+
+    klibc::debug_printf("stack 0x%p, size %lli", current->userspace_stack, current->userspace_stack_size);
+
+    *stack = (void*)current->userspace_stack;
+    return current->userspace_stack_size;
 }

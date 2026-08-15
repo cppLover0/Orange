@@ -9,6 +9,7 @@ llvm-config = 'llvm-config'
 g-ir-scanner = 'orange-g-ir-scanner'
 g-ir-generate = 'orange-g-ir-generate'
 g-ir-compiler = 'orange-g-ir-compiler'
+exe_wrapper = 'run-wrapper'
 
 [host_machine]
 system = 'orange'

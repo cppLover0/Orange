@@ -61,6 +61,9 @@ struct thread {
 
     std::uint64_t scheduling_rate;
 
+    std::uint64_t userspace_stack; // pthread attr require it
+    std::size_t userspace_stack_size;
+
     std::atomic<std::int64_t> sr_s;
     std::atomic<std::int64_t> sr_st;
 

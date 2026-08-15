@@ -1,0 +1,8 @@
+{
+    "name": "adwaita-icon-theme",
+    "version": "latest",
+    "deps": ["base-libs", "libadwaita"],
+    "url": "git:https://github.com/GNOME/adwaita-icon-theme.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

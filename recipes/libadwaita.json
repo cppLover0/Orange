@@ -1,0 +1,8 @@
+{
+    "name": "libadwaita",
+    "version": "1.2",
+    "deps": ["base-libs", "gtk3", "gtk4", "graphene", "curl", "libfyaml", "zstd"],
+    "url": "https://download.gnome.org/sources/libadwaita/1.2/libadwaita-1.2.2.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

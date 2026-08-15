@@ -1,0 +1,8 @@
+{
+    "name": "libfyaml",
+    "version": "0.9.6",
+    "deps": ["base-libs"],
+    "url": "https://github.com/pantoniou/libfyaml/releases/download/v0.9.6/libfyaml-0.9.6.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

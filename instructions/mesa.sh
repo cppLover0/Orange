@@ -6,14 +6,16 @@ prepare() {
 
 configure() {
     meson_configure \
-        -Dglx=xlib \
+        -Dglx=dri \
         -Dplatforms=x11 \
+        -Degl=enabled \
         -Dgles1=enabled \
         -Dgles2=enabled \
         -Dgallium-drivers=llvmpipe \
         -Dvulkan-drivers=swrast \
         -Dvideo-codecs=all_free
 }
+
 
 build() {
     meson compile -j$(nproc)

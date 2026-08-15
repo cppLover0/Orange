@@ -1,6 +1,6 @@
 diff -Naur rust-libc/build.rs rust-libc-clean/build.rs
 --- rust-libc/build.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/build.rs	2026-06-07 14:16:10.657825935 +0300
++++ rust-libc-clean/build.rs	2026-08-01 16:49:19.345269821 +0300
 @@ -42,12 +42,20 @@
      (
          "target_os",
@@ -26,7 +26,7 @@ diff -Naur rust-libc/build.rs rust-libc-clean/build.rs
          "target_arch",
 diff -Naur rust-libc/build.rs.orig rust-libc-clean/build.rs.orig
 --- rust-libc/build.rs.orig	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/build.rs.orig	2026-06-07 14:16:10.658347510 +0300
++++ rust-libc-clean/build.rs.orig	2026-08-01 16:49:19.345880401 +0300
 @@ -0,0 +1,346 @@
 +use std::env::VarError;
 +use std::process::{
@@ -376,7 +376,7 @@ diff -Naur rust-libc/build.rs.orig rust-libc-clean/build.rs.orig
 +}
 diff -Naur rust-libc/Cargo.toml rust-libc-clean/Cargo.toml
 --- rust-libc/Cargo.toml	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/Cargo.toml	2026-06-07 14:16:10.658619620 +0300
++++ rust-libc-clean/Cargo.toml	2026-08-01 16:49:19.345988267 +0300
 @@ -51,6 +51,7 @@
      "x86_64-unknown-freebsd",
      "x86_64-unknown-illumos",
@@ -387,7 +387,7 @@ diff -Naur rust-libc/Cargo.toml rust-libc-clean/Cargo.toml
      #
 diff -Naur rust-libc/Cargo.toml.orig rust-libc-clean/Cargo.toml.orig
 --- rust-libc/Cargo.toml.orig	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/Cargo.toml.orig	2026-06-07 14:16:10.658887101 +0300
++++ rust-libc-clean/Cargo.toml.orig	2026-08-01 16:49:19.346148523 +0300
 @@ -0,0 +1,218 @@
 +[package]
 +name = "libc"
@@ -609,7 +609,7 @@ diff -Naur rust-libc/Cargo.toml.orig rust-libc-clean/Cargo.toml.orig
 +global_value_marked_deprecated = "warn"
 diff -Naur rust-libc/Cargo.toml.rej rust-libc-clean/Cargo.toml.rej
 --- rust-libc/Cargo.toml.rej	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/Cargo.toml.rej	2026-06-07 14:16:10.659029132 +0300
++++ rust-libc-clean/Cargo.toml.rej	2026-08-01 16:49:19.346236661 +0300
 @@ -0,0 +1,26 @@
 +--- Cargo.toml	2026-01-08 15:06:28.000000000 +0300
 ++++ Cargo.toml	2026-06-05 14:35:34.147497636 +0300
@@ -639,7 +639,7 @@ diff -Naur rust-libc/Cargo.toml.rej rust-libc-clean/Cargo.toml.rej
 +     "x86_64-unknown-redox",
 diff -Naur rust-libc/src/new/common/linux_like/mod.rs rust-libc-clean/src/new/common/linux_like/mod.rs
 --- rust-libc/src/new/common/linux_like/mod.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/common/linux_like/mod.rs	2026-06-07 14:16:10.659175612 +0300
++++ rust-libc-clean/src/new/common/linux_like/mod.rs	2026-08-01 16:49:19.346326192 +0300
 @@ -4,6 +4,7 @@
      target_os = "android",
      target_os = "emscripten",
@@ -651,7 +651,7 @@ diff -Naur rust-libc/src/new/common/linux_like/mod.rs rust-libc-clean/src/new/co
  pub(crate) mod pthread;
 diff -Naur rust-libc/src/new/common/linux_like/pthread.rs rust-libc-clean/src/new/common/linux_like/pthread.rs
 --- rust-libc/src/new/common/linux_like/pthread.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/common/linux_like/pthread.rs	2026-06-07 14:16:10.659376625 +0300
++++ rust-libc-clean/src/new/common/linux_like/pthread.rs	2026-08-01 16:49:19.346443937 +0300
 @@ -1,7 +1,7 @@
  use crate::prelude::*;
  
@@ -683,7 +683,7 @@ diff -Naur rust-libc/src/new/common/linux_like/pthread.rs rust-libc-clean/src/ne
  }
 diff -Naur rust-libc/src/new/common/mod.rs rust-libc-clean/src/new/common/mod.rs
 --- rust-libc/src/new/common/mod.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/common/mod.rs	2026-06-07 14:16:10.659579242 +0300
++++ rust-libc-clean/src/new/common/mod.rs	2026-08-01 16:49:19.346554177 +0300
 @@ -23,6 +23,7 @@
      target_os = "emscripten",
      target_os = "l4re",
@@ -694,7 +694,7 @@ diff -Naur rust-libc/src/new/common/mod.rs rust-libc-clean/src/new/common/mod.rs
  
 diff -Naur rust-libc/src/new/common/posix/mod.rs rust-libc-clean/src/new/common/posix/mod.rs
 --- rust-libc/src/new/common/posix/mod.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/common/posix/mod.rs	2026-06-07 14:16:10.659771740 +0300
++++ rust-libc-clean/src/new/common/posix/mod.rs	2026-08-01 16:49:19.346677323 +0300
 @@ -8,6 +8,7 @@
      target_os = "emscripten",
      target_os = "l4re",
@@ -705,7 +705,7 @@ diff -Naur rust-libc/src/new/common/posix/mod.rs rust-libc-clean/src/new/common/
  ))]
 diff -Naur rust-libc/src/new/common/posix/pthread.rs rust-libc-clean/src/new/common/posix/pthread.rs
 --- rust-libc/src/new/common/posix/pthread.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/common/posix/pthread.rs	2026-06-07 14:16:10.660050442 +0300
++++ rust-libc-clean/src/new/common/posix/pthread.rs	2026-08-01 16:49:19.346834573 +0300
 @@ -5,14 +5,14 @@
  use crate::prelude::*;
  
@@ -1022,7 +1022,7 @@ diff -Naur rust-libc/src/new/common/posix/pthread.rs rust-libc-clean/src/new/com
  }
 diff -Naur rust-libc/src/new/common/posix/pthread.rs.orig rust-libc-clean/src/new/common/posix/pthread.rs.orig
 --- rust-libc/src/new/common/posix/pthread.rs.orig	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/new/common/posix/pthread.rs.orig	2026-06-07 14:16:10.660350415 +0300
++++ rust-libc-clean/src/new/common/posix/pthread.rs.orig	2026-08-01 16:49:19.347019436 +0300
 @@ -0,0 +1,322 @@
 +//! Header: `pthread.h`
 +//!
@@ -1348,7 +1348,7 @@ diff -Naur rust-libc/src/new/common/posix/pthread.rs.orig rust-libc-clean/src/ne
 +}
 diff -Naur rust-libc/src/new/linux_uapi/linux/can/j1939.rs rust-libc-clean/src/new/linux_uapi/linux/can/j1939.rs
 --- rust-libc/src/new/linux_uapi/linux/can/j1939.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/linux_uapi/linux/can/j1939.rs	2026-06-07 14:16:10.660661789 +0300
++++ rust-libc-clean/src/new/linux_uapi/linux/can/j1939.rs	2026-08-01 16:49:19.347188809 +0300
 @@ -1,6 +1,6 @@
  //! `linux/can/j1939.h`
  
@@ -1359,7 +1359,7 @@ diff -Naur rust-libc/src/new/linux_uapi/linux/can/j1939.rs rust-libc-clean/src/n
  pub const J1939_IDLE_ADDR: c_uchar = 0xfe;
 diff -Naur rust-libc/src/new/linux_uapi/linux/can/raw.rs rust-libc-clean/src/new/linux_uapi/linux/can/raw.rs
 --- rust-libc/src/new/linux_uapi/linux/can/raw.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/linux_uapi/linux/can/raw.rs	2026-06-07 14:16:10.660825372 +0300
++++ rust-libc-clean/src/new/linux_uapi/linux/can/raw.rs	2026-08-01 16:49:19.347305402 +0300
 @@ -1,6 +1,6 @@
  //! Header: `linux/can/raw.h`
  
@@ -1370,13 +1370,13 @@ diff -Naur rust-libc/src/new/linux_uapi/linux/can/raw.rs rust-libc-clean/src/new
  pub const CAN_RAW_FILTER_MAX: c_int = 512;
 diff -Naur rust-libc/src/new/mlibc/mod.rs rust-libc-clean/src/new/mlibc/mod.rs
 --- rust-libc/src/new/mlibc/mod.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/new/mlibc/mod.rs	2026-06-07 14:16:10.661028820 +0300
++++ rust-libc-clean/src/new/mlibc/mod.rs	2026-08-01 16:49:19.347473814 +0300
 @@ -0,0 +1,2 @@
 +pub(crate) mod pthread;
 +pub(crate) mod unistd;
 diff -Naur rust-libc/src/new/mlibc/pthread.rs rust-libc-clean/src/new/mlibc/pthread.rs
 --- rust-libc/src/new/mlibc/pthread.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/new/mlibc/pthread.rs	2026-06-07 14:16:10.661110215 +0300
++++ rust-libc-clean/src/new/mlibc/pthread.rs	2026-08-01 16:49:19.347546983 +0300
 @@ -0,0 +1,56 @@
 +//! Header: `pthread.h`
 +
@@ -1436,7 +1436,7 @@ diff -Naur rust-libc/src/new/mlibc/pthread.rs rust-libc-clean/src/new/mlibc/pthr
 +};
 diff -Naur rust-libc/src/new/mlibc/unistd.rs rust-libc-clean/src/new/mlibc/unistd.rs
 --- rust-libc/src/new/mlibc/unistd.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/new/mlibc/unistd.rs	2026-06-07 14:16:10.661211288 +0300
++++ rust-libc-clean/src/new/mlibc/unistd.rs	2026-08-01 16:49:19.347632056 +0300
 @@ -0,0 +1,7 @@
 +//! Header: `unistd.h`
 +
@@ -1447,7 +1447,7 @@ diff -Naur rust-libc/src/new/mlibc/unistd.rs rust-libc-clean/src/new/mlibc/unist
 +};
 diff -Naur rust-libc/src/new/mod.rs rust-libc-clean/src/new/mod.rs
 --- rust-libc/src/new/mod.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/new/mod.rs	2026-06-07 14:16:10.661329314 +0300
++++ rust-libc-clean/src/new/mod.rs	2026-08-01 16:49:19.347718110 +0300
 @@ -168,6 +168,9 @@
      } else if #[cfg(target_env = "uclibc")] {
          mod uclibc;
@@ -1470,7 +1470,7 @@ diff -Naur rust-libc/src/new/mod.rs rust-libc-clean/src/new/mod.rs
          pub use unistd::*;
 diff -Naur rust-libc/src/new/mod.rs.orig rust-libc-clean/src/new/mod.rs.orig
 --- rust-libc/src/new/mod.rs.orig	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/new/mod.rs.orig	2026-06-07 14:16:10.661494790 +0300
++++ rust-libc-clean/src/new/mod.rs.orig	2026-08-01 16:49:19.347824914 +0300
 @@ -0,0 +1,239 @@
 +//! This module contains the future directory structure. If possible, new definitions should
 +//! get added here.
@@ -1713,7 +1713,7 @@ diff -Naur rust-libc/src/new/mod.rs.orig rust-libc-clean/src/new/mod.rs.orig
 +}
 diff -Naur rust-libc/src/unix/linux_like/mod.rs rust-libc-clean/src/unix/linux_like/mod.rs
 --- rust-libc/src/unix/linux_like/mod.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/unix/linux_like/mod.rs	2026-06-07 14:16:10.661811094 +0300
++++ rust-libc-clean/src/unix/linux_like/mod.rs	2026-08-01 16:52:23.350594347 +0300
 @@ -258,6 +258,7 @@
      if #[cfg(any(
          target_env = "gnu",
@@ -1744,7 +1744,7 @@ diff -Naur rust-libc/src/unix/linux_like/mod.rs rust-libc-clean/src/unix/linux_l
      }
 diff -Naur rust-libc/src/unix/linux_like/orange/aarch64/mod.rs rust-libc-clean/src/unix/linux_like/orange/aarch64/mod.rs
 --- rust-libc/src/unix/linux_like/orange/aarch64/mod.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/unix/linux_like/orange/aarch64/mod.rs	2026-06-07 14:16:10.663154929 +0300
++++ rust-libc-clean/src/unix/linux_like/orange/aarch64/mod.rs	2026-08-01 16:49:19.348437133 +0300
 @@ -0,0 +1,81 @@
 +use crate::prelude::*;
 +use crate::{off64_t, off_t};
@@ -1829,8 +1829,8 @@ diff -Naur rust-libc/src/unix/linux_like/orange/aarch64/mod.rs rust-libc-clean/s
 +pub const O_LARGEFILE: c_int = 0x20000;
 diff -Naur rust-libc/src/unix/linux_like/orange/mod.rs rust-libc-clean/src/unix/linux_like/orange/mod.rs
 --- rust-libc/src/unix/linux_like/orange/mod.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/unix/linux_like/orange/mod.rs	2026-06-13 19:53:08.699655761 +0300
-@@ -0,0 +1,1266 @@
++++ rust-libc-clean/src/unix/linux_like/orange/mod.rs	2026-08-01 17:17:48.580816681 +0300
+@@ -0,0 +1,1273 @@
 +// This file is autogenerated!
 +// All changes made will be lost (eventually)!
 +use crate::prelude::*;
@@ -1949,6 +1949,13 @@ diff -Naur rust-libc/src/unix/linux_like/orange/mod.rs rust-libc-clean/src/unix/
 +pub const SCHED_DEADLINE: c_int = 6;
 +
 +pub const SOCK_SEQPACKET: c_int = 5;
++
++s! {
++    pub struct in6_pktinfo {
++        pub ipi6_addr: crate::in6_addr,
++        pub ipi6_ifindex: c_uint,
++    }
++}
 +
 +pub const PRIO_PROCESS: crate::__priority_which_t = 0;
 +pub const PRIO_PGRP: crate::__priority_which_t = 1;
@@ -3099,7 +3106,7 @@ diff -Naur rust-libc/src/unix/linux_like/orange/mod.rs rust-libc-clean/src/unix/
 +}
 diff -Naur rust-libc/src/unix/linux_like/orange/riscv64/mod.rs rust-libc-clean/src/unix/linux_like/orange/riscv64/mod.rs
 --- rust-libc/src/unix/linux_like/orange/riscv64/mod.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/unix/linux_like/orange/riscv64/mod.rs	2026-06-07 14:16:10.663658200 +0300
++++ rust-libc-clean/src/unix/linux_like/orange/riscv64/mod.rs	2026-08-01 16:49:19.348952788 +0300
 @@ -0,0 +1,104 @@
 +use crate::prelude::*;
 +use crate::{off64_t, off_t};
@@ -3207,7 +3214,7 @@ diff -Naur rust-libc/src/unix/linux_like/orange/riscv64/mod.rs rust-libc-clean/s
 +pub const O_NOFOLLOW: c_int = 0x20000;
 diff -Naur rust-libc/src/unix/linux_like/orange/x86_64/mod.rs rust-libc-clean/src/unix/linux_like/orange/x86_64/mod.rs
 --- rust-libc/src/unix/linux_like/orange/x86_64/mod.rs	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/unix/linux_like/orange/x86_64/mod.rs	2026-06-07 14:16:10.663775304 +0300
++++ rust-libc-clean/src/unix/linux_like/orange/x86_64/mod.rs	2026-08-01 16:49:19.349119486 +0300
 @@ -0,0 +1,124 @@
 +use crate::prelude::*;
 +use crate::{greg_t, off_t};
@@ -3335,7 +3342,7 @@ diff -Naur rust-libc/src/unix/linux_like/orange/x86_64/mod.rs rust-libc-clean/sr
 +pub const O_NOFOLLOW: c_int = 0x20000;
 diff -Naur rust-libc/src/unix/mod.rs rust-libc-clean/src/unix/mod.rs
 --- rust-libc/src/unix/mod.rs	2026-04-23 22:43:26.000000000 +0300
-+++ rust-libc-clean/src/unix/mod.rs	2026-06-07 14:16:10.663935530 +0300
++++ rust-libc-clean/src/unix/mod.rs	2026-08-01 16:49:19.349331661 +0300
 @@ -2453,7 +2453,8 @@
          target_os = "linux",
          target_os = "l4re",
@@ -3348,7 +3355,7 @@ diff -Naur rust-libc/src/unix/mod.rs rust-libc-clean/src/unix/mod.rs
          pub use self::linux_like::*;
 diff -Naur rust-libc/src/unix/mod.rs.orig rust-libc-clean/src/unix/mod.rs.orig
 --- rust-libc/src/unix/mod.rs.orig	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/src/unix/mod.rs.orig	2026-06-07 14:16:10.664181600 +0300
++++ rust-libc-clean/src/unix/mod.rs.orig	2026-08-01 16:49:19.349670378 +0300
 @@ -0,0 +1,2500 @@
 +//! Definitions found commonly among almost all Unix derivatives
 +//!
@@ -5852,7 +5859,7 @@ diff -Naur rust-libc/src/unix/mod.rs.orig rust-libc-clean/src/unix/mod.rs.orig
 +}
 diff -Naur rust-libc/triagebot.toml.orig rust-libc-clean/triagebot.toml.orig
 --- rust-libc/triagebot.toml.orig	1970-01-01 03:00:00.000000000 +0300
-+++ rust-libc-clean/triagebot.toml.orig	2026-06-07 14:16:10.664777417 +0300
++++ rust-libc-clean/triagebot.toml.orig	2026-08-01 16:49:19.350533066 +0300
 @@ -0,0 +1,132 @@
 +[relabel]
 +allow-unauthenticated = [

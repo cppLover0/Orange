@@ -1,0 +1,8 @@
+{
+    "name": "modem-manager",
+    "version": "1.25.95",
+    "deps": ["base-libs"],
+    "url": "https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/archive/1.25.95-dev/ModemManager-1.25.95-dev.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

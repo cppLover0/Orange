@@ -212,6 +212,34 @@ long long sys_fstat(int fd, stat* out) {
     return sys_newfstatat(fd, nullptr, out, 0);
 }
 
+long long sys_fstatfs(int fd, statfs* out) {
+    thread* current_thread = current_proc;
+    if(!is_safe_to_rw(current_thread, (std::uint64_t)out, PAGE_SIZE))
+        return -EFAULT;
+
+    auto manager = (vfs::fdmanager*)current_thread->fd;
+
+    file_descriptor* file = manager->search(fd);
+    if(file == nullptr)
+        return -EBADF;
+
+    stat tmp_stat = {};
+    file_descriptor target_fd = *file;
+
+    target_fd.vnode.stat(&target_fd, &tmp_stat);
+
+    out->f_type = 0xEF53;
+    out->f_bsize = tmp_stat.st_blksize;
+    out->f_blocks = 0;
+    out->f_bfree = 0;
+    out->f_bavail = 0;
+    out->f_files = 0;
+    out->f_ffree = 0;
+    out->f_namelen = 4096;
+
+    return 0;
+}
+
 long long sys_statfs(const char* path, statfs* out) {
     thread* current_thread = current_proc;
     if(!is_safe_to_rw(current_thread, (std::uint64_t)out, PAGE_SIZE))
@@ -415,6 +443,45 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
 
             return file->socketpair.write_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
         }
+    } else if(file->type == file_descriptor_type::eventfd) {
+
+        if(count < 8)
+            return -EINVAL;
+
+        std::uint64_t current = file->eventfd.counter->load();
+        std::uint64_t next = 0;
+
+        // lock free impl
+
+        while (true) {
+            if (current == 0) {
+                if (file->eventfd.flags & EFD_NONBLOCK) {
+                    return -EAGAIN; 
+                }
+                
+                current = file->eventfd.counter->load();
+                continue;
+            }
+
+            if (file->eventfd.flags & EFD_SEMAPHORE) {
+                next = current - 1;
+            } else {
+                next = 0;
+            }
+
+            if (file->eventfd.counter->compare_exchange_weak(current, next)) {
+                break;
+            }
+            process::yield();
+        }
+
+        if (file->eventfd.flags & EFD_SEMAPHORE) {
+            *(std::uint64_t*)buffer = 1; 
+        } else {
+            *(std::uint64_t*)buffer = current; 
+        }
+
+        return 8;
     }
 
     assert(0, "unimplemented read fd %d, type %d", fd, file->type);
@@ -494,6 +561,13 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
 
             return file->socketpair.read_socket->write(buffer, count);
         }
+    } else if(file->type == file_descriptor_type::eventfd) {
+       
+        if(count < 8)
+            return -EINVAL;
+
+        file->eventfd.counter->fetch_add(*(std::uint64_t*)buffer);
+        return 8;
     }
 
     assert(0, "unimplemented write fd %d, type %d", fd, file->type);
@@ -625,7 +699,11 @@ long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
     if(!file->vnode.ioctl)
         return -ENOTTY;
 
-    return file->vnode.ioctl(file, req, (void*)arg);
+    std::int32_t status = file->vnode.ioctl(file, req, (void*)arg);
+
+    log("ioctl", "status %d", status);
+    return status;
+
 }
 
 long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
@@ -661,6 +739,12 @@ long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
     process_path(current->chroot, at, buffer1, buffer);
 
     target_fd.type = file_descriptor_type::file;
+
+    // i dont have procfs so ill just do this
+    if(klibc::strcmp("/proc/self/exe", buffer) == 0) {
+        klibc::memcpy(buf, current->exe, klibc::strlen(current->exe) > bufsize ? bufsize : klibc::strlen(current->exe));
+        return klibc::strlen(current->exe) > bufsize ? bufsize : klibc::strlen(current->exe);
+    }
 
     int status = vfs::open(&target_fd, buffer, false, false);
     if(status != 0)
@@ -780,6 +864,12 @@ long long sys_fcntl(int fd, int request, std::uint64_t arg) {
 
             fd_s->flags &= ~(O_APPEND | O_ASYNC | O_NONBLOCK | O_RDONLY | O_RDWR | O_WRONLY);
             fd_s->flags |= (arg & (O_APPEND | O_ASYNC | O_NONBLOCK | O_RDONLY | O_RDWR | O_WRONLY));
+
+            if(fd_s->flags & O_NONBLOCK) {
+                fd_s->eventfd.flags |= EFD_NONBLOCK;
+            } else {
+                fd_s->eventfd.flags &= ~(EFD_NONBLOCK);
+            }
 
             return 0;
         }
@@ -974,7 +1064,9 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 if(fd->type == file_descriptor_type::file) {
                     if(fd->vnode.poll) {
                         ret = fd->vnode.poll(fd, vfs_poll_type::pollin);
-                    } 
+                    } else {
+                        log("poll", "there's no poll for file %s", fd->path);
+                    }
                 } else if(fd->type == file_descriptor_type::pipe) {
                     if(fd->fs_specific.pipe->size.load() != 0) 
                         ret = true;
@@ -1001,7 +1093,10 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                     } else {
                         if(fd->socketpair.write_socket->size.load() != 0)
                             ret = true;
-                    }
+                    } 
+                } else if(fd->type == file_descriptor_type::eventfd) {
+                    if(fd->eventfd.counter->load() > 0)
+                        ret = true;
                 }
 
                 if(ret == true) {
@@ -1015,7 +1110,9 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 if(fd->type == file_descriptor_type::file) {
                     if(fd->vnode.poll) {
                         ret = fd->vnode.poll(fd, vfs_poll_type::pollout);
-                    } 
+                    } else {
+                        log("poll", "there's no poll for file %s", fd->path);
+                    }
                 } else if(fd->type == file_descriptor_type::pipe) {
                     if((std::uint64_t)fd->fs_specific.pipe->size.load() != fd->fs_specific.pipe->total_size) 
                         ret = true;
@@ -1039,6 +1136,8 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                         if((std::uint64_t)fd->socketpair.read_socket->size.load() != fd->socketpair.read_socket->total_size)
                             ret = true;
                     }
+                } else if(fd->type == file_descriptor_type::eventfd) {
+                    ret = true;
                 }
 
                 if(ret == true) {
@@ -1273,6 +1372,7 @@ long long sys_epoll_create(int flags) {
 }
 
 long long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *ev) {
+    
     thread* current = current_proc;
 
     if(ev == nullptr && op != EPOLL_CTL_DEL)
@@ -2184,4 +2284,23 @@ long long sys_fchownat(int dfd, const char* path, uid_t owner, gid_t group, int 
 long long sys_fsync(int fd) {
     klibc::debug_printf("fsync was called on fd %d\n", fd);
     return 0;
+}
+
+long long sys_eventfd_create(std::uint64_t initval, int flags) {
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+
+    file_descriptor* fd0 = manager->createlowest(2);
+    fd0->type = file_descriptor_type::eventfd;
+    fd0->eventfd.counter = new std::atomic<std::uint64_t>;
+    fd0->eventfd.ref_count = new std::atomic<std::size_t>;
+    fd0->eventfd.ref_count->store(1);
+    fd0->eventfd.flags = flags;
+    fd0->other.is_cloexec = (flags & EFD_CLOEXEC) ? true : false;
+
+    fd0->eventfd.counter->store(initval);
+
+    klibc::debug_printf("creating eventfd %d\n", fd0->index);
+
+    return fd0->index;
 }

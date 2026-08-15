@@ -5,9 +5,13 @@
 #include <utils/errno.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/paging.hpp>
+#include <drivers/edid.hpp>
+#include <generic/gpu.hpp>
 #include <utils/linux.hpp>
 #include <klibc/string.hpp>
+#include <drivers/edid.hpp>
 #include <generic/sysfs.hpp>
+#include <generic/drm.hpp>
 #include <atomic>
 
 std::int32_t fbdev_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
@@ -33,7 +37,17 @@ std::int32_t fbdev_ioctl(devfs_node* node, std::uint64_t req, void* arg) {
     return -EINVAL;
 }
 
+drm::framebuffer fbdev_drm_access(void* ctx) {
+    auto fb = (drm::framebuffer*)ctx;
+    return *fb;
+}
+
 void fbdev::init() {
+
+    if(gpu::is_there_any_gpu == true) {
+        log("fbdev", "skipping fbdev init");
+        return;
+    }
 
     sysfs::create_dir("/class/graphics/fbcon");
     sysfs::create_symlink("/class/graphics/fbcon/subsystem", (char*)"../..");
@@ -104,5 +118,44 @@ void fbdev::init() {
         sysfs::create("/class/graphics/fb%d/cursor", (void*)"\0", 1, i);
 
         devfs::create(false, buffer, new_arg, (std::uint64_t)fb.address - etc::hhdm(), fb.pitch * fb.height, nullptr, fbdev_ioctl, nullptr, nullptr, nullptr, nullptr, false, PAGING_WC);
+    
+        drm::framebuffer drm_fb = {};
+
+        drm_fb.phys = (std::uint64_t)fb.address - etc::hhdm();
+        drm_fb.width = fb.width;
+        drm_fb.height = fb.height;
+        drm_fb.blue_mask_shift = fb.blue_mask_shift;
+        drm_fb.blue_mask_size = fb.blue_mask_size;
+        drm_fb.red_mask_shift = fb.red_mask_shift;
+        drm_fb.red_mask_size = fb.red_mask_size;
+        drm_fb.green_mask_shift = fb.green_mask_shift;
+        drm_fb.green_mask_size = fb.green_mask_size;
+        drm_fb.pitch = fb.pitch;
+        drm_fb.edid = fb.edid;
+        drm_fb.edid_size = fb.edid_size;
+        drm_fb.memory_model = fb.memory_model;
+        drm_fb.bpp = fb.bpp;
+
+        drm::framebuffer* new_fb = new drm::framebuffer;
+        *new_fb = drm_fb;
+
+        drm::drm_device dev = {};
+        dev.ctx = (void*)new_fb;
+        dev.fb.access_fb = fbdev_drm_access;
+        dev.type = drm::drm_type::framebuffer;
+
+        drm::create(dev);
+
+        if(fb.edid != nullptr && fb.edid_size == 128) {
+            const char* monitor_name = edid::get_monitor_name(fb.edid);
+            if(monitor_name != nullptr) {
+
+                std::uint8_t w,h = 0;
+                if(edid::get_monitor_size(fb.edid, &w, &h) == true) {
+                    log("edid", "monitor name is %s, size is %dx%d cm", monitor_name, w, h);
+                    delete monitor_name;
+                }
+            }
+        }
     }
 }

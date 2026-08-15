@@ -1,0 +1,9 @@
+{
+    "name": "firefox",
+    "version": "140.13.0",
+    "deps": ["base-libs", "rust-host", "gtk3", "gtk4", "pipewire", "nspr", "cbindgen-host", "rust-getrandom0.3.3", "rust-windows-link0.2.0", "rust-mio1.0.1"],
+    "url": "https://archive.mozilla.org/pub/firefox/releases/140.13.0esr/source/firefox-140.13.0esr.source.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true,
+    "comment": "say gex, used for gjs"
+}

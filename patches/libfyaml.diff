@@ -1,0 +1,12 @@
+diff -Naur libfyaml/include/libfyaml/libfyaml-endian.h libfyaml-clean/include/libfyaml/libfyaml-endian.h
+--- libfyaml/include/libfyaml/libfyaml-endian.h	2026-03-15 16:48:50.000000000 +0300
++++ libfyaml-clean/include/libfyaml/libfyaml-endian.h	2026-08-09 12:40:59.967184332 +0300
+@@ -42,7 +42,7 @@
+ extern "C" {
+ #endif
+ 
+-#if defined(__linux__) || defined(__CYGWIN__) || defined(__OpenBSD__) || defined(__GNU__) || defined(__EMSCRIPTEN__)
++#if defined(__linux__) || defined(__CYGWIN__) || defined(__OpenBSD__) || defined(__GNU__) || defined(__EMSCRIPTEN__) || defined(__orange__)
+ # include <endian.h>
+ #elif defined(__APPLE__)
+ # include <libkern/OSByteOrder.h>

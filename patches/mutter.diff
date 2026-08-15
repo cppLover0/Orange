@@ -1,0 +1,42 @@
+diff -Naur mutter/cogl/cogl/winsys/cogl-onscreen-xlib.h mutter-clean/cogl/cogl/winsys/cogl-onscreen-xlib.h
+--- mutter/cogl/cogl/winsys/cogl-onscreen-xlib.h	2022-02-15 19:39:51.000000000 +0300
++++ mutter-clean/cogl/cogl/winsys/cogl-onscreen-xlib.h	2026-08-09 17:30:42.376295287 +0300
+@@ -28,18 +28,18 @@
+ #define COGL_ONSCREEN_XLIB_H
+ 
+ #include "cogl-onscreen.h"
+-#include "winsys/cogl-onscreen-egl.h"
+-#include "winsys/cogl-winsys-egl-private.h"
++// #include "winsys/cogl-onscreen-egl.h"
++// #include "winsys/cogl-winsys-egl-private.h"
+ 
+ #define COGL_TYPE_ONSCREEN_XLIB (cogl_onscreen_xlib_get_type ())
+ G_DECLARE_FINAL_TYPE (CoglOnscreenXlib, cogl_onscreen_xlib,
+                       COGL, ONSCREEN_XLIB,
+-                      CoglOnscreenEgl)
++                      CoglOnscreenGlx)
+ 
+-gboolean
+-_cogl_winsys_egl_onscreen_xlib_init (CoglOnscreen  *onscreen,
+-                                     EGLConfig      egl_config,
+-                                     GError       **error);
++// gboolean
++// _cogl_winsys_egl_onscreen_xlib_init (CoglOnscreen  *onscreen,
++//                                      EGLConfig      egl_config,
++//                                      GError       **error);
+ 
+ COGL_EXPORT CoglOnscreenXlib *
+ cogl_onscreen_xlib_new (CoglContext *context,
+diff -Naur mutter/src/backends/x11/meta-monitor-manager-xrandr.c mutter-clean/src/backends/x11/meta-monitor-manager-xrandr.c
+--- mutter/src/backends/x11/meta-monitor-manager-xrandr.c	2022-02-15 19:39:51.000000000 +0300
++++ mutter-clean/src/backends/x11/meta-monitor-manager-xrandr.c	2026-08-10 22:45:13.155002800 +0300
+@@ -601,6 +601,9 @@
+                                                    MetaMonitorsConfigMethod method,
+                                                    GError                 **error)
+ {
++
++  return TRUE;
++
+   GPtrArray *crtc_assignments;
+   GPtrArray *output_assignments;
+ 

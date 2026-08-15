@@ -1,6 +1,27 @@
+diff -Naur mesa/include/drm-uapi/dma-buf.h mesa-clean/include/drm-uapi/dma-buf.h
+--- mesa/include/drm-uapi/dma-buf.h	2025-12-04 09:02:48.000000000 +0300
++++ mesa-clean/include/drm-uapi/dma-buf.h	2026-08-09 16:42:11.515378463 +0300
+@@ -20,7 +20,7 @@
+ #ifndef _DMA_BUF_UAPI_H_
+ #define _DMA_BUF_UAPI_H_
+ 
+-#if defined(__linux__) || defined(__managarm__)
++#if defined(__linux__) || defined(__managarm__) || defined(__orange__)
+ 
+ #include <linux/types.h>
+ 
 diff -Naur mesa/include/drm-uapi/drm.h mesa-clean/include/drm-uapi/drm.h
 --- mesa/include/drm-uapi/drm.h	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/include/drm-uapi/drm.h	2026-05-29 11:23:55.894998313 +0300
++++ mesa-clean/include/drm-uapi/drm.h	2026-08-09 16:43:54.131269009 +0300
+@@ -35,7 +35,7 @@
+ #ifndef _DRM_H_
+ #define _DRM_H_
+ 
+-#if   defined(__linux__)
++#if   defined(__linux__) || defined(__orange__)
+ 
+ #include <linux/types.h>
+ #include <asm/ioctl.h>
 @@ -44,7 +44,7 @@
  #else /* One of the BSDs */
  
@@ -10,9 +31,21 @@ diff -Naur mesa/include/drm-uapi/drm.h mesa-clean/include/drm-uapi/drm.h
  #include <sys/types.h>
  typedef int8_t   __s8;
  typedef uint8_t  __u8;
+diff -Naur mesa/include/drm-uapi/sync_file.h mesa-clean/include/drm-uapi/sync_file.h
+--- mesa/include/drm-uapi/sync_file.h	2025-12-04 09:02:48.000000000 +0300
++++ mesa-clean/include/drm-uapi/sync_file.h	2026-08-09 16:44:28.630258012 +0300
+@@ -6,7 +6,7 @@
+ #ifndef _UAPI_LINUX_SYNC_H
+ #define _UAPI_LINUX_SYNC_H
+ 
+-#if defined(__linux__)
++#if defined(__linux__) || defined(__orange__)
+ 
+ #include <linux/ioctl.h>
+ #include <linux/types.h>
 diff -Naur mesa/include/renderdoc_app.h mesa-clean/include/renderdoc_app.h
 --- mesa/include/renderdoc_app.h	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/include/renderdoc_app.h	2026-05-29 11:23:55.896288215 +0300
++++ mesa-clean/include/renderdoc_app.h	2026-08-09 16:30:23.729379414 +0300
 @@ -35,7 +35,7 @@
  
  #if defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER)
@@ -24,7 +57,16 @@ diff -Naur mesa/include/renderdoc_app.h mesa-clean/include/renderdoc_app.h
  #define RENDERDOC_CC
 diff -Naur mesa/meson.build mesa-clean/meson.build
 --- mesa/meson.build	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/meson.build	2026-05-29 11:23:55.896865482 +0300
++++ mesa-clean/meson.build	2026-08-09 16:30:36.143932342 +0300
+@@ -144,7 +144,7 @@
+ 
+ with_any_opengl = with_opengl or with_gles1 or with_gles2
+ 
+-system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos', 'android', 'managarm'].contains(host_machine.system())
++system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos', 'android', 'managarm', 'orange'].contains(host_machine.system())
+ 
+ gallium_drivers = get_option('gallium-drivers')
+ if gallium_drivers.contains('auto')
 @@ -1071,7 +1071,7 @@
  endif
  
@@ -36,7 +78,7 @@ diff -Naur mesa/meson.build mesa-clean/meson.build
    pre_args += '-D__EXTENSIONS__'
 diff -Naur mesa/meson.build.orig mesa-clean/meson.build.orig
 --- mesa/meson.build.orig	1970-01-01 03:00:00.000000000 +0300
-+++ mesa-clean/meson.build.orig	2026-05-01 15:00:22.648327294 +0300
++++ mesa-clean/meson.build.orig	2026-08-09 16:30:23.730822984 +0300
 @@ -0,0 +1,2419 @@
 +# Copyright © 2017-2020 Intel Corporation
 +# SPDX-License-Identifier: MIT
@@ -2459,7 +2501,7 @@ diff -Naur mesa/meson.build.orig mesa-clean/meson.build.orig
 +summary(teflon_summary, section: 'Teflon (TensorFlow Lite delegate)', bool_yn: true, list_sep: ' ')
 diff -Naur mesa/src/gallium/drivers/llvmpipe/lp_texture.c mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c
 --- mesa/src/gallium/drivers/llvmpipe/lp_texture.c	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c	2026-05-29 11:23:55.897508825 +0300
++++ mesa-clean/src/gallium/drivers/llvmpipe/lp_texture.c	2026-08-09 16:30:23.731360450 +0300
 @@ -1750,7 +1750,7 @@
     default:
        break;
@@ -2471,7 +2513,7 @@ diff -Naur mesa/src/gallium/drivers/llvmpipe/lp_texture.c mesa-clean/src/gallium
  }
 diff -Naur mesa/src/glx/glxcmds.c mesa-clean/src/glx/glxcmds.c
 --- mesa/src/glx/glxcmds.c	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/src/glx/glxcmds.c	2026-05-29 11:27:24.675530954 +0300
++++ mesa-clean/src/glx/glxcmds.c	2026-08-09 16:30:23.731808226 +0300
 @@ -23,7 +23,7 @@
  #include "util/u_debug.h"
  #else
@@ -2492,7 +2534,7 @@ diff -Naur mesa/src/glx/glxcmds.c mesa-clean/src/glx/glxcmds.c
     int i;
 diff -Naur mesa/src/util/detect_os.h mesa-clean/src/util/detect_os.h
 --- mesa/src/util/detect_os.h	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/src/util/detect_os.h	2026-05-29 11:23:55.897947158 +0300
++++ mesa-clean/src/util/detect_os.h	2026-08-09 16:30:23.732126017 +0300
 @@ -28,6 +28,12 @@
  #define DETECT_OS_ANDROID 1
  #endif
@@ -2517,7 +2559,7 @@ diff -Naur mesa/src/util/detect_os.h mesa-clean/src/util/detect_os.h
  #endif /* DETECT_OS_H */
 diff -Naur mesa/src/util/os_misc.c mesa-clean/src/util/os_misc.c
 --- mesa/src/util/os_misc.c	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/src/util/os_misc.c	2026-05-29 11:23:55.898314186 +0300
++++ mesa-clean/src/util/os_misc.c	2026-08-09 16:30:23.732257536 +0300
 @@ -58,7 +58,7 @@
  #  include <unistd.h>
  #  include <log/log.h>
@@ -2529,7 +2571,7 @@ diff -Naur mesa/src/util/os_misc.c mesa-clean/src/util/os_misc.c
  #  include <sys/resource.h>
 diff -Naur mesa/src/util/os_time.c mesa-clean/src/util/os_time.c
 --- mesa/src/util/os_time.c	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/src/util/os_time.c	2026-05-29 11:23:55.898670123 +0300
++++ mesa-clean/src/util/os_time.c	2026-08-09 16:30:23.732400406 +0300
 @@ -80,7 +80,7 @@
  void
  os_time_sleep(int64_t usecs)
@@ -2541,7 +2583,7 @@ diff -Naur mesa/src/util/os_time.c mesa-clean/src/util/os_time.c
     time.tv_nsec = (usecs % 1000000) * 1000;
 diff -Naur mesa/src/util/u_thread.c mesa-clean/src/util/u_thread.c
 --- mesa/src/util/u_thread.c	2025-12-04 09:02:48.000000000 +0300
-+++ mesa-clean/src/util/u_thread.c	2026-05-29 11:23:55.898872848 +0300
++++ mesa-clean/src/util/u_thread.c	2026-08-09 16:30:23.732546162 +0300
 @@ -75,7 +75,7 @@
  void u_thread_setname( const char *name )
  {

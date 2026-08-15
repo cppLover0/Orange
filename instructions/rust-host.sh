@@ -13,7 +13,9 @@ export BOOTSTRAP_SKIP_TARGET_SANITY=1
 prepare() {
     #autotools_recursive_regen
     export CARGO_UNSTABLE=edition2024
+    export RUSTC_BOOTSTRAP=1
     cargo update --offline --manifest-path Cargo.toml
+    cargo update --offline --manifest-path library/Cargo.toml
 }
 
 configure() {

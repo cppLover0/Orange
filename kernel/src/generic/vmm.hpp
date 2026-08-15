@@ -511,7 +511,7 @@ end:
         std::int64_t current_phys = arch::get_phys_from_page(this->root, virt);
         if(current_phys == 0 || current_phys == -1) {
             ram_file::lock();
-            ram_file::page* page = ram_file::access_page(obj->mmap_info.file->inode, obj->mmap_info.file->ident, ((virt - obj->base) / PAGE_SIZE) + (ALIGNPAGEDOWN(obj->mmap_info.off) / PAGE_SIZE), true, obj->mmap_info.copied_file_desc, 0);
+            ram_file::page* page = ram_file::access_page(obj->mmap_info.file->inode, obj->mmap_info.file->ident, ((virt - obj->base) / PAGE_SIZE) + (ALIGNPAGEDOWN(obj->mmap_info.off) / PAGE_SIZE), true, obj->mmap_info.copied_file_desc, obj->mmap_info.off % PAGE_SIZE);
             ram_file::unlock();
             paging::map_range(this->root, (std::uint64_t)page->p - etc::hhdm(), virt, PAGE_SIZE, PAGING_PRESENT | PAGING_RW | PAGING_USER);
         }

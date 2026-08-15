@@ -1,0 +1,8 @@
+{
+    "name": "cbindgen-host",
+    "version": "0.29.4",
+    "deps": [],
+    "url": "https://github.com/mozilla/cbindgen/archive/refs/tags/0.29.4.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": false
+}

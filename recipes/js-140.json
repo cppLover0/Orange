@@ -1,8 +1,9 @@
 {
     "name": "js-140",
     "version": "140.11.0",
-    "deps": ["base-libs", "bash"],
-    "url": "http://deb.debian.org/debian/pool/main/m/mozjs140/mozjs140_140.11.0.orig.tar.xz",
+    "deps": ["base-libs", "bash", "firefox"], 
+    "url": "package:firefox",
     "should_patch": false,
-    "use_orange_prefix": true
+    "use_orange_prefix": true,
+    "comment": "will use firefox deps"
 }

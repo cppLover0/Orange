@@ -9,6 +9,7 @@
 #include <generic/tmpfs.hpp>
 #include <generic/devfs.hpp>
 #include <generic/unix_sockets.hpp>
+#include <generic/drm.hpp>
 
 #include <generic/evdev.hpp>
 #include <generic/userspace/syscall_list.hpp>
@@ -389,9 +390,10 @@ std::int32_t vfs::unlink(char* path) {
 void vfs::init() {
     klibc::memset(vfs_nodes, 0, sizeof(vfs_nodes));
     tmpfs::init_default(&vfs_nodes[1]);
-    evdev::init_default(&vfs_nodes[2]);
-    devfs::init(&vfs_nodes[3]);
-    sysfs::init(&vfs_nodes[4]);
+    drm::init(&vfs_nodes[2]);
+    evdev::init_default(&vfs_nodes[3]);
+    devfs::init(&vfs_nodes[4]);
+    sysfs::init(&vfs_nodes[5]);
 
     log("vfs", "test /dev/ptmx node is %s", find_node((char*)"/dev/ptmx")->path);
     log("vfs", "vfs_nodes 0x%p",vfs_nodes);

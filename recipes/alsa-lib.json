@@ -1,0 +1,8 @@
+{
+    "name": "alsa-lib",
+    "version": "1.2.9",
+    "deps": ["base-libs", "gtk3"],
+    "url": "https://www.alsa-project.org/files/pub/lib/alsa-lib-1.2.9.tar.bz2",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

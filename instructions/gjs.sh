@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dbsymbolic_functions=false
+    meson_configure -Dbsymbolic_functions=false -Dprofiler=disabled
 }
 
 build() {

@@ -244,8 +244,6 @@ long long sys_getitimer(int timer, itimerval* out) {
 
 long long sys_setitimer(int timer, itimerval* out, itimerval* old) {
 
-    return -ENOSYS;
-
     thread* proc = current_proc;
 
     if(!is_safe_to_rw(proc, (std::uint64_t)out, PAGE_SIZE))

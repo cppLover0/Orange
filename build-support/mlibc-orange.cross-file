@@ -1,0 +1,12 @@
+[binaries]
+c = 'gcc-14'
+cpp = 'g++-14'
+
+[properties]
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'orange'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

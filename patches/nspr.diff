@@ -1,0 +1,26 @@
+diff -Naur nspr/nspr/pr/include/md/_linux.h nspr-clean/nspr/pr/include/md/_linux.h
+--- nspr/nspr/pr/include/md/_linux.h	2022-09-12 14:40:15.000000000 +0300
++++ nspr-clean/nspr/pr/include/md/_linux.h	2026-08-02 12:50:15.350677921 +0300
+@@ -130,17 +130,14 @@
+ #define _MD_ATOMIC_SET                _PR_ia64_AtomicSet
+ #endif
+ 
++// for some reason it doesnt link asm code so ill just replace extern c with builtins
+ #if defined(__x86_64__)
+ #define _PR_HAVE_ATOMIC_OPS
+ #define _MD_INIT_ATOMIC()
+-extern PRInt32 _PR_x86_64_AtomicIncrement(PRInt32 *val);
+-#define _MD_ATOMIC_INCREMENT          _PR_x86_64_AtomicIncrement
+-extern PRInt32 _PR_x86_64_AtomicDecrement(PRInt32 *val);
+-#define _MD_ATOMIC_DECREMENT          _PR_x86_64_AtomicDecrement
+-extern PRInt32 _PR_x86_64_AtomicAdd(PRInt32 *ptr, PRInt32 val);
+-#define _MD_ATOMIC_ADD                _PR_x86_64_AtomicAdd
+-extern PRInt32 _PR_x86_64_AtomicSet(PRInt32 *val, PRInt32 newval);
+-#define _MD_ATOMIC_SET                _PR_x86_64_AtomicSet
++#define _MD_ATOMIC_INCREMENT(ptr) __sync_add_and_fetch(ptr, 1)
++#define _MD_ATOMIC_DECREMENT(ptr) __sync_sub_and_fetch(ptr, 1)
++#define _MD_ATOMIC_ADD(ptr, i) __sync_add_and_fetch(ptr, i)
++#define _MD_ATOMIC_SET(ptr, nv) __sync_lock_test_and_set(ptr, nv)
+ #endif
+ 
+ #if defined(__loongarch__)
