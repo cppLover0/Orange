@@ -13,7 +13,7 @@ prepare() {
 }
 
 configure() {
-    CFLAGS="-D__NR_fchmodat2=452" CXXFLAGS="$CFLAGS" meson --cross-file "${build_support}/mlibc-linux.cross-file" --libdir=/usr/lib --prefix=/usr "${source_dir}" -Dlinux_kernel_headers="${dest_dir}/usr/include" -Dposix_option=enabled -Dlinux_option=enabled -Dglibc_option=enabled -Dbsd_option=enabled
+    CFLAGS="-D__NR_fchmodat2=452" CXXFLAGS="$CFLAGS" meson -Duse_freestnd_hdrs=disabled --cross-file "${build_support}/mlibc-linux.cross-file" --libdir=/usr/lib --prefix=/usr "${source_dir}" -Dlinux_kernel_headers="${dest_dir}/usr/include" -Dposix_option=enabled -Dlinux_option=enabled -Dglibc_option=enabled -Dbsd_option=enabled
 }
 
 build() {

@@ -28,5 +28,10 @@ requirements:
 rsync, meson, ninja, gcc 15 with g++, cmake, make, git, coreutils, sh (bash), llvm, clang (for kernel, im tesing with clang 20, also clang++), tar, qemu, xorriso, texinfo, bison, flex, autoconf, automake, libtool, patchelf, cmake, help2man, meson >= 1.6.1 libglib2.0-dev-bin, itstool, pigz, valac, python3.13, libxml2-utils, latest version of rust, glslang-tools, autogen, gtk-doc-tools, doxygen
 ```
 
+if you are on nixos you can just do
+```
+nix develop --extra-experimental-features nix-command --extra-experimental-features flakes
+```
+
 there's also cmdline for some stuff: init=path, notsc, noacpi
 noacpi means only table init

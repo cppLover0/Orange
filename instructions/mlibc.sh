@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson --cross-file "${build_support}/mlibc-orange.cross-file" --prefix=/usr "${source_dir}" -Dlinux_kernel_headers="${dest_dir}/usr/include" -Dposix_option=enabled -Dlinux_option=enabled -Dglibc_option=enabled -Dbsd_option=enabled
+    meson --cross-file "${build_support}/mlibc-orange.cross-file" --prefix=/usr "${source_dir}" -Duse_freestnd_hdrs=disabled -Dlinux_kernel_headers="${dest_dir}/usr/include" -Dposix_option=enabled -Dlinux_option=enabled -Dglibc_option=enabled -Dbsd_option=enabled
 }
 
 build() {
