@@ -14,6 +14,7 @@ build() {
 
 install() {
     make install DESTDIR="${dest_dir}"
+    ln -s libffi.so "${dest_dir}/usr/lib/libffi.so.7"
 }
 
 pkg_work

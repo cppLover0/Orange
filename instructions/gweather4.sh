@@ -1,5 +1,7 @@
 . "${pkg_lib}"
 
+unset LD_LIBRARY_PATH
+
 prepare() {
     autotools_recursive_regen
 }

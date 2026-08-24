@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    CFLAGS="$CFLAGS -Wno-implicit-function-declaration" cmake_configure
+    CFLAGS="$CFLAGS -Wno-implicit-function-declaration" cmake_configure -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 }
 
 build() {

@@ -1,5 +1,7 @@
 . "${pkg_lib}"
 
+export ACLOCAL=aclocal
+
 prepare() {
     autotools_recursive_regen
 }

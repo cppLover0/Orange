@@ -5,6 +5,12 @@
 # Change as needed.
 override OUTPUT := kernel
 
+override NIX_CFLAGS_COMPILE =
+override NIX_CXXFLAGS_COMPILE =
+override NIX_CFLAGS_LINK =
+override NIX_LDFLAGS =
+export NIX_DONT_SET_RPATH = 1
+
 # Target architecture to build for. Default to x86_64.
 ARCH := x86_64
 
@@ -50,9 +56,9 @@ endif
 # User controllable C flags.
 
 ifeq ($(MODE),DEBUG)
-    CFLAGS := -g -pipe -Werror -Wall
+    CFLAGS := -g -pipe -Werror -Wall -Wno-unused-command-line-argument
 else ifeq ($(MODE), RELEASE)
-    CFLAGS := -g -O3 -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
+    CFLAGS := -g -O3 -Wno-unused-command-line-argument -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
 else
     $(error unknown mode release/debug)
 endif
@@ -95,7 +101,7 @@ override SHARED_FLAGS := \
     -flto \
     -fno-PIC -I uacpi/include \
     -ffunction-sections \
-    -fdata-sections
+    -fdata-sections 
 
 # Internal C/C++ preprocessor flags that should not be changed by the user.
 override CPPFLAGS_C := \

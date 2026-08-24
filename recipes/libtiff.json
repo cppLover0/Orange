@@ -2,7 +2,7 @@
     "name": "libtiff",
     "version": "recent",
     "deps": ["base-libs"],
-    "url": "git:https://gitlab.com/libtiff/libtiff.git",
+    "url": "git:https://github.com/libsdl-org/libtiff.git",
     "should_patch": false,
     "use_orange_prefix": true
 }

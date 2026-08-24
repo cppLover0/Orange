@@ -53,19 +53,19 @@ ac_add_options --disable-tests
 EOF
     cd "${source_dir}/js/src"
 
-    python3 ../../mach configure
+    python3.13 ../../mach configure
 }
 
 
 build() {
     cd "${source_dir}/js/src"
-    python3 ../../mach build -j$(nproc)
+    python3.13 ../../mach build -j$(nproc)
 }
 
 install() {
     cd "${source_dir}/js/src"
     export DESTDIR="${dest_dir}"
-    python3 ../../mach install
+    python3.13 ../../mach install
 }
 
 pkg_work

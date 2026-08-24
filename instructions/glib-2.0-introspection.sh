@@ -8,7 +8,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dglib_debug=disabled -Dman-pages=disabled -Dsysprof=disabled -Dintrospection=enabled -Dxattr=false 
+    meson_configure -Dglib_debug=disabled -Dman-pages=disabled -Dsysprof=disabled -Dintrospection=enabled -Dxattr=false -Dtests=false
 }
 
 build() {

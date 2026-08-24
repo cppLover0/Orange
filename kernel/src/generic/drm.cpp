@@ -74,7 +74,8 @@ void drm::create(drm::drm_device device) {
         }
 
         connector->subpixel = 0;
-        
+        connector->modes_ptr = (std::uint64_t)fb_mode;
+        connector->count_modes = 1;
 
     }
 

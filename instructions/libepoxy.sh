@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Degl=no -Dtests=false
+    meson_configure -Degl=yes -Dtests=false
 }
 
 build() {

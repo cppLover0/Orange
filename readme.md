@@ -15,7 +15,7 @@ make run -j$(nproc) ARCH=$ARCH TOOLCHAIN=llvm
 
 for building distro you can use python script
 ```sh
-python3 orangestrap.py orange_sysroot build distro
+python3 orangestrap.py .orange-build/sysroot build distro
 ```
 
 to pack initrd 

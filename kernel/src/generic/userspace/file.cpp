@@ -701,7 +701,7 @@ long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
 
     std::int32_t status = file->vnode.ioctl(file, req, (void*)arg);
 
-    log("ioctl", "status %d", status);
+    //log("ioctl", "status %d", status);
     return status;
 
 }

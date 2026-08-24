@@ -7,6 +7,7 @@ export PYTHONDONTWRITEBYTECODE="1"
 
 prepare() {
     autotools_recursive_regen
+
     cd third_party/rust
     rm -rf libc nix getrandom mio libloading errno rustix
     cp -rf "${sources}"/rust-libc-workdir libc
@@ -86,16 +87,16 @@ ac_add_options --disable-gecko-profiler
 ac_add_options --disable-profiling
 
 EOF
-    python3 "${source_dir}/mach" configure
+    python3.13 "${source_dir}/mach" configure
 }
 
 
 build() {
-    python3 "${source_dir}/mach" build -j$(nproc)
+    python3.13 "${source_dir}/mach" build -j$(nproc)
 }
 
 install() {
-    python3 "${source_dir}/mach" package
+    python3.13 "${source_dir}/mach" package
     set -e
     rm -rf "${dest_dir}/usr/lib/firefox" "${dest_dir}/usr/bin/firefox"
     cp -a "${build_dir}/obj/dist/firefox" "${dest_dir}/usr/lib/firefox"

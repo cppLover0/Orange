@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    CFLAGS="$CFLAGS -fPIC" cmake_configure -DPNG_STATIC=ON -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DZLIB_LIBRARY="${dest_dir}/usr/lib/libz.a" -DZLIB_INCLUDE_DIR="${dest_dir}/usr/include/"
+    CFLAGS="$CFLAGS -fPIC" cmake_configure -DPNG_STATIC=ON -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DZLIB_LIBRARY="${dest_dir}/usr/lib/libz.a" -DZLIB_INCLUDE_DIR="${dest_dir}/usr/include/" -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 }
 
 build() {

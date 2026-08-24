@@ -5,11 +5,11 @@ prepare() {
 }
 
 configure() {
-    CFLAGS="$CFLAGS -lXau -lXdmcp" meson_configure -Druntime_dir=/run -Dsystemd_system_unitdir=no -Dsystemd_user_unitdir=no -Dsystem_pid_file=/run/dbus/pid -Dsystem_socket=/run/dbus/system_bus_socket -Dselinux=disabled -Dapparmor=disabled -Dlibaudit=disabled -Dkqueue=disabled -Dlaunchd=disabled -Dsystemd=disabled -Dmodular_tests=disabled -Depoll=disabled -Dverbose_mode=true
+    CFLAGS="$CFLAGS -lXau -lXdmcp" meson_configure -Ddoxygen_docs=disabled -Druntime_dir=/run -Dsystemd_system_unitdir=no -Dsystemd_user_unitdir=no -Dsystem_pid_file=/run/dbus/pid -Dsystem_socket=/run/dbus/system_bus_socket -Dselinux=disabled -Dapparmor=disabled -Dlibaudit=disabled -Dkqueue=disabled -Dlaunchd=disabled -Dsystemd=disabled -Dmodular_tests=disabled -Depoll=disabled -Dverbose_mode=true
 }
 
 build() {
-    meson compile -j$(nproc)
+    meson compile 
 }
 
 install() {

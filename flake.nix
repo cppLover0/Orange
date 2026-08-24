@@ -55,6 +55,9 @@
             rustfmt
             pkg-config
             glslang
+            nasm
+            lld
+            debootstrap
           ];
 
           shellHook = ''

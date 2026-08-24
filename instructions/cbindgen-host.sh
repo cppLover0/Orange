@@ -7,6 +7,7 @@ unset PKG_CONFIG_SYSROOT_DIR
 unset LLVM_CONFIG
 unset VAPIGEN
 unset VALAC
+unset LD_LIBRARY_PATH
 
 prepare() {
     true

@@ -1,0 +1,9 @@
+
+{
+    "name": "libsass",
+    "version": "recent idk",
+    "deps": ["base-libs"],
+    "url": "git:https://github.com/sass/libsass.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

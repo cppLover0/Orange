@@ -3,8 +3,9 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/kernel/uacpi/include"
+                "${workspaceFolder}",
+                "${workspaceFolder}/kernel/uacpi/include",
+                "!${workspaceFolder}/.orange-build/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

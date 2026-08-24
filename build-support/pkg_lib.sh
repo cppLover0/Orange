@@ -2,7 +2,7 @@
 trap "exit -1" USR1
 cd "${build_dir}"
 
-export LD_LIBRARY_PATH="${host_dest_dir}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${host_dest_dir}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu/"
 
 export SYSROOT="${dest_dir}"
 export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
@@ -13,6 +13,8 @@ export LLVM_CONFIG="${build_support}/cross-llvm-config"
 export INTROSPECTION_SCANNER_ENV="${host_dest_dir}/bin/g-ir-scanner"
 export INTROSPECTION_COMPILER_ENV="${host_dest_dir}/bin/g-ir-compiler"
 export INTROSPECTION_GENERATE_ENV="${host_dest_dir}/bin/g-ir-generate"
+
+echo "run-wrapper executable: $1, library path: ${RUN_WRAPPER_LD_LIBRARY_PATH}"
 
 cp -rf "${build_support}/cross-llvm-config" "${host_dest_dir}/bin/llvm-config"
 chmod +x "${host_dest_dir}/bin/llvm-config"
