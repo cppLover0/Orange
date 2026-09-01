@@ -49,13 +49,13 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
     if(fd != -1) {
 
         if(file->vnode.advanced_mmap != nullptr) {
-                std::uint64_t phys, size, flags = 0;
-                int status = file->vnode.advanced_mmap(file, off, &phys, &size, &flags);
+                std::uint64_t phys, size, flags1 = 0;
+                int status = file->vnode.advanced_mmap(file, off, &phys, &size, &flags1);
                 if(status == 0) {
                     if(flags & MAP_FIXED) {
-                        allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size > len ? len : size, true);
+                        allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT | flags1, size > len ? len : size, true);
                     } else {
-                        allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size > len ? len : size, false);
+                        allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT | flags1, size > len ? len : size, false);
                     }
 
                     arch::tlb_flush(allocated, len);
@@ -68,13 +68,13 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
 
         if((flags & MAP_PRIVATE) || file->vnode.mmap || current->is_debug) {
             if(file->vnode.mmap != nullptr) {
-                std::uint64_t phys, size, flags = 0;
-                int status = file->vnode.mmap(file, &phys, &size, &flags);
+                std::uint64_t phys, size, flags1 = 0;
+                int status = file->vnode.mmap(file, &phys, &size, &flags1);
                 if(status == 0) {
                     if(flags & MAP_FIXED) {
-                        allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, true);
+                        allocated = current->vmem->map_memory(hint, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT | flags1, size, true);
                     } else {
-                        allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT, size, false);
+                        allocated = current->vmem->map_memory(0, phys, PAGING_RW | PAGING_USER | PAGING_PRESENT | flags1, size, false);
                     }
 
                     arch::tlb_flush(allocated, size);

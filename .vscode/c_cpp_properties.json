@@ -3,9 +3,9 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}",
+                "${workspaceFolder}/kernel/src",
                 "${workspaceFolder}/kernel/uacpi/include",
-                "!${workspaceFolder}/.orange-build/**"
+                "${workspaceFolder}/kernel/limine-protocol/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

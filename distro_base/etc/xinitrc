@@ -1,1 +1,2 @@
-exec gnome-terminal
+gnome-terminal &
+exec mutter

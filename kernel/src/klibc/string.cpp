@@ -4,13 +4,21 @@
 
 void* klibc::memcpy(void *__restrict dest, const void *__restrict src, std::size_t n) {
 #if defined(__x86_64__)
+    void* original_dest = dest;
+
     asm volatile(
-        "rep movsb"
+        "shr $3, %%rcx\n\t"
+        "rep movsq\n\t"
+        "mov %%rdx, %%rcx\n\t"
+        "and $7, %%rcx\n\t"
+        "rep movsb\n\t"
+        "sfence\n\t"
         : "+D"(dest), "+S"(src), "+c"(n)
-        :
+        : "d"(n)
         : "memory"
     );
-    return dest; 
+
+    return original_dest; 
 #else
     std::uint8_t *__restrict pdest = static_cast<std::uint8_t *__restrict>(dest);
     const std::uint8_t *__restrict psrc = static_cast<const std::uint8_t *__restrict>(src);
@@ -21,6 +29,7 @@ void* klibc::memcpy(void *__restrict dest, const void *__restrict src, std::size
     return dest;
 #endif
 }
+
 
 void* klibc::memset(void *s, int c, std::size_t n) {
 #if defined(__x86_64__)

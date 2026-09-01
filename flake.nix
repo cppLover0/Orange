@@ -49,15 +49,13 @@
             itstool
             libxml2
             vala
-            python313
-            rustc
-            cargo
-            rustfmt
             pkg-config
             glslang
             nasm
             lld
             debootstrap
+            python313
+            gdb
           ];
 
           shellHook = ''

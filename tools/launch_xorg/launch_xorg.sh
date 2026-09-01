@@ -23,5 +23,8 @@ echo Launching dbus
 (dbus-daemon --session --address=unix:path=/run/user/1000/bus) > /dev/null 2> /dev/null &
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 
+gsettings set org.gnome.Terminal.Legacy.Settings theme-variant 'dark'
+gsettings set org.gnome.desktop.interface gtk-theme 'Orchis-Dark-Compact'
+
 echo Launching i3wm
 xinit /bin/sh /etc/xinitrc > /dev/null 2> /dev/null

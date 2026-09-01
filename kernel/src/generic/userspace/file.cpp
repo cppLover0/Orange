@@ -665,7 +665,7 @@ long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
     thread* current = current_proc;
 
     if(current->is_debug) {
-        klibc::debug_printf("trying to ioctl fd %d cmd %d arg 0x%p\n", fd, req, arg);
+        klibc::debug_printf("trying to ioctl fd %d  cmd %d arg 0x%p\n", fd, req, arg);
     }
 
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
@@ -673,6 +673,8 @@ long long sys_ioctl(int fd, std::uint64_t req, std::uint64_t arg) {
 
     if(!file)
         return -EBADF;
+
+    klibc::debug_printf("ioctl to %s\n", file->path);
 
     if(!is_safe_to_rw(current, arg, PAGE_SIZE))
         return -EFAULT;
@@ -1064,9 +1066,7 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 if(fd->type == file_descriptor_type::file) {
                     if(fd->vnode.poll) {
                         ret = fd->vnode.poll(fd, vfs_poll_type::pollin);
-                    } else {
-                        log("poll", "there's no poll for file %s", fd->path);
-                    }
+                    } 
                 } else if(fd->type == file_descriptor_type::pipe) {
                     if(fd->fs_specific.pipe->size.load() != 0) 
                         ret = true;
@@ -2134,9 +2134,6 @@ long long sys_renameat(int olddirfd, const char *old_path, int newdirfd, const c
     process_path(current->chroot, at, buffer12, new_path1);
 
     char tmp[4096] = {};
-
-    if(vfs::readlink(new_path1, tmp, 4096) != -ENOENT)
-        return -EEXIST;
 
     if(vfs::readlink(old_path1, tmp, 4096) == ENOENT)
         return -ENOENT;

@@ -8,6 +8,12 @@ Orange is my linux-like x86_64, aarch64, riscv64 os
 [![GitHub contributors](https://img.shields.io/github/contributors/cpplover0/orange)](https://github.com/cpplover0/orange/graphs/contributors)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/m/cpplover0/orange)](https://github.com/cpplover0/orange/commits)
 
+## Preview
+
+![meow](work.png)
+
+## Building
+
 for build do
 ```sh
 make run -j$(nproc) ARCH=$ARCH TOOLCHAIN=llvm
@@ -15,7 +21,7 @@ make run -j$(nproc) ARCH=$ARCH TOOLCHAIN=llvm
 
 for building distro you can use python script
 ```sh
-python3 orangestrap.py .orange-build/sysroot build distro
+python3 orangestrap.py .orange-build/sysroot build distro --create-debootstrap-env
 ```
 
 to pack initrd 
@@ -23,12 +29,12 @@ to pack initrd
 sh create-initrd.sh
 ```
 
-requirements:
+requirements (if you dont use deboostrap env) :
 ```
 rsync, meson, ninja, gcc 15 with g++, cmake, make, git, coreutils, sh (bash), llvm, clang (for kernel, im tesing with clang 20, also clang++), tar, qemu, xorriso, texinfo, bison, flex, autoconf, automake, libtool, patchelf, cmake, help2man, meson >= 1.6.1 libglib2.0-dev-bin, itstool, pigz, valac, python3.13, libxml2-utils, latest version of rust, glslang-tools, autogen, gtk-doc-tools, doxygen
 ```
 
-if you are on nixos you can just do
+if you are on nixos you can do
 ```
 nix develop --extra-experimental-features nix-command --extra-experimental-features flakes
 ```

@@ -1,24 +1,13 @@
-diff -Naur glib-2.0/gio/gcredentialsprivate.h glib-2.0-clean/gio/gcredentialsprivate.h
---- glib-2.0/gio/gcredentialsprivate.h	2026-07-29 16:17:36.000000000 +0300
-+++ glib-2.0-clean/gio/gcredentialsprivate.h	2026-08-21 18:51:13.250260489 +0300
+diff --git glib2-clean/gio/gcredentialsprivate.h glib2-workdir/gio/gcredentialsprivate.h
+index 0310a75..dba61e6 100644
+--- glib2-clean/gio/gcredentialsprivate.h
++++ glib2-workdir/gio/gcredentialsprivate.h
 @@ -104,7 +104,7 @@
   */
  #undef G_CREDENTIALS_HAS_PID
  
 -#ifdef __linux__
-+#if defined(__orange__) || defined(__linux__)
++#if defined(__linux__) || defined(__orange__)
  #define G_CREDENTIALS_SUPPORTED 1
  #define G_CREDENTIALS_USE_LINUX_UCRED 1
  #define G_CREDENTIALS_NATIVE_TYPE G_CREDENTIALS_TYPE_LINUX_UCRED
-diff -Naur glib-2.0/glib/glib-unix.c glib-2.0-clean/glib/glib-unix.c
---- glib-2.0/glib/glib-unix.c	2026-07-29 16:17:36.000000000 +0300
-+++ glib-2.0-clean/glib/glib-unix.c	2026-08-21 18:51:31.609477488 +0300
-@@ -952,7 +952,7 @@
- g_unix_fd_query_path (int      fd,
-                       GError **error)
- {
--#if defined(__linux__) || defined(__sun) || defined(_AIX) || defined (__CYGWIN__)
-+#if defined(__linux__) || defined(__sun) || defined(_AIX) || defined (__CYGWIN__) || defined(__orange__)
-   char *path;
-   char *proc_path;
- 

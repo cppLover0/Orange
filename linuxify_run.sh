@@ -3,7 +3,7 @@
 _path="$(realpath $1)"
 shift 1
 
-dest_dir="$(realpath orange_sysroot/usr/lib)"
+dest_dir="$(realpath .orange-build/sysroot/usr/lib)"
 host_dest_dir="$(realpath .orange-build/prefix/mlibc-host/usr/lib)"
 
 export LD_LIBRARY_PATH="${host_dest_dir}:${dest_dir}:${dest_dir}/mutter-8"

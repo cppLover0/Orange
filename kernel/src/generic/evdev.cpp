@@ -121,7 +121,6 @@ signed long evdev_read(file_descriptor* file, void* buffer, std::size_t count) {
 }
 
 signed long evdev_ls(file_descriptor* file, char* out, std::size_t count) {
-    return 0;
     evdev_lock.lock();
     dirent* dir = (dirent*)out;
     if(file->other.ls_pointer == nullptr) {
@@ -167,7 +166,6 @@ void evdev::submit(int num, input_event event) {
 }
 
 int evdev::create(char* name, int type) {
-    return 0;
 
     evdev_lock.lock();
     evdev::evdev_node* new_node = (evdev::evdev_node*)(pmm::freelist::alloc_4k() + etc::hhdm());
@@ -271,9 +269,10 @@ std::int32_t evdev_open(filesystem* fs, void* file_desc, char* path, bool is_dir
     }
 
     evdev::evdev_node* node = evdev_lookup(path);
-    if(node == nullptr)
+    if(node == nullptr) { evdev_lock.unlock();
         return -ENOENT;
-    
+    }
+
     fd->fs_specific.tmpfs_pointer = (std::uint64_t)node;
     fd->vnode.read = evdev_read;
     fd->vnode.ioctl = evdev_ioctl;

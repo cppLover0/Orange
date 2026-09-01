@@ -11,6 +11,7 @@
 #include <generic/keyboard.hpp>
 #include <utils/align.hpp>
 #include <generic/evdev.hpp>
+#include <generic/time.hpp>
 #include <utils/gobject.hpp>
 
 #if defined(__x86_64__)
@@ -1549,6 +1550,16 @@ extern vfs::pipe* ktty_pipe;
 void input_send(int num, uint8_t key) {
     (void)num;
     keyboard::submit(key);
+
+    std::uint64_t current_nano = time::timer->current_nano();
+    input_event ev = {};
+    ev.time.tv_sec = current_nano / 1000000000;
+    ev.time.tv_usec = (current_nano & 1000000000) / 1000;
+    ev.type = 1;
+    ev.code = key & ~(1 << 7);
+    ev.value = (key & (1 << 7)) ? 0 : 1;
+    evdev::submit(num,ev);
+
     ktty_pipe->write((const char*)&key, 1);
 }
 

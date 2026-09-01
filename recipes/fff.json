@@ -1,0 +1,8 @@
+{
+    "name": "fff",
+    "version": "meoww",
+    "deps": ["base-libs"],
+    "url": "src:tools/fff",
+    "should_patch": false,
+    "use_orange_prefix": true
+}
