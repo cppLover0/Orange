@@ -1,0 +1,53 @@
+diff -Naur libgpg-error/configure libgpg-error-clean/configure
+--- libgpg-error/configure	2026-05-07 11:23:57.000000000 +0300
++++ libgpg-error-clean/configure	2026-09-04 15:51:20.320685912 +0300
+@@ -19900,7 +19900,7 @@
+ printf "%s\n" "$as_me: generated src/lock-obj-pub.native.h for $host" >&6;}
+ elif test x$cross_compiling = xyes; then
+   case $host in
+-    *-*-gnu* | *-*-linux-gnu* | *-*-linux-musl* | wasm*-*-emscripten)
++    *-*-gnu* | *-*-linux-gnu* | *-*-linux-musl* | wasm*-*-emscripten | *-*-orange*)
+     if test -n "$ac_tool_prefix"; then
+   # Extract the first word of "${ac_tool_prefix}objdump", so it can be a program name with args.
+ set dummy ${ac_tool_prefix}objdump; ac_word=$2
+diff -Naur libgpg-error/configure.ac libgpg-error-clean/configure.ac
+--- libgpg-error/configure.ac	2026-05-07 11:12:57.000000000 +0300
++++ libgpg-error-clean/configure.ac	2026-09-04 15:50:08.842721832 +0300
+@@ -634,7 +634,7 @@
+   AC_MSG_NOTICE([generated src/lock-obj-pub.native.h for $host])
+ elif test x$cross_compiling = xyes; then
+   case $host in
+-    *-*-gnu* | *-*-linux-gnu* | *-*-linux-musl* | wasm*-*-emscripten)
++    *-*-gnu* | *-*-linux-gnu* | *-*-linux-musl* | wasm*-*-emscripten | *-*-orange*)
+     AC_CHECK_TOOL(OBJDUMP, [objdump])
+     if test -n "$OBJDUMP"; then
+       lock_obj_h_generated=yes
+diff -Naur libgpg-error/src/syscfg/lock-obj-pub.orange-mlibc.h libgpg-error-clean/src/syscfg/lock-obj-pub.orange-mlibc.h
+--- libgpg-error/src/syscfg/lock-obj-pub.orange-mlibc.h	1970-01-01 03:00:00.000000000 +0300
++++ libgpg-error-clean/src/syscfg/lock-obj-pub.orange-mlibc.h	2026-09-04 15:52:26.730523027 +0300
+@@ -0,0 +1,25 @@
++## lock-obj-pub.x86_64-pc-linux-gnu.h
++## File created by gen-posix-lock-obj - DO NOT EDIT
++## To be included by mkheader into gpg-error.h
++
++typedef struct
++{
++  long _vers;
++  union {
++    volatile char _priv[40];
++    long _x_align;
++    long *_xp_align;
++  } u;
++} gpgrt_lock_t;
++
++#define GPGRT_LOCK_INITIALIZER {1,{{0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0, \
++                                    0,0,0,0,0,0,0,0}}}
++##
++## Local Variables:
++## mode: c
++## buffer-read-only: t
++## End:
++##

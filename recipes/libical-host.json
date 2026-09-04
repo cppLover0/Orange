@@ -1,0 +1,8 @@
+{
+    "name": "libical",
+    "version": "4.0.5",
+    "deps": ["base-libs"],
+    "url": "https://github.com/libical/libical/releases/download/v4.0.5/libical-4.0.5.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": false
+}

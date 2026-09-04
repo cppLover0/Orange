@@ -98,6 +98,7 @@ void* kheap::malloc(std::size_t size) {
 }
 
 void kheap::free(void* ptr) {
+    
     if (!ptr) return;
 
     heap_lock.lock();

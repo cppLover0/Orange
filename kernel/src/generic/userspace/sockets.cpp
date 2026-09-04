@@ -517,6 +517,22 @@ long long sys_getsockopt(int fd, int layer, int number, void* buffer, unsigned* 
             *size = sizeof(un_ucred);
             return 0;
 
+        case 39: // SO_DOMAIN
+
+            if(file->type == file_descriptor_type::socketpair) 
+                *(int*)buffer = PF_UNIX;
+            else    
+                *(int*)buffer = file->socket.socket_type;
+            
+            *size = 4;
+            return 0;
+
+        case 9: // SO_KEEPALIVE
+        
+            *(int*)buffer = 0;
+            *size = 4;
+            return 0;
+
         case 7: // SO_SNDBUF
             *(int*)buffer = 65536;
             *size = 4;
@@ -562,11 +578,21 @@ long long sys_getsockname(int fd, struct sockaddr *addr_ptr, std::uint32_t max_a
     if(file == nullptr)
         return -EBADF;
     
+    if(file->type == file_descriptor_type::socketpair)
+        goto valid;
+
     if(file->type != file_descriptor_type::socket)
         return -EINVAL;
 
+valid:
+
     if(!is_safe_to_rw(current, (std::uint64_t)addr_ptr, max_addr_length + PAGE_SIZE))
         return -EFAULT;
+
+    if(file->type == file_descriptor_type::socketpair) {
+        klibc::memset(addr_ptr, 0, max_addr_length);
+        return 0;
+    }
 
     if(file->socket.socket_type == PF_UNIX) {
         if(file->socket.socket_pointer == nullptr)

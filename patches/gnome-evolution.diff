@@ -1,0 +1,144 @@
+diff -Naur gnome-evolution/CMakeLists.txt gnome-evolution-clean/CMakeLists.txt
+--- gnome-evolution/CMakeLists.txt	2026-05-22 06:50:16.000000000 +0300
++++ gnome-evolution-clean/CMakeLists.txt	2026-09-04 14:44:56.315917818 +0300
+@@ -121,7 +121,7 @@
+ set(libsecret_minimum_version 0.5)
+ set(libxml_minimum_version 2.0.0)
+ set(sqlite_minimum_version 3.7.17)
+-set(uuid_minimum_version 2.0)
++set(uuid_minimum_version 1.0)
+ 
+ # Optional Packages
+ set(goa_minimum_version 3.8)
+@@ -573,8 +573,17 @@
+ 
+ set(CMAKE_REQUIRED_LIBRARIES ${ICONV_LIBS})
+ file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/" _binary_dir_with_separator)
+-CHECK_C_SOURCE_RUNS("#define ICONV_DETECT_BUILD_DIR \"${_binary_dir_with_separator}\"
+-		     #include \"${CMAKE_SOURCE_DIR}/iconv-detect.c\"" _correct_iconv)
++if(NOT CMAKE_CROSSCOMPILING)
++	CHECK_C_SOURCE_RUNS("#define ICONV_DETECT_BUILD_DIR \"${_binary_dir_with_separator}\"
++			     #include \"${CMAKE_SOURCE_DIR}/iconv-detect.c\"" _correct_iconv)
++else(NOT CMAKE_CROSSCOMPILING)
++	set(_correct_iconv TRUE)
++	file(WRITE "${CMAKE_BINARY_DIR}/iconv-detect.h"
++		"/* This is an auto-generated header, DO NOT EDIT! */\n\n"
++		"#define ICONV_ISO_D_FORMAT \"iso-%d-%d\"\n"
++		"#define ICONV_ISO_S_FORMAT \"iso-%d-%s\"\n"
++		"#define ICONV_10646 \"UCS-4BE\"\n")
++endif(NOT CMAKE_CROSSCOMPILING)
+ unset(_binary_dir_with_separator)
+ unset(CMAKE_REQUIRED_LIBRARIES)
+ 
+@@ -636,7 +645,8 @@
+ # Check to see if strftime supports the use of %l and %k
+ # *******************************************************
+ 
+-CHECK_C_SOURCE_RUNS("
++if(NOT CMAKE_CROSSCOMPILING)
++	CHECK_C_SOURCE_RUNS("
+ 	#include <stdlib.h>
+ 	#include <string.h>
+ 	#include <time.h>
+@@ -654,6 +664,7 @@
+ 		return 1;
+ 	return 0;
+ 	}" HAVE_LKSTRFTIME)
++endif(NOT CMAKE_CROSSCOMPILING)
+ 
+ # ******************************
+ # system mail stuff
+diff -Naur gnome-evolution/data/CMakeLists.txt gnome-evolution-clean/data/CMakeLists.txt
+--- gnome-evolution/data/CMakeLists.txt	2026-05-22 06:50:16.000000000 +0300
++++ gnome-evolution-clean/data/CMakeLists.txt	2026-09-04 14:05:44.812224595 +0300
+@@ -31,7 +31,7 @@
+ # ********************************
+ 
+ set(OAUTH2_SCHEMES "x-scheme-handler/eds-oauth2;")
+-if(NOT WITH_GOOGLE_CLIENT_ID STREQUAL "")
++if(NOT WITH_GOOGLE_CLIENT_ID STREQUAL "" AND NOT CMAKE_CROSSCOMPILING)
+ 	set(CMAKE_REQUIRED_DEFINITIONS ${DATA_SERVER_CFLAGS})
+ 	set(CMAKE_REQUIRED_INCLUDES ${CMAKE_BINARY_DIR} ${DATA_SERVER_INCLUDE_DIRS})
+ 	set(CMAKE_REQUIRED_LIBRARIES ${DATA_SERVER_LDFLAGS})
+@@ -41,7 +41,9 @@
+ 			     #define DECODE_TO_FILE \"${_binary_dir_to_file}\"
+ 			     #define DECODE_REVERSED 1
+ 			     #include \"${CMAKE_SOURCE_DIR}/src/libedataserver/e-oauth2-service.c\"" _decoded)
+-	file(READ ${_binary_dir_to_file} _google_oauth2_scheme)
++	if(EXISTS ${_binary_dir_to_file})
++		file(READ ${_binary_dir_to_file} _google_oauth2_scheme)
++	endif(EXISTS ${_binary_dir_to_file})
+ 	unset(_binary_dir_to_file)
+ 	unset(_decoded)
+ 	unset(CMAKE_REQUIRED_LIBRARIES)
+@@ -52,7 +54,7 @@
+ 		set(OAUTH2_SCHEMES "x-scheme-handler/${_google_oauth2_scheme};${OAUTH2_SCHEMES}")
+ 	endif(NOT _google_oauth2_scheme STREQUAL "")
+ 	unset(_google_oauth2_scheme)
+-endif(NOT WITH_GOOGLE_CLIENT_ID STREQUAL "")
++endif(NOT WITH_GOOGLE_CLIENT_ID STREQUAL "" AND NOT CMAKE_CROSSCOMPILING)
+ 
+ configure_file(org.gnome.evolution-data-server.OAuth2-handler.desktop.in
+ 	org.gnome.evolution-data-server.OAuth2-handler.desktop.in
+diff -Naur gnome-evolution/src/addressbook/libebook-contacts/CMakeLists.txt gnome-evolution-clean/src/addressbook/libebook-contacts/CMakeLists.txt
+--- gnome-evolution/src/addressbook/libebook-contacts/CMakeLists.txt	2026-05-22 06:50:16.000000000 +0300
++++ gnome-evolution-clean/src/addressbook/libebook-contacts/CMakeLists.txt	2026-09-04 14:48:21.629589204 +0300
+@@ -23,11 +23,19 @@
+ 	${GNOME_PLATFORM_LDFLAGS}
+ )
+ 
++find_program(RUN_WRAPPER run-wrapper)
++
++set(_gen_western_table_command ${CMAKE_CURRENT_BINARY_DIR}/gen-western-table)
++if(RUN_WRAPPER)
++	list(INSERT _gen_western_table_command 0 ${RUN_WRAPPER})
++endif(RUN_WRAPPER)
++
+ add_custom_command(
+ 	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/e-name-western-tables.h
+-	COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gen-western-table "${CMAKE_CURRENT_SOURCE_DIR}/e-name-western-tables.h.in" >${CMAKE_CURRENT_BINARY_DIR}/e-name-western-tables.h
++	COMMAND ${_gen_western_table_command} "${CMAKE_CURRENT_SOURCE_DIR}/e-name-western-tables.h.in" >${CMAKE_CURRENT_BINARY_DIR}/e-name-western-tables.h
+ 	DEPENDS gen-western-table e-name-western-tables.h.in
+ )
++unset(_gen_western_table_command)
+ 
+ set(DEPENDENCIES
+ 	camel
+diff -Naur gnome-evolution/src/camel/CMakeLists.txt gnome-evolution-clean/src/camel/CMakeLists.txt
+--- gnome-evolution/src/camel/CMakeLists.txt	2026-05-22 06:50:16.000000000 +0300
++++ gnome-evolution-clean/src/camel/CMakeLists.txt	2026-09-04 14:48:14.250422201 +0300
+@@ -18,11 +18,19 @@
+ 	${CMAKE_BINARY_DIR}
+ )
+ 
++find_program(RUN_WRAPPER run-wrapper)
++
++set(_camel_gen_tables_command ${CMAKE_CURRENT_BINARY_DIR}/camel-gen-tables)
++if(RUN_WRAPPER)
++	list(INSERT _camel_gen_tables_command 0 ${RUN_WRAPPER})
++endif(RUN_WRAPPER)
++
+ add_custom_command(
+ 	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/camel-mime-tables.c
+-	COMMAND ${CMAKE_CURRENT_BINARY_DIR}/camel-gen-tables >${CMAKE_CURRENT_BINARY_DIR}/camel-mime-tables.c
++	COMMAND ${_camel_gen_tables_command} >${CMAKE_CURRENT_BINARY_DIR}/camel-mime-tables.c
+ 	DEPENDS camel-gen-tables
+ )
++unset(_camel_gen_tables_command)
+ 
+ set(SOURCES
+ 	camel.c
+diff -Naur gnome-evolution/src/libedataserver/e-ms-oapxbc.c gnome-evolution-clean/src/libedataserver/e-ms-oapxbc.c
+--- gnome-evolution/src/libedataserver/e-ms-oapxbc.c	2026-05-22 06:50:16.000000000 +0300
++++ gnome-evolution-clean/src/libedataserver/e-ms-oapxbc.c	2026-09-04 14:51:43.944152745 +0300
+@@ -41,6 +41,10 @@
+ #define DBUS_BROKER_PATH "/com/microsoft/identity/broker1"
+ #define AT_PRT_SSO_COOKIE 8
+ 
++#ifndef UUID_STR_LEN
++#define UUID_STR_LEN 37
++#endif
++
+ struct _EMsOapxbc {
+ 	GObject parent_instance;
+ 

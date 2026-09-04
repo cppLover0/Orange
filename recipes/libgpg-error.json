@@ -1,0 +1,8 @@
+{
+    "name": "libgpg-error",
+    "version": "1.61",
+    "deps": ["base-libs"],
+    "url": "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.61.tar.bz2",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

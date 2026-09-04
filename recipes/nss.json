@@ -1,0 +1,8 @@
+{
+    "name": "nss",
+    "version": "3.126",
+    "deps": ["base-libs", "nspr"],
+    "url": "https://archive.mozilla.org/pub/security/nss/releases/NSS_3_126_RTM/src/nss-3.126.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

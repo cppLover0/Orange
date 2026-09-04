@@ -23,8 +23,9 @@ echo Launching dbus
 (dbus-daemon --session --address=unix:path=/run/user/1000/bus) > /dev/null 2> /dev/null &
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 
-gsettings set org.gnome.Terminal.Legacy.Settings theme-variant 'dark'
-gsettings set org.gnome.desktop.interface gtk-theme 'Orchis-Dark-Compact'
+PROFILE_ID=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'") 
+gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ use-theme-colors false 
+gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 
 
-echo Launching i3wm
+echo Launching mutter
 xinit /bin/sh /etc/xinitrc > /dev/null 2> /dev/null

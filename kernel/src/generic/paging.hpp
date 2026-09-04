@@ -14,6 +14,7 @@ namespace paging {
     void mapentry(std::uintptr_t root, std::uint8_t type, std::uint32_t flags);
     void map_range(std::uintptr_t root, std::uint64_t phys, std::uintptr_t virt, std::size_t size, int flags);
     void zero_range(std::uintptr_t root, std::uintptr_t virt, std::size_t size);
+    void change_page(std::uintptr_t root, std::uintptr_t virt, std::uintptr_t new_flags);
     void free_range(std::uintptr_t root, std::uintptr_t virt, std::uintptr_t len);
     void duplicate_range(std::uintptr_t root, std::uintptr_t src_root, std::uintptr_t virt, std::uintptr_t len, std::uint32_t flags);
     void init();

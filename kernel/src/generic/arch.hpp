@@ -1,5 +1,7 @@
 #include <cstdint>
 
+#pragma once
+
 #define PAGE_SIZE 4096
 #define PAGING_PRESENT (1 << 0)
 #define PAGING_RW (1 << 1)
@@ -47,8 +49,8 @@ namespace arch {
 
     void panic(char* msg);
     
-
-
+    inline bool is_there_memory_protection = false;
+    void enable_memory_protection();
 
 
     [[gnu::weak]] void fill_root(std::uintptr_t root);

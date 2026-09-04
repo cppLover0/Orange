@@ -5,6 +5,8 @@
 #include <generic/hhdm.hpp>
 #include <klibc/string.hpp>
 #include <klibc/stdio.hpp>
+#include <generic/paging.hpp>
+#include <utils/gobject.hpp>
 #include <utils/align.hpp>
 #include <atomic>
 
@@ -254,9 +256,15 @@ std::uint64_t pmm::freelist::alloc_4k() {
     }
 
     std::uint64_t mem = (std::uint64_t)freelist_hhdm - etc::hhdm();
+
     freelist_hhdm = (std::uint64_t*)(*freelist_hhdm);
+
+    if(arch::is_there_memory_protection == true)
+        paging::change_page(gobject::kernel_root, etc::hhdm() + mem, PAGING_PRESENT | PAGING_RW);
+
     klibc::memset((void*)(mem + etc::hhdm()),0,PAGE_SIZE);
     free_mem -= PAGE_SIZE;
+
     pmm_lock.unlock();
     return mem;
 }
@@ -272,5 +280,8 @@ void pmm::freelist::nlfree(std::uint64_t phys) {
 void pmm::freelist::free(std::uint64_t phys) {
     pmm_lock.lock();
     freelist::nlfree(phys);
+    if(arch::is_there_memory_protection == true)
+        paging::change_page(gobject::kernel_root, etc::hhdm() + phys, PAGING_PRESENT);
+
     pmm_lock.unlock();
 }

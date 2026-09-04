@@ -49,13 +49,20 @@ void x86_64::panic::print_ascii_art() {
 
 extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
 
+    uint64_t cr2;
+    asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
+
+    if(frame->err_code == 3 && frame->cs == 0x08) {
+        log("panic", "found memory corruption");
+        x86_64::panic::print_ascii_art();
+        print_regs(frame);
+        arch::hcf();
+    }
+
     arch::enable_paging(gobject::kernel_root);
 
     if(frame->cs != 0x08)
         asm volatile("swapgs");
-
-    uint64_t cr2;
-    asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
 
     x86_64::cpu_data();
 

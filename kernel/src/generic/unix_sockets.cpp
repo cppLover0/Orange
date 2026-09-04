@@ -116,6 +116,17 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
         for(std::size_t i = 0;i < sizeof(node->pend_conns) / sizeof(unix_socket_pending_connection); i++) {
             unix_socket_pending_connection* current = &node->pend_conns[i];
             if(current->is_used == true && !current->is_accepted.test()) {
+
+                current->proc->op_lock.lock();
+
+                // fym it died
+                if(current->proc->status != PROCESS_LIVE) {
+                    current->is_used = false;
+                    continue;
+                }
+
+                current->proc->op_lock.unlock();
+
                 file_descriptor* dest = (file_descriptor*)current->file;
                 dest->socket.socket_side = 1;
                 fd->socket.socket_side = 0;

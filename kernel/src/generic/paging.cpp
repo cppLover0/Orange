@@ -8,6 +8,7 @@
 #include <utils/gobject.hpp>
 #include <klibc/stdio.hpp>
 #include <generic/paging.hpp>
+#include <utils/assert.hpp>
 
 void __map_kernel(std::uintptr_t root) {
     extern std::uint64_t kernel_start;
@@ -57,6 +58,12 @@ namespace paging {
                 arch::map_page(root, 0, virt + i, 0);
             }
         }
+    }
+
+    void change_page(std::uintptr_t root, std::uintptr_t virt, std::uintptr_t new_flags) {
+        std::int64_t phys = arch::get_phys_from_page(root, virt);
+        assert((phys != 0) || (phys != -1), "can't change page 0x%p", virt);
+        arch::map_page(root, phys, virt, new_flags);
     }
 
     void duplicate_range(std::uintptr_t root, std::uintptr_t src_root, std::uintptr_t virt, std::uintptr_t len, std::uint32_t flags) {

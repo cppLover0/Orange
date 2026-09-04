@@ -103,10 +103,12 @@ namespace arch {
             x86_64::schedule_timer::init();
             x86_64::sse::init();
             syscall::init();
+            enable_memory_protection();
             
             return;
         case ARCH_INIT_COMMON:
             syscall::init();
+            enable_memory_protection();
             return;
         }
     }
@@ -133,5 +135,12 @@ namespace arch {
         return (rflags & (1 << 9)) != 0;
     }
 
+    void enable_memory_protection() {
+        std::uint64_t cr0;
+        asm volatile("mov %%cr0, %0" : "=r"(cr0));
+        cr0 |= (1ULL << 16); 
+        asm volatile("mov %0, %%cr0" : : "r"(cr0));
+        arch::is_there_memory_protection = true;
+    }
 
 }

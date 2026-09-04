@@ -59,7 +59,8 @@ def run_in_debootstrap_env():
         "libxml2", "libxml2-dev", "valac", "gettext", "python3", "python3-dev",
         "python3-setuptools", "python3-mako", "python3-yaml", "rustc", "cargo", "rustfmt",
         "pkg-config", "glslang-tools", "nasm", "libgmp-dev", "libmpc-dev", "libmpfr-dev",
-        "patch", "file", "python3.13", "libxml2-utils", "libgirepository1.0-dev", "gobject-introspection", "gtk-update-icon-cache", "nodejs", "unzip", "locales",
+        "patch", "file", "python3.13", "libxml2-utils", "libgirepository1.0-dev", "gobject-introspection", "gtk-update-icon-cache", "nodejs", "unzip", "locales", "intltool", "gyp", "gperf", "libical-dev",
+        "gpg"
     ]
 
     marker = os.path.join(env_dir, ".orangestrap-debootstrap-ready")
