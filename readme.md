@@ -41,3 +41,5 @@ nix develop --extra-experimental-features nix-command --extra-experimental-featu
 
 there's also cmdline for some stuff: init=path, notsc, noacpi
 noacpi means only table init
+
+i didnt clankered kernel btw
