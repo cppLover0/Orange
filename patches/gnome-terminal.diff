@@ -62,18 +62,3 @@ diff -Naur gnome-terminal/src/terminal-app.cc gnome-terminal-clean/src/terminal-
  #endif /* TERMINAL_SERVER */
  #ifdef TERMINAL_PREFERENCES
    terminal_prefs_show_preferences(profile, hint, timestamp);
-diff -Naur gnome-terminal/src/server.cc gnome-terminal-clean/src/server.cc
---- gnome-terminal/src/server.cc	2026-03-14 23:54:54.000000000 +0300
-+++ gnome-terminal-clean/src/server.cc	2026-09-13 10:55:00.000000000 +0300
-@@ -45,7 +45,10 @@
- 
- static char *app_id = nullptr;
- 
--#define INACTIVITY_TIMEOUT (100 /* ms */)
-+/* Orange: 100ms was too short. The server stayed reachable while shutting
-+ * down, so a terminal opened right after closing the last one was served by
-+ * the dying server and closed immediately. Keep it alive for a bit longer. */
-+#define INACTIVITY_TIMEOUT (5000 /* ms */)
- 
- 
- #include <dlfcn.h>
