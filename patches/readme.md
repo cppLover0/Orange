@@ -1,2 +1,2 @@
 patches for orange
-i clankered some of them
+i didn't clankered so much only minor stuff like version mismatch fixes and gnome terminal preferences button fix bruh
