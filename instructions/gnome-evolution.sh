@@ -14,6 +14,9 @@ build() {
 
 install() {
     DESTDIR="${dest_dir}" cmake --install .
+    echo symlink
+    rm -rf "${dest_dir}/usr/lib/libedbus-private.so"
+    ln -s evolution-data-server/libedbus-private.so "${dest_dir}/usr/lib/libedbus-private.so"
 }
 
 pkg_work

@@ -67,6 +67,7 @@ thread* process::create_process(bool is_user) {
     new_thread->real_next = -1;
     new_thread->prof_next = -1;
     new_thread->virt_next = -1;
+    new_thread->groups = (int*)(pmm::freelist::alloc_4k() + etc::hhdm());
 
     new_thread->exe = (char*)(pmm::freelist::alloc_4k() + etc::hhdm());
 
@@ -89,6 +90,7 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
     if(clarg.flags & CLONE_THREAD) {
         new_proc->pid = proc->pid;
         new_proc->pgrp = proc->pgrp;
+        klibc::memcpy(new_proc->comm, proc->comm, 16);
     } else {
         new_proc->pid = new_proc->id;
         new_proc->pgrp = new_proc->id;
@@ -119,6 +121,7 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
     }
 
     new_proc->uid = proc->uid;
+    new_proc->euid = proc->euid;
     new_proc->exit_signal = clarg.exit_signal;
 
 #if defined(__x86_64__)
@@ -183,6 +186,9 @@ thread* process::clone3(thread* proc, clone_args clarg, void* frame) {
     assert(new_proc->ctx.cr3, "type shit");
     assert(new_proc->original_root, "type shit");
     assert(new_proc->sig != proc->sig, "oh man");
+
+    klibc::memcpy(new_proc->groups, proc->groups, PAGE_SIZE);
+    new_proc->groups_size = proc->groups_size;
 
     return new_proc;
 
@@ -292,6 +298,7 @@ void process::kill(thread* t, int status, bool exit_group) {
         if(t->chroot) pmm::freelist::free((std::uint64_t)t->chroot - etc::hhdm());
         if(t->cwd) pmm::freelist::free((std::uint64_t)t->cwd - etc::hhdm());
         if(t->exe) pmm::freelist::free((std::uint64_t)t->exe - etc::hhdm());
+        if(t->groups) pmm::freelist::free((std::uint64_t)t->groups - etc::hhdm());
         if(t->sig) delete t->sig;
         t->syscall_stack = 0;
         t->name = 0;
@@ -299,6 +306,7 @@ void process::kill(thread* t, int status, bool exit_group) {
         t->cwd = 0;
         t->sig = 0;
         t->exe = 0;
+        t->groups = 0;
 
         vmm* v = t->vmem;
 
@@ -416,7 +424,8 @@ void process::schedule(void* ctx) {
                             if(current_thread->sig) {
                                 current_thread->real.it_value = current_thread->real.it_interval;
                                 current_thread->real_next = process::itimer_calculate(&current_thread->real);
-                                current_thread->sig->push(SIGALRM);
+                                if(!__sigismember(&current_thread->sigset, SIGALRM))
+                                    current_thread->sig->push(SIGALRM);
                             }
                         }
                     }
@@ -426,7 +435,8 @@ void process::schedule(void* ctx) {
                             if(current_thread->sig) {
                                 current_thread->virt.it_value = current_thread->virt.it_interval;
                                 current_thread->virt_next = process::itimer_calculate(&current_thread->virt, false);
-                                current_thread->sig->push(SIGVTALRM);
+                                if(!__sigismember(&current_thread->sigset, SIGVTALRM))
+                                    current_thread->sig->push(SIGVTALRM);
                             }
                         }
                     }
@@ -436,7 +446,8 @@ void process::schedule(void* ctx) {
                             if(current_thread->sig) {
                                 current_thread->prof.it_value = current_thread->prof.it_interval;
                                 current_thread->prof_next = process::itimer_calculate(&current_thread->prof, false);
-                                current_thread->sig->push(SIGPROF);
+                                if(!__sigismember(&current_thread->sigset, SIGPROF))
+                                    current_thread->sig->push(SIGPROF);
                             }
                         }
                     }
@@ -450,7 +461,15 @@ void process::schedule(void* ctx) {
                         }
                     }
 
-                    if(current_thread->sig && current_thread->ctx.cs != 0x08 && current_thread->should_block_signals_next == false) {
+                    if(current_thread->sig) {
+                        if(current_thread->sig->check_for_sig(SIGKILL)) {
+                            kill(current_thread, 128 + SIGKILL, true);
+                            goto happy;
+                        }
+                    }
+
+                    // check can i do signals, and is stack even valid
+                    if(current_thread->sig && current_thread->ctx.cs != 0x08 && current_thread->should_block_signals_next == false && current_thread->ctx.rip < etc::hhdm() - PAGE_SIZE) {
                         std::int8_t sig = current_thread->sig->pop(&current_thread->sigset);
                         if(sig != -1) {
                             if(sig != SIGKILL) {
@@ -506,11 +525,17 @@ void process::schedule(void* ctx) {
                                         new_stack = (std::uint64_t*)(current_thread->ctx.rsp - 8);
                                     }
 
+                                    if((std::uint64_t)new_stack == 0) {
+                                        new_stack = (std::uint64_t*)(current_thread->ctx.rsp - 8);
+                                    }
+
                                     if(current_thread->vmem->getlen((std::uint64_t)new_stack) == nullptr) {
                                         // i cant do anything :(
                                         kill(current_thread, 128 + 11, true);
                                         goto happy;
                                     }
+
+                                    //log("f", "sig %d rsp 0x%p, new_stack 0x%p", sig, current_thread->ctx.rsp, new_stack);
 
                                     new_stack = (std::uint64_t*)ALIGNDOWN(((std::uint64_t)new_stack - PAGE_SIZE),16);
 
@@ -521,6 +546,9 @@ void process::schedule(void* ctx) {
                                     new_sigtrace.next = current_thread->sigtrace_obj;
                                     new_sigtrace.sigset = current_thread->sigset;
                                     new_sigtrace.ctx = current_thread->ctx;
+
+                                    current_thread->sigset.__val |= current_thread->signals_handlers[sig].sigset.__val;
+                                    __sigaddset(&current_thread->sigset, sig);
 
                                     new_stack = (std::uint64_t*)stackmgr::memcpy((std::uint64_t)new_stack,&new_sigtrace,sizeof(new_sigtrace));
                                     signal_trace* new_sigtrace_stack = (signal_trace*)new_stack;

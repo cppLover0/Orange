@@ -5,7 +5,7 @@
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 6G -d int -serial file:t -device qemu-xhci -device usb-kbd -device usb-mouse -s -smp 8 -d int 
+QEMUFLAGS := -m 6G -d int -serial file:tt1 -device qemu-xhci -device usb-kbd -device usb-mouse -s -smp 4 -d int 
 
 override IMAGE_NAME := orange-$(ARCH)
 

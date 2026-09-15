@@ -1,0 +1,8 @@
+{
+    "name": "gnome-tweaks",
+    "version": "42.0",
+    "deps": ["base-libs", "gnome-shell", "pygobject"],
+    "url": "https://github.com/GNOME/gnome-tweaks/archive/refs/tags/42.0.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

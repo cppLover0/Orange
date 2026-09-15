@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dnautilus_extension=false -Ddocs=false
+    meson_configure -Dnautilus_extension=false -Ddocs=false -Ddbg=true
 }
 
 build() {

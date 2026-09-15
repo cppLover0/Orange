@@ -8,9 +8,11 @@
 #include <generic/unix_sockets.hpp>
 #include <generic/userspace/syscall_list.hpp>
 #include <generic/userspace/sockets.hpp>
+#include <utils/random.hpp>
 #include <generic/userspace/safety.hpp>
 #include <generic/time.hpp>
 #include <utils/signal_ret.hpp>
+#include <utils/timerfd_struct.hpp>
 #include <utils/signal.hpp>
 #include <generic/flock.hpp>
 
@@ -373,6 +375,9 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
         klibc::debug_printf("trying to read fd %d buffer 0x%p count %lli\n", fd, buffer, count);
     }
 
+    if(!fix_userspace_memory(current, (std::uint64_t)buffer, count))
+        return -EFAULT;
+
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
     file_descriptor* file = manager->search(fd);
     if(file == nullptr)
@@ -414,7 +419,7 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
                     klibc::debug_printf("sock c %d %d", file->socket.write_socket->socket_counter.load(), file->socket.read_socket->size.load());
                 }
 
-                if(file->socket.write_socket->socket_counter == 0 && file->socket.read_socket->size.load() == 0)
+                if(file->socket.write_socket->socket_counterv2 == 0 && file->socket.read_socket->size.load() == 0)
                     return 0; 
 
                 return file->socket.read_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
@@ -424,7 +429,7 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
                     klibc::debug_printf("sock c %d %d", file->socket.read_socket->socket_counter.load(), file->socket.write_socket->size.load());
                 }
 
-                if(file->socket.read_socket->socket_counter == 0 && file->socket.write_socket->size.load() == 0)
+                if(file->socket.read_socket->socket_counterv2 == 0 && file->socket.write_socket->size.load() == 0)
                     return 0; 
 
                 return file->socket.write_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
@@ -432,13 +437,13 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
         }
     } else if(file->type == file_descriptor_type::socketpair) {
         if(file->socketpair.is_slave) {
-            if(file->socketpair.write_socket->socket_counter == 0 && file->socketpair.read_socket->size.load() == 0)
+            if(file->socketpair.write_socket->socket_counterv2 == 0 && file->socketpair.read_socket->size.load() == 0)
                 return 0; 
 
             return file->socketpair.read_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
         } else {
 
-            if(file->socketpair.read_socket->socket_counter == 0 && file->socketpair.write_socket->size.load() == 0)
+            if(file->socketpair.read_socket->socket_counterv2 == 0 && file->socketpair.write_socket->size.load() == 0)
                 return 0; 
 
             return file->socketpair.write_socket->read(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
@@ -482,6 +487,36 @@ long long sys_read(int fd, char* buffer, std::uint64_t count) {
         }
 
         return 8;
+    } else if(file->type == file_descriptor_type::timerfd) {
+
+        log("timerfd", "read timerfd");
+
+        std::uint64_t current = file->timerfd->counter.load();
+        std::uint64_t next = 0;
+
+        while (true) {
+            if (current == 0) {
+                if (file->timerfd->flags & O_NONBLOCK) {
+                    return -EAGAIN; 
+                }
+                
+                current = file->timerfd->counter.load();
+                continue;
+            }
+
+            next = 0;
+
+            if (file->timerfd->counter.compare_exchange_weak(current, next)) {
+                break;
+            }
+            process::yield();
+        }
+
+        *(std::uint64_t*)buffer = current; 
+
+        log("timerfd", "timerfd done");
+
+        return 8;
     }
 
     assert(0, "unimplemented read fd %d, type %d", fd, file->type);
@@ -502,6 +537,9 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
     if(!is_safe_to_rw(current, (std::uint64_t)buffer, count)) {
         return -EFAULT;
     }
+
+    if(!fix_userspace_memory(current, (std::uint64_t)buffer, count))
+        return -EFAULT;
 
     vfs::fdmanager* manager = (vfs::fdmanager*)current->fd;
     file_descriptor* file = manager->search(fd);
@@ -524,13 +562,13 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
 
             if(file->socket.socket_side == 1) {
 
-                if(file->socket.write_socket->socket_counter == 0)
+                if(file->socket.write_socket->socket_counterv2 == 0)
                     return -EPIPE; 
 
                 return file->socket.write_socket->write(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
             } else {
 
-                if(file->socket.read_socket->socket_counter == 0)
+                if(file->socket.read_socket->socket_counterv2 == 0)
                     return -EPIPE; 
 
                 return file->socket.read_socket->write(buffer, count, (file->flags & O_NONBLOCK) ? 1 : 0);
@@ -550,13 +588,13 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
 
         if(file->socketpair.is_slave) {
 
-            if(file->socketpair.write_socket->socket_counter == 0)
+            if(file->socketpair.write_socket->socket_counterv2 <= 0)
                 return -EPIPE; 
 
             return file->socketpair.write_socket->write(buffer, count);
         } else {
 
-            if(file->socketpair.read_socket->socket_counter == 0)
+            if(file->socketpair.read_socket->socket_counterv2 == 0)
                 return -EPIPE; 
 
             return file->socketpair.read_socket->write(buffer, count);
@@ -568,6 +606,8 @@ long long sys_write(int fd, char* buffer, std::uint64_t count) {
 
         file->eventfd.counter->fetch_add(*(std::uint64_t*)buffer);
         return 8;
+    } else if(file->type == file_descriptor_type::timerfd) { 
+        return -EINVAL;
     }
 
     assert(0, "unimplemented write fd %d, type %d", fd, file->type);
@@ -587,6 +627,9 @@ long long sys_pwrite64(int fd, char* buffer, std::uint64_t count, std::uint64_t 
     if(!is_safe_to_rw(current, (std::uint64_t)buffer, count)) {
         return -EFAULT;
     }
+
+    if(!fix_userspace_memory(current, (std::uint64_t)buffer, count))
+        return -EFAULT;
 
     if(current->is_debug) {
         klibc::debug_printf("trying to pwrite64 fd %d buffer 0x%p count %lli pos %lli\n", fd, buffer, count, pos);
@@ -622,6 +665,9 @@ long long sys_pread64(int fd, char* buffer, std::uint64_t count, std::uint64_t p
     if(!is_safe_to_rw(current, (std::uint64_t)buffer, count)) {
         return -EFAULT;
     }
+
+    if(!fix_userspace_memory(current, (std::uint64_t)buffer, count))
+        return -EFAULT;
 
     if(current->is_debug) {
         klibc::debug_printf("trying to pread64 fd %d buffer 0x%p count %lli pos %lli\n", fd, buffer, count, pos);
@@ -719,6 +765,12 @@ long long sys_readlinkat(int dfd, const char* path, char* buf, int bufsize) {
         return -EFAULT;
     }
 
+    if(!fix_userspace_memory(current, (std::uint64_t)buf, bufsize))
+        return -EFAULT;
+
+    if(!fix_userspace_memory(current, (std::uint64_t)path, PAGE_SIZE))
+        return -EFAULT;
+
     if(path == nullptr || buf == nullptr)
         return -EINVAL;
 
@@ -795,6 +847,10 @@ long long sys_dup(int fd) {
 
 long long sys_dup2(int old, int new_fd) {
     thread* current = current_proc;
+
+    if(old == new_fd)
+        return 0;
+
     auto manager = (vfs::fdmanager*)current->fd;
     file_descriptor* src = manager->search(old);
     if(src == nullptr)
@@ -1097,6 +1153,9 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                 } else if(fd->type == file_descriptor_type::eventfd) {
                     if(fd->eventfd.counter->load() > 0)
                         ret = true;
+                } else if(fd->type == file_descriptor_type::timerfd) {
+                    if(fd->timerfd->counter.load() > 0)
+                        ret = true;
                 }
 
                 if(ret == true) {
@@ -1120,24 +1179,26 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
                     if(fd->socket.socket_type ==  PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
                         if(fd->socket.socket_side == 1) {
                             klibc::debug_printf("meoww1 %lli %lli\n", fd->socket.write_socket->size.load(), fd->socket.write_socket->total_size);
-                            if((std::uint64_t)fd->socket.write_socket->size.load() != fd->socket.write_socket->total_size)
+                            if((std::uint64_t)fd->socket.write_socket->size.load() != fd->socket.write_socket->total_size || fd->socket.read_socket->is_closed.test(std::memory_order_acquire))
                                 ret = true;
                         } else {
                             klibc::debug_printf("meoww2 %lli %lli\n", fd->socket.read_socket->size.load(),  fd->socket.read_socket->total_size);
-                            if((std::uint64_t)fd->socket.read_socket->size.load() != fd->socket.read_socket->total_size)
+                            if((std::uint64_t)fd->socket.read_socket->size.load() != fd->socket.read_socket->total_size || fd->socket.write_socket->is_closed.test(std::memory_order_acquire))
                                 ret = true;
                         }
                     }
                 } else if(fd->type == file_descriptor_type::socketpair) {
                     if(fd->socketpair.is_slave) {
-                        if((std::uint64_t)fd->socketpair.write_socket->size.load() != fd->socketpair.write_socket->total_size)
+                        if((std::uint64_t)fd->socketpair.write_socket->size.load() != fd->socketpair.write_socket->total_size || fd->socketpair.read_socket->is_closed.test(std::memory_order_acquire))
                             ret = true;
                     } else {
-                        if((std::uint64_t)fd->socketpair.read_socket->size.load() != fd->socketpair.read_socket->total_size)
+                        if((std::uint64_t)fd->socketpair.read_socket->size.load() != fd->socketpair.read_socket->total_size || fd->socketpair.write_socket->is_closed.test(std::memory_order_acquire))
                             ret = true;
                     }
                 } else if(fd->type == file_descriptor_type::eventfd) {
                     ret = true;
+                } else if(fd->type == file_descriptor_type::timerfd) {
+                    ret = false;
                 }
 
                 if(ret == true) {
@@ -1149,12 +1210,12 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
             bool pollhup_ret = false;
 
             if(fd->type == file_descriptor_type::socket && !fd->socket.is_listen) {
-                if(fd->socket.socket_side == PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
+                if(fd->socket.socket_type == PF_UNIX && fd->socket.write_socket != nullptr && fd->socket.read_socket != nullptr) {
                     if(fd->socket.socket_side == 1) {
-                        if(fd->socket.write_socket->connected_to_pipe_write == 0 && fd->socket.write_socket->size != 0)
+                        if(fd->socket.write_socket->socket_counterv2 <= 0)
                             pollhup_ret = true;
                     } else {
-                        if(fd->socket.read_socket->connected_to_pipe_write == 0 && fd->socket.read_socket->size != 0)
+                        if(fd->socket.read_socket->socket_counterv2 <= 0)
                             pollhup_ret = true;
                     }
                 }
@@ -1162,12 +1223,16 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
 
             if(fd->type == file_descriptor_type::socketpair) {
                 if(fd->socketpair.is_slave) {
-                    if(fd->socketpair.write_socket->connected_to_pipe_write == 0 && fd->socketpair.write_socket->size != 0)
+                    if(fd->socketpair.write_socket->socket_counterv2 <= 0)
                         pollhup_ret = true;
                 } else {
-                    if(fd->socketpair.read_socket->connected_to_pipe_write == 0 && fd->socketpair.read_socket->size != 0)
+                    if(fd->socketpair.read_socket->socket_counterv2 <= 0)
                         pollhup_ret = true;
                 }
+            }
+
+            if(pollhup_ret && (fd->type == file_descriptor_type::socketpair || fd->type == file_descriptor_type::socket)) {
+                klibc::printf("POLLHUP!");
             }
 
             if(fd->type == file_descriptor_type::pipe) {
@@ -1657,6 +1722,9 @@ long long sys_getdents64(int fd, char* buf, std::uint64_t count) {
     if(!is_safe_to_rw(current, (std::uint64_t)buf, count + PAGE_SIZE)) 
         return -EFAULT;
 
+    if(!fix_userspace_memory(current, (std::uint64_t)buf, count))
+        return -EFAULT;
+
     auto manager = (vfs::fdmanager*)current->fd;
     file_descriptor* file = nullptr;
 
@@ -1690,6 +1758,12 @@ long long sys_statx(int dfd, const char* path, int flags, std::uint32_t mask, st
     if(!is_safe_to_rw(current, (std::uint64_t)out, 4096)) {
         return -EFAULT;
     }
+
+    if(!fix_userspace_memory(current, (std::uint64_t)out, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!fix_userspace_memory(current, (std::uint64_t)path, PAGE_SIZE))
+        return -EFAULT;
 
     klibc::memset(out, 0, sizeof(stat));
 
@@ -2041,7 +2115,57 @@ long long sys_ttyname(int fd, char *buf, std::size_t size) {
     return 0;
 }
 
-// hard links are unimplemented so just convert to symlinks 
+long long sys_symlinkat(const char* target, int newdirfd, const char *new_path) {
+
+    thread* current = current_proc;
+    if(!is_safe_to_rw(current, (std::uint64_t)target, 4096)) {
+        return -EFAULT;
+    }
+
+    if(target == nullptr)
+        return -EINVAL;
+
+    if(!is_safe_to_rw(current, (std::uint64_t)new_path, 4096)) {
+        return -EFAULT;
+    }
+
+    if(new_path == nullptr)
+        return -EINVAL;
+
+    char buffer12[4096] = {};
+    char new_path1[4096] = {};
+    klibc::memcpy(buffer12, new_path, safe_strlen((char*)new_path, 4096));
+
+    char* at = at_to_char(current, newdirfd);
+    if(at == nullptr)
+        return -EBADF;
+
+    process_path(current->chroot, at, buffer12, new_path1);
+
+    char tmp[4096] = {};
+
+    if(vfs::readlink(new_path1, tmp, 4096) != -ENOENT)
+        return -EEXIST;
+
+    if(int status = vfs::create(new_path1, vfs_file_type::symlink, 0777, current->uid, current->gid); status != 0)
+        return status;
+
+    char buffer00[4096] = {};
+    klibc::memcpy(buffer00, target, safe_strlen((char*)target, 4096));
+
+    file_descriptor file = {};
+    vfs::open(&file, new_path1, false, false);
+
+    file.vnode.write(&file, buffer00, PAGE_SIZE);
+    file.vnode.close(&file);
+
+    return 0;
+}
+
+long long sys_symlink(const char *target_path, const char *link_path) {
+    return sys_symlinkat(target_path, AT_FDCWD, link_path);
+}
+
 long long sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags) {
     (void)flags;
 
@@ -2300,4 +2424,121 @@ long long sys_eventfd_create(std::uint64_t initval, int flags) {
     klibc::debug_printf("creating eventfd %d\n", fd0->index);
 
     return fd0->index;
+}
+
+long long sys_timerfd_create(int clockid, int flags) {
+
+    if(clockid != CLOCK_MONOTONIC && clockid != CLOCK_REALTIME)
+        return -EINVAL;
+
+    thread* current = current_proc;
+    auto manager = (vfs::fdmanager*)current->fd;
+
+    auto timer = new timerfd;
+    timer->usage_counter = 1;
+    timer->clock_type = clockid; // actually ignored 
+    timer->flags = flags;
+
+    file_descriptor* fd0 = manager->createlowest(2);
+    fd0->type = file_descriptor_type::timerfd;
+    fd0->other.is_cloexec = (flags & __O_CLOEXEC) ? true : false;
+
+    fd0->timerfd = timer;
+
+    klibc::printf("creating timerfd %d\n", fd0->index);
+
+    return fd0->index;
+}
+
+void timerfd_work(void* ctx) {
+    auto timer = (timerfd*)ctx;
+    timer->counter++;
+}
+
+#define TFD_TIMER_ABSTIME 1
+
+long long sys_timerfd_settime(int fd, int flags, timerfd_spec* value, timerfd_spec* oldvalue) {
+    thread* proc = current_proc;
+    auto manager = (vfs::fdmanager*)proc->fd;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)value, PAGE_SIZE))
+        return -EFAULT;
+
+    if(!is_safe_to_rw(proc, (std::uint64_t)oldvalue, PAGE_SIZE))
+        return -EFAULT;
+
+    auto file = manager->search(fd);
+
+    if(file == nullptr)
+        return -EBADF;
+    
+    if(file->type != file_descriptor_type::timerfd)
+        return -EINVAL;
+
+    if(oldvalue != nullptr) {
+        file->timerfd->lock.lock();
+
+        if(file->timerfd->target_timer == nullptr) {
+            goto invalid_timerfd;
+        }
+
+        if(file->timerfd->target_timer->is_used == false) {
+            goto invalid_timerfd;
+        }
+
+        if(file->timerfd->target_timer->ownership != file->timerfd->timer_ownership) {
+invalid_timerfd:
+            klibc::memset(oldvalue, 0, sizeof(*oldvalue));
+            file->timerfd->lock.unlock();
+            return 0;
+        }
+
+        oldvalue->it_interval.tv_sec = file->timerfd->target_timer->interval / 1000000000;
+        oldvalue->it_interval.tv_nsec = file->timerfd->target_timer->interval % 1000000000;
+
+        std::uint64_t counter = file->timerfd->target_timer->counter;
+
+        oldvalue->it_value.tv_sec = counter / 1000000000;
+        oldvalue->it_value.tv_nsec = counter % 1000000000;
+
+        file->timerfd->lock.unlock();
+    }
+
+    if(value != nullptr) {
+        file->timerfd->lock.lock();
+
+        if(file->timerfd->target_timer != nullptr && file->timerfd->target_timer->is_used == true && file->timerfd->target_timer->ownership == file->timerfd->timer_ownership) {
+            timer_thread::remove(file->timerfd->target_timer);
+        } 
+
+        file->timerfd->target_timer = nullptr;
+
+        std::uint64_t target_nano = (static_cast<std::uint64_t>(value->it_value.tv_sec) * 1'000'000'000ULL) 
+                            + value->it_value.tv_nsec;
+        std::uint64_t relative_nano = 0;
+
+        if (flags & TFD_TIMER_ABSTIME) { // todo: make normal absolute counters
+            std::uint64_t current = time::current_unix_time.load(); 
+            
+            if (target_nano <= current) {
+                relative_nano = 1; 
+            } else {
+                relative_nano = target_nano - (current * 1000 * 1000 * 1000);
+            }
+        } else {
+            relative_nano = target_nano;
+        }
+
+        std::uint64_t ownership = random::random();
+        file->timerfd->timer_ownership = ownership;
+        file->timerfd->target_timer = timer_thread::create(timerfd_work, file->timerfd, relative_nano, (value->it_interval.tv_sec * 1000 * 1000 * 1000) + value->it_interval.tv_nsec, ownership);
+
+        file->timerfd->lock.unlock();
+    }
+
+    return 0;
+}
+
+long long sys_timerfd_gettime(int fd, struct timerfd_spec* time) {
+    return sys_timerfd_settime(fd, 0, nullptr, time);
 }

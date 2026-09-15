@@ -194,4 +194,14 @@ namespace arch {
         info &= ~(PTE_DIRTY);
         x86_64_map_page(root, info & LVL_PG_MASK, virt, info & ~(LVL_PG_MASK));
     }
+
+    void setup_dirty_bit(std::uintptr_t root, std::uintptr_t virt) {
+        std::int64_t info = __memory_paging_getphysn((std::uint64_t*)(root + etc::hhdm()),virt,0);
+        if(info == -1 || (info & LVL_PG_MASK) == 0)
+            return;
+
+        info |= (PTE_DIRTY);
+        x86_64_map_page(root, info & LVL_PG_MASK, virt, info & ~(LVL_PG_MASK));
+    }
+
 };

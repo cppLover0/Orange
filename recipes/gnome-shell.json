@@ -1,8 +1,8 @@
 {
     "name": "gnome-shell",
-    "version": "43.0",
-    "deps": ["base-libs", "mutter", "gnome-evolution", "gcr-4"],
-    "url": "https://gitlab.gnome.org/GNOME/gnome-shell/-/archive/43.0/gnome-shell-43.0.tar.gz",
+    "version": "42.9",
+    "deps": ["base-libs", "mutter", "gnome-evolution", "gcr-4", "ibus", "gcr-3", "accountsservice", "librsvg", "gdk-pixbuf-rsvg"],
+    "url": "https://gitlab.gnome.org/GNOME/gnome-shell/-/archive/42.9/gnome-shell-42.9.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true
 }

@@ -39,3 +39,60 @@ diff -Naur gjs/meson.build gjs-clean/meson.build
  
  ### Check for external programs ################################################
  
+
+diff --git a/gjs/engine.cpp b/gjs/engine.cpp
+--- a/gjs/engine.cpp
++++ b/gjs/engine.cpp
+@@ -197,10 +197,29 @@
+ JSContext* gjs_create_js_context(GjsContextPrivate* uninitialized_gjs) {
+     g_assert(gjs_is_inited);
+     JSContext* cx = JS_NewContext(/* max bytes = */ 32 * 1024 * 1024);
+-    if (!cx)
++    if (!cx) {
++        g_printerr("gjs: JS_NewContext() failed\n");
+         return nullptr;
++    }
++
++    bool enable_jit = !(g_getenv("GJS_DISABLE_JIT"));
++    if (enable_jit) {
++        gjs_debug(GJS_DEBUG_CONTEXT, "Enabling JIT");
++    }
++    JS::ContextOptionsRef(cx).setAsmJS(enable_jit);
++
++    uint32_t value = enable_jit ? 1 : 0;
++
++    JS_SetGlobalJitCompilerOption(
++        cx, JSJitCompilerOption::JSJITCOMPILER_ION_ENABLE, value);
++    JS_SetGlobalJitCompilerOption(
++        cx, JSJitCompilerOption::JSJITCOMPILER_BASELINE_ENABLE, value);
++    JS_SetGlobalJitCompilerOption(
++        cx, JSJitCompilerOption::JSJITCOMPILER_BASELINE_INTERPRETER_ENABLE,
++        value);
+ 
+     if (!JS::InitSelfHostedCode(cx)) {
++        g_printerr("gjs: JS::InitSelfHostedCode() failed\n");
+         JS_DestroyContext(cx);
+         return nullptr;
+     }
+@@ -239,21 +258,5 @@
+             "extra warnings.");
+     }
+ 
+-    bool enable_jit = !(g_getenv("GJS_DISABLE_JIT"));
+-    if (enable_jit) {
+-        gjs_debug(GJS_DEBUG_CONTEXT, "Enabling JIT");
+-    }
+-    JS::ContextOptionsRef(cx).setAsmJS(enable_jit);
+-
+-    uint32_t value = enable_jit ? 1 : 0;
+-
+-    JS_SetGlobalJitCompilerOption(
+-        cx, JSJitCompilerOption::JSJITCOMPILER_ION_ENABLE, value);
+-    JS_SetGlobalJitCompilerOption(
+-        cx, JSJitCompilerOption::JSJITCOMPILER_BASELINE_ENABLE, value);
+-    JS_SetGlobalJitCompilerOption(
+-        cx, JSJitCompilerOption::JSJITCOMPILER_BASELINE_INTERPRETER_ENABLE,
+-        value);
+-
+     return cx;
+ }

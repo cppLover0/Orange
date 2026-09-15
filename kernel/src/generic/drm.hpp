@@ -19,6 +19,19 @@ struct drm_clip_rect {
 
 namespace drm {
 
+    // struct drm_damage_clip {
+    //     drm_clip_rect*
+    // };
+
+    // class drm_damage {
+    // private:
+        
+    // public:
+
+    
+
+    // };
+
     namespace drm_structs {
 
         #define DRM_MODE_TYPE_PREFERRED	(1<<3)
@@ -370,6 +383,7 @@ namespace drm {
             std::uint64_t phys;
             std::uint64_t len;
             std::uint64_t magic;
+            std::uint64_t temp_value;
             bool is_fb;
         };
 
@@ -526,6 +540,7 @@ namespace drm {
 
         struct {
             framebuffer (*access_fb)(void* ctx);
+            std::uint64_t* ctx;
         } fb;
 
         char path[256];

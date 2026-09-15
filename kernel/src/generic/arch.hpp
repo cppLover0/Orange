@@ -36,6 +36,7 @@ namespace arch {
     void copy_higher_half(std::uintptr_t root, std::uintptr_t src_root);
     bool is_dirty_address(std::uintptr_t root, std::uintptr_t virt);
     void clear_dirty_bit(std::uintptr_t root, std::uintptr_t virt);
+    void setup_dirty_bit(std::uintptr_t root, std::uintptr_t virt);
 
     int level_paging();
 

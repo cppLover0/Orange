@@ -7,7 +7,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dintrospection=false -Dtests=false
+    meson_configure -Dintrospection=true -Dtests=false -Dgtk_doc=false
 }
 
 build() {

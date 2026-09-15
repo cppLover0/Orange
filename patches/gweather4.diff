@@ -1,7 +1,7 @@
 diff -Naur gweather4/meson.build gweather4-clean/meson.build
 --- gweather4/meson.build	2023-08-07 17:23:58.000000000 +0300
-+++ gweather4-clean/meson.build	2026-08-22 22:29:04.032600862 +0300
-@@ -47,7 +47,6 @@
++++ gweather4-clean/meson.build	2026-09-05 18:56:37.608535485 +0300
+@@ -47,11 +47,10 @@
    '-d', 'C0326',
  ]
  
@@ -9,3 +9,8 @@ diff -Naur gweather4/meson.build gweather4-clean/meson.build
  gen_locations_variant = find_program('build-aux/meson/gen_locations_variant.py')
  
  g_ir_scanner = find_program('g-ir-scanner', required: get_option('introspection'))
+-build_gir = get_option('introspection') and g_ir_scanner.found() and not meson.is_cross_build()
++build_gir = get_option('introspection') 
+ build_docs = get_option('gtk_doc') and build_gir
+ 
+ schemas_srcdir = meson.project_source_root() / 'schemas'

@@ -5,6 +5,7 @@ prepare() {
 }
 
 configure() {
+    export PATH="$PATH:${SYSROOT}/usr/bin"
     "${source_dir}"/configure --host=x86_64-orange-mlibc --prefix=/usr 
 }
 

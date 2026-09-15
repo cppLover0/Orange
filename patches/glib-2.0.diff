@@ -11,3 +11,61 @@ index 0310a75..dba61e6 100644
  #define G_CREDENTIALS_SUPPORTED 1
  #define G_CREDENTIALS_USE_LINUX_UCRED 1
  #define G_CREDENTIALS_NATIVE_TYPE G_CREDENTIALS_TYPE_LINUX_UCRED
+diff --git glib2-clean/glib/gthread.c glib2-workdir/glib/gthread.c
+--- glib2-clean/glib/gthread.c
++++ glib2-workdir/glib/gthread.c
+@@ -771,7 +771,16 @@
+   gsize *value_location = (gsize *) location;
+   gsize old_value;
+ 
+-  g_return_if_fail (result != 0);
++  if (G_UNLIKELY (result == 0))
++    {
++      g_critical ("g_once_init_leave: result == 0 for location %p, removing the failed initialisation so it can be retried", value_location);
++      g_mutex_lock (&g_once_mutex);
++      if (g_once_init_list != NULL)
++        g_once_init_list = g_slist_remove (g_once_init_list, (void *) value_location);
++      g_cond_broadcast (&g_once_cond);
++      g_mutex_unlock (&g_once_mutex);
++      return;
++    }
+ 
+   old_value = (gsize) g_atomic_pointer_exchange (value_location, result);
+   g_return_if_fail (old_value == 0);
+@@ -807,7 +816,16 @@
+   gpointer *value_location = (gpointer *) location;
+   gpointer old_value;
+ 
+-  g_return_if_fail (result != 0);
++  if (G_UNLIKELY (result == NULL))
++    {
++      g_critical ("g_once_init_leave_pointer: result == NULL for location %p, removing the failed initialisation so it can be retried", value_location);
++      g_mutex_lock (&g_once_mutex);
++      if (g_once_init_list != NULL)
++        g_once_init_list = g_slist_remove (g_once_init_list, (void *) value_location);
++      g_cond_broadcast (&g_once_cond);
++      g_mutex_unlock (&g_once_mutex);
++      return;
++    }
+ 
+   old_value = g_atomic_pointer_exchange (value_location, result);
+   g_return_if_fail (old_value == 0);
+diff --git glib2-clean/glib/gdatetime.c glib2-workdir/glib/gdatetime.c
+--- glib2-clean/glib/gdatetime.c
++++ glib2-workdir/glib/gdatetime.c
+@@ -3811,6 +3811,15 @@
+   g_return_val_if_fail (format != NULL, NULL);
+   g_return_val_if_fail (g_utf8_validate (format, -1, NULL), NULL);
+ 
++  if (g_getenv ("GDT_DEBUG") != NULL)
++    {
++      static int fmt_count = 0;
++      fmt_count++;
++      if (fmt_count < 20 || (fmt_count % 10000) == 0)
++        g_printerr ("[gdt] g_date_time_format #%d format='%s' mono=%lld\n",
++                    fmt_count, format, (long long) g_get_monotonic_time ());
++    }
++
+   outstr = g_string_sized_new (strlen (format) * 2);
+ 
+   if (!g_date_time_format_utf8 (datetime, format, outstr,

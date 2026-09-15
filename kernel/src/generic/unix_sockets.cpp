@@ -94,10 +94,6 @@ long long unix_sockets::connect(thread* proc, file_descriptor* file, sockaddr_un
     }
 
     klibc::debug_printf("connected meow\n");
-
-    conn->is_used = false;
-
-    // meow meow
     
     return 0;
 }
@@ -122,6 +118,7 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
                 // fym it died
                 if(current->proc->status != PROCESS_LIVE) {
                     current->is_used = false;
+                    current->proc->op_lock.unlock();
                     continue;
                 }
 
@@ -136,6 +133,9 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
 
                 vfs::pipe* r = new vfs::pipe(0);
                 vfs::pipe* w = new vfs::pipe(0);
+
+                r->socket_counterv2 = 1; // slave
+                w->socket_counterv2 = 1; // master
 
                 dest->socket.write_socket = w;
                 dest->socket.read_socket = r;
@@ -172,6 +172,8 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
                 current->is_accepted.try_lock();
                 current->is_used = false;
 
+                klibc::debug_printf("accept %d-%d, fd %d", fd->index, dest->index, file->index);
+
                 un_lock.unlock();
                 goto end;
 
@@ -182,6 +184,7 @@ long long unix_sockets::accept(thread* proc, file_descriptor* file, sockaddr_un*
     }
 
 end:
+
     return fd->index;
 }
 

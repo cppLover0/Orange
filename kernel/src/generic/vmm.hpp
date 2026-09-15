@@ -281,6 +281,7 @@ public:
         bool state = false;
         if(should_lock)
             state = this->lock.lock();
+
         vmm_obj* start = this->start;
         vmm_obj* current = start->next;
         vmm_obj* prev = start;
@@ -326,9 +327,7 @@ public:
             } else if(before->shm && !before->mmap_info.copied_file_desc) {
                 free_shm(before);
                 dumb_unmap(before->base);
-            } else {
-                before->len -= ((before->base + before->len) - base);
-            }
+            } 
 
             if(before->mmap_info.copied_file_desc) {
                 mmap_syncer::sync(this, before);
@@ -483,6 +482,7 @@ end:
             void* new_file = (void*)(pmm::freelist::alloc_4k() + etc::hhdm());
             klibc::memcpy(new_file, file_desc, PAGE_SIZE);
             current->mmap_info.copied_file_desc = new_file;
+            (((void (*)(void*))dup))(new_file);
         } else {
             current->mmap_info.copied_file_desc = nullptr;
         }

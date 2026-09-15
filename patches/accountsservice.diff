@@ -1,0 +1,91 @@
+--- a/meson.build
++++ b/meson.build
+@@ -71,6 +71,7 @@
+   'getusershell',
+   'setutxdb',
+   'fgetpwent',
++  'fgetspent_r',
+ ]
+ 
+ foreach func: check_functions
+@@ -79,11 +80,12 @@
+ 
+ if cc.has_header_symbol('utmpx.h', 'WTMPX_FILENAME', prefix: '#define _GNU_SOURCE')
+   config_h.set('PATH_WTMP', 'WTMPX_FILENAME')
+-elif cc.has_header_symbol('paths.h', '_PATH_WTMPX')
++elif cc.has_header_symbol('utmpx.h', 'WTMPX_FILE', prefix: '#define _GNU_SOURCE')
++  config_h.set('PATH_WTMP', 'WTMPX_FILE')
++elif cc.has_header_symbol('paths.h', '_PATH_WTMPX', prefix: '#define _GNU_SOURCE')
+   config_h.set('PATH_WTMP', '_PATH_WTMPX')
+ else
+-  assert(run_command('test', '-e', '/var/log/utx.log').returncode() == 0, 'Do not know which filename to watch for wtmp changes')
+-  config_h.set_quoted('PATH_WTMP', '/var/log/utx.log')
++  config_h.set_quoted('PATH_WTMP', '/var/log/wtmp')
+ endif
+ 
+ # compiler flags
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -28,11 +28,10 @@
+ 
+ policy = act_namespace.to_lower() + '.policy'
+ 
+-i18n.merge_file(
+-  policy,
++configure_file(
+   input: policy + '.in',
+   output: policy,
+-  po_dir: po_dir,
++  copy: true,
+   install: true,
+   install_dir: policy_dir,
+ )
+--- a/src/daemon.c
++++ b/src/daemon.c
+@@ -164,6 +164,37 @@
+         g_remove (icon_filename);
+ }
+ 
++static int
++fgetspent_r_compat (FILE         *fp,
++                    struct spwd  *spbuf,
++                    char         *buf,
++                    size_t        len,
++                    struct spwd **entry)
++{
++#ifndef HAVE_FGETSPENT_R /* musl, mlibc, etc */
++        int r, pwd_off;
++        struct spwd *spwd = fgetspent (fp);
++        if (spwd == NULL)
++                return -1;
++
++        r = snprintf (buf, len, "%s%c%n%s", spwd->sp_namp, 0, &pwd_off, spwd->sp_pwdp);
++        if (r < 0)
++                return -1;
++        if (r >= len) {
++                errno = ERANGE;
++                return -1;
++        }
++
++        memcpy (spbuf, spwd, sizeof *spwd);
++        spbuf->sp_namp = buf;
++        spbuf->sp_pwdp = buf + pwd_off;
++        *entry = spbuf;
++        return 0;
++#else /* Other Linux */
++        return fgetspent_r (fp, spbuf, buf, len, entry);
++#endif
++}
++
+ static struct passwd *
+ entry_generator_fgetpwent (Daemon       *daemon,
+                            GHashTable   *users,
+@@ -201,7 +232,7 @@
+ 
+                         shadow_entry_buffers = g_malloc0 (sizeof (*shadow_entry_buffers));
+ 
+-                        ret = fgetspent_r (fp, &shadow_entry_buffers->spbuf, shadow_entry_buffers->buf, sizeof (shadow_entry_buffers->buf), &shadow_entry);
++                        ret = fgetspent_r_compat (fp, &shadow_entry_buffers->spbuf, shadow_entry_buffers->buf, sizeof (shadow_entry_buffers->buf), &shadow_entry);
+                         if (ret == 0) {
+                                 g_hash_table_insert (shadow_users, g_strdup (shadow_entry->sp_namp), shadow_entry_buffers);
+                         } else {

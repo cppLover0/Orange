@@ -6,12 +6,14 @@
 #include <utils/assert.hpp>
 #include <generic/pmm.hpp>
 #include <generic/userspace/sockets.hpp>
+#include <generic/lock/secure_spinlock.hpp>
 #include <generic/hhdm.hpp>
 #include <generic/scheduling.hpp>
 #include <utils/ringbuffer.hpp>
 #include <generic/unix_sockets_extern.hpp>
 #include <generic/lock/spinlock.hpp>
 #include <generic/flock.hpp>
+#include <generic/timer_thread.hpp>
 
 struct statfs {
    long    f_type;  
@@ -26,7 +28,7 @@ struct statfs {
    long    f_spare[6];
 };
 
-#define USERSPACE_PIPE_SIZE (128 * 1024)
+#define USERSPACE_PIPE_SIZE (512 * 1024)
 #define S_IFMT  00170000
 #define S_IFSOCK 0140000
 #define S_IFLNK	 0120000
@@ -175,7 +177,8 @@ enum class file_descriptor_type : std::uint8_t {
     epoll = 4,
     memfd = 5,
     socketpair = 6,
-    eventfd = 7
+    eventfd = 7,
+    timerfd = 8
 };
 
 struct dirent {
@@ -271,7 +274,7 @@ inline static std::uint32_t vfs_to_dt_type(vfs_file_type type) {
 }
 
 struct filesystem { 
-    locks::mutex lock;
+    locks::secure_spinlock lock;
 
     union {
         std::uint64_t partition;
@@ -322,6 +325,8 @@ namespace vfs {
 
         std::uint32_t zero_message_count = 0;
         std::atomic<std::uint32_t> socket_counter = 1;
+
+        std::atomic<std::int32_t> socket_counterv2 = 1; // :P
 
         un_ucred sock_ucred;
         
@@ -446,6 +451,8 @@ namespace vfs {
 
                 if (this->size == 0) {
 
+                    assert(this->socket_counterv2 != 0, "shiiiit");
+
                     if (this->is_closed.test(std::memory_order_acquire)) {
                         this->lock.unlock(state);
                         return 0; 
@@ -515,6 +522,19 @@ struct epoll_member {
     bool is_used;
     int target_fd;
     epoll_event ev;
+};
+
+struct timerfd {
+    int flags; 
+    int clock_type;
+    std::atomic<std::uint64_t> counter;
+
+    locks::spinlock lock;
+
+    timer_thread::timer_thread_guest* target_timer;
+    std::uint64_t timer_ownership;
+
+    std::atomic<std::uint64_t> usage_counter;
 };
 
 struct file_descriptor {
@@ -588,6 +608,8 @@ struct file_descriptor {
         std::atomic<std::uint64_t>* counter;
         int flags;
     } eventfd;
+
+    timerfd* timerfd;
 
     struct {
         disk* target_disk;
@@ -761,10 +783,12 @@ namespace vfs {
                         }
 
                         if(new_fd->socket.socket_side == 1) {
+                            new_fd->socket.read_socket->socket_counterv2++;
                             new_fd->socket.read_socket->socket_counter++;
                             new_fd->socket.read_socket->create(PIPE_SIDE_READ);
                             new_fd->socket.write_socket->create(PIPE_SIDE_WRITE);
                         } else {
+                            new_fd->socket.write_socket->socket_counterv2++;
                             new_fd->socket.write_socket->socket_counter++;
                             new_fd->socket.write_socket->create(PIPE_SIDE_READ);
                             new_fd->socket.read_socket->create(PIPE_SIDE_WRITE);
@@ -772,10 +796,12 @@ namespace vfs {
                     }
                 } else if(new_fd->type == file_descriptor_type::socketpair) {
                     if(new_fd->socketpair.is_slave) {
+                        new_fd->socketpair.read_socket->socket_counterv2++;
                         new_fd->socketpair.read_socket->socket_counter++;
                         new_fd->socketpair.read_socket->create(PIPE_SIDE_READ);
                         new_fd->socketpair.write_socket->create(PIPE_SIDE_WRITE);
                     } else {
+                        new_fd->socketpair.write_socket->socket_counterv2++;
                         new_fd->socketpair.write_socket->socket_counter++;
                         new_fd->socketpair.write_socket->create(PIPE_SIDE_READ);
                         new_fd->socketpair.read_socket->create(PIPE_SIDE_WRITE);
@@ -784,6 +810,10 @@ namespace vfs {
                     new_fd->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
                 } else if(new_fd->type == file_descriptor_type::eventfd) {
                     *new_fd->eventfd.ref_count = *new_fd->eventfd.ref_count + 1;
+                } else if(new_fd->type == file_descriptor_type::timerfd) {
+                    new_fd->timerfd->lock.lock();
+                    new_fd->timerfd->usage_counter++;
+                    new_fd->timerfd->lock.unlock();
                 }
 
                 current = current->next;
@@ -812,10 +842,12 @@ namespace vfs {
                     }
 
                     if(new_fd->socket.socket_side == 1) {
+                        new_fd->socket.read_socket->socket_counterv2++;
                         new_fd->socket.read_socket->socket_counter++;
                         new_fd->socket.read_socket->create(PIPE_SIDE_READ);
                         new_fd->socket.write_socket->create(PIPE_SIDE_WRITE);
                     } else {
+                        new_fd->socket.write_socket->socket_counterv2++;
                         new_fd->socket.write_socket->socket_counter++;
                         new_fd->socket.write_socket->create(PIPE_SIDE_READ);
                         new_fd->socket.read_socket->create(PIPE_SIDE_WRITE);
@@ -823,10 +855,12 @@ namespace vfs {
                 }
             } else if(new_fd->type == file_descriptor_type::socketpair) {
                 if(new_fd->socketpair.is_slave) {
+                    new_fd->socketpair.read_socket->socket_counterv2++;
                     new_fd->socketpair.read_socket->socket_counter++;
                     new_fd->socketpair.read_socket->create(PIPE_SIDE_READ);
                     new_fd->socketpair.write_socket->create(PIPE_SIDE_WRITE);
                 } else {
+                    new_fd->socketpair.write_socket->socket_counterv2++;
                     new_fd->socketpair.write_socket->socket_counter++;
                     new_fd->socketpair.write_socket->create(PIPE_SIDE_READ);
                     new_fd->socketpair.read_socket->create(PIPE_SIDE_WRITE);
@@ -835,6 +869,10 @@ namespace vfs {
                 new_fd->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
             } else if(new_fd->type == file_descriptor_type::eventfd) {
                 *new_fd->eventfd.ref_count = *new_fd->eventfd.ref_count + 1;
+            } else if(new_fd->type == file_descriptor_type::timerfd) {
+                new_fd->timerfd->lock.lock();
+                new_fd->timerfd->usage_counter++;
+                new_fd->timerfd->lock.unlock();
             }
             new_fd->next = next;
             fd_lock.unlock(state);
@@ -917,10 +955,12 @@ namespace vfs {
                     }
 
                     if(lowest->socket.socket_side == 1) {
+                        lowest->socket.read_socket->socket_counterv2++;
                         lowest->socket.read_socket->socket_counter++;
                         lowest->socket.read_socket->create(PIPE_SIDE_READ);
                         lowest->socket.write_socket->create(PIPE_SIDE_WRITE);
                     } else {
+                        lowest->socket.write_socket->socket_counterv2++;
                         lowest->socket.write_socket->socket_counter++;
                         lowest->socket.write_socket->create(PIPE_SIDE_READ);
                         lowest->socket.read_socket->create(PIPE_SIDE_WRITE);
@@ -928,10 +968,12 @@ namespace vfs {
                 }
             } else if(lowest->type == file_descriptor_type::socketpair) {
                 if(lowest->socketpair.is_slave) {
+                    lowest->socketpair.read_socket->socket_counterv2++;
                     lowest->socketpair.read_socket->socket_counter++;
                     lowest->socketpair.read_socket->create(PIPE_SIDE_READ);
                     lowest->socketpair.write_socket->create(PIPE_SIDE_WRITE);
                 } else {
+                    lowest->socketpair.write_socket->socket_counterv2++;
                     lowest->socketpair.write_socket->socket_counter++;
                     lowest->socketpair.write_socket->create(PIPE_SIDE_READ);
                     lowest->socketpair.read_socket->create(PIPE_SIDE_WRITE);
@@ -940,6 +982,10 @@ namespace vfs {
                 lowest->epoll.epoll_usage_counter->fetch_add(1, std::memory_order_relaxed);
             } else if(lowest->type == file_descriptor_type::eventfd) {
                 *lowest->eventfd.ref_count = *lowest->eventfd.ref_count + 1;
+            } else if(lowest->type == file_descriptor_type::timerfd) {
+                lowest->timerfd->lock.lock();
+                lowest->timerfd->usage_counter++;
+                lowest->timerfd->lock.unlock();
             }
 
             this->fd_lock.unlock(state);
@@ -990,10 +1036,12 @@ namespace vfs {
                     }
 
                     if(file->socket.socket_side == 1) {
+                        file->socket.read_socket->socket_counterv2--;
                         //file->socket.read_socket->socket_counter--;
                         file->socket.read_socket->close(PIPE_SIDE_READ);
                         file->socket.write_socket->close(PIPE_SIDE_WRITE);
                     } else {
+                        file->socket.write_socket->socket_counterv2--;
                         //file->socket.write_socket->socket_counter--;
                         file->socket.write_socket->close(PIPE_SIDE_READ);
                         file->socket.read_socket->close(PIPE_SIDE_WRITE);
@@ -1001,10 +1049,12 @@ namespace vfs {
                 }
             } else if(file->type == file_descriptor_type::socketpair) {
                 if(file->socketpair.is_slave) {
+                    file->socketpair.read_socket->socket_counterv2--;
                     //file->socketpair.read_socket->socket_counter--;
                     file->socketpair.read_socket->close(PIPE_SIDE_READ);
                     file->socketpair.write_socket->close(PIPE_SIDE_WRITE);
                 } else {
+                    file->socketpair.write_socket->socket_counterv2--;
                     //file->socketpair.write_socket->socket_counter--;
                     file->socketpair.write_socket->close(PIPE_SIDE_READ);
                     file->socketpair.read_socket->close(PIPE_SIDE_WRITE);
@@ -1026,6 +1076,21 @@ namespace vfs {
                     delete file->eventfd.ref_count;
                     delete file->eventfd.counter;
                 }
+            } else if(file->type == file_descriptor_type::timerfd) {
+                file->timerfd->lock.lock();
+
+                assert(file->timerfd->usage_counter >= 0, "shiit");
+
+                file->timerfd->usage_counter--;
+
+                if(file->timerfd->usage_counter == 0) {
+                    if(file->timerfd->target_timer != nullptr)
+                        timer_thread::remove(file->timerfd->target_timer);
+                    delete file->timerfd;
+                } 
+
+                file->timerfd->lock.unlock();
+
             } else if(file->type != file_descriptor_type::unallocated) {
                 assert(0, "unimplemented close type %d", file->type);
             } 

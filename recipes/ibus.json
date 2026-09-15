@@ -1,0 +1,8 @@
+{
+    "name": "ibus",
+    "version": "recent",
+    "deps": ["base-libs", "xorg-libs"],
+    "url": "git:https://github.com/ibus/ibus.git",
+    "should_patch": true,
+    "use_orange_prefix": true
+}

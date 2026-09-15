@@ -10,3 +10,70 @@ diff -Naur gnome-terminal/meson.build gnome-terminal-clean/meson.build
  vte_default_options          = [
    'docs=false',
    'gir=false',
+diff -Naur gnome-terminal/src/terminal-app.cc gnome-terminal-clean/src/terminal-app.cc
+--- gnome-terminal/src/terminal-app.cc	2026-03-14 23:54:54.000000000 +0300
++++ gnome-terminal-clean/src/terminal-app.cc	2026-09-13 10:52:00.000000000 +0300
+@@ -1448,21 +1448,37 @@
+                               unsigned timestamp)
+ {
+ #ifdef TERMINAL_SERVER
++  /* Orange: don't use the private D-Bus bridge / prefs process. Just spawn
++   * gnome-terminal-preferences directly. Without --bus-fd it shows the
++   * dialogue immediately (see prefs-main.cc), so no D-Bus IPC is needed. */
+   gs_free char* uuid = nullptr;
+   if (profile)
+     uuid = terminal_settings_list_dup_uuid_from_child (app->profiles_list, profile);
+ 
+-  gs_unref_object auto process = reinterpret_cast<TerminalPrefsProcess*>(g_weak_ref_get(&app->prefs_process_ref));
+-  if (process) {
+-    terminal_prefs_process_show(process,
+-                                uuid,
+-                                hint,
+-                                timestamp);
+-  } else {
+-    terminal_prefs_process_new_async(nullptr, // cancellable,
+-                                     GAsyncReadyCallback(launch_prefs_cb),
+-                                     prefs_launch_data_new(app, uuid, hint, timestamp));
+-  }
++  gs_unref_object auto launcher = g_subprocess_launcher_new(GSubprocessFlags(0));
++  gs_free auto exe = terminal_client_get_file_uninstalled(TERM_LIBEXECDIR,
++                                                          TERM_LIBEXECDIR,
++                                                          TERMINAL_PREFERENCES_BINARY_NAME,
++                                                          G_FILE_TEST_IS_EXECUTABLE);
++
++  gs_free char* uuid_arg = uuid ? g_strdup_printf("--profile=%s", uuid) : nullptr;
++  gs_free char* hint_arg = hint ? g_strdup_printf("--hint=%s", hint) : nullptr;
++  gs_free char* timestamp_arg = g_strdup_printf("--timestamp=%u", timestamp);
++
++  char const* argv[6];
++  guint argc = 0;
++  argv[argc++] = exe;
++  if (uuid_arg)
++    argv[argc++] = uuid_arg;
++  if (hint_arg)
++    argv[argc++] = hint_arg;
++  argv[argc++] = timestamp_arg;
++  argv[argc] = nullptr;
++
++  gs_free_error GError* error = nullptr;
++  if (!g_subprocess_launcher_spawnv(launcher, argv, &error))
++    _terminal_debug_print (TERMINAL_DEBUG_PROCESSES,
++                           "Failed to launch preferences: %s\n", error->message);
+ #endif /* TERMINAL_SERVER */
+ #ifdef TERMINAL_PREFERENCES
+   terminal_prefs_show_preferences(profile, hint, timestamp);
+diff -Naur gnome-terminal/src/server.cc gnome-terminal-clean/src/server.cc
+--- gnome-terminal/src/server.cc	2026-03-14 23:54:54.000000000 +0300
++++ gnome-terminal-clean/src/server.cc	2026-09-13 10:55:00.000000000 +0300
+@@ -45,7 +45,10 @@
+ 
+ static char *app_id = nullptr;
+ 
+-#define INACTIVITY_TIMEOUT (100 /* ms */)
++/* Orange: 100ms was too short. The server stayed reachable while shutting
++ * down, so a terminal opened right after closing the last one was served by
++ * the dying server and closed immediately. Keep it alive for a bit longer. */
++#define INACTIVITY_TIMEOUT (5000 /* ms */)
+ 
+ 
+ #include <dlfcn.h>

@@ -48,7 +48,10 @@ install() {
 
     glib-compile-schemas "${dest_dir}/usr"/share/glib-2.0/schemas
 
-    update-mime-database "${dest_dir}"/usr/share/mime
+    update-mime-database "${dest_dir}/usr/share/mime"
+    update-desktop-database "${dest_dir}/usr/share/applications/"
+
+    gtk-update-icon-cache -f -t "${dest_dir}/usr/share/icons/hicolor"
 
 }
 

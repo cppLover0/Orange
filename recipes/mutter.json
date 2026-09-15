@@ -1,8 +1,8 @@
 {
     "name": "mutter",
-    "version": "42.9",
+    "version": "43.3",
     "deps": ["base-libs", "gtk3", "xorg-libs", "python", "gobject-introspection", "graphene", "lcms", "gnome-settings-daemon"],
-    "url": "https://gitlab.gnome.org/GNOME/mutter/-/archive/40.9/mutter-40.9.tar.gz",
+    "url": "https://gitlab.gnome.org/GNOME/mutter/-/archive/42.9/mutter-42.9.tar.gz",
     "should_patch": false,
     "use_orange_prefix": true
 }

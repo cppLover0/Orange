@@ -25,6 +25,7 @@ install() {
     mkdir -p "${host_dest_dir}/mlibc-host"
     DESTDIR="${host_dest_dir}/mlibc-host" ninja install
     rm -rf "${host_dest_dir}/mlibc-host"/usr/lib/crt0.o
+    rm -rf "${host_dest_dir}/mlibc-host"/usr/lib/libc.so.6
     rm -rf "${host_dest_dir}/mlibc-host"/usr/lib/ld64.so.1
     ln -s ld.so "${host_dest_dir}/mlibc-host"/usr/lib/ld64.so.1
     ln -s crt1.o "${host_dest_dir}/mlibc-host"/usr/lib/crt0.o

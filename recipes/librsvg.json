@@ -1,0 +1,8 @@
+{
+    "name": "librsvg",
+    "version": "2.62.3",
+    "deps": ["base-libs", "gtk3"],
+    "url": "https://download.gnome.org/sources/librsvg/2.62/librsvg-2.62.3.tar.xz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

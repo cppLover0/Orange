@@ -56,15 +56,15 @@ endif
 # User controllable C flags.
 
 ifeq ($(MODE),DEBUG)
-    CFLAGS := -g -pipe -Werror -Wall -Wno-unused-command-line-argument
+    CFLAGS := -g -pipe -Wall -Wno-unused-command-line-argument -Wno-frame-address
 else ifeq ($(MODE), RELEASE)
-    CFLAGS := -g -O3 -Wno-unused-command-line-argument -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
+    CFLAGS := -g -O3 -Wno-unused-command-line-argument -Wno-frame-address -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
 else
     $(error unknown mode release/debug)
 endif
 
 # User controllable C++ flags. We default to same as C flags.
-CXXFLAGS := $(CFLAGS)
+CXXFLAGS := $(CFLAGS) 
 
 # User controllable C/C++ preprocessor flags. We set none by default.
 CPPFLAGS :=

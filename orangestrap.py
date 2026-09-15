@@ -60,7 +60,7 @@ def run_in_debootstrap_env():
         "python3-setuptools", "python3-mako", "python3-yaml", "rustc", "cargo", "rustfmt",
         "pkg-config", "glslang-tools", "nasm", "libgmp-dev", "libmpc-dev", "libmpfr-dev",
         "patch", "file", "python3.13", "libxml2-utils", "libgirepository1.0-dev", "gobject-introspection", "gtk-update-icon-cache", "nodejs", "unzip", "locales", "intltool", "gyp", "gperf", "libical-dev",
-        "gpg"
+        "gpg", "dbus-x11", "iso-codes", "gjs", "sassc", "ssh", "cargo-c", "gcc-14", "g++-14", "desktop-file-utils"
     ]
 
     marker = os.path.join(env_dir, ".orangestrap-debootstrap-ready")

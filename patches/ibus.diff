@@ -1,0 +1,7 @@
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -239,2 +239,3 @@
+ enable_pygobject = pygobject_dep.found()
++pyoverridesdir = ''
+ if enable_pygobject

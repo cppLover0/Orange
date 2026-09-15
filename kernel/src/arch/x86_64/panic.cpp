@@ -47,7 +47,10 @@ void x86_64::panic::print_ascii_art() {
 #include <generic/lock/spinlock.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 
-extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
+extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame, int cs, std::uint64_t rip) {
+
+    (void)cs;
+    (void)rip;
 
     uint64_t cr2;
     asm volatile("mov %%cr2, %0" : "=r"(cr2) : : "memory");
@@ -85,9 +88,12 @@ extern "C" void CPUKernelPanic(x86_64::idt::int_frame_t* frame) {
         vmm_obj* obj = current_thread->vmem->nlgetlen(cr2);
         if(obj != nullptr) {
 
+            assert(current_thread->is_holding_lock == false, "lazy allocations is banned when thread is holding lock, id %d, rip 0x%p, last_sys %d", current_thread->id, frame->rip, current_thread->last_syscall)
+
             if(obj->mmap_info.copied_file_desc == nullptr) {
                 current_thread->vmem->inv_lazy_alloc(ALIGNPAGEDOWN(cr2), cr2 + (PAGE_SIZE * 4) > obj->base + obj->len ? PAGE_SIZE : PAGE_SIZE * 4);
             } else {
+                assert(frame->cs != 0x08, "lazy allocation of mmaped files in kernel is banned (can do weird deadlocks) rip 0x%p", frame->rip)
                 current_thread->vmem->inv_lazy_file_alloc_4kb(obj, ALIGNPAGEDOWN(cr2));
             }
 
@@ -146,7 +152,7 @@ meow:
             }
         }
     } else {
-        klibc::debug_printf("got panic proc %d !\n", current_thread->id);
+        klibc::debug_printf("got panic proc %d %p!\n", current_thread->id, frame->rip);
         current_thread->sig->push(11); // sigsegv
         current_thread->should_not_save_ctx = true;
         current_thread->ctx = *frame;

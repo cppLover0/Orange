@@ -18,14 +18,36 @@ export LC_NUMERIC=C.UTF-8
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 export DISPLAY=:0
+export XDG_CURRENT_DESKTOP=GNOME 
+export HOME=/root
+
+echo Updating gdk-pixbuf
+
+gdk-pixbuf-query-loaders --update-cache
 
 echo Launching dbus
+export GSK_RENDERER=cairo 
+
+echo Launching dbus system
+
+dbus-daemon --system --fork
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
+
+echo Launching dbus session
+
 (dbus-daemon --session --address=unix:path=/run/user/1000/bus) > /dev/null 2> /dev/null &
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 
-PROFILE_ID=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'") 
-gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ use-theme-colors false 
-gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 
+echo meow meow meow
 
-echo Launching mutter
+PROFILE_ID=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'") 
+
+gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+gsettings set org.gnome.desktop.interface icon-theme 'hicolor'
+
+gsettings set org.gnome.desktop.background picture-options 'zoom'
+gsettings set org.gnome.desktop.background picture-uri 'file:///etc/gnomebg.png'
+gsettings set org.gnome.desktop.background picture-uri-dark 'file:///etc/gnomebg.png'
+
+echo Launching gnome-shell
 xinit /bin/sh /etc/xinitrc > /dev/null 2> /dev/null

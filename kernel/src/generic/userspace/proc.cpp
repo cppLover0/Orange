@@ -148,6 +148,21 @@ long long sys_getuid() {
     return current_proc->uid;
 }
 
+long long sys_geteuid() {
+    klibc::debug_printf("geteuid\n");
+    return current_proc->euid;
+}
+
+long long sys_setuid(int uid) {
+    current_proc->uid = uid;
+    return 0;
+}
+
+long long sys_setgid(int gid) {
+    current_proc->gid = gid;
+    return 0;
+}
+
 long long sys_getcwd(char* buf, std::uint64_t len) {
     thread* current = current_proc;
     if(!is_safe_to_rw(current, (std::uint64_t)buf, PAGE_SIZE)) {
@@ -237,8 +252,8 @@ long long sys_getresuid(int* uid, int* euid, int* suid) {
         return -EINVAL;
 
     *uid = proc->uid;
-    *euid = proc->uid;
-    *suid = proc->uid;
+    *euid = proc->euid;
+    *suid = 0;
 
     klibc::debug_printf("getresuid\n");
         
@@ -407,8 +422,13 @@ long long clone3_impl(void* ctx, clone_args* clarg, std::uint64_t size) {
     new_proc->is_debug = proc->is_debug;
     new_proc->debug_file_descriptor = proc->debug_file_descriptor;
     
-    new_proc->userspace_stack = proc->userspace_stack;
-    new_proc->userspace_stack_size = proc->userspace_stack_size;
+    if(clarg->stack) {
+        new_proc->userspace_stack = clarg->stack;
+        new_proc->userspace_stack_size = clarg->stack_size;
+    } else {
+        new_proc->userspace_stack = proc->userspace_stack;
+        new_proc->userspace_stack_size = proc->userspace_stack_size;
+    }
 
     if(clarg->flags & CLONE_VFORK) {
         while(1) {
@@ -462,7 +482,7 @@ long long sys_newthread(void* frame, std::uint64_t new_ip, std::uint64_t new_sta
     new_proc->is_debug = current_thread->is_debug;
     new_proc->debug_file_descriptor = current_thread->debug_file_descriptor;
 
-    new_proc->userspace_stack = new_stack;
+    new_proc->userspace_stack = new_stack - stack_size;
     new_proc->userspace_stack_size = stack_size;
 
 #if defined(__x86_64__)
@@ -516,7 +536,7 @@ long long sys_exit_group(void* ctx, int status) {
 
     proc->exit_request = 2;
     proc->exit_code = (status & 0xFF) << 8;
-    klibc::debug_printf("exit group status %d\n", status);
+    klibc::serial_printf("exit group status %d\n", status);
     arch::enable_paging(gobject::kernel_root);
     process::yield();
     while(1) {process::yield();}
@@ -793,5 +813,65 @@ long long sys_stackinfo(void** stack) {
     klibc::debug_printf("stack 0x%p, size %lli", current->userspace_stack, current->userspace_stack_size);
 
     *stack = (void*)current->userspace_stack;
+
+    log("stack", "stack 0x%p, size %lli", current->userspace_stack, current->userspace_stack_size);
     return current->userspace_stack_size;
+}
+
+long long sys_getgroups(std::size_t size, int* list) {
+    thread* current = current_proc;
+    thread* target = process::by_id(current->pid);
+    assert(target != nullptr, "im cooked");
+
+    if(!is_safe_to_rw(current, (std::uint64_t)list, PAGE_SIZE))
+        return -EFAULT;
+
+    if(size == 0) {
+        return target->groups_size;
+    } else {
+
+        if(list == nullptr)
+            return -EINVAL;
+    
+        if((int)size < target->groups_size)
+            return -EINVAL;
+
+        klibc::memcpy(list, target->groups, target->groups_size * sizeof(int));
+        return 0;
+    }
+}
+
+long long sys_setgroups(std::size_t size, int* list) {
+    thread* current = current_proc;
+    thread* target = process::by_id(current->pid);
+    assert(target != nullptr, "im cooked");
+
+    if(!is_safe_to_rw(current, (std::uint64_t)list, PAGE_SIZE))
+        return -EFAULT;
+
+    if(list == nullptr || size == 0) {
+        klibc::memset(target->groups, 0, PAGE_SIZE);
+        target->groups_size = 0;
+        return 0;
+    }
+    
+    if(size * sizeof(int) > PAGE_SIZE)
+        return -EINVAL;
+
+    klibc::memcpy(target->groups, list, size * sizeof(int));
+    target->groups_size = size;
+
+    return 0;
+}
+
+long long sys_setreuid(int ruid, int euid) {
+    current_proc->uid = ruid;
+    current_proc->euid = euid;
+    return 0;
+}
+
+long long sys_setregid(int rgid, int egid) {
+    (void)egid;
+    current_proc->gid = rgid;
+    return 0;
 }

@@ -28,6 +28,7 @@
 #include <utils/random.hpp>
 #include <generic/randomdev.hpp>
 #include <generic/mmap_syncer.hpp>
+#include <generic/timer_thread.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
@@ -112,6 +113,7 @@ extern "C" void main() {
     //sysfs::dump();
 
     time::update_unix_time();
+    timer_thread::init();
 
     modules::init();
     mmap_syncer::init();

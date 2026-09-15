@@ -1,0 +1,8 @@
+{
+    "name": "gcr-3",
+    "version": "3.41.2",
+    "deps": ["base-libs", "mutter", "nss", "libsecret", "libical", "libgcrypt", "p11-kit"],
+    "url": "https://download.gnome.org/sources/gcr/3.41/gcr-3.41.2.tar.xz",
+    "should_patch": true,
+    "use_orange_prefix": true
+}

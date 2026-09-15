@@ -110,7 +110,7 @@ long long sys_clock_gettime(clockid_t which_clock, struct timespec *tp) {
     case CLOCK_TAI:
     case CLOCK_REALTIME_COARSE:
     case CLOCK_REALTIME:
-        tp->tv_sec = ts / 1000000000;
+        tp->tv_sec = time::current_unix_time;
         tp->tv_nsec = ts % 1000000000;
         return 0;
     case CLOCK_THREAD_CPUTIME_ID:
@@ -257,6 +257,47 @@ long long sys_getaffinity(int pid, size_t cpusetsize, cpu_set_t *mask) {
 
     klibc::memset(mask,0,cpusetsize);
     klibc::memcpy(mask,&temp_set,cpusetsize);
+
+    return 0;
+}
+
+long long sys_setthreadname(int tid, const char* name) {
+    thread* proc = current_proc;
+
+    thread* target = process::by_id(tid);
+    if(target == nullptr)
+        return -ESRCH;
+
+    if(name == nullptr)
+        return -EINVAL;
+
+    if(is_safe_to_rw(proc, (std::uint64_t)name, PAGE_SIZE) == false)
+        return -EFAULT;
+
+    klibc::memset(target->comm, 0, 16);
+    klibc::memcpy(target->comm, name, safe_strlen((char*)name, 15));
+
+    return 0;
+}
+
+long long sys_getthreadname(int tid, char* buffer, int len) {
+    thread* proc = current_proc;
+
+    thread* target = process::by_id(tid);
+    if(target == nullptr)
+        return -ESRCH;
+
+    if(buffer == nullptr)
+        return -EINVAL;
+
+    if(is_safe_to_rw(proc, (std::uint64_t)buffer, PAGE_SIZE + len) == false)
+        return -EFAULT;
+
+    if(len < klibc::strlen(target->comm) || len < 16)
+        return -ERANGE;
+
+    klibc::memset(buffer, 0, len);
+    klibc::memcpy(buffer, target->comm, klibc::strlen(target->comm));
 
     return 0;
 }

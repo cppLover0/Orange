@@ -9,6 +9,7 @@
 #include <arch/x86_64/cpu/idt.hpp>
 #include <arch/x86_64/cpu/lapic.hpp>
 #include <arch/x86_64/panic.hpp>
+#include <arch/x86_64/drivers/cmos.hpp>
 #include <arch/x86_64/irq.hpp>
 #include <klibc/stdio.hpp>
 #include <arch/x86_64/drivers/ioapic.hpp>
@@ -73,6 +74,7 @@ namespace arch {
     void init(int stage) {
         switch(stage) {
         case ARCH_INIT_EARLY:
+            time::current_unix_time = x86_64::cmos::get_unix_time_cmos();
             x86_64::init_cpu_data();
             drivers::hpet::init();
             drivers::pvclock::bsp_init();

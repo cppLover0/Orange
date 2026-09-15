@@ -37,6 +37,8 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
 
     if(flags & MAP_ANONYMOUS) {
 
+        
+
         if(flags & MAP_FIXED) {
             allocated = current->vmem->alloc_memory(hint, len, true);
         } else {
@@ -92,6 +94,8 @@ long long sys_mmap(std::uint64_t hint, std::uint64_t len, std::uint64_t prot, st
             arch::tlb_flush(allocated, len);
 
             klibc::debug_printf("mmap file %s\n", file->path);
+
+            fix_userspace_memory(current, allocated, len);
 
             std::uint64_t old = file->offset;
             file->offset = off;

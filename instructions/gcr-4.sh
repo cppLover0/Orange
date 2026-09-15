@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure 
+    meson_configure -Dssh_agent=false -Dgtk_doc=false
 }
 
 build() {

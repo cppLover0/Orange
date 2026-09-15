@@ -13,6 +13,9 @@
 #include <generic/userspace/robust.hpp>
 #include <utils/linux.hpp>
 #include <generic/time.hpp>
+
+struct thread;
+
 #include <generic/vmm.hpp>
 #include <atomic>
 
@@ -37,6 +40,7 @@ struct signal_trace {
     aarch64::el::int_frame ctx;
 #endif
     sigset_t sigset;
+    int sig;
     signal_trace* next;
 };
 
@@ -64,9 +68,18 @@ struct thread {
     std::uint64_t userspace_stack; // pthread attr require it
     std::size_t userspace_stack_size;
 
+    std::atomic<std::uint32_t>* debug_shit_counter;
+    std::atomic<std::uint32_t>* debug_shit_counter2;
+
+    bool is_sleep_mode;
+
     std::atomic<std::int64_t> sr_s;
     std::atomic<std::int64_t> sr_st;
 
+    int* groups; // always 4 kb
+    int groups_size;
+
+    char comm[16];
     char* exe;
 
     bool should_block_signals_next;
@@ -120,6 +133,8 @@ struct thread {
     int* tidptr;
     std::atomic<int> fd_ptr;
  
+    bool is_holding_lock;
+    int euid;
     int uid;
     int gid;
     
@@ -147,6 +162,9 @@ namespace process {
 
     int futex_wake(thread* proc, int* lock, int count);
     void futex_wait(thread* proc, int* lock);
+
+    void wakeup_sleep_mode(thread* thread);
+    void finish_work(thread* thread);
 
     extern "C" void schedule(void* frame);
 

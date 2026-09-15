@@ -1,0 +1,8 @@
+{
+    "name": "orange_gir_callers",
+    "version": "wahhh",
+    "deps": ["base-libs"],
+    "url": "src:tools/orange_gir_callers",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

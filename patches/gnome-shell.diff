@@ -1,0 +1,301 @@
+diff -Naur gnome-shell/js/gdm/loginDialog.js gnome-shell-clean/js/gdm/loginDialog.js
+--- gnome-shell/js/gdm/loginDialog.js	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/js/gdm/loginDialog.js	2026-09-12 13:54:26.869831404 +0300
+@@ -18,10 +18,18 @@
+  */
+ 
+ const {
+-    AccountsService, Atk, Clutter, Gdm, Gio,
++    AccountsService, Atk, Clutter, Gio,
+     GLib, GObject, Meta, Pango, Shell, St,
+ } = imports.gi;
+ 
++let Gdm;
++try {
++    imports.gi.versions.Gdm = '1.0';
++    Gdm = imports.gi.Gdm;
++} catch (e) {
++    Gdm = null;
++}
++
+ const AuthPrompt = imports.gdm.authPrompt;
+ const Batch = imports.gdm.batch;
+ const BoxPointer = imports.ui.boxpointer;
+@@ -416,11 +424,13 @@
+         parentActor.add_child(this);
+ 
+         this._userManager = AccountsService.UserManager.get_default();
+-        this._gdmClient = new Gdm.Client();
++        this._gdmClient = Gdm ? new Gdm.Client() : null;
+ 
+-        try {
+-            this._gdmClient.set_enabled_extensions([Gdm.UserVerifierChoiceList.interface_info().name]);
+-        } catch (e) {
++        if (this._gdmClient) {
++            try {
++                this._gdmClient.set_enabled_extensions([Gdm.UserVerifierChoiceList.interface_info().name]);
++            } catch (e) {
++            }
+         }
+ 
+         this._settings = new Gio.Settings({ schema_id: GdmUtil.LOGIN_SCREEN_SCHEMA });
+diff -Naur gnome-shell/js/gdm/util.js gnome-shell-clean/js/gdm/util.js
+--- gnome-shell/js/gdm/util.js	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/js/gdm/util.js	2026-09-12 13:54:26.870468878 +0300
+@@ -2,7 +2,15 @@
+ /* exported BANNER_MESSAGE_KEY, BANNER_MESSAGE_TEXT_KEY, LOGO_KEY,
+             DISABLE_USER_LIST_KEY, fadeInActor, fadeOutActor, cloneAndFadeOutActor */
+ 
+-const { Clutter, Gdm, Gio, GLib } = imports.gi;
++const { Clutter, Gio, GLib } = imports.gi;
++
++let Gdm;
++try {
++    imports.gi.versions.Gdm = '1.0';
++    Gdm = imports.gi.Gdm;
++} catch (e) {
++    Gdm = null;
++}
+ const Signals = imports.signals;
+ 
+ const Batch = imports.gdm.batch;
+@@ -18,11 +26,13 @@
+ const FprintDeviceIface = loadInterfaceXML('net.reactivated.Fprint.Device');
+ const FprintDeviceProxy = Gio.DBusProxy.makeProxyWrapper(FprintDeviceIface);
+ 
+-Gio._promisify(Gdm.Client.prototype, 'open_reauthentication_channel');
+-Gio._promisify(Gdm.Client.prototype, 'get_user_verifier');
+-Gio._promisify(Gdm.UserVerifierProxy.prototype,
+-    'call_begin_verification_for_user');
+-Gio._promisify(Gdm.UserVerifierProxy.prototype, 'call_begin_verification');
++if (Gdm) {
++    Gio._promisify(Gdm.Client.prototype, 'open_reauthentication_channel');
++    Gio._promisify(Gdm.Client.prototype, 'get_user_verifier');
++    Gio._promisify(Gdm.UserVerifierProxy.prototype,
++        'call_begin_verification_for_user');
++    Gio._promisify(Gdm.UserVerifierProxy.prototype, 'call_begin_verification');
++}
+ 
+ var PASSWORD_SERVICE_NAME = 'gdm-password';
+ var FINGERPRINT_SERVICE_NAME = 'gdm-fingerprint';
+diff -Naur gnome-shell/js/misc/systemActions.js gnome-shell-clean/js/misc/systemActions.js
+--- gnome-shell/js/misc/systemActions.js	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/js/misc/systemActions.js	2026-09-12 13:54:26.870979688 +0300
+@@ -1,5 +1,12 @@
+ /* exported getDefault */
+-const { AccountsService, Clutter, Gdm, Gio, GLib, GObject, Meta } = imports.gi;
++const { AccountsService, Clutter, Gio, GLib, GObject, Meta } = imports.gi;
++
++let Gdm = null;
++try {
++    imports.gi.versions.Gdm = '1.0';
++    Gdm = imports.gi.Gdm;
++} catch (e) {
++}
+ 
+ const GnomeSession = imports.misc.gnomeSession;
+ const LoginManager = imports.misc.loginManager;
+@@ -143,7 +150,13 @@
+             available: true,
+         });
+ 
+-        this._loginScreenSettings = new Gio.Settings({ schema_id: LOGIN_SCREEN_SCHEMA });
++        // org.gnome.login-screen is only provided by GDM; without it the
++        // schema does not exist and Gio.Settings would throw.
++        const schemaSource = Gio.SettingsSchemaSource.get_default();
++        this._loginScreenSettings =
++            schemaSource.lookup(LOGIN_SCREEN_SCHEMA, true)
++                ? new Gio.Settings({ schema_id: LOGIN_SCREEN_SCHEMA })
++                : null;
+         this._lockdownSettings = new Gio.Settings({ schema_id: LOCKDOWN_SCHEMA });
+         this._orientationSettings = new Gio.Settings({ schema_id: 'org.gnome.settings-daemon.peripherals.touchscreen' });
+ 
+@@ -339,7 +352,7 @@
+     _updatePowerOff() {
+         let disabled = Main.sessionMode.isLocked ||
+                        (Main.sessionMode.isGreeter &&
+-                        this._loginScreenSettings.get_boolean(DISABLE_RESTART_KEY));
++                        this._loginScreenSettings?.get_boolean(DISABLE_RESTART_KEY));
+         this._actions.get(POWER_OFF_ACTION_ID).available = this._canHavePowerOff && !disabled;
+         this.notify('can-power-off');
+ 
+@@ -360,7 +373,7 @@
+         let disabled = (Main.sessionMode.isLocked &&
+                         this._suspendNeedsAuth) ||
+                        (Main.sessionMode.isGreeter &&
+-                        this._loginScreenSettings.get_boolean(DISABLE_RESTART_KEY));
++                        this._loginScreenSettings?.get_boolean(DISABLE_RESTART_KEY));
+         this._actions.get(SUSPEND_ACTION_ID).available = this._canHaveSuspend && !disabled;
+         this.notify('can-suspend');
+     }
+@@ -372,7 +385,8 @@
+ 
+     _updateSwitchUser() {
+         let allowSwitch = !this._lockdownSettings.get_boolean(DISABLE_USER_SWITCH_KEY);
+-        let multiUser = this._userManager.can_switch() && this._userManager.has_multiple_users;
++        let multiUser = !!Gdm && this._userManager.can_switch() &&
++                        this._userManager.has_multiple_users;
+         let shouldShowInMode = !Main.sessionMode.isLocked && !Main.sessionMode.isGreeter;
+ 
+         let visible = allowSwitch && multiUser && shouldShowInMode;
+@@ -390,7 +404,7 @@
+         let systemAccount = user.system_account;
+         let localAccount = user.local_account;
+         let multiUser = this._userManager.has_multiple_users;
+-        let multiSession = Gdm.get_session_ids().length > 1;
++        let multiSession = Gdm && Gdm.get_session_ids().length > 1;
+         let shouldShowInMode = !Main.sessionMode.isLocked && !Main.sessionMode.isGreeter;
+ 
+         let visible = allowLogout && (alwaysShow || multiUser || multiSession || systemAccount || !localAccount) && shouldShowInMode;
+@@ -423,7 +437,8 @@
+             Main.screenShield.lock(false);
+ 
+         Clutter.threads_add_repaint_func_full(Clutter.RepaintFlags.POST_PAINT, () => {
+-            Gdm.goto_login_session_sync(null);
++            if (Gdm)
++                Gdm.goto_login_session_sync(null);
+             return false;
+         });
+     }
+diff -Naur gnome-shell/js/ui/unlockDialog.js gnome-shell-clean/js/ui/unlockDialog.js
+--- gnome-shell/js/ui/unlockDialog.js	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/js/ui/unlockDialog.js	2026-09-12 13:54:26.871516479 +0300
+@@ -2,10 +2,18 @@
+ /* exported UnlockDialog */
+ 
+ const {
+-    AccountsService, Atk, Clutter, Gdm, Gio,
++    AccountsService, Atk, Clutter, Gio,
+     GnomeDesktop, GLib, GObject, Meta, Shell, St,
+ } = imports.gi;
+ 
++let Gdm;
++try {
++    imports.gi.versions.Gdm = '1.0';
++    Gdm = imports.gi.Gdm;
++} catch (e) {
++    Gdm = null;
++}
++
+ const Background = imports.ui.background;
+ const Layout = imports.ui.layout;
+ const Main = imports.ui.main;
+@@ -473,13 +481,15 @@
+ 
+         parentActor.add_child(this);
+ 
+-        this._gdmClient = new Gdm.Client();
++        this._gdmClient = Gdm ? new Gdm.Client() : null;
+ 
+-        try {
+-            this._gdmClient.set_enabled_extensions([
+-                Gdm.UserVerifierChoiceList.interface_info().name,
+-            ]);
+-        } catch (e) {
++        if (this._gdmClient) {
++            try {
++                this._gdmClient.set_enabled_extensions([
++                    Gdm.UserVerifierChoiceList.interface_info().name,
++                ]);
++            } catch (e) {
++            }
+         }
+ 
+         this._adjustment = new St.Adjustment({
+@@ -824,6 +834,9 @@
+     }
+ 
+     _otherUserClicked() {
++        if (!Gdm)
++            return;
++
+         Gdm.goto_login_session_sync(null);
+ 
+         this._authPrompt.cancel();
+diff -Naur gnome-shell/src/main.c gnome-shell-clean/src/main.c
+--- gnome-shell/src/main.c	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/src/main.c	2026-09-12 13:54:26.872042449 +0300
+@@ -13,7 +13,7 @@
+ #include <gtk/gtk.h>
+ #include <glib-unix.h>
+ #include <glib/gi18n-lib.h>
+-#include <girepository.h>
++#include <girepository/girepository.h>
+ #include <meta/meta-context.h>
+ #include <meta/meta-plugin.h>
+ #include <meta/prefs.h>
+@@ -126,17 +126,18 @@
+ static void
+ shell_introspection_init (void)
+ {
++  g_autoptr (GIRepository) repository = gi_repository_dup_default ();
+ 
+-  g_irepository_prepend_search_path (MUTTER_TYPELIB_DIR);
+-  g_irepository_prepend_search_path (GNOME_SHELL_PKGLIBDIR);
++  gi_repository_prepend_search_path (repository, MUTTER_TYPELIB_DIR);
++  gi_repository_prepend_search_path (repository, GNOME_SHELL_PKGLIBDIR);
+ 
+   /* We need to explicitly add the directories where the private libraries are
+    * installed to the GIR's library path, so that they can be found at runtime
+    * when linking using DT_RUNPATH (instead of DT_RPATH), which is the default
+    * for some linkers (e.g. gold) and in some distros (e.g. Debian).
+    */
+-  g_irepository_prepend_library_path (MUTTER_TYPELIB_DIR);
+-  g_irepository_prepend_library_path (GNOME_SHELL_PKGLIBDIR);
++  gi_repository_prepend_library_path (repository, MUTTER_TYPELIB_DIR);
++  gi_repository_prepend_library_path (repository, GNOME_SHELL_PKGLIBDIR);
+ }
+ 
+ static void
+@@ -497,7 +498,7 @@
+   context = meta_create_context (WM_NAME);
+   meta_context_add_option_entries (context, gnome_shell_options,
+                                    GETTEXT_PACKAGE);
+-  meta_context_add_option_group (context, g_irepository_get_option_group ());
++  meta_context_add_option_group (context, gi_repository_get_option_group ());
+ 
+   session_mode = (char *) g_getenv ("GNOME_SHELL_SESSION_MODE");
+ 
+diff -Naur gnome-shell/src/meson.build gnome-shell-clean/src/meson.build
+--- gnome-shell/src/meson.build	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/src/meson.build	2026-09-12 13:55:27.568181658 +0300
+@@ -48,6 +48,8 @@
+ 
+ install_rpath = ':'.join([mutter_typelibdir, pkglibdir])
+ 
++repo_dep = dependency('girepository-2.0')
++
+ gnome_shell_deps = [
+   gio_unix_dep,
+   libxml_dep,
+@@ -59,6 +61,7 @@
+   cogl_pango_dep,
+   startup_dep,
+   gi_dep,
++  repo_dep,
+   polkit_dep,
+   gcr_dep,
+   libsystemd_dep
+@@ -215,7 +218,8 @@
+   'Clutter-@0@'.format(mutter_api_version),
+   'Meta-@0@'.format(mutter_api_version),
+   'Gcr-3',
+-  'PolkitAgent-1.0'
++  'PolkitAgent-1.0',
++  'GioUnix-2.0'
+ ]
+ 
+ if have_networkmanager
+diff -Naur gnome-shell/src/shell-util.c gnome-shell-clean/src/shell-util.c
+--- gnome-shell/src/shell-util.c	2023-03-19 23:50:15.000000000 +0300
++++ gnome-shell-clean/src/shell-util.c	2026-09-12 13:54:26.872998093 +0300
+@@ -104,8 +104,7 @@
+ #ifdef HAVE__NL_TIME_FIRST_WEEKDAY
+   langinfo.string = nl_langinfo (_NL_TIME_FIRST_WEEKDAY);
+   first_weekday = langinfo.string[0];
+-  langinfo.string = nl_langinfo (_NL_TIME_WEEK_1STDAY);
+-  week_origin = langinfo.word;
++  week_origin = 19971130;
+   if (week_origin == 19971130) /* Sunday */
+     week_1stday = 0;
+   else if (week_origin == 19971201) /* Monday */

@@ -78,6 +78,8 @@ asmException:
     mov rax,cr3
     push rax
     mov rdi,rsp
+    mov rsi, [rsp + 152]
+    mov rdx, [rsp + 144]
     jmp CPUKernelPanic
 
 isr_no_err_stub 0

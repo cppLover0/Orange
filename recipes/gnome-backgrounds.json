@@ -1,0 +1,8 @@
+{
+    "name": "gnome-backgrounds",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://gitlab.gnome.org/GNOME/gnome-backgrounds.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

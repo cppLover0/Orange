@@ -7,15 +7,19 @@ ld = 'x86_64-orange-mlibc-ld'
 strip = 'x86_64-orange-mlibc-strip'
 pkg-config = 'pkg-config'
 llvm-config = 'llvm-config'
-g-ir-scanner = 'orange-g-ir-scanner'
-g-ir-generate = 'orange-g-ir-generate'
-g-ir-compiler = 'orange-g-ir-compiler'
+g-ir-scanner = 'o-orange-gir-scanner'
+g-ir-generate = 'o-orange-gir-generate'
+g-ir-compiler = 'o-orange-gir-compiler'
 exe_wrapper = 'run-wrapper'
 glib-compile-resources = 'glib-compile-resources'
 glib-compile-schemas = 'glib-compile-schemas'
+rust = ['rustc', '--target', 'x86_64-unknown-orange-mlibc', '-C', 'linker=x86_64-orange-mlibc-gcc'] 
 
 [host_machine]
 system = 'orange'
 cpu_family = 'x86_64'
 cpu = 'x86_64'
 endian = 'little'
+
+[properties]
+rust_target = 'x86_64-unknown-orange-mlibc'

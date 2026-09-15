@@ -1,8 +1,6 @@
-diff --git dbus-clean/dbus/dbus-sysdeps-unix.c dbus-workdir/dbus/dbus-sysdeps-unix.c
-index 87ba2d8..c4ab364 100644
 --- dbus-clean/dbus/dbus-sysdeps-unix.c
 +++ dbus-workdir/dbus/dbus-sysdeps-unix.c
-@@ -2589,29 +2589,12 @@ DBusSocket
+@@ -2589,46 +2589,27 @@
  _dbus_accept  (DBusSocket listen_fd)
  {
    DBusSocket client_fd;
@@ -35,9 +33,10 @@ index 87ba2d8..c4ab364 100644
      }
  
    if (client_fd.fd < 0)
-@@ -2620,14 +2603,6 @@ _dbus_accept  (DBusSocket listen_fd)
+     {
+       if (errno == EINTR)
          goto retry;
-     }
+-    }
  
 -  _dbus_verbose ("client fd %d accepted\n", client_fd.fd);
 -
@@ -46,7 +45,14 @@ index 87ba2d8..c4ab364 100644
 -#endif
 -    {
 -      _dbus_fd_set_close_on_exec(client_fd.fd);
--    }
++      return client_fd;
+     }
  
++  /* Orange: accept4() is not available, so we must set FD_CLOEXEC manually.
++   * Otherwise every connection accepted by the bus daemon leaks into every
++   * service it spawns, and the daemon never sees those clients disconnect. */
++  _dbus_fd_set_close_on_exec (client_fd.fd);
++
    return client_fd;
  }
+ 

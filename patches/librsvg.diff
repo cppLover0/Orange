@@ -1,0 +1,124 @@
+diff -Naur librsvg/Cargo.lock librsvg-clean/Cargo.lock
+--- librsvg/Cargo.lock	2026-06-02 03:31:18.000000000 +0300
++++ librsvg-clean/Cargo.lock	2026-09-15 19:07:20.556335526 +0300
+@@ -1458,7 +1458,7 @@
+ 
+ [[package]]
+ name = "libc"
+-version = "0.2.180"
++version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
+ 
+diff -Naur librsvg/Cargo.toml librsvg-clean/Cargo.toml
+--- librsvg/Cargo.toml	2026-06-02 03:31:18.000000000 +0300
++++ librsvg-clean/Cargo.toml	2026-09-15 19:07:20.558056912 +0300
+@@ -61,7 +61,7 @@
+ image = { version = "0.25.0", default-features = false }
+ itertools = "0.14.0"
+ language-tags = "0.3.1"
+-libc = "0.2"
++libc = "0.2.186"
+ librsvg = { path = "rsvg" }
+ librsvg-c = { path = "librsvg-c" }
+ locale_config = "0.3.0"                                   # not "*" as per the documentation, since crates.io doesn't accept wildcards
+diff -Naur librsvg/gdk-pixbuf-loader/meson.build librsvg-clean/gdk-pixbuf-loader/meson.build
+--- librsvg/gdk-pixbuf-loader/meson.build	2026-06-02 03:31:18.000000000 +0300
++++ librsvg-clean/gdk-pixbuf-loader/meson.build	2026-09-15 19:43:31.577794699 +0300
+@@ -12,18 +12,13 @@
+   console: true,
+   install: true,
+   install_dir: pixbuf_dep.get_variable(pkgconfig: 'gdk_pixbuf_moduledir', pkgconfig_define: ['prefix', prefix]),
+-  depends: librsvg_rust_dep,
+-  depend_files: pixbufloader_sources,
+-  env: extra_env,
+   command: [
+-    cargo_wrapper,
+-    cargo_wrapper_args,
+-    '--command=build',
+-    '--current-build-dir', '@OUTDIR@',
+-    '--current-source-dir', meson.current_source_dir(),
+-    '--packages', 'pixbufloader-svg',
+-    '--extension', ext_dynamic
+-  ]
++    python,
++    '-c',
++    'import shutil; import sys; shutil.copy(sys.argv[1], sys.argv[2])',
++    meson.project_source_root() / 'target' / 'x86_64-unknown-orange-mlibc' / 'release' / 'libpixbufloader_svg.so',
++    '@OUTPUT@',
++  ],
+ )
+ 
+ pixbuf_thumbnailer = configure_file(
+diff -Naur librsvg/librsvg-c/Cargo.toml librsvg-clean/librsvg-c/Cargo.toml
+--- librsvg/librsvg-c/Cargo.toml	2026-06-02 03:31:18.000000000 +0300
++++ librsvg-clean/librsvg-c/Cargo.toml	2026-09-15 19:07:20.558353262 +0300
+@@ -29,6 +29,9 @@
+ capi = ["librsvg/capi"]
+ pixbuf = ["dep:gdk-pixbuf"]
+ 
++[lib]
++crate-type = ["staticlib", "rlib"]
++
+ [package.metadata.capi]
+ min_version = "0.10.10"
+ 
+diff -Naur librsvg/rsvg/meson.build librsvg-clean/rsvg/meson.build
+--- librsvg/rsvg/meson.build	2026-06-02 03:31:18.000000000 +0300
++++ librsvg-clean/rsvg/meson.build	2026-09-15 19:07:20.558778309 +0300
+@@ -83,23 +83,20 @@
+   'src/xml/xml2.rs',
+ )
+ 
++cargo_artifacts_dir = meson.project_source_root() / 'target' / 'x86_64-unknown-orange-mlibc' / 'release'
++
+ rust_artifacts = custom_target(
+   'librsvg-2',
+   build_by_default: true,
+   output: '@0@rsvg_@1@.@2@'.format(lib_prefix, librsvg_api_major, ext_static),
+   console: true,
+-  depend_files: library_sources + librsvg_c_sources,
+-  env: extra_env,
+   command: [
+-    cargo_wrapper,
+-    cargo_wrapper_args,
+-    '--command=cbuild',
+-    '--current-build-dir', '@OUTDIR@',
+-    '--current-source-dir', meson.current_source_dir(),
+-    '--packages', 'librsvg-c',
+-    '--extension', ext_static,
+-  ] + avif_feature_args
+-    + pixbuf_feature_args,
++    python,
++    '-c',
++    'import shutil; import sys; shutil.copy(sys.argv[1], sys.argv[2])',
++    cargo_artifacts_dir / 'liblibrsvg_c.a',
++    '@OUTPUT@',
++  ],
+ )
+ 
+ librsvg_c_lib = rust_artifacts[0]
+diff -Naur librsvg/rsvg_convert/meson.build librsvg-clean/rsvg_convert/meson.build
+--- librsvg/rsvg_convert/meson.build	2026-06-02 03:31:18.000000000 +0300
++++ librsvg-clean/rsvg_convert/meson.build	2026-09-15 19:07:20.559114506 +0300
+@@ -26,14 +26,12 @@
+   depend_files: rsvg_convert_files,
+   env: extra_env,
+   command: [
+-    cargo_wrapper,
+-    cargo_wrapper_args,
+-    '--command=build',
+-    '--current-build-dir', '@OUTDIR@',
+-    '--current-source-dir', meson.current_source_dir(),
+-    '--packages', 'rsvg_convert',
+-    '--bin', 'rsvg-convert'
+-  ] + avif_feature_args,
++    python,
++    '-c',
++    'import shutil; import sys; shutil.copy(sys.argv[1], sys.argv[2])',
++    meson.project_source_root() / 'target' / 'x86_64-unknown-orange-mlibc' / 'release' / 'rsvg-convert',
++    '@OUTPUT@',
++  ],
+ )
+ 
+ if build_tests

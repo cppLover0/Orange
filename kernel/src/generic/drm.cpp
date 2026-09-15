@@ -4,7 +4,9 @@
 #include <generic/drm.hpp>
 #include <generic/lock/spinlock.hpp>
 #include <utils/errno.hpp>
+#include <generic/scheduling.hpp>
 #include <utils/foreach.hpp>
+#include <generic/arch.hpp>
 #include <klibc/string.hpp>
 #include <klibc/stdio.hpp>
 #include <drivers/edid.hpp>
@@ -21,6 +23,69 @@ drm::drm_device* drm_lookup(const char* path) {
     }
     return 0;
 }
+
+void simpledrm_draw_clip(void *dst, std::uint32_t dst_pitch, std::uint8_t* src, std::uint32_t src_pitch, std::uint32_t bpp, drm_clip_rect* clip)
+{
+    std::int32_t rect_width_bytes = (clip->x2 - clip->x1) * bpp;
+    std::int32_t rect_height_lines = clip->y2 - clip->y1;
+
+    std::size_t dst_offset = (clip->y1 * dst_pitch) + (clip->x1 * bpp);
+    std::size_t src_offset = (clip->y1 * src_pitch) + (clip->x1 * bpp);
+
+    auto dst_ptr = (std::uint8_t*)dst + dst_offset;
+    auto src_ptr = (std::uint8_t*)src + src_offset;
+
+    for (int y = 0; y < rect_height_lines; y++) {
+        klibc::memcpy(dst_ptr, src_ptr, rect_width_bytes);
+
+        dst_ptr += dst_pitch;
+        src_ptr += src_pitch;
+    }
+}
+
+// bool can_do_freq(std::uint64_t freq_hz, std::uint64_t* next_tick) {
+
+//     std::uint64_t now = time::timer->current_nano();
+
+//     std::uint64_t period = 1000000000LL / freq_hz;
+
+//     if(*next_tick == 0) 
+//         *next_tick = now;
+
+//     if (now < *next_tick) 
+//         return false;
+
+//     *next_tick = *next_tick + period;
+
+//     if (now > *next_tick + period) {
+//         *next_tick = now + period;
+//     }
+
+//     return true;
+// }
+
+// // context is uint64_t[4]
+// // [0] - frequency
+// // [1] - dest
+// // [2] - src
+// // [3] - size
+// // [4] - target process
+
+// void drm_double_buffering_thread(void* context) {
+//     auto ctx = (std::uint64_t*)context;
+//     std::uint64_t next = 0;
+//     while(true) {
+//         if(can_do_freq(ctx[0], &next) == true && (void*)ctx[2] != nullptr) {
+
+//             klibc::memcpy((void*)ctx[1], (void*)ctx[2], (std::uint64_t)ctx[3]);
+            
+// #if defined(__x86_64__)
+//             asm volatile("sfence" ::: "memory");
+// #endif
+//         }
+//         process::yield();
+//     }
+// }
 
 std::uint32_t drm::fb_to_format(drm::framebuffer* fb) {
     if (fb->bpp == 32) {
@@ -102,7 +167,9 @@ void drm::create(drm::drm_device device) {
         fb_mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED | DRM_MODE_TYPE_USERDEF;
         fb_mode->hdisplay = fb.width;
         fb_mode->vdisplay = fb.height;
-        fb_mode->vrefresh = 60;
+
+        fb_mode->vrefresh = 59;
+
         fb_mode->hsync_start = fb.width + 8;
         fb_mode->hsync_end   = fb.width + 16;
         fb_mode->htotal      = fb.width + 24;
@@ -372,6 +439,21 @@ void drm::create(drm::drm_device device) {
         new_device->plane_prop_values = plane_props_values;
         new_device->plane_props = plane_props_id;
         new_device->plane_prop_count = 12;
+
+        auto context = new std::uint64_t[4];
+
+        new_device->fb.ctx = context;
+
+        context[0] = fb_mode->vrefresh;
+        context[1] = fb.phys + etc::hhdm();
+        context[2] = (std::uint64_t)nullptr;
+        context[3] = fb.height * fb.pitch;
+
+        // thread* thr = process::kthread(drm_double_buffering_thread, context);
+        // process::wakeup(thr);
+
+        // log("drm", "created double buffering thread %d", thr->id);
+
     }
 
     new_device->magic = 0x1122334455667788;
@@ -618,6 +700,7 @@ std::int32_t drm_ioctl(file_descriptor* file, std::uint64_t req, void* arg) {
                 assert(0,"fb failv");
 
             out->fb_id = drm::allocate();
+            device->fb.ctx[2] = info->phys + etc::hhdm();
 
             drm::_kms.create(out->fb_id, info);
 
@@ -812,42 +895,30 @@ std::int32_t drm_ioctl(file_descriptor* file, std::uint64_t req, void* arg) {
                 assert(0, "fb failv");
 
             drm::framebuffer fb = device->fb.access_fb(device->ctx);
-            
-            uint8_t* dst_base = (uint8_t*)(fb.phys + etc::hhdm());
-            uint8_t* src_base = (uint8_t*)(info->phys + etc::hhdm()); 
 
-            uint64_t bpp = fb.bpp / 8;
-            if (bpp == 0) bpp = 4;
+            char* src = (char*)(info->phys + etc::hhdm());
+            char* dest = (char*)(fb.phys + etc::hhdm());
 
-            if (in->num_clips == 0 || in->clips_ptr == 0) {
-                klibc::memcpy(dst_base, src_base, fb.height * fb.pitch);
-            } else {
+            std::uint32_t bpp = fb.bpp > 16 ? fb.bpp / 8 : fb.bpp;
+            auto clips = (drm_clip_rect*)in->clips_ptr;
+
+            if (in->num_clips == 0 || clips == nullptr) {
+                drm_clip_rect full_screen = {};
+                full_screen.x2 = fb.width;  
+                full_screen.y2 = fb.height;
                 
-                auto clips = (drm_clip_rect*)in->clips_ptr;
-
-                for (uint32_t i = 0; i < in->num_clips; ++i) {
-                    drm_clip_rect clip = clips[i];
-
-                    if (clip.x1 >= fb.width || clip.y1 >= fb.height) continue;
-                    if (clip.x2 > fb.width)  clip.x2 = fb.width;
-                    if (clip.y2 > fb.height) clip.y2 = fb.height;
-                    if (clip.x1 >= clip.x2 || clip.y1 >= clip.y2) continue;
-
-                    std::uint64_t bytes_to_copy = (std::uint64_t)(clip.x2 - clip.x1) * bpp;
-                    std::uint64_t x_offset = (std::uint64_t)clip.x1 * bpp;
-
-                    for (std::uint64_t y = clip.y1; y < clip.y2; ++y) {
-                        std::uint64_t row_offset = (y * fb.pitch) + x_offset;
-                        klibc::memcpy(dst_base + row_offset, src_base + row_offset, bytes_to_copy);
-                    }
+                simpledrm_draw_clip((std::uint8_t*)dest, fb.pitch, (std::uint8_t*)src, fb.pitch, bpp, &full_screen);
+            } else {
+                for (unsigned int i = 0; i < in->num_clips; i++) {
+                    simpledrm_draw_clip((std::uint8_t*)dest, fb.pitch, (std::uint8_t*)src, fb.pitch, bpp, &clips[i]);
                 }
             }
 
             return 0;
-
         }
         break;
     }
+
 
 
     case drm::drm_structs::drm_requests::DRM_IOCTL_MODE_GETENCODER: {

@@ -57,6 +57,20 @@ __sigismember (sigset_t *set, int sig)
   return (set->__val & (1 << (sig - 1))) ? 1 : 0;
 }
 
+static inline int
+__sigaddset (sigset_t *set, int sig)
+{
+  set->__val |= __sigmask (sig);
+  return 0;
+}
+
+static inline int
+__sigdelset (sigset_t *set, int sig)
+{
+  set->__val &= ~__sigmask (sig);
+  return 0;
+}
+
 struct sigaction {
     void (*handler)(int);
 	unsigned long flags;
@@ -122,6 +136,20 @@ public:
 
         this->lock.unlock();
         return 0;
+    }
+
+    bool check_for_sig(int sig) {
+        this->lock.lock();
+
+        for(int i = 0; i < 128; i++) {
+            if(this->bitmap->test(i) && this->sigs[i] == sig) {
+                this->lock.unlock(); 
+                return true;
+            }
+        }
+
+        this->lock.unlock();
+        return false;
     }
 
 };

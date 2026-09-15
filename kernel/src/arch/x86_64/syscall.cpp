@@ -130,9 +130,25 @@ syscall_item syscall_table[] = {
     {false, 108, (void*)sys_fsync},
     {false, 109, (void*)sys_stackinfo},
     {false, 110, (void*)sys_fstatfs},
-    {false, 111, (void*)sys_eventfd_create}
+    {false, 111, (void*)sys_eventfd_create},
+    {false, 112, (void*)sys_setthreadname},
+    {false, 113, (void*)sys_getthreadname},
+    {false, 114, (void*)sys_timerfd_create},
+    {false, 115, (void*)sys_timerfd_settime}, 
+    {false, 116, (void*)sys_timerfd_gettime},
+    {false, 117, (void*)sys_symlink}, 
+    {false, 118, (void*)sys_symlinkat},
+    {false, 119, (void*)sys_geteuid},
+    {false, 120, (void*)sys_setuid}, 
+    {false, 121, (void*)sys_setgid},
+    {false, 122, (void*)sys_setgroups},
+    {false, 123, (void*)sys_getgroups},
+    {false, 124, (void*)sys_setregid}, 
+    {false, 125, (void*)sys_setreuid}
 };
 
+// long long sys_symlinkat(const char* target, int newdirfd, const char *new_path);
+// long long sys_symlink(const char *target_path, const char *link_path);
 // long long sys_shmat(int shmid, std::uint64_t hint, int shmflg);
 // long long sys_shmctl(int shmid, int cmd, struct shmid_ds *buf);
 // long long sys_shmget(int key, size_t size, int shmflg);
@@ -151,16 +167,23 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
     thread* current = current_proc;
     current->signal_ctx = *ctx; // its used to return to userspace when there's signal 
 
+    if(current->sig->check_for_sig(SIGKILL)) {
+        process::yield();
+    }
+
     current->last_syscall = current_sys->num;
 
     long long ret = 0;
+
+    //klibc::serial_printf("sys %d\n", current_sys->num);
 
 #ifdef SYSCALL_PROFILING
     std::uint64_t start = time::timer->current_nano();
 #endif
 
-    //  if(current->is_debug)
-    //      klibc::debug_printf("sys %d rdi 0x%p rsi 0x%p rdx 0x%p cwd %s\n", current_sys->num, ctx->rdi, ctx->rsi, ctx->rdx, current->cwd);
+    std::uint64_t s1 = current->debug_shit_counter == nullptr ? 9999 : current->debug_shit_counter->load();
+    std::uint64_t s2 = current->debug_shit_counter2 == nullptr ? 9999 : current->debug_shit_counter2->load();
+
 
     if(current_sys->is_ctx_passed) {
         auto func = (long long (*)(x86_64::idt::int_frame_t*, long long, long long, long long, long long, long long, long long))(current_sys->sys);
@@ -177,12 +200,16 @@ extern "C" void syscall_handler_c(x86_64::idt::int_frame_t* ctx) {
     }
 #endif
 
-    if(current->is_debug && current_sys->num != 6 && current_sys->num != 5)
-         klibc::debug_printf("sys %d ret %lli\n", current_sys->num, ret);
+    if(current->is_debug && current_sys->num != 6 && current_sys->num != 5 && current_sys->num != 28)
+          klibc::debug_printf("sys %d ret %lli %lli %lli %lli %lli\n", current_sys->num, ret, current->debug_shit_counter == nullptr ? 9999 : current->debug_shit_counter->load(), current->debug_shit_counter2 == nullptr ? 9999 : current->debug_shit_counter2->load(), s1, s2);
 
     assert(ctx->cr3 != 0, "uh nuh ");
 
     ctx->rax = ret;
+
+    if(current->sig->check_for_sig(SIGKILL)) {
+        process::yield();
+    }
 
     if(current->is_restore_sigset) {
         klibc::memcpy(&current->sigset,&current->temp_sigset,sizeof(sigset_t));

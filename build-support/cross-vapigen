@@ -1,4 +1,7 @@
 #!/bin/sh
+
+export LD_LIBRARY_PATH="${host_dest_dir}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu/"
+
 [ -z "$VALADIR" ] && ( echo "Please set VALADIR environment variable"; exit 1 )
 [ -z "$GI_GIR_PATH" ] && ( echo "Please set GI_GIR_PATH environment variable"; exit 1 )
 vapigen --vapidir="$VALADIR" --girdir="$GI_GIR_PATH" "$@"

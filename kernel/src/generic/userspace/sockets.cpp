@@ -23,6 +23,7 @@ long long sys_socket(int family, int type, int protocol) {
 
     if(family != PF_UNIX) {
         klibc::debug_printf("unimplemented socket family %d for type %d\n", family, type);
+        return -ENOTSUP;
     } 
 
     if(family == PF_NETLINK) {
@@ -133,7 +134,7 @@ long long sys_connect(int fd, const struct sockaddr *addr_ptr, std::uint32_t add
 
     if(file->socket.socket_type == PF_UNIX) {
         if(file->socket.write_socket || file->socket.read_socket)
-            return -EINVAL;
+            return -EISCONN;
         if(current->is_debug) {
             klibc::debug_printf("trying to connect to %s fd %d\n", ((sockaddr_un*)addr_ptr)->sun_path, fd);
         }
@@ -386,6 +387,9 @@ long long sys_msg_recv(int fd, struct msghdr *hdr, int flags) {
         if(!target_pipe)
             return -EBADF;
 
+        if(target_pipe->connected_to_pipe_write == 0 && target_pipe->size == 0)
+            return 0;
+
         std::uint64_t total_size = 0;
         for (int i = 0; i < hdr->msg_iovlen; i++) {
             if(!is_safe_to_rw(proc, (std::uint64_t)hdr->msg_iov[i].iov_base,hdr->msg_iov[i].iov_len))
@@ -457,6 +461,9 @@ long long sys_msg_recv(int fd, struct msghdr *hdr, int flags) {
     } else if(fd_s->type == file_descriptor_type::socketpair) {
 
         vfs::pipe* target_pipe = fd_s->socketpair.is_slave ? fd_s->socketpair.read_socket : fd_s->socketpair.write_socket;
+
+        if(target_pipe->connected_to_pipe_write == 0 && target_pipe->size == 0)
+            return 0;
 
         std::uint64_t total_size = 0;
         for (int i = 0; i < hdr->msg_iovlen; i++) {
@@ -647,5 +654,37 @@ long long sys_socketpair(int* fds, int flags) {
 
 long long sys_shutdown(int sockfd, int how) {
     (void)how;
-    return sys_close(sockfd);
+
+    thread* current = current_proc;
+
+    auto manager = (vfs::fdmanager*)current->fd;
+    file_descriptor* socket = manager->search(sockfd);
+
+    if(socket == nullptr)
+        return -EBADF;
+
+    if((socket->type == file_descriptor_type::socket || socket->type == file_descriptor_type::socketpair) == false)
+        return -EINVAL;
+
+    if(socket->type == file_descriptor_type::socket) {
+        if(socket->socket.read_socket == nullptr || socket->socket.write_socket == nullptr)
+            return -EISCONN;
+
+        if(socket->socket.socket_side == 1) {
+            socket->socket.read_socket->socket_counterv2 = 0;
+        } else {
+            socket->socket.write_socket->socket_counterv2 = 0;
+        }
+    } else if(socket->type == file_descriptor_type::socketpair) {
+        if(socket->socketpair.is_slave == true) {
+            socket->socketpair.read_socket->socket_counterv2 = 0;
+        } else {
+            socket->socketpair.write_socket->socket_counterv2 = 0;
+        }
+    } else {
+        assert(0, "what???");
+    }
+
+    log("f", "SHUTDOWN");
+    return 0;
 }

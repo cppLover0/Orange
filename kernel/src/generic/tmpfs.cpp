@@ -158,8 +158,10 @@ signed long tmpfs_ls(file_descriptor* file, char* out, std::size_t count) {
 
     std::size_t current_offset = 0;
 
-    if(node->type != vfs_file_type::directory)
+    if(node->type != vfs_file_type::directory) {
+        file->vnode.fs->lock.unlock();
         return -ENOTDIR;
+    }
 
     std::uint64_t stack_protect2 = 0x1122DDAAF09311BB;
 
@@ -525,7 +527,7 @@ bool tmpfs_test_for_busy(tmpfs::tmpfs_node* node) {
 
 std::int32_t tmpfs_internal_remove(tmpfs::tmpfs_node* node) {
 
-    klibc::debug_printf("rm 0x%p", node);
+    //klibc::debug_printf("rm 0x%p", node);
 
     if(tmpfs_test_for_busy(node) || node->nlink != 0)
         return -EBUSY;

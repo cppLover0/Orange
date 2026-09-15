@@ -1,0 +1,21 @@
+--- a/gcr/test-secure-memory.c
++++ b/gcr/test-secure-memory.c
+@@ -54,6 +54,10 @@
+ static gsize
+ get_rlimit_memlock (void)
+ {
++#ifndef RLIMIT_MEMLOCK
++	/* This platform (mlibc) does not provide RLIMIT_MEMLOCK. */
++	return 0;
++#else
+ 	struct rlimit memlock;
+ 
+ 	/* If the test program is running as a privileged user, it is
+@@ -82,6 +86,7 @@
+ 	}
+ 
+ 	return memlock.rlim_cur;
++#endif
+ }
+ 
+ static void

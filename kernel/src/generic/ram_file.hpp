@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <generic/lock/secure_spinlock.hpp>
 #include <generic/lock/spinlock.hpp>
 
 namespace ram_file {
@@ -22,7 +23,7 @@ namespace ram_file {
         content* next;
     };
 
-    inline locks::spinlock _lock;
+    inline locks::secure_spinlock _lock;
 
     inline void lock() { _lock.lock(); }
     inline void unlock() { _lock.unlock(); }

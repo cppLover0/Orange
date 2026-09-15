@@ -1,12 +1,11 @@
 . "${pkg_lib}"
-exit 0
 
 prepare() {
     autotools_recursive_regen
 }
 
 configure() {
-    meson_configure 
+    meson_configure -Dtest_disable_sandbox=true
 }
 
 build() {

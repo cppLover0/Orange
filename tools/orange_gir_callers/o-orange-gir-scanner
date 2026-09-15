@@ -1,0 +1,4 @@
+#! /bin/sh
+
+export LD_LIBRARY_PATH="${host_dest_dir}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu/"
+orange-g-ir-scanner "$@"

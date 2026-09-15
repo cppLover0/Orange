@@ -1,0 +1,8 @@
+{
+    "name": "accountsservice",
+    "version": "0.6.55",
+    "deps": ["base-libs", "dbus", "polkit"],
+    "url": "https://gitlab.freedesktop.org/accountsservice/accountsservice/-/archive/0.6.55/accountsservice-0.6.55.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -7,7 +7,7 @@ prepare() {
 configure() {
     meson_configure \
     -Dsystemdsystemunitdir=no \
-    -Dintrospection=disabled \
+    -Dintrospection=enabled \
     -Dgtk-doc=false \
     -Dman=false
 }

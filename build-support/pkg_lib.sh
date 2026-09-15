@@ -85,11 +85,11 @@ chmod +x "${build_support}"/ldd-wrapper
 chmod +x "${build_support}"/run-wrapper
 cp -rf "${build_support}"/ldd-wrapper "${build_support}"/run-wrapper "${host_dest_dir}/bin"
 
-export RUN_WRAPPER_LD_LIBRARY_PATH="${host_dest_dir}/mlibc-host/usr/lib:${dest_dir}/usr/lib"
+export RUN_WRAPPER_LD_LIBRARY_PATH="${host_dest_dir}/mlibc-host/usr/lib:${dest_dir}/usr/lib:${dest_dir}/usr/lib/pulseaudio:${dest_dir}/usr/lib/mutter-10"
 export RUN_WRAPPER_INTERP="${host_dest_dir}/mlibc-host/usr/lib/ld.so"
 export GI_LDD_WRAPPER="ldd-wrapper"
 export GI_CROSS_LAUNCHER="run-wrapper"
-export GI_GIR_PATH="${dest_dir}/usr/share/gir-1.0"
+export GI_GIR_PATH="${dest_dir}/usr/share/gir-1.0:${dest_dir}/usr/lib/mutter-10"
 
 gir_prepare() {
     true

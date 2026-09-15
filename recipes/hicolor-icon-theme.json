@@ -1,0 +1,8 @@
+{
+    "name": "hicolor-icon-theme",
+    "version": "recent",
+    "deps": ["base-libs"],
+    "url": "git:https://gitlab.freedesktop.org/xdg/default-icon-theme.git",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

@@ -28,9 +28,6 @@ build() {
 install() {
     make install-gcc -j$(nproc) 
     make install-target-libgcc -j$(nproc) 
-    make all-target-libstdc++-v3
-    make install-target-libstdc++-v3 
-    cp -rf "${host_dest_dir}"/x86_64-orange-mlibc/lib/libstdc++.so* "${dest_dir}/usr/lib"
     cp -rf "${host_dest_dir}"/lib/gcc/x86_64-orange-mlibc/15.1.0/libgcc.a "${dest_dir}/usr/lib/libgcc_s.a"
 }
 

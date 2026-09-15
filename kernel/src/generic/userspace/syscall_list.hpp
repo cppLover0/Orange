@@ -3,14 +3,10 @@
 #include <generic/vfs.hpp>
 #include <klibc/string.hpp>
 #include <utils/assert.hpp>
+#include <utils/timerfd_struct.hpp>
 #include <utils/linux.hpp>
 
-#if defined(__x86_64__)
-#include <arch/x86_64/cpu_local.hpp>
-#define current_proc (CPU_LOCAL_READ(current_thread))
-#else
-#error "todo"
-#endif
+#include <generic/userspace/current_proc.hpp>
 
 inline static void process_path(const char* chroot, const char* at, const char* path, char* result) {
     size_t chroot_len = (chroot ? klibc::strlen(chroot) : 0);
@@ -187,4 +183,24 @@ long long sys_ftruncate(int fd, std::size_t new_size);
 long long sys_fchownat(int dfd, const char* path, uid_t owner, gid_t group, int flags);
 long long sys_stackinfo(void** stack);
 
+long long sys_setthreadname(int tid, const char* name);
+long long sys_getthreadname(int tid, char* buffer, int len);
+
 long long sys_eventfd_create(std::uint64_t initval, int flags);
+
+long long sys_timerfd_create(int clockid, int flags);
+long long sys_timerfd_settime(int fd, int flags, timerfd_spec* value, timerfd_spec* oldvalue);
+long long sys_timerfd_gettime(int fd, struct timerfd_spec* time);
+
+long long sys_symlinkat(const char* target, int newdirfd, const char *new_path);
+long long sys_symlink(const char *target_path, const char *link_path);
+
+long long sys_geteuid();
+long long sys_setuid(int uid);
+long long sys_setgid(int gid);
+
+long long sys_getgroups(std::size_t size, int* list);
+long long sys_setgroups(std::size_t size, int* list);
+
+long long sys_setreuid(int ruid, int euid);
+long long sys_setregid(int rgid, int egid);

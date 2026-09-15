@@ -7,7 +7,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dgio_sniffing=true -Dman=false -Dintrospection=enabled -Dbuiltin_loaders=all
+    meson_configure -Dgio_sniffing=true -Dman=false -Dintrospection=enabled -Dbuiltin_loaders=all 
 }
 
 build() {

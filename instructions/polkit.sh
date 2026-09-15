@@ -5,7 +5,7 @@ prepare() {
 }
 
 configure() {
-    meson_configure -Dlibs-only=true -Dsession_tracking=ConsoleKit -Dauthfw=shadow
+    CFLAGS="-Wno-implicit-function-declaration -Wno-int-conversion" meson_configure -Dsession_tracking=ConsoleKit -Dauthfw=shadow
 }
 
 build() {

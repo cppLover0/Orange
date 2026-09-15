@@ -1,0 +1,8 @@
+{
+    "name": "libstdc++",
+    "version": "idk",
+    "deps": ["mlibc", "gcc-host"], 
+    "url": "package:gcc-host",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

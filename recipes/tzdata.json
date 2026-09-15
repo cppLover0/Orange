@@ -1,0 +1,8 @@
+{
+    "name": "tzdata",
+    "version": "2025b",
+    "deps": ["base-libs"],
+    "url": "https://github.com/eggert/tz/archive/refs/tags/2025b.tar.gz",
+    "should_patch": false,
+    "use_orange_prefix": true
+}

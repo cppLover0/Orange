@@ -5,16 +5,15 @@
 int is_success_init_serial = 0;
 
 void x86_64::serial::init() {
-    x86_64::io::outb(PORT + 1, 0x00);   
-    x86_64::io::outb(PORT + 3, 0x80);    
-    x86_64::io::outb(PORT + 0, 0x03);   
-    x86_64::io::outb(PORT + 1, 0x00);    
-    x86_64::io::outb(PORT + 3, 0x03); 
-    x86_64::io::outb(PORT + 2, 0xC7);   
-    x86_64::io::outb(PORT + 4, 0x0B);    
-    x86_64::io::outb(PORT + 4, 0x1E);    
-    x86_64::io::outb(PORT + 0, 0xAE);    
-
+    x86_64::io::outb(PORT + 1, 0x00);
+    x86_64::io::outb(PORT + 3, 0x80);
+    x86_64::io::outb(PORT + 0, 0x01);
+    x86_64::io::outb(PORT + 1, 0x00);
+    x86_64::io::outb(PORT + 3, 0x03);
+    x86_64::io::outb(PORT + 2, 0xC7);
+    x86_64::io::outb(PORT + 4, 0x0B);
+    x86_64::io::outb(PORT + 4, 0x1E);
+    x86_64::io::outb(PORT + 0, 0xAE);
     if(x86_64::io::inb(PORT + 0) != 0xAE) {
         is_success_init_serial = 0;
         return;
@@ -23,6 +22,7 @@ void x86_64::serial::init() {
     is_success_init_serial = 1;
     x86_64::io::outb(PORT + 4, 0x0F);
 }
+
 
 int is_transmit_empty() {
    return x86_64::io::inb(PORT + 5) & 0x20;

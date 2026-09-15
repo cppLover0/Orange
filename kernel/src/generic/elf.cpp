@@ -353,7 +353,11 @@ void elf::exec(thread* proc, const char* path, char** argv, char** envp) {
 #if defined(__x86_64__)
     proc->ctx.rsp = proc->vmem->alloc_memory(0, 8 * 1024 * 1024, false);
     proc->vmem->inv_lazy_alloc(proc->ctx.rsp,(8 * 1024 * 1024));
+
+    std::uint64_t original_stack = proc->ctx.rsp;
+
     proc->ctx.rsp += (4 * 1024 * 1024) - PAGE_SIZE;
+
     std::uint64_t* _stack = (std::uint64_t*)proc->ctx.rsp;
 
     std::uint64_t random_data_aux = (std::uint64_t)proc->vmem->alloc_memory(0, 4096, false);
@@ -400,8 +404,8 @@ void elf::exec(thread* proc, const char* path, char** argv, char** envp) {
 
     proc->ctx.rsp = (std::uint64_t)_stack;
 
-    proc->userspace_stack = (std::uint64_t)_stack;
-    proc->userspace_stack_size = (8 * 1024 * 1024) - PAGE_SIZE;
+    proc->userspace_stack = (std::uint64_t)original_stack;
+    proc->userspace_stack_size = (4 * 1024 * 1024) - PAGE_SIZE;
 
     proc->ctx.rip = elfload.interp_entry;
 
