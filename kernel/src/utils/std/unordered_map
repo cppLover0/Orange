@@ -1,0 +1,148 @@
+#pragma once
+
+#include <cstdint>
+#include <utils/std/cmath>
+#include <generic/lock/spinlock.hpp>
+#include <utils/std/vector>
+#include <utils/std/bit>
+
+namespace std {
+
+    template <typename key_type, typename value_type>
+    struct hash_bucket_member {
+        key_type key;
+        value_type value;
+        hash_bucket_member* next;
+    };
+
+    template <typename key_type, typename value_type>
+    struct hash_pair {
+        key_type key;
+        value_type value;
+    }; 
+
+    template <typename key_type, typename value_type>
+    class unordered_map {
+    private:
+
+        std::size_t size = 0;
+        std::size_t bucket_size = 0;
+
+        std::vector<hash_bucket_member<key_type, value_type>> array;
+        std::vector<hash_bucket_member<key_type, value_type>> hash_member_space; // its easier to put stuff here instead of heap 
+
+        locks::spinlock map_lock;
+
+        static constexpr int max_bucket_multiple = 2;
+
+        constexpr std::uintptr_t do_hash(const key_type& key) {
+            std::intptr_t hash = 0;
+            for (std::uintptr_t i = 0; i < sizeof(key_type); i++) {
+                hash = (hash << 5) - hash + ((std::uint8_t*)&key)[i];
+            }
+            return std::abs(hash) % this->bucket_size;
+        }
+
+        constexpr static std::uintptr_t do_hash(const key_type& key, const std::size_t& bucket_size) {
+            std::intptr_t hash = 0;
+            for (std::uintptr_t i = 0; i < sizeof(key_type); i++) {
+                hash = (hash << 5) - hash + ((std::uint8_t*)&key)[i];
+            }
+            return std::abs(hash) % bucket_size;
+        }
+        
+        constexpr bool should_rehash() {
+            if(bucket_size == 0)
+                return true;
+            return this->size / this->bucket_size >= max_bucket_multiple ? true : false;
+        }
+
+        inline static void static_put(std::vector<hash_bucket_member<key_type, value_type>>& array, std::vector<hash_bucket_member<key_type, value_type>>& space, const std::size_t& bucket_size, const key_type& key, const value_type& value, std::size_t& size) {
+            auto key_hash = do_hash(key, bucket_size);
+            auto bucket_end = &(array[key_hash]);
+            while(bucket_end) {
+                if(bucket_end->next == nullptr)
+                    break;
+                bucket_end = bucket_end->next;
+            }
+
+            size++;
+            auto new_member = &space.push_back({key, value, nullptr});
+            bucket_end->next = new_member;
+        }
+
+        void rehash(const std::size_t& new_bucket_size) {
+            
+            //log("r", "rehash %d %d", this->size, new_bucket_size);
+
+            std::vector<hash_bucket_member<key_type, value_type>> new_array;
+            std::vector<hash_pair<key_type, value_type>> total_hash_list;
+
+            for(std::size_t i = 0;i < this->bucket_size; i++) {
+                hash_bucket_member<key_type, value_type> current = this->array[i];
+                auto start = current.next;
+                foreach(start) {
+                    hash_pair<key_type, value_type> new_pair = {item->key, item->value};
+                    total_hash_list.push_back(new_pair);
+                }
+            }
+
+            this->bucket_size = new_bucket_size;
+
+            this->hash_member_space.zero();
+            for(std::size_t i = 0; i < total_hash_list.size(); i++) {
+                static_put(new_array, this->hash_member_space, this->bucket_size, total_hash_list[i].key, total_hash_list[i].value, this->size);
+            }
+            this->array.copy(new_array); // do copy
+
+        }
+
+    public:
+
+        unordered_map() {
+            this->bucket_size = 1;
+        }
+
+        std::uintptr_t array_index(const key_type& key) {
+            return do_hash(key);
+        }
+
+        void put(const key_type& key, const value_type& value) {
+            this->map_lock.lock();
+            static_put(this->array, this->hash_member_space, this->bucket_size, key, value, this->size);
+
+            if(should_rehash())
+                rehash(this->bucket_size * this->max_bucket_multiple);
+
+            this->map_lock.unlock();
+        }
+
+        value_type* get(const key_type& key) {
+            this->map_lock.lock();
+            auto idx = array_index(key);
+            hash_bucket_member<key_type, value_type>& bucket = array[idx];
+            auto start = bucket.next;
+
+            foreach(start) {
+                if(item->key == key) {
+                    this->map_lock.unlock();
+                    return &item->value;
+                }
+            }
+
+            this->map_lock.unlock();
+            return nullptr;
+        }
+
+        value_type& operator[](const key_type& key) {
+            if(this->get(key) == nullptr) {
+                value_type j = {};
+                this->put(key, j);
+
+                assert(this->get(key) != nullptr, "shit %lli", key);
+            }
+            return *this->get(key);
+        }
+        
+    };
+};

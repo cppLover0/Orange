@@ -70,7 +70,7 @@ namespace x86_64 {
             return days[month - 1];
         }
 
-        static inline static std::uint64_t get_unix_time_cmos() {
+        static inline std::uint64_t get_unix_time_cmos() {
             int year = cmos::year();
             int month = cmos::month();
             int day = cmos::day();

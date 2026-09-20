@@ -83,9 +83,9 @@ ram_file::page* ram_file::access_page(std::int64_t inode, void* id, std::size_t 
 
     assert(copy_file.vnode.read, "fuck you %s", copy_file.path);
 
-    klibc::printf("MEOW %s off %lli, %lli, %lli count %lli\n", copy_file.path, original_mmap_off, page_num * PAGE_SIZE, copy_file.offset);
+    //klibc::printf("MEOW %s off %lli, %lli, %lli count %lli\n", copy_file.path, original_mmap_off, page_num * PAGE_SIZE, copy_file.offset);
     std::size_t count = copy_file.vnode.read(&copy_file, new_page->p, PAGE_SIZE);
-    klibc::printf("count %lli\n", count);
+    //klibc::printf("count %lli\n", count);
     
     assert(count != 0, "gamgesromssgfdkvbl %lli %lli count %lli", copy_file.offset, page_num, count); // debug assert
 

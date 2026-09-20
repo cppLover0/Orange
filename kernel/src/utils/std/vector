@@ -1,0 +1,156 @@
+#pragma once
+
+#include <cstdint>
+#include <atomic>
+#include <generic/pmm.hpp>
+#include <generic/hhdm.hpp>
+#include <utils/align.hpp>
+#include <utils/foreach.hpp>
+#include <utils/assert.hpp>
+#include <utils/std/algorithm>
+
+// its linked list but i like std::vector name more so ill name this std::vector
+
+namespace std {
+
+    constexpr inline std::size_t get_page_remain_array_index(std::size_t size, std::size_t a) {
+        return ALIGNDOWN(4096 - a, size) / size;
+    }
+
+    template <typename T>
+    struct [[gnu::packed]] vector_linked_list {
+        vector_linked_list* next;
+        T objects[get_page_remain_array_index(sizeof(T), sizeof(vector_linked_list*))];
+        static_assert(sizeof(T) <= 4096, "T can't be bigger than page size");
+    };
+    
+    template <typename T>
+    class vector {
+    private:
+        vector_linked_list<T>* list = nullptr;
+
+        void ensure_enough_size(const std::size_t& max_index) {
+            constexpr std::size_t indexes_in_struct = sizeof(vector_linked_list<T>::objects) / sizeof(T);
+            
+            assert(sizeof(vector_linked_list<T>) <= PAGE_SIZE, "vector_linked_list is bigger than page size ! %d %d %d %d %d %d %d", ALIGNDOWN(4096 - 8, sizeof(T)), ALIGNDOWN(4096 - 8, sizeof(T)) / sizeof(T), sizeof(T), sizeof(vector_linked_list<T>*), get_page_remain_array_index(sizeof(T), sizeof(vector_linked_list<T>*)), sizeof(vector_linked_list<T>::objects), sizeof(T));
+
+            if(list == nullptr) {
+                list = (vector_linked_list<T>*)(pmm::freelist::alloc_4k() + etc::hhdm());
+            }
+
+            auto current = list;
+            auto current_index = max_index;
+
+            while(true) {
+
+                if(current_index < indexes_in_struct)
+                    break;
+
+                current_index -= indexes_in_struct;
+
+                if(current->next == nullptr) {
+                    current->next = (vector_linked_list<T>*)(pmm::freelist::alloc_4k() + etc::hhdm());
+                }
+                current = current->next;
+            }
+
+            this->arr_size = std::max(this->arr_size, max_index + 1);
+        }
+
+    public:
+
+        std::size_t arr_size = 0;
+
+        vector() {
+            this->list = (vector_linked_list<T>*)(pmm::freelist::alloc_4k() + etc::hhdm());
+        }
+
+        void zero() {
+            if(this->list != nullptr) {
+                auto current = this->list;
+                while(current) {
+                    auto next = current->next;
+                    pmm::freelist::free((std::uint64_t)current - etc::hhdm());
+                    current = next;
+                }
+                this->list = nullptr;
+            }
+            this->arr_size = 0;
+        }
+
+        void copy(vector& source) {
+            this->zero();
+
+            if(const auto src_list = source.access_list(); src_list != nullptr) {
+                this->ensure_enough_size(source.size() - 1);
+                auto current = src_list;
+                auto dest_list = this->list;
+                foreach(current) {
+                    klibc::memcpy(dest_list->objects, item->objects, sizeof(item->objects));
+                    dest_list = dest_list->next;
+                }
+            }
+
+        }
+
+        vector(const vector& source) {
+            this->copy(source);
+        }
+
+        ~vector() {
+            auto current = this->list;
+            while(current) {
+                auto next = current->next;
+                pmm::freelist::free((std::uint64_t)current - etc::hhdm());
+                current = next;
+            }
+        }
+
+        vector_linked_list<T>* access_list() {
+            return this->list;
+        }
+
+        const vector_linked_list<T>* access_list() const {
+            return this->list;
+        }
+
+        std::size_t size() {
+            return this->arr_size;
+        }
+
+        std::size_t size() const {
+            return this->arr_size;
+        }
+
+        T& push_back(const T& value) {
+            T& item = this->access(this->size());
+            item = value;
+            return item;
+        }
+
+        T& access(const std::size_t& idx) {
+            this->ensure_enough_size(idx);
+
+            constexpr std::size_t indexes_in_struct = sizeof(vector_linked_list<T>::objects) / sizeof(T);
+            std::size_t current_index = idx;
+
+            auto current = this->list;
+
+            while(current) {
+                if(current_index < indexes_in_struct) {
+                    return current->objects[current_index];
+                } 
+                current_index -= indexes_in_struct;
+                current = current->next;
+            }
+
+            assert(0, "never should happen idx %d", idx);
+            __builtin_unreachable();
+        }
+
+        T& operator[](std::size_t idx) {
+            return this->access(idx);
+        }
+
+    };
+};

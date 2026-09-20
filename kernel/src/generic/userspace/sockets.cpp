@@ -453,7 +453,6 @@ long long sys_msg_recv(int fd, struct msghdr *hdr, int flags) {
             } else
                 target_pipe->lock.unlock(state);
 
-            target_pipe->lock.unlock(state);
             hdr->msg_controllen = new_msglen;
 
             klibc::debug_printf("msg_recv fd %d total_read %lli flags %d from proc %d, controllen %d srclen %d\n",fd,total_read,flags,proc->id,hdr->msg_controllen,src_msglen);
@@ -685,6 +684,6 @@ long long sys_shutdown(int sockfd, int how) {
         assert(0, "what???");
     }
 
-    log("f", "SHUTDOWN");
+    //log("f", "SHUTDOWN");
     return 0;
 }

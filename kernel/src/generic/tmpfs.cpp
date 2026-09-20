@@ -408,7 +408,7 @@ again_paste:
     for(std::uint64_t i = 0;i < parent->size / sizeof(tmpfs::directory_cont); i++) {
         if(parent->dirents[i].node == nullptr)  {
             parent->dirents[i].node = new_node;
-            klibc::memcpy(parent->dirents[i].name, tmpfs_get_name_from_path(path), klibc::strlen(tmpfs_get_name_from_path(path)) + 1);
+            klibc::strcpy(parent->dirents[i].name, tmpfs_get_name_from_path(path));
             is_pasted = true;
             break;
         }
@@ -685,7 +685,7 @@ std::int32_t tmpfs_unlink(filesystem* fs, char* path) {
     }
 
     char name[257] = {};
-    klibc::memcpy(name, tmpfs_get_name_from_path(path), klibc::strlen(tmpfs_get_name_from_path(path)) + 1);
+    klibc::strcpy(name, tmpfs_get_name_from_path(path));
 
     tmpfs::tmpfs_node* parent = tmpfs_get_parent(path);
 
@@ -724,7 +724,7 @@ void fast_unlink(filesystem* fs, char* new_path, tmpfs::tmpfs_node* new_node) {
         return;
 
     char name[257] = {};
-    klibc::memcpy(name, tmpfs_get_name_from_path(new_path), klibc::strlen(tmpfs_get_name_from_path(new_path)) + 1);
+    klibc::strcpy(name, tmpfs_get_name_from_path(new_path));
 
     tmpfs::tmpfs_node* parentz = tmpfs_get_parent(new_path);
 
@@ -778,7 +778,7 @@ std::int32_t tmpfs_rename(filesystem* fs, char* old_path, char* new_path) {
     for(std::uint64_t i = 0;i < parent->size / sizeof(tmpfs::directory_cont); i++) {
         if(parent->dirents[i].node == nullptr)  {
             parent->dirents[i].node = old_node;
-            klibc::memcpy(parent->dirents[i].name, tmpfs_get_name_from_path(new_path), klibc::strlen(tmpfs_get_name_from_path(new_path)) + 1);
+            klibc::strcpy(parent->dirents[i].name, tmpfs_get_name_from_path(new_path));
             is_pasted = true;
             break;
         }
@@ -815,7 +815,7 @@ void tmpfs::init_default(vfs::node* node) {
     node->fs->link = tmpfs_link;
     node->fs->unlink = tmpfs_unlink;
     node->fs->rename = tmpfs_rename;
-    klibc::memcpy(node->path, "/\0\0", sizeof("/\0\0") + 1);
+    klibc::strcpy(node->path, "/");
 
     alloc_t root_alloc = pmm::buddy::alloc(PAGE_SIZE);
 
@@ -824,7 +824,7 @@ void tmpfs::init_default(vfs::node* node) {
     root_node.physical_size = root_alloc.real_size;
     root_node.nlink = 9999999;
     root_node.size = root_node.physical_size;
-    klibc::memcpy(node->internal_path, "/", sizeof("/\0") + 1);
+    klibc::strcpy(node->internal_path, "/");
 
     root_node.dirents = (tmpfs::directory_cont*)(root_alloc.phys + etc::hhdm());
     log("tmpfs", "root_node is 0x%p",&root_node);

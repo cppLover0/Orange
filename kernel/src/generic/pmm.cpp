@@ -8,6 +8,7 @@
 #include <generic/paging.hpp>
 #include <utils/gobject.hpp>
 #include <utils/align.hpp>
+#include <utils/std/algorithm>
 #include <atomic>
 
 locks::spinlock pmm_lock;
@@ -168,8 +169,13 @@ void pmm::buddy::init() {
                 new_base += LEVEL_TO_SIZE(__buddy_align_power(new_len));
                 new_len -= LEVEL_TO_SIZE(__buddy_align_power(new_len));
             }
+
+            pmm::virt_hhdm_max = std::max((std::uint64_t)(etc::hhdm() + current->base + current->length), pmm::virt_hhdm_max);
         }
+
     }
+
+    pmm::virt_hhdm_max += (1024ull * 1024 * 1024 * 4);
 
     free_mem = memory_size;
 

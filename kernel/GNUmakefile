@@ -56,7 +56,7 @@ endif
 # User controllable C flags.
 
 ifeq ($(MODE),DEBUG)
-    CFLAGS := -g -pipe -Wall -Wno-unused-command-line-argument -Wno-frame-address
+    CFLAGS := -g -pipe -Wall -Wno-unused-command-line-argument -Wno-frame-address -Werror
 else ifeq ($(MODE), RELEASE)
     CFLAGS := -g -O3 -Wno-unused-command-line-argument -Wno-frame-address -ffast-math -pipe -Werror -Wall -fomit-frame-pointer -funroll-loops -fno-exceptions -mllvm -force-vector-width=64 -mllvm -inline-threshold=1000
 else

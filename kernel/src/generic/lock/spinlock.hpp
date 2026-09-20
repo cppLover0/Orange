@@ -2,7 +2,6 @@
 #include <atomic>
 #include <cstdint>
 #include <klibc/stdio.hpp>
-#include <utils/assert.hpp>
 
 #include <generic/arch.hpp>
 
@@ -16,8 +15,6 @@ namespace locks {
             bool lock() {
                 if(is_disabled)
                     return 0;
-                
-                assert(arch::test_interrupts() == false, "bug1");
 
                 //arch::disable_interrupts();
                 while (flag.test_and_set(std::memory_order_acquire)) {
@@ -32,7 +29,6 @@ namespace locks {
 
                 arch::memory_barrier();
 
-                assert(state == false, "bug4");
                 if(state)
                     arch::enable_interrupts();
             }
@@ -51,8 +47,6 @@ namespace locks {
         std::atomic_flag flag = ATOMIC_FLAG_INIT;
     public:
             void lock() {
-
-                assert(arch::test_interrupts() == false, "bug2");
 
                 while (flag.test_and_set(std::memory_order_acquire)) {
                     arch::pause();

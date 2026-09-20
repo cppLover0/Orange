@@ -93,23 +93,23 @@ void fbdev::init() {
 
         sysfs::create_dir("/class/graphics/fb%d", i);
         sysfs::create_symlink("/class/graphics/fb%d/subsystem", (char*)"../..", i);
-        sysfs::create("/class/graphics/fb%d/rotate", (void*)"0\0", 2, i);
-        sysfs::create("/class/graphics/fb%d/name", (void*)"vesafb\0", sizeof("vesafb"), i);
+        sysfs::create("/class/graphics/fb%d/rotate", (void*)"0", 2, i);
+        sysfs::create("/class/graphics/fb%d/name", (void*)"vesafb", sizeof("vesafb"), i);
 
         char buffer2[256];
         int len2 = klibc::__printfbuf(buffer2, 256, "U:%llix%llip-0", fb.width, fb.height);
         sysfs::create("/class/graphics/fb%d/modes", (void*)buffer2, len2 + 1, i);
         sysfs::create("/class/graphics/fb%d/mode", (void*)buffer2, len2 + 1, i);
 
-        sysfs::create("/class/graphics/fb%d/pan", (void*)("0,0\0"), sizeof("0,0"), i);
+        sysfs::create("/class/graphics/fb%d/pan", (void*)("0,0"), sizeof("0,0"), i);
 
         len2 = klibc::__printfbuf(buffer2, 256, "%lli,%lli", fb.width, fb.height);
         sysfs::create("/class/graphics/fb%d/virtual_size", buffer2, len2, i);
 
         len2 = klibc::__printfbuf(buffer2, 256, "%d", vinfo->bits_per_pixel);
         sysfs::create("/class/graphics/fb%d/bits_per_pixel", (void*)buffer2, len2 + 1, i);
-        sysfs::create("/class/graphics/fb%d/blank", (void*)"0\0", sizeof("0"), i);
-        sysfs::create("/class/graphics/fb%d/state", (void*)"0\0", sizeof("0"), i);
+        sysfs::create("/class/graphics/fb%d/blank", (void*)"0", sizeof("0"), i);
+        sysfs::create("/class/graphics/fb%d/state", (void*)"0", sizeof("0"), i);
 
         len2 = klibc::__printfbuf(buffer2, 256, "29:%d", i);
         sysfs::create("/class/graphics/fb%d/dev", buffer2, len2, i);

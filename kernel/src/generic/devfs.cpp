@@ -233,8 +233,8 @@ void devfs::init(vfs::node* new_node) {
     new_node->fs->open = devfs_open;
     new_node->fs->readlink = devfs_readlink;
     new_node->fs->remove = devfs_remove;
-    klibc::memcpy(new_node->path, "/dev/\0", sizeof("/dev/\0") + 1);
-    klibc::memcpy(new_node->internal_path, "/dev", sizeof("/dev\0") + 1);
+    klibc::strcpy(new_node->path, "/dev/");
+    klibc::strcpy(new_node->internal_path, "/dev");
 
     create(false, (char*)"/input", nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, true);
     create(false, (char*)"/dri", nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, true);

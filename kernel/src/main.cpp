@@ -29,12 +29,16 @@
 #include <generic/randomdev.hpp>
 #include <generic/mmap_syncer.hpp>
 #include <generic/timer_thread.hpp>
+#include <generic/vma.hpp>
 
 #if defined(__x86_64__)
 #include <arch/x86_64/drivers/pci.hpp>
 #include <arch/x86_64/cpu_local.hpp>
 #include <arch/x86_64/drivers/serial.hpp>
 #endif
+
+#include <utils/std/vector>
+#include <utils/std/unordered_map>
 
 extern std::size_t memory_size;
 extern int is_early;
@@ -62,6 +66,8 @@ extern "C" void main() {
     pmm::init();
     paging::init();
     kheap::init();
+    vma::kmem = new vma::_vma(10, 10);
+
     utils::flanterm::init();
     utils::flanterm::fullinit();
     cmdline::init();

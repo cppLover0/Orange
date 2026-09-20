@@ -294,8 +294,8 @@ void evdev::init_default(vfs::node* node) {
     filesystem* new_fs = new filesystem;
     node->fs = new_fs;
 
-    klibc::memcpy(node->path, "/dev/input/\0\0", sizeof("/dev/input/\0\0") + 1);
-    klibc::memcpy(node->internal_path, "/dev/input", sizeof("/dev/input\0") + 1);
+    klibc::strcpy(node->path, "/dev/input/");
+    klibc::strcpy(node->internal_path, "/dev/input");
     node->fs->readlink = evdev_readlink;
     node->fs->open = evdev_open;
     node->fs->create = evdev_create;

@@ -14,6 +14,7 @@
 #include <generic/lock/spinlock.hpp>
 #include <generic/flock.hpp>
 #include <generic/timer_thread.hpp>
+#include <utils/std/unordered_map>
 
 struct statfs {
    long    f_type;  
@@ -653,31 +654,35 @@ namespace vfs {
         locks::preempt_spinlock fd_lock;
         std::atomic<int> fd_usage_pointer = 0;
 
-        file_descriptor* search(int idx) {
-            bool state = this->fd_lock.lock();
-            file_descriptor* current = this->head_fd;
-            while(current) {
-                if(current->index == idx && current->type != file_descriptor_type::unallocated) {
+        std::unordered_map<int, file_descriptor*> fd_hash_map;
+
+        file_descriptor* search(int idx, bool should_lock = true) {
+            bool state = false;
+            if(should_lock == true)
+                state = this->fd_lock.lock();
+            file_descriptor* current = this->fd_hash_map[idx];
+
+            if(current == nullptr) {
+                if(should_lock == true)
                     this->fd_lock.unlock(state);
-                    return current;
-                }
-                current = current->next;
+                return nullptr; 
             }
 
-            this->fd_lock.unlock(state);
+            if(current->type != file_descriptor_type::unallocated) {
+                if(should_lock == true)
+                    this->fd_lock.unlock(state);
+                return current;
+            }
+
+            if(should_lock == true)
+                this->fd_lock.unlock(state);
+
             return nullptr;
         }
 
         file_descriptor* nl_search(int idx) {
-            file_descriptor* current = this->head_fd;
-            while(current) {
-                if(current->index == idx) {
-                    return current;
-                }
-                current = current->next;
-            }
-
-            return nullptr;
+            file_descriptor* current = this->fd_hash_map[idx];
+            return current;
         }
 
         file_descriptor* createlowest(int idx) {
@@ -716,6 +721,9 @@ namespace vfs {
                 lowest->index = candidate;
                 lowest->next = head_fd;
                 head_fd = lowest;
+
+                this->fd_hash_map[candidate] = lowest;
+
             }
 
             file_descriptor* next_ptr = lowest->next;
@@ -742,7 +750,7 @@ namespace vfs {
             file_descriptor* current = this->head_fd;
             while(current) {
                 if(current->type != file_descriptor_type::unallocated) {
-                    this->close(current); 
+                    this->close(0, 0, false, current); 
                 }
                 file_descriptor* next = current->next;
                 pmm::freelist::free((std::uint64_t)current - etc::hhdm());
@@ -768,6 +776,8 @@ namespace vfs {
                 klibc::memcpy(new_fd, current, sizeof(file_descriptor));
                 new_fd->next = dest->head_fd;
                 dest->head_fd = new_fd;
+
+                dest->fd_hash_map[new_fd->index] = new_fd;
 
                 if(new_fd->type == file_descriptor_type::pipe) {
                     new_fd->fs_specific.pipe->create(new_fd->other.pipe_side);
@@ -887,7 +897,7 @@ namespace vfs {
                     if(should_cloexec) {
                         current->other.is_cloexec = true;
                     } else {
-                        this->close(current);
+                        this->close(0, 0, false, current);
                     }
                 }
                 current = next;
@@ -923,7 +933,7 @@ namespace vfs {
             }
 
             if(lowest) {
-                this->close(lowest);
+                this->close(0, 0, false, lowest);
             }
 
             if (lowest == nullptr) {
@@ -931,6 +941,8 @@ namespace vfs {
                 lowest->index = idx;
                 lowest->next = head_fd;
                 head_fd = lowest;
+
+                this->fd_hash_map[idx] = lowest;
             }
 
             file_descriptor* next_ptr = lowest->next;
@@ -992,7 +1004,21 @@ namespace vfs {
             return lowest;
         }
 
-        void close(file_descriptor* file, int pid = 0) {
+        // i moved it to fd to make it under lock
+        void close(int fd, int pid = 0, bool should_lock = true, file_descriptor* internal_file = nullptr) {
+
+            bool state = false;
+
+            if(should_lock)
+                state = this->fd_lock.lock();
+
+            file_descriptor* file = nullptr;
+
+            if(internal_file != nullptr) 
+                file = internal_file;
+            else 
+                file = search(fd, false);
+
             if(file->type == file_descriptor_type::file) {
 
                 if(file->vnode.fs) {
@@ -1095,6 +1121,9 @@ namespace vfs {
                 assert(0, "unimplemented close type %d", file->type);
             } 
             file->type = file_descriptor_type::unallocated;
+
+            if(should_lock)
+                this->fd_lock.unlock(state);
         }
 
         void cloexec() {
@@ -1103,7 +1132,7 @@ namespace vfs {
             while(current) {
                 file_descriptor* next = current->next;
                 if(current->other.is_cloexec)
-                    this->close(current); 
+                    this->close(0, 0, false, current); 
                 current = next;
             } 
             fd_lock.unlock(state);

@@ -192,9 +192,10 @@ void process_close(void* node1) {
 
     unix_socket_node* node = (unix_socket_node*)node1;
 
+    un_lock.lock();
+
     node->open_counter--;
     if(node->open_counter == 0 && node->link_counter == 0) {
-        un_lock.lock();
         unix_socket_node* parent = head_unsock_node;
         while(parent) {
             if(parent->next == node)
@@ -207,8 +208,9 @@ void process_close(void* node1) {
 
         pmm::freelist::free((std::uint64_t)node - etc::hhdm());
 
-        un_lock.unlock();
+       
     }
+    un_lock.unlock();
 }
 
 unix_socket_node* unix_sockets::find(sockaddr_un* path) {

@@ -83,7 +83,7 @@ long long sys_openat(int dfd, const char* path, int flags, int mode) {
 
 fail:
     if(status != 0) {
-        manager->close(new_fd);
+        manager->close(0, 0, true, new_fd);
         return status;
     }
 
@@ -703,7 +703,7 @@ long long sys_close(int fd) {
     if(!file)
         return -EBADF;
 
-    manager->close(file, current->pid);
+    manager->close(fd, current->pid);
     return 0;
 }
 
@@ -1232,7 +1232,7 @@ long long poll_impl(pollfd* fds, std::uint32_t nfds, int timeout) {
             }
 
             if(pollhup_ret && (fd->type == file_descriptor_type::socketpair || fd->type == file_descriptor_type::socket)) {
-                klibc::printf("POLLHUP!");
+                klibc::debug_printf("POLLHUP!");
             }
 
             if(fd->type == file_descriptor_type::pipe) {
@@ -2445,7 +2445,7 @@ long long sys_timerfd_create(int clockid, int flags) {
 
     fd0->timerfd = timer;
 
-    klibc::printf("creating timerfd %d\n", fd0->index);
+    klibc::debug_printf("creating timerfd %d\n", fd0->index);
 
     return fd0->index;
 }

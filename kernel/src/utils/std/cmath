@@ -1,0 +1,10 @@
+#pragma once
+
+namespace std {
+    
+    template <typename T>
+    constexpr inline T abs(const T& x) {
+        return (x < 0) ? -x : x;
+    }
+
+};

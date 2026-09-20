@@ -62,4 +62,7 @@ namespace pmm {
         void free(std::uint64_t phys);
         void nlfree(std::uint64_t phys);
     };
+
+    inline std::uint64_t virt_hhdm_max = 0;
+
 };

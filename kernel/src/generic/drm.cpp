@@ -1190,8 +1190,8 @@ void drm::init(vfs::node* node) {
     filesystem* new_fs = new filesystem;
     node->fs = new_fs;
 
-    klibc::memcpy(node->path, "/dev/dri/\0\0", sizeof("/dev/dri/\0\0") + 1);
-    klibc::memcpy(node->internal_path, "/dev/dri", sizeof("/dev/dri\0") + 1);
+    klibc::strcpy(node->path, "/dev/dri/");
+    klibc::strcpy(node->internal_path, "/dev/dri");
     node->fs->readlink = drm_readlink;
     node->fs->open = drm_open;
 

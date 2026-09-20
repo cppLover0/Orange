@@ -87,6 +87,10 @@ int klibc::strlen(const char *str) {
     return len;
 }
 
+void klibc::strcpy(void* dest, const void* src) {
+    klibc::memcpy(dest, src, klibc::strlen((const char*)src) + 1);
+}
+
 char* klibc::strchr(const char *s, int c) {
     while (*s) {
         if (*s == (char)c) return (char *)s;

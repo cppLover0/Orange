@@ -1,0 +1,15 @@
+#pragma once
+
+#include <cstdint>
+
+namespace std {
+    template <typename T>
+    constexpr inline T bit_ceil(T x) {
+        if(x <= 1) return x;
+        x--;
+        for(std::size_t shift = 1; shift < sizeof(T) * 8; shift <<= 1) {
+            x |= x >> shift;
+        }
+        return x + 1;
+    }
+}

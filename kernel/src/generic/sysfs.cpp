@@ -460,15 +460,15 @@ void sysfs::init(vfs::node* node) {
     node->fs->open = sysfs_open;
     node->fs->create = sysfs_create;
     node->fs->readlink = sysfs_readlink;
-    klibc::memcpy(node->path, "/sys/\0\0", sizeof("/sys/\0\0") + 1);
+    klibc::strcpy(node->path, "/sys/");
 
     alloc_t root_alloc = pmm::buddy::alloc(PAGE_SIZE);
 
     sysfs_root_node.size = 0;
     sysfs_root_node.type = vfs_file_type::directory;
     sysfs_root_node.physical_size = root_alloc.real_size;
-    klibc::memcpy(sysfs_root_node.name, "/\0", sizeof("/\0") + 1);
-    klibc::memcpy(node->internal_path, "/sys", sizeof("/sys\0") + 1);
+    klibc::strcpy(sysfs_root_node.name, "/");
+    klibc::strcpy(node->internal_path, "/sys");
 
     sysfs_root_node.directory_content = (tmpfs::legacy_tmpfs_node**)(root_alloc.phys + etc::hhdm());
 
