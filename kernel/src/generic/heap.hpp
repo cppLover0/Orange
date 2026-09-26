@@ -11,10 +11,15 @@ struct heap_block {
 
 namespace kheap {
 
+    enum class heap_flags {
+        default_flag = 0,
+        no_vma = 1
+    };
+
     void* opt_malloc(std::size_t size);
     void opt_free(void* ptr);
 
     void init();
-    void* malloc(std::size_t size);
+    void* malloc(std::size_t size, heap_flags flags = heap_flags::default_flag);
     void free(void* ptr);
 }

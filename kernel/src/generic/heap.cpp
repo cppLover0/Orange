@@ -40,7 +40,8 @@ static void defragment() {
     }
 }
 
-void* kheap::malloc(std::size_t size) {
+void* kheap::malloc(std::size_t size, heap_flags flags) {
+    (void)flags;
     if (size == 0) return nullptr;
 
     size = (size + 7) & ~7;

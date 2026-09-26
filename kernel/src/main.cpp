@@ -39,6 +39,7 @@
 
 #include <utils/std/vector>
 #include <utils/std/unordered_map>
+#include <utils/rbtree.hpp>
 
 extern std::size_t memory_size;
 extern int is_early;
@@ -100,6 +101,22 @@ extern "C" void main() {
     randomdev::init();
 
     random::reseed();
+
+    auto start = time::timer->current_nano();
+    utils::rbtree<std::uint64_t> tree;
+
+    for(int i = 0;i < 10000; i++) {
+        tree[i] = i * 2;
+        //klibc::printf(" %d ", tree[i]);
+    }
+
+    for(int i = 0;i < 10000; i++) {
+        tree.remove(i);
+    }
+
+    auto end = time::timer->current_nano();
+
+    log("F", "%lli", end - start);
 
     if(!cmdline::parser->contains("noacpi")) {
         drivers::powerbutton::init();
