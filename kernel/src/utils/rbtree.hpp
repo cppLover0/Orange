@@ -5,6 +5,8 @@
 
 // i used wikipedia as ref
 
+// i made my implementation to be able to work like linked list too (start, next functions)
+
 namespace utils {
 
     enum class rbtree_color {
@@ -13,6 +15,7 @@ namespace utils {
         red = 2
     };
 
+    template <typename key_type>
     struct rbtree_node {
 
         rbtree_node* parent = nullptr;
@@ -21,7 +24,10 @@ namespace utils {
         rbtree_node* left = nullptr;
 
         rbtree_color color = rbtree_color::whoisthis;
-        std::uintptr_t x = 0; 
+        key_type x = 0; 
+
+        std::atomic<std::size_t> size = 0;
+        std::atomic<std::size_t> ref = 1;
 
         void* value = nullptr;
 
@@ -96,15 +102,15 @@ namespace utils {
 
     };
 
-    template <typename T>
+    template <typename T, typename key_type>
     class rbtree {
     private:
 
 
-        rbtree_node* root = nullptr;
-        locks::spinlock lock;
+        rbtree_node<key_type>* root = nullptr;
+        locks::spinlock lock; 
         
-        rbtree_node* find(const std::uintptr_t& key) {
+        rbtree_node<key_type>* find(const key_type& key) {
             auto current = root;
 
             while(current) {
@@ -119,7 +125,7 @@ namespace utils {
             return nullptr;
         }
 
-        rbtree_node* insert_final(const T& value, rbtree_node* node) {
+        rbtree_node<key_type>* insert_final(const T& value, rbtree_node<key_type>* node) {
             if(node->value != nullptr)
                 delete static_cast<T*>(node->value);
 
@@ -129,9 +135,9 @@ namespace utils {
             return node;
         }
 
-        rbtree_node* insert_recursive(const std::uintptr_t& key, const T& value, rbtree_node* parent, rbtree_node*& node) {
+        rbtree_node<key_type>* insert_recursive(const key_type& key, const T& value, rbtree_node<key_type>* parent, rbtree_node<key_type>*& node) {
             if(node == nullptr) {
-                node = new rbtree_node;
+                node = new rbtree_node<key_type>;
                 node->color = rbtree_color::red;
                 node->parent = parent;
                 node->x = key;
@@ -149,18 +155,21 @@ namespace utils {
             return nullptr;
         }
 
-        void insert(const std::uintptr_t& key, const T& value) {
-            this->lock.lock();
+        rbtree_node<key_type>& insert(const key_type& key, const T& value, bool should_lock = true) {
+            if(should_lock == true)
+                this->lock.lock();
             auto node = insert_recursive(key, value, nullptr, this->root);
             fix_insert(node);
-            this->lock.unlock();
+            if(should_lock == true)
+                this->lock.unlock();
+            return *node;
         }
 
-        void remove_recursive(const std::uintptr_t& key, rbtree_node*& node) {
+        void remove_recursive(const key_type& key, rbtree_node<key_type>*& node) {
             if (node == nullptr)
                 return;
 
-            auto remove_node = [](rbtree_node* node) {
+            auto remove_node = [](rbtree_node<key_type>* node) {
                 if (node->value != nullptr)
                     delete static_cast<T*>(node->value);
                 delete node;
@@ -197,15 +206,15 @@ namespace utils {
                     remove_node(old_node);
 
                 } else {
-                    rbtree_node** successor_ref = &node->right;
+                    rbtree_node<key_type>** successor_ref = &node->right;
                     while ((*successor_ref)->left != nullptr) {
                         successor_ref = &(*successor_ref)->left;
                     }
 
-                    rbtree_node* successor = *successor_ref;
+                    rbtree_node<key_type>* successor = *successor_ref;
                     rbtree_color successor_color = successor->color;
-                    rbtree_node* successor_parent = successor->parent;
-                    rbtree_node* successor_right = successor->right;
+                    rbtree_node<key_type>* successor_parent = successor->parent;
+                    rbtree_node<key_type>* successor_right = successor->right;
 
                     if (successor->parent != node) {
                         *successor_ref = successor->right;
@@ -249,7 +258,7 @@ namespace utils {
             }
         }
 
-        void fix_insert(rbtree_node* node) {
+        void fix_insert(rbtree_node<key_type>* node) {
             if(node->parent == nullptr) {
                 node->color = rbtree_color::black;
                 return;
@@ -289,7 +298,7 @@ namespace utils {
             }
         }
 
-        void fix_remove(rbtree_node* node) {
+        void fix_remove(rbtree_node<key_type>* node) {
             while (node != this->root && node->color == rbtree_color::black) {
                 if (node->parent == nullptr)
                     return;
@@ -364,7 +373,7 @@ namespace utils {
                 node->color = rbtree_color::black;
         }
 
-        void clear(rbtree_node* node) {
+        void clear(rbtree_node<key_type>* node) {
             if(node == nullptr) 
                 return;
 
@@ -377,9 +386,61 @@ namespace utils {
             delete node;
         }
 
+        rbtree_node<key_type>* search_for_the_most_left(rbtree_node<key_type>* node) {
+            auto current = node;
+            while(current) {
+                if(current->left == nullptr)
+                    return current;
+
+                current = current->left;
+            }
+
+            return nullptr;
+        }
+
+        rbtree_node<key_type>* find_gap_child(rbtree_node<key_type>* node, const std::size_t& size) {
+
+            if(node->right != nullptr) {
+                auto leftest = this->search_for_the_most_left(node);
+                if(leftest->x - node->x >= size)
+                    return node;
+
+                auto result = this->find_gap_child(node->right, size);
+
+                if(result != nullptr)
+                    return result;
+            }
+
+            return nullptr;
+        }
+
+        rbtree_node<key_type>* find_gap_left(rbtree_node<key_type>* node, const std::size_t& size) {
+
+            if(node->right != nullptr) {
+                auto leftest = this->search_for_the_most_left(node->right);
+                if(leftest->x - node->x >= size)
+                    return node;
+
+                auto result = this->find_gap_child(node->right, size);
+
+                if(result != nullptr)
+                    return result;
+            } else {
+                if(node->parent != nullptr) {
+                    if(node->parent->x - node->x >= size)
+                        return node;
+                }
+            }
+
+            if(node->parent != nullptr)
+                return find_gap_left(node->parent, size);
+            
+            return nullptr;
+        }
+
     public:
 
-        T* get(const std::uintptr_t& key) {
+        T* get(const key_type& key) {
             this->lock.lock();
 
             auto node = this->find(key);
@@ -399,7 +460,7 @@ namespace utils {
             this->lock.unlock();
         }
 
-        T& operator[](const std::uintptr_t& key) {
+        T& operator[](const key_type& key) {
             if(this->get(key) == nullptr) {
                 T empty_type = {};
                 this->insert(key, empty_type);
@@ -409,51 +470,167 @@ namespace utils {
             return *static_cast<T*>(this->get(key));
         }
 
-        void remove(const std::uintptr_t& key) {
+        T* insert_object(const key_type& key, const T& value_obj) {
+            return static_cast<T*>(this->insert(key, value_obj).value);
+        }
+
+        T* insert_object_add_ref(const key_type& key, const T& value_obj) {
             this->lock.lock();
+
+            if(auto node = this->find(key); node != nullptr) {
+                node->ref++;
+                this->lock.unlock();
+                return static_cast<T*>(node->value);
+            }
+
+            auto value = static_cast<T*>(this->insert(key, value_obj, false).value);
+
+            this->lock.unlock();
+            return value;
+        }
+
+        T* insert_size(const key_type& key, const std::size_t& size, const T& value_obj) {
+            rbtree_node<key_type>& node = this->insert(key, value_obj);
+            node.size = size;
+            return static_cast<T*>(node.value);
+        }
+
+        T* find_size(const std::size_t& size, rbtree_node<key_type>* node = nullptr) {
+
+            if(this->root == nullptr)
+                return nullptr;
+
+            if(node == nullptr) {
+                this->lock.lock();
+                node = this->root;
+            }
+
+            T* res = nullptr;
+
+            if(node->size >= size) {
+                res = static_cast<T*>(node->value);
+                goto done;
+            }
+
+            if(node->left != nullptr) {
+                if(node->left->size >= size) {
+                    res = static_cast<T*>(node->left->value);
+                    goto done;
+                }
+
+                res = find_size(size, node->left);
+                if(res != nullptr)
+                    goto done;
+            }
+
+            if(node->right != nullptr) {
+                if(node->right->size >= size) {
+                    res = static_cast<T*>(node->right->value);
+                    goto done;
+                }
+
+                res = find_size(size, node->right);
+                if(res != nullptr)
+                    goto done;
+            }
+
+done:
+            if(node == this->root)
+                this->lock.unlock();
+
+            return res;
+        }
+
+        T* find_gap(const std::size_t& size) {
+            this->lock.lock();
+
+            if(this->root == nullptr) {
+                this->lock.unlock();
+                return nullptr;
+            }
+
+            auto leftest = this->search_for_the_most_left(this->root);
+            if(leftest == nullptr) {
+                this->lock.unlock();
+                return nullptr;
+            }
+
+            auto node = this->find_gap_left(leftest, size);
+
+            if(node == nullptr) {
+                this->lock.unlock();
+                return nullptr;
+            }
+
+
+            T* value = static_cast<T*>(node->value);
+            this->lock.unlock();
+
+            return value;
+        }
+
+        void remove(const key_type& key) {
+            this->lock.lock();
+
+            if(auto node = this->find(key); node != nullptr) {
+                if(--node->ref != 0)
+                    return;
+            }
+
             this->remove_recursive(key, this->root);
             this->lock.unlock();
         }
 
         // start from the most left elements
-        inline void start(rbtree_node*& out) {
+        inline T* start(rbtree_node<key_type>*& out) {
             this->lock.lock();
             out = this->root;
             while(out->left != nullptr)
                 out = out->left;
             this->lock.unlock();
+            return static_cast<T*>(out->value);
+        }
+
+        // end
+        inline T* end(rbtree_node<key_type>*& out) {
+            this->lock.lock();
+            out = this->root;
+            while(out->right != nullptr)
+                out = out->right;
+            this->lock.unlock();
+            return static_cast<T*>(out->value);
         }
 
         // iterate
-        inline T* next(rbtree_node*& p) {
-            if (p == nullptr)
+        inline T* next(rbtree_node<key_type>*& p) {
+            if(p == nullptr)
                 return nullptr;
 
             this->lock.lock();
 
-            auto cur = p;
-            if (cur->right != nullptr) {
-                cur = cur->right;
-                while (cur->left != nullptr)
-                    cur = cur->left;
+            auto current = p;
+            if(current->right != nullptr) {
+                current = current->right;
+                while(current->left != nullptr)
+                    current = current->left;
             } else {
 
-                rbtree_node* parent = cur->parent;
-                while (parent != nullptr && cur == parent->right) {
-                    cur = parent;
+                rbtree_node<key_type>* parent = current->parent;
+                while(parent != nullptr && current == parent->right) {
+                    current = parent;
                     parent = parent->parent;
                 }
-                cur = parent; 
+                current = parent; 
             }
 
-            p = cur;
+            p = current;
 
-            if (cur == nullptr) {
+            if(current == nullptr) {
                 this->lock.unlock();
                 return nullptr;
             }
 
-            T* value = static_cast<T*>(cur->value);
+            T* value = static_cast<T*>(current->value);
             this->lock.unlock();
             return value;
         }

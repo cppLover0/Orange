@@ -67,7 +67,7 @@ extern "C" void main() {
     pmm::init();
     paging::init();
     kheap::init();
-    vma::kmem = new vma::_vma(10, 10);
+    vma::kmem = new vma::_vma(pmm::virt_hhdm_max);
 
     utils::flanterm::init();
     utils::flanterm::fullinit();
@@ -102,21 +102,7 @@ extern "C" void main() {
 
     random::reseed();
 
-    auto start = time::timer->current_nano();
-    utils::rbtree<std::uint64_t> tree;
-
-    for(int i = 0;i < 10000; i++) {
-        tree[i] = i * 2;
-        //klibc::printf(" %d ", tree[i]);
-    }
-
-    for(int i = 0;i < 10000; i++) {
-        tree.remove(i);
-    }
-
-    auto end = time::timer->current_nano();
-
-    log("F", "%lli", end - start);
+    log("vma test", "test mem 0x%p 0x%p 0x%p 0x%p", vma::kmem->alloc(PAGE_SIZE), vma::kmem->alloc(PAGE_SIZE), vma::kmem->alloc(PAGE_SIZE * 256), vma::kmem->alloc(PAGE_SIZE));
 
     if(!cmdline::parser->contains("noacpi")) {
         drivers::powerbutton::init();
